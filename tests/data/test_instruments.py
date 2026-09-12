@@ -377,6 +377,125 @@ def test_from_toml_rejects_an_unknown_key(tmp_path):
     assert "SP500" in str(excinfo.value)
 
 
+def test_from_toml_rejects_an_unknown_key_in_the_publication_rule(tmp_path):
+    """A typo inside the sub-table is look-ahead bias, so it must fail too.
+
+    This is the sharper half of the unknown-key check. ``lag_days`` carries a
+    default of zero, so ``lag_dayz = 1`` builds a rule without complaint and
+    publishes a D+1 series on D - the strategy then reads a value that did not
+    exist yet. The top-level check alone does not see it: the sub-table is a
+    nested dict, and ``publication_rule`` is itself a legitimate key.
+    """
+    typo = SAMPLE_TOML.replace("lag_days = 0", "lag_dayz = 1", 1)
+
+    with pytest.raises(ValueError, match="lag_dayz") as excinfo:
+        InstrumentRegistry.from_toml(write_toml(tmp_path, typo))
+
+    assert "US10Y" in str(excinfo.value)
+    assert "publication_rule" in str(excinfo.value)
+
+
+def test_from_toml_names_the_entry_missing_a_required_key(tmp_path):
+    """A missing key names the entry and the file, not just the key.
+
+    ``tomllib`` returns a plain dict, so indexing it straight would raise
+    ``KeyError('name')`` - true, and useless: the registry holds several entries
+    and the reader of the error is looking for one line in one TOML file.
+    """
+    without_name = SAMPLE_TOML.replace('name = "S&P 500"\n', "", 1)
+
+    with pytest.raises(ValueError, match="name") as excinfo:
+        InstrumentRegistry.from_toml(write_toml(tmp_path, without_name))
+
+    assert "SP500" in str(excinfo.value)
+
+
+def test_from_toml_rejects_a_file_declaring_no_instrument(tmp_path):
+    """An empty or mistyped config is an error, never an empty universe.
+
+    A registry of zero instruments would let the whole pipeline run and produce
+    an empty result, with nothing saying the config was never read.
+    """
+    with pytest.raises(ValueError, match="instrument"):
+        InstrumentRegistry.from_toml(write_toml(tmp_path, "[calendar]\nid = 'XNYS'\n"))
+
+
+def test_from_toml_rejects_a_session_bound_that_is_not_a_plain_date(tmp_path):
+    """``first_session`` written as a TOML datetime is refused at load time.
+
+    ``datetime`` is a subclass of ``date``, so an ``isinstance`` check passes and
+    the value travels until ``is_listed`` compares it to a real date and raises a
+    ``TypeError`` - far from the config line that caused it.
+    """
+    as_datetime = SAMPLE_TOML.replace(
+        "first_session = 1990-01-02", "first_session = 1990-01-02T00:00:00Z", 1
+    )
+
+    with pytest.raises(ValueError, match="first_session") as excinfo:
+        InstrumentRegistry.from_toml(write_toml(tmp_path, as_datetime))
+
+    assert "SP500" in str(excinfo.value)
+
+
+def test_from_toml_accepts_the_native_toml_local_time(tmp_path):
+    """``publication_time = 16:15:00`` unquoted is a TOML local time, and is valid.
+
+    Both spellings must reach the same instant: the unquoted one is what a reader
+    of the TOML spec writes naturally, and refusing it with a ``TypeError`` from
+    inside the loader would name neither the file nor the instrument.
+    """
+    unquoted = SAMPLE_TOML.replace(
+        'publication_time = "16:15:00"', "publication_time = 16:15:00", 1
+    )
+
+    registry = InstrumentRegistry.from_toml(write_toml(tmp_path, unquoted))
+
+    assert registry.get("US10Y").publication_rule.publication_time == time(16, 15)
+
+
+COMMITTED_INSTRUMENTS = (
+    Path(__file__).resolve().parents[2] / "market_data" / "metadata" / "instruments.toml"
+)
+"""The registry a backtest actually runs on.
+
+Deliberately the real file rather than a fixture: the synthetic ``SAMPLE_TOML``
+above pins the loader's behaviour, and nothing else would notice the day the
+committed config itself stops parsing. Offline and deterministic - it is a
+committed file, and editing it is a reviewed change by construction.
+"""
+
+
+def test_the_committed_registry_loads():
+    """The committed config parses, and every entry satisfies its own invariants.
+
+    ``__post_init__`` runs on each entry, so this also pins that no committed
+    instrument is a BAR without a calendar or a LEVEL without a rule.
+    """
+    registry = InstrumentRegistry.from_toml(COMMITTED_INSTRUMENTS)
+
+    assert len(registry) > 0
+    assert [instrument.id for instrument in registry] == sorted(i.id for i in registry)
+
+
+def test_every_committed_bar_points_at_an_existing_calendar():
+    """A ``calendar_id`` with no calendar file is a config error waiting to happen.
+
+    The registry cannot check this itself - calendars live in their own files -
+    so the consistency between the two committed configs is pinned here.
+    """
+    calendars = COMMITTED_INSTRUMENTS.parent / "calendars"
+    registry = InstrumentRegistry.from_toml(COMMITTED_INSTRUMENTS)
+
+    missing = [
+        instrument.id
+        for instrument in registry
+        if instrument.calendar_id is not None
+        and not (calendars / f"{instrument.calendar_id}.toml").exists()
+    ]
+
+    assert missing == []
+
+
 INSERTION_ORDER = ["VIX", "ETF_WORLD", "AAA_FIRST", "US10Y"]
 """Deliberately not alphabetical: a registry that returns insertion order would
 pass an ordering test built on an already-sorted fixture."""
