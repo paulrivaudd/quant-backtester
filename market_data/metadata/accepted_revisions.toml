@@ -1,0 +1,13 @@
+# Reviewed decisions to let a provider correction through.
+#
+# The canonical history is stable by default: a revision detected in
+# clean/revisions.parquet is logged and ignored unless it is listed here.
+# Every entry changes numbers that were already produced, which is why this
+# file is in git and requires a reason.
+#
+# [[revision]]
+# instrument_id = "SP500"
+# table = "bars"
+# observation_date = 2026-09-10
+# field = "close"
+# reason = "Yahoo corrected an obviously wrong print; checked against Stooq."

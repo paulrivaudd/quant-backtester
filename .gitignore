@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Environments
+.venv/
+.env
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Local market data and research output (reproducible from code + config)
+data/**
+!data/**/
+!data/**/.gitkeep
+results/
+*.parquet
+*.csv
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Market data tree: raw snapshots and derived clean layer are never committed.
+# metadata/ is configuration and MUST stay tracked - it determines past results.
+market_data/raw/
+market_data/clean/
+market_data/validation/

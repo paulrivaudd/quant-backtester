@@ -1,0 +1,17 @@
+# Euronext Paris trading calendar.
+calendar_id = "XPAR"
+timezone = "Europe/Paris"
+regular_open = "09:00:00"
+regular_close = "17:30:00"
+
+holidays = [
+  2026-01-01,
+  2026-04-03,
+  2026-04-06,
+  2026-05-01,
+  2026-12-25,
+]
+
+[early_closes]
+2026-12-24 = "14:05:00"
+2026-12-31 = "14:05:00"

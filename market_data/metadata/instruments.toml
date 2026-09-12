@@ -1,0 +1,72 @@
+# Instrument registry - committed configuration.
+#
+# A backtest result follows from committed code plus this file. Editing it
+# changes past results, so changes belong in a reviewed diff.
+
+[[instrument]]
+id = "SP500"
+name = "S&P 500"
+asset_type = "INDEX"
+data_type = "BAR"
+currency = "USD"
+primary_source = "YAHOO"
+source_symbol = "^GSPC"
+calendar_id = "XNYS"
+tradable = false
+first_session = 1990-01-02
+
+[[instrument]]
+id = "ETF_WORLD"
+name = "Amundi MSCI World (PEA)"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "CW8.PA"
+calendar_id = "XPAR"
+tradable = true
+first_session = 2018-01-02
+
+[[instrument]]
+id = "VIX"
+name = "CBOE Volatility Index"
+asset_type = "VOLATILITY"
+data_type = "BAR"
+currency = "NA"
+primary_source = "YAHOO"
+source_symbol = "^VIX"
+calendar_id = "XNYS"
+tradable = false
+first_session = 1990-01-02
+
+[[instrument]]
+id = "US10Y"
+name = "US 10-year Treasury constant maturity rate"
+asset_type = "RATE"
+data_type = "LEVEL"
+currency = "NA"
+primary_source = "FRED"
+source_symbol = "DGS10"
+tradable = false
+first_session = 1990-01-02
+
+  [instrument.publication_rule]
+  publication_time = "16:15:00"
+  timezone = "America/New_York"
+  lag_days = 0
+
+[[instrument]]
+id = "ECB_EURUSD"
+name = "ECB euro reference exchange rate, USD"
+asset_type = "FX"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "ECB"
+source_symbol = "EXR.D.USD.EUR.SP00.A"
+tradable = false
+first_session = 1999-01-04
+
+  [instrument.publication_rule]
+  publication_time = "16:00:00"
+  timezone = "Europe/Paris"
+  lag_days = 0
