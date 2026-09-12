@@ -12,8 +12,9 @@ because a backtest result must follow from committed code plus committed config.
 
 from __future__ import annotations
 
+import tomllib
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import UTC, date, datetime, time, timedelta
 from enum import Enum
 from pathlib import Path
@@ -157,7 +158,16 @@ class Instrument:
         ``available_at`` sera toujours calculable. Les verifier a la
         construction evite un ``None`` qui remonte jusqu'au reader.
         """
-        raise NotImplementedError("Exercice 1.2")
+        if self.data_type == DataType.BAR:
+            if self.calendar_id is None:
+                raise ValueError(f"BAR instrument {self.id} has no calendar_id")
+            if self.publication_rule is not None:
+                raise ValueError(f"BAR instrument {self.id} has a publication_rule")
+        if self.data_type == DataType.LEVEL:
+            if self.publication_rule is None:
+                raise ValueError(f"LEVEL instrument {self.id} has no publication_rule")
+            if self.calendar_id is not None:
+                raise ValueError(f"LEVEL instrument {self.id} has a calendar_id")
 
     def is_listed(self, on: date) -> bool:
         """Return whether the instrument existed on ``on``.
@@ -176,7 +186,17 @@ class Instrument:
         -----
         Exercice 1.3 (facile). Des bornes ``None`` sont ouvertes.
         """
-        raise NotImplementedError("Exercice 1.3")
+        after_first = self.first_session is None or on >= self.first_session
+        before_last = self.last_session is None or on <= self.last_session
+        return after_first and before_last
+
+
+INSTRUMENT_KEYS = frozenset(f.name for f in fields(Instrument))
+"""Legitimate keys of an ``[[instrument]]`` table, derived from the dataclass.
+
+Derived rather than retyped: a field added to :class:`Instrument` is accepted by
+the loader the same day, and a key that is not one is a typo by construction.
+"""
 
 
 class InstrumentRegistry:
@@ -189,7 +209,11 @@ class InstrumentRegistry:
     """
 
     def __init__(self, instruments: Sequence[Instrument]) -> None:
-        raise NotImplementedError("Exercice 1.4")
+        self._instruments: dict[str, Instrument] = {}
+        for instrument in instruments:
+            if instrument.id in self._instruments:
+                raise ValueError(f"Duplicate instrument id {instrument.id}")
+            self._instruments[instrument.id] = instrument
 
     @classmethod
     def from_toml(cls, path: Path) -> InstrumentRegistry:
@@ -213,7 +237,41 @@ class InstrumentRegistry:
         remonter une erreur claire sur une cle inconnue plutot que de l'ignorer :
         une faute de frappe dans la config doit echouer bruyamment.
         """
-        raise NotImplementedError("Exercice 1.5")
+        with path.open("rb") as fh:
+            raw = tomllib.load(fh)
+
+        instruments = []
+        for raw_instrument in raw["instrument"]:
+            unknown = set(raw_instrument) - INSTRUMENT_KEYS
+            if unknown:
+                entry = raw_instrument.get("id", "<entry without an id>")
+                raise ValueError(
+                    f"Instrument {entry} has unknown key(s): {', '.join(sorted(unknown))}"
+                )
+            publication_rule = None
+            if "publication_rule" in raw_instrument:
+                raw_rule = raw_instrument["publication_rule"]
+                publication_rule = PublicationRule(
+                    publication_time=time.fromisoformat(raw_rule["publication_time"]),
+                    timezone=raw_rule["timezone"],
+                    lag_days=raw_rule.get("lag_days", 0),
+                )
+            instrument = Instrument(
+                id=raw_instrument["id"],
+                name=raw_instrument["name"],
+                asset_type=AssetType(raw_instrument["asset_type"]),
+                data_type=DataType(raw_instrument["data_type"]),
+                currency=raw_instrument["currency"],
+                primary_source=raw_instrument["primary_source"],
+                source_symbol=raw_instrument["source_symbol"],
+                tradable=raw_instrument["tradable"],
+                calendar_id=raw_instrument.get("calendar_id"),
+                publication_rule=publication_rule,
+                first_session=raw_instrument.get("first_session"),
+                last_session=raw_instrument.get("last_session"),
+            )
+            instruments.append(instrument)
+        return cls(instruments)
 
     def get(self, instrument_id: str) -> Instrument:
         """Return one instrument.
@@ -237,7 +295,7 @@ class InstrumentRegistry:
         -----
         Exercice 1.6 (facile).
         """
-        raise NotImplementedError("Exercice 1.6")
+        return self._instruments[instrument_id]
 
     def list_all(self) -> list[Instrument]:
         """Return every instrument, ordered by id.
@@ -252,7 +310,8 @@ class InstrumentRegistry:
         Exercice 1.7 (facile). L'ordre stable compte : il rend reproductible
         l'ordre d'ecriture des fichiers et donc les diffs.
         """
-        raise NotImplementedError("Exercice 1.7")
+        return sorted(self._instruments.values(), key=lambda x: x.id)
+        # lambda x: x.id est une fonction anonyme qui prend un instrument x et retourne son id.
 
     def list_tradable(self) -> list[Instrument]:
         """Return the instruments the execution layer may trade.
@@ -266,7 +325,7 @@ class InstrumentRegistry:
         -----
         Exercice 1.8 (facile).
         """
-        raise NotImplementedError("Exercice 1.8")
+        return [instr for instr in self.list_all() if instr.tradable]
 
     def list_by_source(self, source: str) -> list[Instrument]:
         """Return the instruments fetched from one source.
@@ -285,16 +344,16 @@ class InstrumentRegistry:
         -----
         Exercice 1.9 (facile). Sert a grouper les telechargements par source.
         """
-        raise NotImplementedError("Exercice 1.9")
+        return [instr for instr in self.list_all() if instr.primary_source == source]
 
     def __iter__(self) -> Iterator[Instrument]:
         """Iterate over instruments in id order."""
-        raise NotImplementedError("Exercice 1.10")
+        return iter(self.list_all())
 
     def __len__(self) -> int:
         """Return the number of registered instruments."""
-        raise NotImplementedError("Exercice 1.10")
+        return len(self._instruments)
 
     def __contains__(self, instrument_id: object) -> bool:
         """Return whether an id is registered."""
-        raise NotImplementedError("Exercice 1.10")
+        return instrument_id in self._instruments

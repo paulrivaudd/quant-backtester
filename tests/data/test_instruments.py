@@ -9,11 +9,18 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 from datetime import UTC, date, datetime, time, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from quant_backtester.data.instruments import PublicationRule
+from quant_backtester.data.instruments import (
+    AssetType,
+    DataType,
+    Instrument,
+    InstrumentRegistry,
+    PublicationRule,
+)
 
 FRED_US10Y = PublicationRule(publication_time=time(16, 15), timezone="America/New_York")
 """FRED publishes DGS10 at 16:15 New York wall clock, for the same day."""
@@ -23,6 +30,35 @@ ECB_FX = PublicationRule(publication_time=time(16, 0), timezone="Europe/Paris")
 
 NEXT_DAY = PublicationRule(publication_time=time(16, 15), timezone="America/New_York", lag_days=1)
 """Same release time, published the following calendar day."""
+
+
+def make_instrument(**overrides: object) -> Instrument:
+    """Build a valid BAR instrument, with the fields under test overridden.
+
+    Defaults are deliberately a *valid* instrument: each test then changes the
+    one field it is about, so a failure points at that field and nothing else.
+    """
+    fields = {
+        "id": "TEST",
+        "name": "Test instrument",
+        "asset_type": AssetType.ETF,
+        "data_type": DataType.BAR,
+        "currency": "EUR",
+        "primary_source": "YAHOO",
+        "source_symbol": "TEST",
+        "tradable": True,
+        "calendar_id": "XPAR",
+    }
+    return Instrument(**(fields | overrides))
+
+
+LEVEL_FIELDS = {
+    "asset_type": AssetType.RATE,
+    "data_type": DataType.LEVEL,
+    "calendar_id": None,
+    "publication_rule": ECB_FX,
+}
+"""Overrides turning the default BAR into a valid LEVEL."""
 
 
 def test_availability_is_utc_aware():
@@ -119,61 +155,311 @@ def test_rule_is_immutable():
         ECB_FX.publication_time = time(9, 0)  # type: ignore[misc]
 
 
-@pytest.mark.skip(reason="Exercice 1.2")
+def test_valid_instruments_are_accepted():
+    """The two well-formed shapes construct: BAR with a calendar, LEVEL with a rule."""
+    assert make_instrument().calendar_id == "XPAR"
+    assert make_instrument(**LEVEL_FIELDS).publication_rule is ECB_FX
+
+
 def test_bar_without_calendar_is_rejected():
     """A BAR instrument with no ``calendar_id`` cannot produce an availability."""
+    with pytest.raises(ValueError, match="calendar_id") as excinfo:
+        make_instrument(calendar_id=None)
+
+    assert "TEST" in str(excinfo.value)
 
 
-@pytest.mark.skip(reason="Exercice 1.2")
 def test_level_without_publication_rule_is_rejected():
     """A LEVEL instrument with no ``publication_rule`` cannot produce one either."""
+    with pytest.raises(ValueError, match="publication_rule") as excinfo:
+        make_instrument(**(LEVEL_FIELDS | {"publication_rule": None}))
+
+    assert "TEST" in str(excinfo.value)
 
 
-@pytest.mark.skip(reason="Exercice 1.2")
-def test_instrument_carrying_the_other_kind_field_is_rejected():
-    """A BAR with a ``publication_rule``, or a LEVEL with a ``calendar_id``, is a config error."""
+@pytest.mark.parametrize(
+    ("overrides", "offending_field"),
+    [
+        ({"publication_rule": ECB_FX}, "publication_rule"),
+        (LEVEL_FIELDS | {"calendar_id": "XPAR"}, "calendar_id"),
+    ],
+    ids=["bar_carrying_a_publication_rule", "level_carrying_a_calendar"],
+)
+def test_instrument_carrying_the_other_kind_field_is_rejected(overrides, offending_field):
+    """A BAR with a ``publication_rule``, or a LEVEL with a ``calendar_id``, is a config error.
+
+    This is the half that a "required fields are present" check misses: both
+    instruments below have everything they need, plus something they must not
+    have. It is the shape a half-edited TOML entry takes.
+    """
+    with pytest.raises(ValueError, match=offending_field):
+        make_instrument(**overrides)
 
 
-@pytest.mark.skip(reason="Exercice 1.3")
-def test_is_listed_bounds_are_inclusive_and_open_when_none():
-    """``first_session`` and ``last_session`` are inclusive; ``None`` means unbounded."""
+DELISTED = {"first_session": date(1993, 1, 29), "last_session": date(2020, 6, 30)}
+"""Overrides for an instrument with both bounds closed."""
 
 
-@pytest.mark.skip(reason="Exercice 1.4")
+@pytest.mark.parametrize(
+    ("on", "expected"),
+    [
+        (date(1993, 1, 28), False),  # the day before the first session
+        (date(1993, 1, 29), True),  # the first session itself: inclusive
+        (date(2005, 7, 14), True),  # well inside
+        (date(2020, 6, 30), True),  # the last session itself: still listed
+        (date(2020, 7, 1), False),  # the day after: gone
+    ],
+    ids=["before", "first_bound", "inside", "last_bound", "after"],
+)
+def test_is_listed_bounds_are_inclusive(on, expected):
+    """``first_session`` and ``last_session`` are inclusive.
+
+    The two boundary days are the point of this test. Off by one on the last
+    session silently drops a delisted instrument's final day - a day on which
+    positions still had to be closed.
+    """
+    assert make_instrument(**DELISTED).is_listed(on) is expected
+
+
+@pytest.mark.parametrize(
+    ("bounds", "on", "expected"),
+    [
+        # Still listed: no upper bound, so any later date is listed.
+        ({"first_session": date(1993, 1, 29)}, date(1993, 1, 28), False),
+        ({"first_session": date(1993, 1, 29)}, date(2099, 1, 1), True),
+        # Listed since forever, delisted at some point.
+        ({"last_session": date(2020, 6, 30)}, date(1900, 1, 1), True),
+        ({"last_session": date(2020, 6, 30)}, date(2020, 7, 1), False),
+        # Both open: no date can be outside.
+        ({}, date(1900, 1, 1), True),
+        ({}, date(2099, 1, 1), True),
+    ],
+    ids=[
+        "first_only_before",
+        "first_only_after",
+        "last_only_before",
+        "last_only_after",
+        "unbounded_past",
+        "unbounded_future",
+    ],
+)
+def test_is_listed_treats_none_as_an_open_bound(bounds, on, expected):
+    """``None`` means "no bound", never "unknown".
+
+    An implementation reading ``None`` as a missing value would have to guess,
+    and guessing here turns "the ETF did not exist yet" into a data hole.
+    """
+    assert make_instrument(**bounds).is_listed(on) is expected
+
+
+def test_registry_accepts_distinct_instruments():
+    """A registry over distinct ids constructs without complaining.
+
+    Deliberately asserts nothing about the internals: what the registry holds is
+    observable through ``get`` and ``list_all``, and is checked by their own
+    tests. Reaching into ``_instruments`` here would make this test rewrite
+    itself the day the storage changes.
+    """
+    registry = InstrumentRegistry(
+        [make_instrument(id="SPY"), make_instrument(id="IWM"), make_instrument(id="QQQ")]
+    )
+
+    assert isinstance(registry, InstrumentRegistry)
+
+
 def test_duplicate_ids_are_a_configuration_error():
-    """Two instruments sharing an id must fail loudly at registry construction."""
+    """Two instruments sharing an id must fail loudly at registry construction.
+
+    A dict keyed by id silently keeps the last one, which is the worst possible
+    outcome: the backtest runs, on a universe quietly one instrument short, and
+    nothing in the output says so. The duplicated id must be named - the reader
+    of the error is looking for a line in a TOML file.
+    """
+    duplicated = [
+        make_instrument(id="SPY", name="S&P 500 ETF"),
+        make_instrument(id="IWM"),
+        make_instrument(id="SPY", name="Copy-pasted entry"),
+    ]
+
+    with pytest.raises(ValueError, match="SPY") as excinfo:
+        InstrumentRegistry(duplicated)
+
+    assert "IWM" not in str(excinfo.value)
 
 
-@pytest.mark.skip(reason="Exercice 1.5")
-def test_from_toml_reads_dates_enums_and_publication_rules():
-    """The committed TOML round-trips into instruments, enums and rules included."""
+SAMPLE_TOML = """
+[[instrument]]
+id = "SP500"
+name = "S&P 500"
+asset_type = "INDEX"
+data_type = "BAR"
+currency = "USD"
+primary_source = "YAHOO"
+source_symbol = "^GSPC"
+calendar_id = "XNYS"
+tradable = false
+first_session = 1990-01-02
+
+[[instrument]]
+id = "US10Y"
+name = "US 10-year Treasury constant maturity rate"
+asset_type = "RATE"
+data_type = "LEVEL"
+currency = "NA"
+primary_source = "FRED"
+source_symbol = "DGS10"
+tradable = false
+first_session = 1990-01-02
+
+  [instrument.publication_rule]
+  publication_time = "16:15:00"
+  timezone = "America/New_York"
+  lag_days = 0
+"""
+"""A two-entry config: one BAR, one LEVEL. Synthetic, so the committed registry
+can grow without breaking these tests."""
 
 
-@pytest.mark.skip(reason="Exercice 1.5")
-def test_from_toml_rejects_an_unknown_key():
-    """A typo in the config fails loudly rather than being silently ignored."""
+def write_toml(tmp_path, content: str) -> Path:
+    """Write ``content`` to a TOML file under ``tmp_path`` and return its path."""
+    path = tmp_path / "instruments.toml"
+    path.write_text(content, encoding="utf-8")
+    return path
 
 
-@pytest.mark.skip(reason="Exercice 1.6")
-def test_get_raises_keyerror_on_unknown_id():
-    """An unknown id is a ``KeyError``, never a ``None`` travelling downstream."""
+def test_from_toml_reads_dates_enums_and_publication_rules(tmp_path):
+    """The TOML round-trips into instruments, enums and rules included.
+
+    TOML hands back strings and dicts; the registry must hand back enum members,
+    a ``date`` and a ``PublicationRule``. The dataclass type-checks none of this,
+    so a string left unconverted travels silently until something uses it.
+    """
+    registry = InstrumentRegistry.from_toml(write_toml(tmp_path, SAMPLE_TOML))
+    bar = registry.get("SP500")
+    level = registry.get("US10Y")
+
+    assert bar.asset_type is AssetType.INDEX
+    assert bar.data_type is DataType.BAR
+    assert bar.first_session == date(1990, 1, 2)
+    assert bar.publication_rule is None
+
+    assert isinstance(level.publication_rule, PublicationRule)
+    assert level.publication_rule.publication_time == time(16, 15)
+    assert level.calendar_id is None
 
 
-@pytest.mark.skip(reason="Exercice 1.7")
-def test_list_all_is_ordered_by_id():
-    """A stable order keeps file writes, and therefore diffs, reproducible."""
+def test_from_toml_produces_a_usable_publication_rule(tmp_path):
+    """The loaded rule computes an availability, end to end.
+
+    The regression this pins: ``publication_time`` left as the string
+    ``"16:15:00"`` builds a ``PublicationRule`` without complaint, and only fails
+    later inside ``available_at`` - far from the line that caused it.
+    """
+    registry = InstrumentRegistry.from_toml(write_toml(tmp_path, SAMPLE_TOML))
+
+    available_at = registry.get("US10Y").publication_rule.available_at(date(2024, 3, 14))
+
+    assert available_at == datetime(2024, 3, 14, 20, 15, tzinfo=UTC)
 
 
-@pytest.mark.skip(reason="Exercice 1.8")
-def test_list_tradable_excludes_signal_only_instruments():
+def test_from_toml_rejects_an_unknown_key(tmp_path):
+    """A typo in the config fails loudly rather than being silently ignored.
+
+    ``tradble`` instead of ``tradable`` would leave the instrument on its default
+    and quietly put a non-tradable series into the execution universe. The error
+    must name both the offending key and the entry it sits in.
+    """
+    typo = SAMPLE_TOML.replace("tradable = false", "tradble = false", 1)
+
+    with pytest.raises(ValueError, match="tradble") as excinfo:
+        InstrumentRegistry.from_toml(write_toml(tmp_path, typo))
+
+    assert "SP500" in str(excinfo.value)
+
+
+INSERTION_ORDER = ["VIX", "ETF_WORLD", "AAA_FIRST", "US10Y"]
+"""Deliberately not alphabetical: a registry that returns insertion order would
+pass an ordering test built on an already-sorted fixture."""
+
+
+@pytest.fixture
+def registry() -> InstrumentRegistry:
+    """Return a four-instrument registry spanning both sources and both kinds."""
+    return InstrumentRegistry(
+        [
+            make_instrument(id="VIX", tradable=False, primary_source="YAHOO"),
+            make_instrument(id="ETF_WORLD", tradable=True, primary_source="YAHOO"),
+            make_instrument(id="AAA_FIRST", tradable=True, primary_source="YAHOO"),
+            make_instrument(id="US10Y", tradable=False, primary_source="FRED", **LEVEL_FIELDS),
+        ]
+    )
+
+
+def test_get_returns_the_registered_instrument(registry):
+    """``get`` hands back the instrument carrying that id."""
+    assert registry.get("VIX").id == "VIX"
+
+
+def test_get_raises_keyerror_on_unknown_id(registry):
+    """An unknown id is a ``KeyError``, never a ``None`` travelling downstream.
+
+    A ``None`` returned here would surface as an ``AttributeError`` somewhere in
+    a strategy, with nothing left to say which id was missing.
+    """
+    with pytest.raises(KeyError, match="NOT_A_REAL_ID"):
+        registry.get("NOT_A_REAL_ID")
+
+
+def test_list_all_is_ordered_by_id(registry):
+    """A stable order keeps file writes, and therefore diffs, reproducible.
+
+    The fixture is inserted out of order on purpose: returning the dict's own
+    order would look correct until someone reorders the TOML file.
+    """
+    ids = [instrument.id for instrument in registry.list_all()]
+
+    assert ids == ["AAA_FIRST", "ETF_WORLD", "US10Y", "VIX"]
+    assert ids != INSERTION_ORDER
+
+
+def test_list_tradable_excludes_signal_only_instruments(registry):
     """VIX and US10Y are readable but never tradable."""
+    tradable = [instrument.id for instrument in registry.list_tradable()]
+
+    assert tradable == ["AAA_FIRST", "ETF_WORLD"]
+    assert all(instrument.tradable for instrument in registry.list_tradable())
 
 
-@pytest.mark.skip(reason="Exercice 1.9")
-def test_list_by_source_groups_downloads():
+def test_list_by_source_groups_downloads(registry):
     """Instruments are grouped by source so downloads can be batched per provider."""
+    assert [i.id for i in registry.list_by_source("YAHOO")] == ["AAA_FIRST", "ETF_WORLD", "VIX"]
+    assert [i.id for i in registry.list_by_source("FRED")] == ["US10Y"]
 
 
-@pytest.mark.skip(reason="Exercice 1.10")
-def test_registry_supports_len_iteration_and_contains():
+def test_list_by_source_returns_empty_for_an_unused_source(registry):
+    """An unknown source is an empty list, not an error: nothing to download.
+
+    ``"YAHO"`` is a prefix of ``"YAHOO"`` and must still match nothing: the
+    comparison is an equality, not a substring test. Provider identifiers do
+    overlap in practice - a ``YAHOO`` and a ``YAHOO_V2`` adapter would silently
+    share instruments under a looser rule.
+    """
+    assert registry.list_by_source("BLOOMBERG") == []
+    assert registry.list_by_source("YAHO") == []
+    assert registry.list_by_source("YAHOO_V2") == []
+
+
+def test_filters_keep_the_order_of_list_all(registry):
+    """Every listing agrees on one order, because they all derive from ``list_all``."""
+    reference = [i.id for i in registry.list_all()]
+    tradable = [i.id for i in registry.list_tradable()]
+
+    assert tradable == [i for i in reference if i in tradable]
+
+
+def test_registry_supports_len_iteration_and_contains(registry):
     """Iteration follows id order, like :meth:`list_all`."""
+    assert len(registry) == 4
+    assert [instrument.id for instrument in registry] == [i.id for i in registry.list_all()]
+    assert "VIX" in registry
+    assert "NOT_A_REAL_ID" not in registry
