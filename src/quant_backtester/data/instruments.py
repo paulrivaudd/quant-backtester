@@ -14,9 +14,10 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from enum import Enum
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
 class DataType(Enum):
@@ -83,8 +84,12 @@ class PublicationRule:
         UTC. Piege : ne construis jamais un datetime naif puis ne lui greffe un
         fuseau apres coup - passe ``tzinfo`` a la construction.
         """
-        
-       
+        # Le lag porte sur la date, pas sur l'instant : convertir en UTC puis
+        # ajouter 24 h decale d'une heure autour d'un changement d'heure.
+        jour_de_diffusion = observation_date + timedelta(days=self.lag_days)
+        zone = ZoneInfo(self.timezone)
+        local_time = datetime.combine(jour_de_diffusion, self.publication_time, tzinfo=zone)
+        return local_time.astimezone(UTC)
 
 
 @dataclass(frozen=True, slots=True)
