@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -38,7 +39,8 @@ def make_instrument(**overrides: object) -> Instrument:
     Defaults are deliberately a *valid* instrument: each test then changes the
     one field it is about, so a failure points at that field and nothing else.
     """
-    fields = {
+    # Typed ``Any`` so a test can override a field with a deliberately wrong value.
+    fields: dict[str, Any] = {
         "id": "TEST",
         "name": "Test instrument",
         "asset_type": AssetType.ETF,
@@ -49,7 +51,8 @@ def make_instrument(**overrides: object) -> Instrument:
         "tradable": True,
         "calendar_id": "XPAR",
     }
-    return Instrument(**(fields | overrides))
+    fields.update(overrides)
+    return Instrument(**fields)
 
 
 LEVEL_FIELDS = {
@@ -357,7 +360,10 @@ def test_from_toml_produces_a_usable_publication_rule(tmp_path):
     """
     registry = InstrumentRegistry.from_toml(write_toml(tmp_path, SAMPLE_TOML))
 
-    available_at = registry.get("US10Y").publication_rule.available_at(date(2024, 3, 14))
+    rule = registry.get("US10Y").publication_rule
+
+    assert rule is not None
+    available_at = rule.available_at(date(2024, 3, 14))
 
     assert available_at == datetime(2024, 3, 14, 20, 15, tzinfo=UTC)
 
@@ -449,8 +455,10 @@ def test_from_toml_accepts_the_native_toml_local_time(tmp_path):
     )
 
     registry = InstrumentRegistry.from_toml(write_toml(tmp_path, unquoted))
+    rule = registry.get("US10Y").publication_rule
 
-    assert registry.get("US10Y").publication_rule.publication_time == time(16, 15)
+    assert rule is not None
+    assert rule.publication_time == time(16, 15)
 
 
 COMMITTED_INSTRUMENTS = (

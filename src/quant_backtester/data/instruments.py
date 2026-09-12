@@ -233,34 +233,34 @@ def _reject_unknown_keys(table: Mapping[str, Any], allowed: frozenset[str], cont
         raise ValueError(f"{context} has unknown key(s): {', '.join(sorted(unknown))}")
 
 
-def _require(table: Mapping[str, Any], key: str, context: str) -> object:
-    """Return ``table[key]``, naming both the key and its location if absent.
+def _require(table: Mapping[str, Any], keys: Sequence[str], context: str) -> None:
+    """Check that every key is present, naming the first absent one and its location.
 
     Parameters
     ----------
     table : Mapping[str, Any]
         Parsed TOML table.
-    key : str
-        Required key.
+    keys : Sequence[str]
+        Required keys, checked in order.
     context : str
         Where the table sits.
-
-    Returns
-    -------
-    object
-        The value, deliberately untyped: TOML guarantees nothing about it, and
-        the conversion to the field's real type belongs to the caller.
 
     Raises
     ------
     ValueError
-        If the key is absent. ``tomllib`` hands back a plain dict, so this would
+        If a key is absent. ``tomllib`` hands back a plain dict, so this would
         otherwise surface as a bare ``KeyError('name')`` with nothing to say
         which entry of which file to go and fix.
+
+    Notes
+    -----
+    The caller then reads ``table[key]`` itself. The value is deliberately
+    untyped: TOML guarantees nothing about it, and the conversion to the field's
+    real type belongs to the caller.
     """
-    if key not in table:
-        raise ValueError(f"{context} is missing the required key {key!r}")
-    return table[key]
+    for key in keys:
+        if key not in table:
+            raise ValueError(f"{context} is missing the required key {key!r}")
 
 
 def _as_session_date(value: object, key: str, context: str) -> date | None:
@@ -363,23 +363,38 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
     if raw_rule is not None:
         rule_context = f"{context}: publication_rule"
         _reject_unknown_keys(raw_rule, PUBLICATION_RULE_KEYS, rule_context)
+        _require(raw_rule, ("publication_time",), rule_context)
+        publication_time = _as_publication_time(raw_rule["publication_time"], rule_context)
+        _require(raw_rule, ("timezone",), rule_context)
         publication_rule = PublicationRule(
-            publication_time=_as_publication_time(
-                _require(raw_rule, "publication_time", rule_context), rule_context
-            ),
-            timezone=_require(raw_rule, "timezone", rule_context),
+            publication_time=publication_time,
+            timezone=raw_rule["timezone"],
             lag_days=raw_rule.get("lag_days", 0),
         )
 
+    _require(
+        table,
+        (
+            "id",
+            "name",
+            "asset_type",
+            "data_type",
+            "currency",
+            "primary_source",
+            "source_symbol",
+            "tradable",
+        ),
+        context,
+    )
     return Instrument(
-        id=_require(table, "id", context),
-        name=_require(table, "name", context),
-        asset_type=AssetType(_require(table, "asset_type", context)),
-        data_type=DataType(_require(table, "data_type", context)),
-        currency=_require(table, "currency", context),
-        primary_source=_require(table, "primary_source", context),
-        source_symbol=_require(table, "source_symbol", context),
-        tradable=_require(table, "tradable", context),
+        id=table["id"],
+        name=table["name"],
+        asset_type=AssetType(table["asset_type"]),
+        data_type=DataType(table["data_type"]),
+        currency=table["currency"],
+        primary_source=table["primary_source"],
+        source_symbol=table["source_symbol"],
+        tradable=table["tradable"],
         calendar_id=table.get("calendar_id"),
         publication_rule=publication_rule,
         first_session=_as_session_date(table.get("first_session"), "first_session", context),
