@@ -12,10 +12,25 @@ early closes. A fixed close time would mis-stamp exactly those sessions.
 
 from __future__ import annotations
 
+import tomllib
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+MAX_CLOSED_DAYS = 14
+"""Longest run of consecutive closed days searched before giving up.
+
+A weekend plus a holiday week is well under it; running past it means the
+holiday list does not cover the date, not that the venue is shut.
+"""
+
+
+def _require_date(day: object, calendar_id: str, method: str) -> None:
+    """Raise ``TypeError`` unless ``day`` is exactly a ``date``, not a ``datetime``."""
+    if type(day) is not date:
+        raise TypeError(f"{calendar_id}: {method} expects a date, got {day!r}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +54,48 @@ class Session:
     open_utc: datetime
     close_utc: datetime
     is_half_day: bool
+
+
+CALENDAR_KEYS = frozenset(
+    {"calendar_id", "timezone", "regular_open", "regular_close", "holidays", "early_closes"}
+)
+"""Keys a calendar TOML file must carry, and the only ones it may carry."""
+
+
+def _as_local_time(value: object, key: str, path: Path) -> time:
+    """Return a local wall-clock time from either TOML spelling.
+
+    Parameters
+    ----------
+    value : object
+        Value parsed from TOML: a native local time (``09:30:00``) or a string
+        (``"09:30:00"``).
+    key : str
+        Name of the setting, quoted in the error message.
+    path : Path
+        File the value was read from.
+
+    Returns
+    -------
+    time
+        The naive exchange-local time.
+
+    Raises
+    ------
+    ValueError
+        If the value is neither. ``time.fromisoformat`` alone would raise a
+        ``TypeError`` on a native time or an integer, naming neither the key nor
+        the file.
+    """
+    if isinstance(value, time):
+        return value
+    message = f"{path} has {key} = {value!r}; expected a local time such as 09:30:00"
+    if not isinstance(value, str):
+        raise ValueError(message)
+    try:
+        return time.fromisoformat(value)
+    except ValueError:
+        raise ValueError(message) from None
 
 
 class TradingCalendar:
@@ -70,7 +127,39 @@ class TradingCalendar:
         holidays: frozenset[date],
         early_closes: Mapping[date, time],
     ) -> None:
-        raise NotImplementedError("Exercice 2.1")
+        self._calendar_id = calendar_id
+        try:
+            ZoneInfo(timezone)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ValueError(f"{calendar_id}: unknown timezone {timezone!r}") from None
+        if regular_open.tzinfo is not None or regular_close.tzinfo is not None:
+            raise ValueError(
+                f"{calendar_id}: regular_open and regular_close must be naive local times"
+            )
+        if regular_open >= regular_close:
+            raise ValueError(f"{calendar_id}: regular_open must be before regular_close")
+        for day in holidays:
+            if type(day) is not date:
+                raise ValueError(f"{calendar_id}: holiday {day} is not a date")
+            if day.weekday() >= 5:
+                raise ValueError(f"{calendar_id}: holiday {day} falls on a weekend")
+        for day, close in early_closes.items():
+            if type(day) is not date:
+                raise ValueError(f"{calendar_id}: early close {day} is not a date")
+            if not regular_open < close < regular_close:
+                raise ValueError(
+                    f"{calendar_id}: early close on {day} at {close} is outside the regular session"
+                )
+            if day in holidays:
+                raise ValueError(f"{calendar_id}: early close on {day} is also a holiday")
+            if day.weekday() >= 5:
+                raise ValueError(f"{calendar_id}: early close on {day} falls on a weekend")
+        self._timezone = timezone
+        self._regular_open = regular_open
+        self._regular_close = regular_close
+        # Copies: a caller mutating its own set or dict afterwards must not rewrite history.
+        self._holidays = frozenset(holidays)
+        self._early_closes = dict(early_closes)
 
     @classmethod
     def from_toml(cls, path: Path) -> TradingCalendar:
@@ -93,12 +182,34 @@ class TradingCalendar:
         jamais les feries par une regle ("4e jeudi de novembre"), la liste est
         plus courte a maintenir qu'a debuguer.
         """
-        raise NotImplementedError("Exercice 2.2")
+        with path.open("rb") as fh:
+            raw = tomllib.load(fh)
+        # A typo such as `utc_offset` must fail, not be silently ignored.
+        unknown = set(raw) - CALENDAR_KEYS
+        if unknown:
+            raise ValueError(f"{path} has unknown key(s): {', '.join(sorted(unknown))}")
+        missing = CALENDAR_KEYS - set(raw)
+        if missing:
+            raise ValueError(f"{path} is missing required key(s): {', '.join(sorted(missing))}")
+        # TOML keys are always strings, even when they look like dates: convert both sides.
+        early_closes = {}
+        for day, close in raw["early_closes"].items():
+            early_closes[date.fromisoformat(day)] = _as_local_time(
+                close, f"early_closes.{day}", path
+            )
+        return cls(
+            calendar_id=raw["calendar_id"],
+            timezone=raw["timezone"],
+            regular_open=_as_local_time(raw["regular_open"], "regular_open", path),
+            regular_close=_as_local_time(raw["regular_close"], "regular_close", path),
+            holidays=frozenset(raw["holidays"]),
+            early_closes=early_closes,
+        )
 
     @property
     def calendar_id(self) -> str:
         """Return the venue identifier."""
-        raise NotImplementedError("Exercice 2.1")
+        return self._calendar_id
 
     def is_open(self, day: date) -> bool:
         """Return whether the venue trades on ``day``.
@@ -111,13 +222,24 @@ class TradingCalendar:
         Returns
         -------
         bool
-            ``False`` on weekends and holidays.
+            ``False`` on weekends and holidays. A half day is open.
+
+        Raises
+        ------
+        TypeError
+            If ``day`` is a ``datetime``. It subclasses ``date`` but never equals
+            one, so it would slip past the holiday set and report a closed day
+            as open.
 
         Notes
         -----
         Exercice 2.3 (facile).
         """
-        raise NotImplementedError("Exercice 2.3")
+        if type(day) is not date:
+            raise TypeError(f"{self._calendar_id}: is_open expects a date, got {day!r}")
+        if day.weekday() >= 5:
+            return False
+        return day not in self._holidays
 
     def session(self, day: date) -> Session | None:
         """Return the session held on ``day``, if any.
@@ -132,19 +254,40 @@ class TradingCalendar:
         Session | None
             ``None`` if the venue is closed that day.
 
+        Raises
+        ------
+        TypeError
+            If ``day`` is a ``datetime``, for the same reason as :meth:`is_open`.
+
         Notes
         -----
         Exercice 2.4 (le coeur du module, moyen). Construis les instants avec
-        ``datetime(..., tzinfo=ZoneInfo(self.timezone))`` puis ``.astimezone(UTC)``.
+        ``datetime(..., tzinfo=ZoneInfo(self._timezone))`` puis ``.astimezone(UTC)``.
         Les trois dates a verifier a la main, qui cassent toute implementation
         naive :
 
         - 27 novembre 2026, XNYS : demi-seance, cloture 13:00 ET.
         - 12 mars 2026, XNYS vs XPAR : les Etats-Unis sont deja a l'heure d'ete,
           l'Europe non. L'ecart entre les deux clotures n'est pas celui de juin.
-        - 1er novembre, XPAR ferme et XNYS ouvert : deux calendriers desalignes.
+        - 6 avril 2026 (lundi de Paques), XPAR ferme et XNYS ouvert : deux
+          calendriers desalignes. Le 1er novembre 2026 est un dimanche.
+
+        The UTC offset is resolved per date by the zone, never stored. Opening and
+        closing times sit far from the small-hours DST switch, so no local time
+        here is skipped or repeated.
         """
-        raise NotImplementedError("Exercice 2.4")
+        if type(day) is not date:
+            raise TypeError(f"{self._calendar_id}: session expects a date, got {day!r}")
+        if not self.is_open(day):
+            return None
+        zone = ZoneInfo(self._timezone)
+        close = self._early_closes.get(day, self._regular_close)
+        return Session(
+            session_date=day,
+            open_utc=datetime.combine(day, self._regular_open, tzinfo=zone).astimezone(UTC),
+            close_utc=datetime.combine(day, close, tzinfo=zone).astimezone(UTC),
+            is_half_day=day in self._early_closes,
+        )
 
     def sessions(self, start: date, end: date) -> list[Session]:
         """Return every session in ``[start, end]``, inclusive.
@@ -159,13 +302,32 @@ class TradingCalendar:
         list[Session]
             Sessions in chronological order; empty if none.
 
+        Raises
+        ------
+        TypeError
+            If either bound is a ``datetime``.
+        ValueError
+            If ``start`` is after ``end``: inverted bounds are a caller bug, not
+            an empty range.
+
         Notes
         -----
         Exercice 2.5 (facile).
         """
-        raise NotImplementedError("Exercice 2.5")
+        _require_date(start, self._calendar_id, "sessions")
+        _require_date(end, self._calendar_id, "sessions")
+        if start > end:
+            raise ValueError(f"{self._calendar_id}: sessions start {start} is after end {end}")
+        result = []
+        day = start
+        while day <= end:
+            session = self.session(day)
+            if session is not None:
+                result.append(session)
+            day += timedelta(days=1)
+        return result
 
-    def next_session(self, after: date) -> Session | None:
+    def next_session(self, after: date) -> Session:
         """Return the first session strictly after ``after``.
 
         Parameters
@@ -175,8 +337,17 @@ class TradingCalendar:
 
         Returns
         -------
-        Session | None
-            ``None`` if the calendar does not extend that far.
+        Session
+            The next session.
+
+        Raises
+        ------
+        TypeError
+            If ``after`` is a ``datetime``.
+        LookupError
+            If no session is found within ``MAX_CLOSED_DAYS`` days. The calendar
+            cannot tell where its holiday list ends, so a long closed run means
+            the data is missing rather than the venue shut.
 
         Notes
         -----
@@ -185,9 +356,10 @@ class TradingCalendar:
         explicitement le nombre de jours explores et leve plutot que de boucler
         sans fin si la liste de feries s'arrete.
         """
-        raise NotImplementedError("Exercice 2.6")
+        _require_date(after, self._calendar_id, "next_session")
+        return self._scan(after, timedelta(days=1))
 
-    def previous_session(self, before: date) -> Session | None:
+    def previous_session(self, before: date) -> Session:
         """Return the last session strictly before ``before``.
 
         Parameters
@@ -197,14 +369,35 @@ class TradingCalendar:
 
         Returns
         -------
-        Session | None
-            ``None`` if the calendar does not extend that far.
+        Session
+            The previous session.
+
+        Raises
+        ------
+        TypeError
+            If ``before`` is a ``datetime``.
+        LookupError
+            If no session is found within ``MAX_CLOSED_DAYS`` days, as in
+            :meth:`next_session`.
 
         Notes
         -----
         Exercice 2.7 (facile).
         """
-        raise NotImplementedError("Exercice 2.7")
+        _require_date(before, self._calendar_id, "previous_session")
+        return self._scan(before, timedelta(days=-1))
+
+    def _scan(self, origin: date, step: timedelta) -> Session:
+        """Return the first session met stepping from ``origin``, ``origin`` excluded."""
+        day = origin
+        for _ in range(MAX_CLOSED_DAYS):
+            day += step
+            session = self.session(day)
+            if session is not None:
+                return session
+        raise LookupError(
+            f"{self._calendar_id}: no session within {MAX_CLOSED_DAYS} days of {origin}"
+        )
 
     def sessions_between(self, start: date, end: date) -> int:
         """Count the sessions in ``(start, end]``.
@@ -222,12 +415,27 @@ class TradingCalendar:
             Number of sessions, used to express staleness in sessions rather
             than in calendar days.
 
+        Raises
+        ------
+        TypeError
+            If either bound is a ``datetime``.
+        ValueError
+            If ``start`` is after ``end``.
+
         Notes
         -----
         Exercice 2.8 (facile). "Vieux de 3 jours" ne veut rien dire un lundi ;
         "vieux d'une seance" est sans ambiguite.
         """
-        raise NotImplementedError("Exercice 2.8")
+        _require_date(start, self._calendar_id, "sessions_between")
+        _require_date(end, self._calendar_id, "sessions_between")
+        if start > end:
+            raise ValueError(
+                f"{self._calendar_id}: sessions_between start {start} is after end {end}"
+            )
+        if start == end:
+            return 0
+        return len(self.sessions(start + timedelta(days=1), end))
 
 
 class CalendarRegistry:
@@ -237,10 +445,20 @@ class CalendarRegistry:
     ----------
     calendars : Sequence[TradingCalendar]
         Calendars to index.
+
+    Raises
+    ------
+    ValueError
+        If two calendars share an id: the second would silently replace the
+        first.
     """
 
     def __init__(self, calendars: Sequence[TradingCalendar]) -> None:
-        raise NotImplementedError("Exercice 2.9")
+        self._calendars: dict[str, TradingCalendar] = {}
+        for calendar in calendars:
+            if calendar.calendar_id in self._calendars:
+                raise ValueError(f"duplicate calendar id {calendar.calendar_id!r}")
+            self._calendars[calendar.calendar_id] = calendar
 
     @classmethod
     def from_directory(cls, directory: Path) -> CalendarRegistry:
@@ -256,11 +474,20 @@ class CalendarRegistry:
         CalendarRegistry
             Registry of the loaded calendars.
 
+        Raises
+        ------
+        ValueError
+            If the folder holds no calendar: a wrong path must not yield an
+            empty registry that fails later on the first lookup.
+
         Notes
         -----
         Exercice 2.10 (facile).
         """
-        raise NotImplementedError("Exercice 2.10")
+        paths = sorted(directory.glob("*.toml"))
+        if not paths:
+            raise ValueError(f"no calendar (*.toml) found in {directory}")
+        return cls([TradingCalendar.from_toml(path) for path in paths])
 
     def get(self, calendar_id: str) -> TradingCalendar:
         """Return one calendar.
@@ -284,8 +511,12 @@ class CalendarRegistry:
         -----
         Exercice 2.11 (facile).
         """
-        raise NotImplementedError("Exercice 2.11")
+        try:
+            return self._calendars[calendar_id]
+        except KeyError:
+            known = ", ".join(sorted(self._calendars))
+            raise KeyError(f"unknown calendar {calendar_id!r}; known: {known}") from None
 
     def __iter__(self) -> Iterator[TradingCalendar]:
         """Iterate over calendars in id order."""
-        raise NotImplementedError("Exercice 2.11")
+        return iter([self._calendars[key] for key in sorted(self._calendars)])
