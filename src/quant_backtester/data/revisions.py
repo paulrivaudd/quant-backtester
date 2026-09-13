@@ -17,8 +17,9 @@ different number three weeks later.
 
 from __future__ import annotations
 
+import tomllib
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import date, datetime
 from pathlib import Path
 
@@ -51,17 +52,61 @@ class AcceptedRevision:
     reason: str
 
 
+REVISION_TABLES = frozenset({"bars", "levels"})
+"""Tables a revision can be accepted for."""
+
+REVISION_KEYS = frozenset(field.name for field in fields(AcceptedRevision))
+"""Keys of a ``[[revision]]`` table, all required.
+
+Derived from the dataclass, like the instrument loader's keys: a field added to
+:class:`AcceptedRevision` is accepted by the loader the same day.
+"""
+
+
 class AcceptedRevisions:
     """The set of revisions we have explicitly agreed to apply.
 
     Parameters
     ----------
     revisions : Sequence[AcceptedRevision]
-        Reviewed decisions.
+        Reviewed decisions. Empty is valid and the normal state: nothing has
+        been accepted yet, so the history stays exactly as first stored.
+
+    Raises
+    ------
+    ValueError
+        If a decision names a table other than ``bars`` or ``levels``, has an
+        observation date that is not a plain date, has a blank reason, or
+        repeats the key of another decision: two reviews of the same correction
+        cannot both be the one that was made.
     """
 
     def __init__(self, revisions: Sequence[AcceptedRevision]) -> None:
-        raise NotImplementedError("Exercice 7.1")
+        keys: set[tuple[str, str, date, str]] = set()
+        for revision in revisions:
+            label = (
+                f"Accepted revision of {revision.instrument_id} {revision.table}."
+                f"{revision.field} on {revision.observation_date}"
+            )
+            if revision.table not in REVISION_TABLES:
+                raise ValueError(f"{label}: table must be one of {sorted(REVISION_TABLES)}")
+            observation_date: object = revision.observation_date
+            if isinstance(observation_date, datetime) or not isinstance(observation_date, date):
+                raise ValueError(f"{label}: observation_date must be a plain date")
+            if not revision.reason.strip():
+                raise ValueError(f"{label}: a reason is required")
+            key = (
+                revision.instrument_id,
+                revision.table,
+                revision.observation_date,
+                revision.field,
+            )
+            if key in keys:
+                raise ValueError(f"{label}: accepted more than once")
+            keys.add(key)
+        # A tuple and a frozenset: the caller's list can change, the decisions cannot.
+        self._revisions = tuple(revisions)
+        self._keys = frozenset(keys)
 
     @classmethod
     def from_toml(cls, path: Path) -> AcceptedRevisions:
@@ -77,11 +122,63 @@ class AcceptedRevisions:
         AcceptedRevisions
             Loaded decisions.
 
+        Raises
+        ------
+        ValueError
+            If ``path`` exists but is not a file, the file holds a table other
+            than ``[[revision]]``, an entry has an unknown or missing key or an
+            observation date that is not a bare TOML date, or a decision is
+            invalid (see the class).
+
         Notes
         -----
         Exercice 7.2 (facile).
+
+        Entries are ``[[revision]]`` tables, the shape the committed file
+        documents. The date is a bare TOML date (``observation_date =
+        2026-09-10``), which ``tomllib`` already returns as a ``date``; a quoted
+        string or a datetime is refused rather than guessed at.
         """
-        raise NotImplementedError("Exercice 7.2")
+        if not path.exists():
+            return cls([])
+        if not path.is_file():
+            raise ValueError(f"Accepted revisions path is not a file: {path}")
+        with path.open("rb") as handle:
+            raw = tomllib.load(handle)
+        unknown_tables = sorted(set(raw) - {"revision"})
+        if unknown_tables:
+            raise ValueError(f"{path} has unknown table(s): {', '.join(unknown_tables)}")
+        entries = raw.get("revision", [])
+        if not isinstance(entries, list):
+            raise ValueError(f"{path}: revision must be an array of [[revision]] tables")
+        revisions: list[AcceptedRevision] = []
+        for position, entry in enumerate(entries):
+            context = f"{path} revision[{position}]"
+            if not isinstance(entry, dict):
+                raise ValueError(f"{context} must be a table")
+            unknown = sorted(set(entry) - REVISION_KEYS)
+            missing = sorted(REVISION_KEYS - set(entry))
+            if unknown or missing:
+                raise ValueError(f"{context}: unknown key(s) {unknown}, missing key(s) {missing}")
+            observation_date = entry["observation_date"]
+            if isinstance(observation_date, datetime) or not isinstance(observation_date, date):
+                raise ValueError(
+                    f"{context}: observation_date = {observation_date!r}; "
+                    "expected a bare date such as 2026-09-10"
+                )
+            revisions.append(
+                AcceptedRevision(
+                    instrument_id=entry["instrument_id"],
+                    table=entry["table"],
+                    observation_date=observation_date,
+                    field=entry["field"],
+                    reason=entry["reason"],
+                )
+            )
+        try:
+            return cls(revisions)
+        except ValueError as exc:
+            raise ValueError(f"{path}: {exc}") from None
 
     def is_accepted(
         self, instrument_id: str, table: str, observation_date: date, field: str
@@ -107,8 +204,12 @@ class AcceptedRevisions:
         Notes
         -----
         Exercice 7.3 (facile).
+
+        All four parts must match exactly. Accepting the close of a session does
+        not accept its open, and a ``datetime`` never equals the ``date`` of a
+        decision.
         """
-        raise NotImplementedError("Exercice 7.3")
+        return (instrument_id, table, observation_date, field) in self._keys
 
 
 def detect_revisions(
