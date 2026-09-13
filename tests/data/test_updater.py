@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime
+from typing import BinaryIO
+
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
+
+from quant_backtester.data.repository import write_parquet_atomic
+from quant_backtester.data.schemas import LEVELS_SCHEMA
 
 
 @pytest.mark.skip(reason="Exercice 9.5 - test 3/3")
@@ -45,9 +54,34 @@ def test_constant_factor_shift_triggers_a_full_refetch(market_root):
     """
 
 
-@pytest.mark.skip(reason="Exercice 3.1")
-def test_interrupted_write_leaves_the_previous_file_intact(market_root):
+def test_interrupted_write_leaves_the_previous_file_intact(market_root, monkeypatch):
     """An exception mid-write must not destroy the existing dataset."""
+    path = market_root / "clean" / "levels" / "US10Y.parquet"
+    stored = pd.DataFrame(
+        {
+            "instrument_id": ["US10Y"],
+            "observation_date": [date(2026, 1, 2)],
+            "value": [4.1],
+            "available_at_utc": pd.DatetimeIndex(
+                [datetime(2026, 1, 2, 21, 15, tzinfo=UTC)]
+            ).as_unit("us"),
+            "source": ["FRED"],
+            "source_fetch_id": ["20260103T000000Z"],
+        }
+    )
+    write_parquet_atomic(stored, path, LEVELS_SCHEMA)
+    before = path.read_bytes()
+
+    def crash_mid_write(table: pa.Table, where: BinaryIO) -> None:
+        where.write(b"PAR1 half a file")
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(pq, "write_table", crash_mid_write)
+    with pytest.raises(RuntimeError, match="disk full"):
+        write_parquet_atomic(stored.assign(value=[9.9]), path, LEVELS_SCHEMA)
+
+    assert path.read_bytes() == before
+    assert [p.name for p in path.parent.iterdir()] == ["US10Y.parquet"]
 
 
 @pytest.mark.skip(reason="Exercice 9.2")

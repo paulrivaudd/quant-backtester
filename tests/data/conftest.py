@@ -67,4 +67,6 @@ def market_root(tmp_path: Path) -> Path:
     -----
     Exercice T.2. Cree ``metadata/``, ``raw/``, ``clean/`` et ``validation/``.
     """
-    pytest.skip("Exercice T.2")
+    for subdir in ("metadata", "raw", "clean", "validation"):
+        (tmp_path / subdir).mkdir()
+    return tmp_path
