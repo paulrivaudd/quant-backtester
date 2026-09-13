@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.instruments import (
     AssetType,
     DataType,
@@ -502,6 +503,25 @@ def test_every_committed_bar_points_at_an_existing_calendar():
     ]
 
     assert missing == []
+
+
+def test_committed_calendars_cover_every_instrument_from_its_first_session():
+    """A backtest can start on any instrument's first session without leaving its calendar.
+
+    The committed calendars once listed 2026 alone while SP500 started in 1990,
+    so every earlier holiday read as a session. Calendars now raise outside their
+    covered period; this pins that the committed period reaches back far enough.
+    """
+    calendars = CalendarRegistry.from_directory(COMMITTED_INSTRUMENTS.parent / "calendars")
+    uncovered = []
+    for instrument in InstrumentRegistry.from_toml(COMMITTED_INSTRUMENTS):
+        if instrument.calendar_id is None:
+            continue
+        covered_from = calendars.get(instrument.calendar_id).covered_from
+        if instrument.first_session is None or instrument.first_session < covered_from:
+            uncovered.append((instrument.id, instrument.first_session, covered_from))
+
+    assert uncovered == []
 
 
 INSERTION_ORDER = ["VIX", "ETF_WORLD", "AAA_FIRST", "US10Y"]

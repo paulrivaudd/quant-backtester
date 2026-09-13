@@ -344,6 +344,121 @@ def test_every_committed_calendar_loads_under_its_own_name():
         assert TradingCalendar.from_toml(path).calendar_id == path.stem
 
 
+def committed(calendar_id: str) -> TradingCalendar:
+    """Load one committed calendar file."""
+    return TradingCalendar.from_toml(COMMITTED_CALENDARS / f"{calendar_id}.toml")
+
+
+def test_committed_calendars_cover_their_declared_periods():
+    """NYSE from 1990, Paris from 2002, both through 2026; earlier Paris dates raise.
+
+    The committed files once held 2026 alone while instruments started in 1990,
+    and every earlier holiday read as a session.
+    """
+    xnys, xpar = committed("XNYS"), committed("XPAR")
+
+    assert (xnys.covered_from, xnys.covered_until) == (date(1990, 1, 1), date(2026, 12, 31))
+    assert (xpar.covered_from, xpar.covered_until) == (date(2002, 1, 1), date(2026, 12, 31))
+    with pytest.raises(CalendarCoverageError):
+        xpar.is_open(date(2001, 7, 13))
+
+
+@pytest.mark.parametrize(
+    "day",
+    [
+        date(1994, 4, 27),
+        date(2001, 9, 11),
+        date(2001, 9, 14),
+        date(2004, 6, 11),
+        date(2007, 1, 2),
+        date(2012, 10, 29),
+        date(2012, 10, 30),
+        date(2016, 12, 26),
+        date(2018, 12, 5),
+        date(2025, 1, 9),
+    ],
+    ids=[
+        "nixon-mourning",
+        "september-11",
+        "september-14",
+        "reagan-mourning",
+        "ford-mourning",
+        "sandy-day-1",
+        "sandy-day-2",
+        "christmas-observed-2016",
+        "bush-mourning",
+        "carter-mourning",
+    ],
+)
+def test_committed_nyse_is_closed_on_historical_closures(day):
+    """Closures no weekday rule derives - mournings, an attack, a hurricane - are listed.
+
+    Each of these days read as a session in a calendar that stopped at 2026: a
+    data gap reported where the market was shut, and an open price that never
+    existed for the engine to fill at.
+    """
+    assert not committed("XNYS").is_open(day)
+
+
+def test_committed_nyse_reopened_after_september_11():
+    """Monday 17 September 2001 traded again: the closure lasted four sessions."""
+    assert committed("XNYS").is_open(date(2001, 9, 17))
+
+
+@pytest.mark.parametrize(
+    ("year", "expected"),
+    [(2001, 248), (2012, 250), (2016, 252)],
+    ids=["2001-september-11", "2012-sandy", "2016-regular"],
+)
+def test_committed_nyse_session_counts(year, expected):
+    """Whole years: 2001 lost four sessions to 11 September, 2012 two to Sandy."""
+    sessions = committed("XNYS").sessions(date(year, 1, 1), date(year, 12, 31))
+
+    assert len(sessions) == expected
+
+
+@pytest.mark.parametrize(
+    ("calendar_id", "day", "close_utc"),
+    [
+        ("XNYS", date(1990, 12, 24), datetime(1990, 12, 24, 19, 0, tzinfo=UTC)),
+        ("XNYS", date(2019, 7, 3), datetime(2019, 7, 3, 17, 0, tzinfo=UTC)),
+        ("XPAR", date(2018, 12, 24), datetime(2018, 12, 24, 13, 5, tzinfo=UTC)),
+    ],
+    ids=["nyse-1990-at-14h-est", "nyse-2019-at-13h-edt", "paris-2018-at-14h05-cet"],
+)
+def test_committed_half_days_close_at_their_historical_time(calendar_id, day, close_utc):
+    """Early closes keep their own local time: NYSE closed at 14:00 in 1990, 13:00 later.
+
+    A close stamped at the regular 16:00 would make that day's close look known
+    three hours after it was.
+    """
+    session = committed(calendar_id).session(day)
+
+    assert session is not None
+    assert session.is_half_day
+    assert session.close_utc == close_utc
+
+
+@pytest.mark.parametrize(
+    ("day", "expected"),
+    [
+        (date(2018, 5, 1), False),
+        (date(2018, 5, 8), True),
+        (date(2025, 4, 18), False),
+        (date(2025, 4, 21), False),
+        (date(2025, 12, 26), False),
+    ],
+    ids=["labour-day", "victory-day-trades", "good-friday", "easter-monday", "boxing-day"],
+)
+def test_committed_paris_follows_euronext_not_french_public_holidays(day, expected):
+    """Euronext closes on its own holidays, not on every French public holiday.
+
+    8 May is a public holiday in France, yet Paris trades: deriving the venue's
+    calendar from the country's would close it on a session day.
+    """
+    assert committed("XPAR").is_open(day) is expected
+
+
 def test_regular_session_close_is_utc_aware(xnys):
     """A regular NYSE session closes at 16:00 ET, expressed in UTC.
 
