@@ -66,9 +66,12 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "-ra",
+    # Offline by default; run the live provider checks with `uv run pytest -m network`.
+    "-m",
+    "not network",
 ]
 markers = [
     "slow: tests that take more than a second",
-    "network: tests that hit a live data provider (deselected by default in CI)",
+    "network: tests that hit a live data provider (deselected by default, run with -m network)",
 ]
 filterwarnings = ["error"]

@@ -177,8 +177,10 @@ class FredNormalizer:
 
         Notes
         -----
-        Exercice 5.3 (facile). Les ``"."`` deviennent des lignes absentes, pas
-        des ``NaN`` : une observation manquante n'existe pas, elle ne vaut pas
+        Exercice 5.3 (facile). Le raw vient de ``fredgraph.csv`` : colonnes
+        ``observation_date`` et ``<series id>``, tout en chaines. Les champs
+        vides (et les ``"."`` des anciens exports) deviennent des lignes
+        absentes, pas des ``NaN`` : une observation manquante n'existe pas, elle ne vaut pas
         "inconnu". ``available_at_utc`` vient de
         ``instrument.publication_rule.available_at``, jamais d'un calendrier de
         bourse.
