@@ -8,7 +8,11 @@ from typing import Any
 
 import pytest
 
-from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
+from quant_backtester.data.calendars import (
+    CalendarCoverageError,
+    CalendarRegistry,
+    TradingCalendar,
+)
 
 
 def make_calendar(**overrides: object) -> TradingCalendar:
@@ -25,6 +29,9 @@ def make_calendar(**overrides: object) -> TradingCalendar:
         "regular_close": time(16, 0),
         "holidays": frozenset({date(2026, 11, 26)}),
         "early_closes": {date(2026, 11, 27): time(13, 0)},
+        # Two years, so the look-ahead guards can declare a 2027 holiday.
+        "covered_from": date(2026, 1, 1),
+        "covered_until": date(2027, 12, 31),
     }
     fields.update(overrides)
     return TradingCalendar(**fields)
@@ -213,6 +220,8 @@ calendar_id = "XTST"
 timezone = "America/New_York"
 regular_open = "09:30:00"
 regular_close = "16:00:00"
+covered_from = 2026-01-01
+covered_until = 2026-12-31
 holidays = [2026-11-26]
 
 [early_closes]
@@ -659,3 +668,107 @@ def test_registry_loads_the_committed_calendars():
     registry = CalendarRegistry.from_directory(COMMITTED_CALENDARS)
 
     assert [c.calendar_id for c in registry] == ["XNYS", "XPAR"]
+
+
+# --- coverage: a calendar only answers for the period its holiday list covers --
+
+
+def test_coverage_bounds_are_exposed():
+    """The covered period is readable, so a caller can check it before a long run."""
+    calendar = make_calendar()
+
+    assert (calendar.covered_from, calendar.covered_until) == (date(2026, 1, 1), date(2027, 12, 31))
+
+
+def test_coverage_error_is_a_lookup_error():
+    """Callers already catching the bounded-search ``LookupError`` also catch this one."""
+    assert issubclass(CalendarCoverageError, LookupError)
+
+
+@pytest.mark.parametrize(
+    "day",
+    [date(2025, 12, 31), date(2025, 12, 27), date(2028, 1, 3)],
+    ids=["weekday-before", "saturday-before", "weekday-after"],
+)
+@pytest.mark.parametrize("method", ["is_open", "session"])
+def test_dates_outside_the_coverage_raise(method, day):
+    """Outside its holiday list the calendar does not know, so it raises.
+
+    The weekend case matters too: "closed on Saturday" is true, but answering it
+    would let a scan walk out of the covered period one day at a time.
+    """
+    with pytest.raises(CalendarCoverageError, match="XTST"):
+        getattr(make_calendar(), method)(day)
+
+
+def test_coverage_bounds_are_inclusive():
+    """The first and last covered days both answer normally."""
+    calendar = make_calendar(
+        covered_from=date(2026, 1, 5),
+        covered_until=date(2026, 1, 9),
+        holidays=frozenset(),
+        early_closes={},
+    )
+
+    assert [calendar.is_open(date(2026, 1, day)) for day in range(5, 10)] == [True] * 5
+
+
+def test_sessions_crossing_the_coverage_end_raise():
+    """A range running past the covered period fails instead of being truncated or invented."""
+    calendar = make_calendar(covered_until=date(2026, 12, 31))
+
+    with pytest.raises(CalendarCoverageError, match="2027-01-01"):
+        calendar.sessions(date(2026, 12, 28), date(2027, 1, 4))
+
+
+@pytest.mark.parametrize(
+    ("method", "day"),
+    [("next_session", date(2026, 12, 31)), ("previous_session", date(2026, 1, 1))],
+    ids=["next-after-the-end", "previous-before-the-start"],
+)
+def test_neighbour_search_stops_at_the_coverage_edge(method, day):
+    """The session after the last covered day is unknown, not "the next weekday".
+
+    Friday 1 January 2027 is a holiday everywhere; a calendar without data for it
+    must not return it as the next session.
+    """
+    calendar = make_calendar(covered_until=date(2026, 12, 31))
+
+    with pytest.raises(CalendarCoverageError, match="XTST"):
+        getattr(calendar, method)(day)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"covered_from": date(2027, 1, 1), "covered_until": date(2026, 12, 31)},
+        {"holidays": frozenset({date(2028, 1, 3)})},
+        {"early_closes": {date(2025, 11, 28): time(13, 0)}},
+        {"covered_from": datetime(2026, 1, 1, tzinfo=UTC)},
+    ],
+    ids=["inverted", "holiday-outside", "early-close-outside", "datetime-bound"],
+)
+def test_invalid_coverage_is_rejected(overrides):
+    """A coverage that contradicts itself or the lists it describes is a config error."""
+    with pytest.raises(ValueError, match="XTST"):
+        make_calendar(**overrides)
+
+
+def test_from_toml_reads_the_coverage(tmp_path):
+    """``covered_from`` and ``covered_until`` are native TOML dates, read as such."""
+    calendar = TradingCalendar.from_toml(write_toml(tmp_path, SAMPLE_TOML))
+
+    assert (calendar.covered_from, calendar.covered_until) == (date(2026, 1, 1), date(2026, 12, 31))
+    with pytest.raises(CalendarCoverageError):
+        calendar.is_open(date(2027, 1, 4))
+
+
+@pytest.mark.parametrize("key", ["covered_from", "covered_until"])
+def test_from_toml_requires_the_coverage(tmp_path, key):
+    """A calendar file without its covered period is refused, naming the key and the file."""
+    without = "\n".join(line for line in SAMPLE_TOML.splitlines() if not line.startswith(key))
+
+    with pytest.raises(ValueError, match=key) as excinfo:
+        TradingCalendar.from_toml(write_toml(tmp_path, without))
+
+    assert "XTST.toml" in str(excinfo.value)

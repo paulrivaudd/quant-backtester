@@ -27,6 +27,15 @@ holiday list does not cover the date, not that the venue is shut.
 """
 
 
+class CalendarCoverageError(LookupError):
+    """A date outside the period a calendar's holiday list is complete for.
+
+    Outside that period the calendar has no data. Answering "open" on every
+    weekday would invent sessions on real holidays - 11 September 2001, Christmas
+    2016 - and nothing downstream would notice.
+    """
+
+
 def _require_date(day: object, calendar_id: str, method: str) -> None:
     """Raise ``TypeError`` unless ``day`` is exactly a ``date``, not a ``datetime``."""
     if type(day) is not date:
@@ -57,7 +66,16 @@ class Session:
 
 
 CALENDAR_KEYS = frozenset(
-    {"calendar_id", "timezone", "regular_open", "regular_close", "holidays", "early_closes"}
+    {
+        "calendar_id",
+        "timezone",
+        "regular_open",
+        "regular_close",
+        "covered_from",
+        "covered_until",
+        "holidays",
+        "early_closes",
+    }
 )
 """Keys a calendar TOML file must carry, and the only ones it may carry."""
 
@@ -116,6 +134,11 @@ class TradingCalendar:
         Weekdays on which the venue is closed.
     early_closes : Mapping[date, time]
         Sessions closing before ``regular_close``, with their local close time.
+    covered_from, covered_until : date
+        Inclusive period for which ``holidays`` and ``early_closes`` are
+        complete. Every holiday and early close lies inside it, and any date
+        outside it raises :class:`CalendarCoverageError` instead of being
+        assumed a regular weekday.
     """
 
     def __init__(
@@ -126,6 +149,8 @@ class TradingCalendar:
         regular_close: time,
         holidays: frozenset[date],
         early_closes: Mapping[date, time],
+        covered_from: date,
+        covered_until: date,
     ) -> None:
         self._calendar_id = calendar_id
         try:
@@ -138,14 +163,25 @@ class TradingCalendar:
             )
         if regular_open >= regular_close:
             raise ValueError(f"{calendar_id}: regular_open must be before regular_close")
+        for name, bound in (("covered_from", covered_from), ("covered_until", covered_until)):
+            if type(bound) is not date:
+                raise ValueError(f"{calendar_id}: {name} {bound!r} is not a date")
+        if covered_from > covered_until:
+            raise ValueError(
+                f"{calendar_id}: covered_from {covered_from} is after covered_until {covered_until}"
+            )
         for day in holidays:
             if type(day) is not date:
                 raise ValueError(f"{calendar_id}: holiday {day} is not a date")
             if day.weekday() >= 5:
                 raise ValueError(f"{calendar_id}: holiday {day} falls on a weekend")
+            if not covered_from <= day <= covered_until:
+                raise ValueError(f"{calendar_id}: holiday {day} is outside the covered period")
         for day, close in early_closes.items():
             if type(day) is not date:
                 raise ValueError(f"{calendar_id}: early close {day} is not a date")
+            if not covered_from <= day <= covered_until:
+                raise ValueError(f"{calendar_id}: early close {day} is outside the covered period")
             if not regular_open < close < regular_close:
                 raise ValueError(
                     f"{calendar_id}: early close on {day} at {close} is outside the regular session"
@@ -160,6 +196,8 @@ class TradingCalendar:
         # Copies: a caller mutating its own set or dict afterwards must not rewrite history.
         self._holidays = frozenset(holidays)
         self._early_closes = dict(early_closes)
+        self._covered_from = covered_from
+        self._covered_until = covered_until
 
     @classmethod
     def from_toml(cls, path: Path) -> TradingCalendar:
@@ -204,12 +242,24 @@ class TradingCalendar:
             regular_close=_as_local_time(raw["regular_close"], "regular_close", path),
             holidays=frozenset(raw["holidays"]),
             early_closes=early_closes,
+            covered_from=raw["covered_from"],
+            covered_until=raw["covered_until"],
         )
 
     @property
     def calendar_id(self) -> str:
         """Return the venue identifier."""
         return self._calendar_id
+
+    @property
+    def covered_from(self) -> date:
+        """Return the first day the holiday list is complete for."""
+        return self._covered_from
+
+    @property
+    def covered_until(self) -> date:
+        """Return the last day the holiday list is complete for."""
+        return self._covered_until
 
     def is_open(self, day: date) -> bool:
         """Return whether the venue trades on ``day``.
@@ -230,6 +280,10 @@ class TradingCalendar:
             If ``day`` is a ``datetime``. It subclasses ``date`` but never equals
             one, so it would slip past the holiday set and report a closed day
             as open.
+        CalendarCoverageError
+            If ``day`` is outside the covered period, weekends included. Every
+            other method goes through this one, so none of them can answer for a
+            date the holiday list does not cover.
 
         Notes
         -----
@@ -237,6 +291,11 @@ class TradingCalendar:
         """
         if type(day) is not date:
             raise TypeError(f"{self._calendar_id}: is_open expects a date, got {day!r}")
+        if not self._covered_from <= day <= self._covered_until:
+            raise CalendarCoverageError(
+                f"{self._calendar_id}: {day} is outside the covered period "
+                f"{self._covered_from} to {self._covered_until}; extend {self._calendar_id}.toml"
+            )
         if day.weekday() >= 5:
             return False
         return day not in self._holidays

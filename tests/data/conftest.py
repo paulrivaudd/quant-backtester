@@ -35,6 +35,8 @@ def xnys() -> TradingCalendar:
             {date(2026, 1, 19), date(2026, 9, 7), date(2026, 11, 26), date(2026, 12, 25)}
         ),
         early_closes={date(2026, 11, 27): time(13, 0), date(2026, 12, 24): time(13, 0)},
+        covered_from=date(2026, 1, 1),
+        covered_until=date(2026, 12, 31),
     )
 
 
@@ -56,6 +58,8 @@ def xpar() -> TradingCalendar:
             {date(2026, 4, 3), date(2026, 4, 6), date(2026, 5, 1), date(2026, 12, 25)}
         ),
         early_closes={date(2026, 12, 24): time(14, 5), date(2026, 12, 31): time(14, 5)},
+        covered_from=date(2026, 1, 1),
+        covered_until=date(2026, 12, 31),
     )
 
 

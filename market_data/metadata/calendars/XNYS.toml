@@ -4,6 +4,11 @@ timezone = "America/New_York"
 regular_open = "09:30:00"
 regular_close = "16:00:00"
 
+# The lists below are complete for this period only. Any date outside it raises
+# CalendarCoverageError rather than being assumed a regular weekday.
+covered_from = 2026-01-01
+covered_until = 2026-12-31
+
 # Extend as far back as your backtests go.
 holidays = [
   2026-01-01,
