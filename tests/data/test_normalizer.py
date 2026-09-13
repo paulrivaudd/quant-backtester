@@ -15,7 +15,7 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 
-from quant_backtester.data.calendars import CalendarCoverageError, TradingCalendar
+from quant_backtester.data.calendars import CalendarCoverageError, CalendarRegistry, TradingCalendar
 from quant_backtester.data.crosscheck import CrossCheckPolicy, cross_check_bars
 from quant_backtester.data.instruments import (
     AssetType,
@@ -36,6 +36,7 @@ from quant_backtester.data.normalizer import (
 )
 from quant_backtester.data.schemas import BARS_SCHEMA, CORPORATE_ACTIONS_SCHEMA, LEVELS_SCHEMA
 from quant_backtester.data.sources.base import RawDownload
+from quant_backtester.data.sources.yahoo import YahooSource
 
 
 def utc(year: int, month: int, day: int, hour: int, minute: int) -> datetime:
@@ -634,10 +635,79 @@ def test_yahoo_actions_reject_a_negative_or_missing_value(
         NORMALIZER.normalize(spy_etf, actions_download(raw), xnys)
 
 
-def test_yahoo_actions_missing_column_raises(spy_etf: Instrument, xnys: TradingCalendar) -> None:
-    raw = yahoo_actions([("2026-06-10", 0.0, 4.0)]).drop(columns=["Stock Splits"])
-    with pytest.raises(ValueError, match="Stock Splits"):
+def test_yahoo_actions_without_a_split_column_keep_the_dividends(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    # SPY never split, and Yahoo sends its actions with a Dividends column only.
+    raw = yahoo_actions([("2026-03-20", 1.74, 0.0), ("2026-06-19", 1.76, 0.0)]).drop(
+        columns=["Stock Splits"]
+    )
+    actions = actions_of(NORMALIZER.normalize(spy_etf, actions_download(raw), xnys))
+    assert actions["action_type"].tolist() == ["DIVIDEND", "DIVIDEND"]
+    assert actions["value"].tolist() == [1.74, 1.76]
+
+
+def test_yahoo_actions_without_a_dividend_column_keep_the_splits(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    raw = yahoo_actions([("2026-06-10", 0.0, 4.0)]).drop(columns=["Dividends"])
+    actions = actions_of(NORMALIZER.normalize(spy_etf, actions_download(raw), xnys))
+    assert actions["action_type"].tolist() == ["SPLIT"]
+    assert actions["value"].tolist() == [4.0]
+
+
+def test_yahoo_actions_without_any_action_column_raise(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    raw = yahoo_actions([("2026-06-10", 1.0, 0.0)]).rename(
+        columns={"Dividends": "Capital Gains", "Stock Splits": "Other"}
+    )
+    with pytest.raises(ValueError, match="none of the columns"):
         NORMALIZER.normalize(spy_etf, actions_download(raw), xnys)
+
+
+COMMITTED_CALENDARS = Path(__file__).resolve().parents[2] / "market_data" / "metadata" / "calendars"
+
+
+@pytest.mark.network
+def test_yahoo_actions_live_spy_has_no_split_column_and_normalizes(spy_etf: Instrument) -> None:
+    xnys = CalendarRegistry.from_directory(COMMITTED_CALENDARS).get("XNYS")
+    raw = YahooSource().download_corporate_actions(spy_etf, date(2024, 1, 1), date(2024, 12, 31))
+    assert raw is not None
+    assert "Stock Splits" not in raw.frame.columns
+    actions = actions_of(NORMALIZER.normalize(spy_etf, raw, xnys))
+    # Four quarterly ex-dates in 2024, and nothing else.
+    assert actions["action_type"].tolist() == ["DIVIDEND"] * 4
+
+
+@pytest.mark.network
+def test_yahoo_actions_live_ge_dividends_survive_a_reverse_split_and_two_spin_offs() -> None:
+    xnys = CalendarRegistry.from_directory(COMMITTED_CALENDARS).get("XNYS")
+    ge = Instrument(
+        id="US_GE",
+        name="General Electric",
+        asset_type=AssetType.EQUITY,
+        data_type=DataType.BAR,
+        currency="USD",
+        primary_source="YAHOO",
+        source_symbol="GE",
+        tradable=True,
+        calendar_id="XNYS",
+    )
+    raw = YahooSource().download_corporate_actions(ge, date(2021, 6, 1), date(2022, 12, 31))
+    assert raw is not None
+    actions = actions_of(NORMALIZER.normalize(ge, raw, xnys))
+    paid = {
+        ex_date: value
+        for ex_date, action_type, value in zip(
+            actions["ex_date"], actions["action_type"], actions["value"], strict=True
+        )
+        if action_type == "DIVIDEND"
+    }
+    # Yahoo serves 0.049841 for both: divided by 0.125, 1.281 and 1.253 in turn.
+    # GE actually paid 1 cent before its 1-for-8 reverse split and 8 cents after it.
+    assert paid[date(2021, 6, 25)] == pytest.approx(0.01, rel=1e-3)
+    assert paid[date(2022, 12, 14)] == pytest.approx(0.08, rel=1e-3)
 
 
 def test_yahoo_actions_without_requested_range_raise(

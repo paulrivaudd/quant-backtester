@@ -549,7 +549,9 @@ def _normalize_yahoo_actions(
     requested ``[start, end_inclusive]`` are kept, and they are filtered before
     any calendar lookup, since old ex-dates lie outside the calendar coverage.
     One Yahoo row yields zero, one or two canonical rows, ``0.0`` meaning no
-    event. Dividends are multiplied back by the later splits Yahoo divided them
+    event. Yahoo omits a column that never held an event (SPY has no
+    ``Stock Splits`` column, checked on 2026-09-13): an absent column counts as
+    zeros. Dividends are multiplied back by the later splits Yahoo divided them
     by (see :func:`_later_split_factor`), and each action becomes available at
     the close of its ex-date.
 
@@ -571,10 +573,10 @@ def _normalize_yahoo_actions(
     Raises
     ------
     ValueError
-        If an action column or a request date is missing, the index is
-        unusable, any value is negative or missing (a later split scales the
-        dividends before it, so every row counts), or an event falls on a day
-        the venue was closed.
+        If the frame has no action column at all, a request date is missing,
+        the index is unusable, any value is negative or missing (a later split
+        scales the dividends before it, so every row counts), or an event falls
+        on a day the venue was closed.
     CalendarCoverageError
         If an event inside the requested range falls outside the calendar
         coverage.
@@ -582,14 +584,22 @@ def _normalize_yahoo_actions(
     raw = download.frame
     if raw.empty:
         return _empty_frame(CORPORATE_ACTIONS_SCHEMA)
-    missing = sorted(set(YAHOO_ACTION_COLUMNS) - set(raw.columns))
-    if missing:
-        raise ValueError(f"Yahoo actions of {instrument.id} lack column(s): {', '.join(missing)}")
+    if not any(column in raw.columns for column in YAHOO_ACTION_COLUMNS):
+        raise ValueError(
+            f"Yahoo actions of {instrument.id} have none of the columns "
+            f"{', '.join(YAHOO_ACTION_COLUMNS)}: {', '.join(map(str, raw.columns))}"
+        )
     start = _requested_date(download, "start")
     end = _requested_date(download, "end_inclusive")
     ex_dates = _session_dates(raw.index, calendar)
+    # Yahoo drops a column that never held an event: absent means zeros, not an error.
     values: dict[str, list[float]] = {
-        column: raw[column].to_numpy(dtype="float64").tolist() for column in YAHOO_ACTION_COLUMNS
+        column: (
+            raw[column].to_numpy(dtype="float64").tolist()
+            if column in raw.columns
+            else [0.0] * len(ex_dates)
+        )
+        for column in YAHOO_ACTION_COLUMNS
     }
     for column, column_values in values.items():
         for position, value in enumerate(column_values):
