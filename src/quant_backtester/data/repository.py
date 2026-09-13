@@ -9,6 +9,7 @@ Layout under the market data root::
     raw/<source>/<instrument_id>/<fetch_id>.parquet   immutable, append-only
     raw/<source>/<instrument_id>/<fetch_id>.json      request manifest
     clean/bars/<instrument_id>.parquet
+    clean/checked_bars/<instrument_id>.parquet        bars cross-checked across sources
     clean/levels/<instrument_id>.parquet
     clean/corporate_actions.parquet
     clean/revisions.parquet
@@ -38,10 +39,12 @@ import pyarrow.parquet as pq
 
 from quant_backtester.data.schemas import (
     BARS_SCHEMA,
+    CHECKED_BARS_SCHEMA,
     CORPORATE_ACTIONS_SCHEMA,
     LEVELS_SCHEMA,
     REVISIONS_SCHEMA,
     VALIDATION_LOG_SCHEMA,
+    CheckStatus,
 )
 from quant_backtester.data.sources.base import RawDownload
 from quant_backtester.data.validator import ValidationReport
@@ -319,6 +322,70 @@ class MarketDataRepository:
             # Same columns and dtypes as a loaded file, just zero rows.
             return BARS_SCHEMA.empty_table().to_pandas()
         frame = pq.read_table(path).to_pandas()
+        # session_date holds datetime.date objects: compare with dates, not Timestamps.
+        if start is not None:
+            frame = frame.loc[frame["session_date"] >= start]
+        if end is not None:
+            frame = frame.loc[frame["session_date"] <= end]
+        return frame.reset_index(drop=True)
+
+    def save_checked_bars(self, instrument_id: str, frame: pd.DataFrame) -> None:
+        """Replace an instrument's cross-checked bars.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument concerned.
+        frame : pd.DataFrame
+            Full output of
+            :func:`~quant_backtester.data.crosscheck.cross_check_bars`,
+            chronologically sorted.
+
+        Raises
+        ------
+        ValueError
+            If ``frame`` does not match the checked bars schema, holds rows of
+            another instrument, is not sorted by ``session_date`` without
+            duplicates, or carries an unknown ``check_status``.
+        """
+        for field in ("instrument_id", "session_date", "check_status"):
+            if field not in frame.columns:
+                raise ValueError(f"Missing column {field!r} in checked bars frame")
+        if not (frame["instrument_id"] == instrument_id).all():
+            raise ValueError(
+                f"Checked bars frame for {instrument_id} holds rows of another instrument"
+            )
+        if not (frame["session_date"].is_monotonic_increasing and frame["session_date"].is_unique):
+            raise ValueError(
+                "Checked bars frame must be sorted by session_date, without duplicates"
+            )
+        unknown = sorted(set(frame["check_status"]) - {status.value for status in CheckStatus})
+        if unknown:
+            raise ValueError(f"Unknown check_status value(s): {', '.join(map(str, unknown))}")
+        path = self.root / "clean" / "checked_bars" / f"{instrument_id}.parquet"
+        write_parquet_atomic(frame, path, CHECKED_BARS_SCHEMA)
+
+    def load_checked_bars(
+        self, instrument_id: str, start: date | None = None, end: date | None = None
+    ) -> pd.DataFrame:
+        """Load an instrument's cross-checked bars.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument concerned.
+        start, end : date | None
+            Inclusive bounds on ``session_date``; ``None`` means unbounded.
+
+        Returns
+        -------
+        pd.DataFrame
+            Checked bars, every status included; empty frame with the right
+            columns if none. Choosing which statuses to trust is the caller's
+            decision, not the repository's.
+        """
+        path = self.root / "clean" / "checked_bars" / f"{instrument_id}.parquet"
+        frame = _load_or_empty(path, CHECKED_BARS_SCHEMA)
         # session_date holds datetime.date objects: compare with dates, not Timestamps.
         if start is not None:
             frame = frame.loc[frame["session_date"] >= start]

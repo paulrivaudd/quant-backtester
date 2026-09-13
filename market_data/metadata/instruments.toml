@@ -27,6 +27,12 @@ calendar_id = "XPAR"
 tradable = true
 first_session = 2018-01-02
 
+  # Yahoo reports no split for CW8, so its bars are raw (checked 2026-09-13).
+  # Euronext serves about two years only: older sessions stay SINGLE_SOURCE.
+  [[instrument.check_sources]]
+  source = "EURONEXT"
+  source_symbol = "LU1681043599-XPAR"
+
 [[instrument]]
 id = "VIX"
 name = "CBOE Volatility Index"

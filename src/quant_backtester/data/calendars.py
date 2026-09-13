@@ -252,6 +252,11 @@ class TradingCalendar:
         return self._calendar_id
 
     @property
+    def timezone(self) -> str:
+        """Return the IANA zone of the venue, e.g. ``"America/New_York"``."""
+        return self._timezone
+
+    @property
     def covered_from(self) -> date:
         """Return the first day the holiday list is complete for."""
         return self._covered_from

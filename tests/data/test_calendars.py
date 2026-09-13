@@ -42,6 +42,11 @@ def test_valid_calendar_exposes_its_id():
     assert make_calendar().calendar_id == "XTST"
 
 
+def test_valid_calendar_exposes_its_timezone():
+    """The venue zone is exposed, so a normalizer can read provider dates locally."""
+    assert make_calendar(timezone="Europe/Paris").timezone == "Europe/Paris"
+
+
 def test_calendar_id_is_read_only():
     """The venue id cannot be reassigned after construction.
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import tomllib
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from datetime import UTC, date, datetime, time, timedelta
 from enum import Enum
 from pathlib import Path
@@ -96,6 +96,23 @@ class PublicationRule:
 
 
 @dataclass(frozen=True, slots=True)
+class CheckSource:
+    """A second provider consulted to cross-check an instrument's bars.
+
+    Attributes
+    ----------
+    source : str
+        Source identifier, e.g. ``"EURONEXT"``.
+    source_symbol : str
+        Symbol understood by that source, e.g. ``"LU1681043599-XPAR"``.
+        Providers rarely share a symbology, so each check source carries its own.
+    """
+
+    source: str
+    source_symbol: str
+
+
+@dataclass(frozen=True, slots=True)
 class Instrument:
     """Static description of one market data series.
 
@@ -130,6 +147,9 @@ class Instrument:
         collapse into the same ``NaN``.
     last_session : date | None
         Last session, for a delisted instrument. ``None`` means still listed.
+    check_sources : tuple[CheckSource, ...]
+        Further providers whose bars are compared with the primary source's, in
+        declared order. Empty for a series with a single source.
     """
 
     id: str
@@ -144,6 +164,7 @@ class Instrument:
     publication_rule: PublicationRule | None = None
     first_session: date | None = None
     last_session: date | None = None
+    check_sources: tuple[CheckSource, ...] = ()
 
     def __post_init__(self) -> None:
         """Reject an instrument whose availability could not be computed.
@@ -152,7 +173,9 @@ class Instrument:
         ------
         ValueError
             If a ``BAR`` has no ``calendar_id``, if a ``LEVEL`` has no
-            ``publication_rule``, or if either carries the other's field.
+            ``publication_rule``, or if either carries the other's field; if
+            ``check_sources`` is not a tuple of :class:`CheckSource`, names a
+            source twice (primary included), or is set on a ``LEVEL``.
 
         Notes
         -----
@@ -170,6 +193,60 @@ class Instrument:
                 raise ValueError(f"LEVEL instrument {self.id} has no publication_rule")
             if self.calendar_id is not None:
                 raise ValueError(f"LEVEL instrument {self.id} has a calendar_id")
+        if not isinstance(self.check_sources, tuple) or not all(
+            isinstance(check, CheckSource) for check in self.check_sources
+        ):
+            raise ValueError(f"Instrument {self.id}: check_sources must be a tuple of CheckSource")
+        repeated = sorted({source for source in self.sources if self.sources.count(source) > 1})
+        if repeated:
+            raise ValueError(
+                f"Instrument {self.id} lists source(s) {', '.join(repeated)} more than once"
+            )
+        if self.check_sources and self.data_type != DataType.BAR:
+            raise ValueError(
+                f"Instrument {self.id} is a {self.data_type.value}: "
+                "only BAR series are cross-checked"
+            )
+
+    @property
+    def sources(self) -> tuple[str, ...]:
+        """Return every source of the instrument, primary first, then check sources."""
+        return (self.primary_source, *(check.source for check in self.check_sources))
+
+    def for_source(self, source: str) -> Instrument:
+        """Return the instrument as one of its sources sees it.
+
+        Adapters read ``primary_source`` and ``source_symbol`` only. For a check
+        source, the copy returned carries that source and its symbol and no check
+        sources of its own; ``id`` and every other field are unchanged, so the
+        download lands under the same instrument.
+
+        Parameters
+        ----------
+        source : str
+            Primary or check source identifier.
+
+        Returns
+        -------
+        Instrument
+            ``self`` for the primary source, a re-pointed copy otherwise.
+
+        Raises
+        ------
+        KeyError
+            If ``source`` is neither the primary source nor a check source.
+        """
+        if source == self.primary_source:
+            return self
+        for check in self.check_sources:
+            if check.source == source:
+                return replace(
+                    self,
+                    primary_source=check.source,
+                    source_symbol=check.source_symbol,
+                    check_sources=(),
+                )
+        raise KeyError(f"Instrument {self.id} has no source {source}")
 
     def is_listed(self, on: date) -> bool:
         """Return whether the instrument existed on ``on``.
@@ -208,6 +285,9 @@ sharper one: ``lag_days`` carries a default, so a mistyped key falls back to
 zero rather than failing, and a series released on D+1 silently becomes
 readable on D. That is look-ahead bias introduced by a typo.
 """
+
+CHECK_SOURCE_KEYS = frozenset(f.name for f in fields(CheckSource))
+"""Legitimate keys of an ``[[instrument.check_sources]]`` sub-table, all required."""
 
 
 def _reject_unknown_keys(table: Mapping[str, Any], allowed: frozenset[str], context: str) -> None:
@@ -372,6 +452,22 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
             lag_days=raw_rule.get("lag_days", 0),
         )
 
+    raw_checks = table.get("check_sources", [])
+    if not isinstance(raw_checks, list):
+        raise ValueError(
+            f"{context}: check_sources must be an array of [[instrument.check_sources]] tables"
+        )
+    check_sources: list[CheckSource] = []
+    for position, raw_check in enumerate(raw_checks):
+        check_context = f"{context}: check_sources[{position}]"
+        if not isinstance(raw_check, dict):
+            raise ValueError(f"{check_context} must be a table")
+        _reject_unknown_keys(raw_check, CHECK_SOURCE_KEYS, check_context)
+        _require(raw_check, ("source", "source_symbol"), check_context)
+        check_sources.append(
+            CheckSource(source=raw_check["source"], source_symbol=raw_check["source_symbol"])
+        )
+
     _require(
         table,
         (
@@ -399,6 +495,7 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
         publication_rule=publication_rule,
         first_session=_as_session_date(table.get("first_session"), "first_session", context),
         last_session=_as_session_date(table.get("last_session"), "last_session", context),
+        check_sources=tuple(check_sources),
     )
 
 

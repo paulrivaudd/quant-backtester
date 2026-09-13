@@ -107,6 +107,42 @@ which the provider does not give us. That is deliberately conservative: we learn
 of a split later than the market did, so the backtest can never gain from it.
 """
 
+
+class CheckStatus(Enum):
+    """Outcome of cross-checking one session across sources."""
+
+    CONFIRMED = "CONFIRMED"
+    """Every source holding the session agrees within the declared tolerances."""
+
+    SINGLE_SOURCE = "SINGLE_SOURCE"
+    """Only one source holds the session: there is nothing to compare it with."""
+
+    CONFLICT = "CONFLICT"
+    """Two sources disagree beyond a tolerance, or only one of them has a value."""
+
+
+CHECKED_BARS_SCHEMA: Final = pa.schema(
+    [
+        *BARS_SCHEMA,
+        pa.field("check_status", pa.string(), nullable=False),
+        pa.field("checked_sources", pa.string(), nullable=False),
+        pa.field("checked_fetch_ids", pa.string(), nullable=False),
+        pa.field("max_price_rel_diff", pa.float64()),
+        pa.field("max_volume_rel_diff", pa.float64()),
+    ]
+)
+"""Bars after cross-checking every source configured for an instrument.
+
+The bar fields are the reference source's whenever it holds the session, so a
+``CONFIRMED`` row is the reference bar with a second opinion attached, and
+``source``/``source_fetch_id`` name the provider the values were taken from.
+``checked_sources`` lists the sources holding the session, sorted and
+comma-separated; ``checked_fetch_ids`` pairs each with its fetch as
+``SOURCE:fetch_id``. The relative differences are the largest seen between any
+two sources: ``NaN`` with a single source, ``inf`` when a value is missing on one
+side only.
+"""
+
 REVISIONS_SCHEMA: Final = pa.schema(
     [
         pa.field("instrument_id", pa.string(), nullable=False),

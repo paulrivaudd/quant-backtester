@@ -85,8 +85,9 @@ def spy(monkeypatch: pytest.MonkeyPatch) -> TickerSpy:
         },
         index=index,
     )
-    # A dividend before the requested range, a 4:1 split and a dividend inside
-    # it. Yahoo ignores the range, so the adapter must keep all three rows.
+    # Three dividends, one before the requested range: Yahoo ignores the range, so
+    # the adapter must keep all three rows. No split: SPY never split, and a split
+    # would make the bars download refuse the instrument.
     actions_index = pd.DatetimeIndex(
         [
             pd.Timestamp("2025-12-19", tz="America/New_York"),
@@ -96,7 +97,7 @@ def spy(monkeypatch: pytest.MonkeyPatch) -> TickerSpy:
         name="Date",
     )
     actions_frame = pd.DataFrame(
-        {"Dividends": [1.74, 0.0, 1.76], "Stock Splits": [0.0, 4.0, 0.0]},
+        {"Dividends": [1.74, 1.75, 1.76], "Stock Splits": [0.0, 0.0, 0.0]},
         index=actions_index,
     )
     recorder = TickerSpy(frame=frame, actions_frame=actions_frame)
@@ -224,6 +225,7 @@ def test_download_records_the_request_and_library_version(
         "auto_adjust": False,
         "actions": False,
         "yfinance_version": yfinance.__version__,
+        "split_check": "no split reported",
     }
 
 
@@ -444,3 +446,95 @@ def test_download_live_unknown_symbol_raises() -> None:
     unknown = bar_instrument(AssetType.EQUITY, UNKNOWN_SYMBOL)
     with pytest.raises(ValueError, match=UNKNOWN_SYMBOL):
         YahooSource().download(unknown, date(2024, 1, 2), date(2024, 1, 5))
+
+
+# --- split guard: Yahoo restates the bars of anything that ever split -----------
+
+
+def split_actions() -> pd.DataFrame:
+    """Return a Yahoo actions frame with two splits around a dividend, AAPL-like."""
+    index = pd.DatetimeIndex(
+        [
+            pd.Timestamp("2014-06-09", tz="America/New_York"),
+            pd.Timestamp("2019-11-07", tz="America/New_York"),
+            pd.Timestamp("2020-08-31", tz="America/New_York"),
+        ],
+        name="Date",
+    )
+    return pd.DataFrame(
+        {"Dividends": [0.0, 0.1925, 0.0], "Stock Splits": [7.0, 0.0, 4.0]}, index=index
+    )
+
+
+@pytest.mark.parametrize(
+    "asset_type", [AssetType.ETF, AssetType.EQUITY], ids=lambda asset_type: asset_type.value
+)
+def test_download_refuses_a_split_instrument_before_fetching_any_bar(
+    spy: TickerSpy, source: YahooSource, asset_type: AssetType
+) -> None:
+    spy.actions_frame = split_actions()
+    with pytest.raises(ValueError, match="2 split") as raised:
+        source.download(bar_instrument(asset_type, "AAPL"), date(2026, 9, 10), date(2026, 9, 11))
+    assert "2020-08-31" in str(raised.value)
+    assert spy.actions_reads == ["AAPL"]
+    # Restated bars must never be fetched, let alone archived.
+    assert spy.calls == []
+
+
+@pytest.mark.parametrize(
+    "asset_type",
+    [AssetType.INDEX, AssetType.VOLATILITY],
+    ids=lambda asset_type: asset_type.value,
+)
+def test_download_of_an_asset_that_cannot_split_skips_the_check(
+    spy: TickerSpy, source: YahooSource, asset_type: AssetType
+) -> None:
+    spy.actions_frame = split_actions()
+    result = source.download(
+        bar_instrument(asset_type, "^GSPC"), date(2026, 9, 10), date(2026, 9, 11)
+    )
+    assert spy.actions_reads == []
+    assert result.request["split_check"] == "not applicable"
+
+
+def test_download_of_an_etf_without_split_records_the_check(
+    spy: TickerSpy, spy_etf: Instrument, source: YahooSource
+) -> None:
+    result = source.download(spy_etf, date(2026, 9, 10), date(2026, 9, 11))
+    assert spy.actions_reads == ["SPY"]
+    assert result.request["split_check"] == "no split reported"
+
+
+def test_download_of_an_etf_without_any_action_passes_the_check(
+    spy: TickerSpy, spy_etf: Instrument, source: YahooSource
+) -> None:
+    # An accumulating ETF such as CW8 has no action at all: Yahoo returns nothing.
+    spy.actions_frame = pd.DataFrame()
+    result = source.download(spy_etf, date(2026, 9, 10), date(2026, 9, 11))
+    assert len(result.frame) == 2
+
+
+@pytest.mark.network
+def test_download_live_refuses_aapl_bars_restated_for_splits() -> None:
+    aapl = bar_instrument(AssetType.EQUITY, "AAPL")
+    with pytest.raises(ValueError, match="2020-08-31"):
+        YahooSource().download(aapl, date(2020, 8, 27), date(2020, 9, 1))
+
+
+@pytest.mark.network
+def test_download_live_accepts_cw8_which_never_split() -> None:
+    cw8 = Instrument(
+        id="ETF_WORLD",
+        name="Amundi MSCI World (PEA)",
+        asset_type=AssetType.ETF,
+        data_type=DataType.BAR,
+        currency="EUR",
+        primary_source="YAHOO",
+        source_symbol="CW8.PA",
+        tradable=True,
+        calendar_id="XPAR",
+    )
+    result = YahooSource().download(cw8, date(2024, 12, 23), date(2024, 12, 31))
+    assert result.request["split_check"] == "no split reported"
+    # 23, 24, 27, 30 and 31 December: the 25th and 26th are Euronext holidays.
+    assert len(result.frame) == 5

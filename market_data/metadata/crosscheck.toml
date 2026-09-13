@@ -1,0 +1,14 @@
+# Cross-check tolerances - committed configuration.
+#
+# Calibrated on 2026-09-13 on the 508 sessions CW8 shares between Yahoo and
+# Euronext (2024-09-16 to 2026-09-11). Yahoo stores prices as float32, which
+# leaves a relative noise below 6e-8; every genuine disagreement found was above
+# 2e-4 (a flat placeholder bar with zero volume on 2025-10-24, an open and a few
+# highs and lows that differ). Volumes matched exactly everywhere else.
+#
+# Changing a value changes which bars are CONFIRMED, so it belongs in a reviewed
+# diff.
+
+[bars]
+price_rel_tolerance = 1e-6
+volume_rel_tolerance = 0.0

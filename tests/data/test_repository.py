@@ -19,6 +19,7 @@ import pytest
 from quant_backtester.data.repository import MarketDataRepository, write_parquet_atomic
 from quant_backtester.data.schemas import (
     BARS_SCHEMA,
+    CHECKED_BARS_SCHEMA,
     CORPORATE_ACTIONS_SCHEMA,
     LEVELS_SCHEMA,
     REVISIONS_SCHEMA,
@@ -526,6 +527,103 @@ def test_load_bars_bounds_are_inclusive(market_root, start, end, expected):
 
     assert loaded["session_date"].tolist() == expected
     assert loaded.index.tolist() == list(range(len(expected)))
+
+
+# --- save_checked_bars and load_checked_bars ----------------------------------
+
+
+def make_checked_bars(
+    sessions: list[date] = SESSIONS, instrument_id: str = "SPY", status: str = "CONFIRMED"
+) -> pd.DataFrame:
+    """Build cross-checked bars: ``make_bars`` plus the verdict columns."""
+    count = len(sessions)
+    return make_bars(sessions, instrument_id).assign(
+        check_status=[status] * count,
+        checked_sources=["EURONEXT,YAHOO"] * count,
+        checked_fetch_ids=[f"EURONEXT:{FETCH_ID},YAHOO:{FETCH_ID}"] * count,
+        max_price_rel_diff=[0.0] * count,
+        max_volume_rel_diff=[0.0] * count,
+    )
+
+
+def test_checked_bars_round_trip(market_root: Path) -> None:
+    """Checked bars load back unchanged, under their own directory."""
+    repository = MarketDataRepository(market_root)
+    checked = make_checked_bars()
+
+    repository.save_checked_bars("SPY", checked)
+
+    assert (market_root / "clean" / "checked_bars" / "SPY.parquet").exists()
+    assert not (market_root / "clean" / "bars" / "SPY.parquet").exists()
+    pd.testing.assert_frame_equal(repository.load_checked_bars("SPY"), checked)
+
+
+def test_checked_bars_keep_every_status_and_missing_differences(market_root: Path) -> None:
+    """A single-source row has no difference to report: NaN survives the round trip."""
+    repository = MarketDataRepository(market_root)
+    checked = make_checked_bars(status="SINGLE_SOURCE").assign(
+        checked_sources=["YAHOO"] * len(SESSIONS),
+        max_price_rel_diff=[float("nan")] * len(SESSIONS),
+        max_volume_rel_diff=[float("nan")] * len(SESSIONS),
+    )
+
+    repository.save_checked_bars("SPY", checked)
+
+    pd.testing.assert_frame_equal(repository.load_checked_bars("SPY"), checked)
+
+
+@pytest.mark.parametrize(
+    "checked",
+    [
+        make_checked_bars(instrument_id="QQQ"),
+        make_checked_bars(list(reversed(SESSIONS))),
+        make_checked_bars([SESSIONS[0], SESSIONS[0]]),
+        make_checked_bars(status="PROBABLY_FINE"),
+        make_checked_bars().drop(columns="check_status"),
+        make_checked_bars().drop(columns="checked_sources"),
+        make_bars(),
+    ],
+    ids=[
+        "other-instrument",
+        "unsorted",
+        "duplicate-session",
+        "unknown-status",
+        "missing-status",
+        "missing-checked-sources",
+        "plain-bars",
+    ],
+)
+def test_save_checked_bars_rejects_an_invalid_frame(
+    market_root: Path, checked: pd.DataFrame
+) -> None:
+    """An invalid frame raises and nothing is written."""
+    repository = MarketDataRepository(market_root)
+
+    with pytest.raises(ValueError):
+        repository.save_checked_bars("SPY", checked)
+
+    assert not (market_root / "clean" / "checked_bars" / "SPY.parquet").exists()
+
+
+def test_load_checked_bars_of_an_unknown_instrument_has_the_canonical_columns(
+    market_root: Path,
+) -> None:
+    """No file is zero rows with the checked bars columns."""
+    empty = MarketDataRepository(market_root).load_checked_bars("QQQ")
+
+    assert empty.empty
+    assert list(empty.columns) == CHECKED_BARS_SCHEMA.names
+
+
+def test_load_checked_bars_bounds_are_inclusive(market_root: Path) -> None:
+    """``start`` and ``end`` are both included, and the index restarts at zero."""
+    repository = MarketDataRepository(market_root)
+    repository.save_checked_bars("SPY", make_checked_bars())
+
+    loaded = repository.load_checked_bars("SPY", SESSIONS[1], SESSIONS[2])
+
+    assert loaded["session_date"].tolist() == SESSIONS[1:3]
+    assert loaded.index.tolist() == [0, 1]
 
 
 # --- 3.8 / 3.9 MarketDataRepository.save_levels and load_levels ---------------

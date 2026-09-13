@@ -2,10 +2,17 @@
 
 Provider quirks, all handled here and never leaked downstream:
 
-- ``auto_adjust=True`` is the library default and must be turned **off**. With
-  it on, the OHLC series itself is restated at every corporate action, so the
-  value stored for a past date changes depending on the day it was downloaded.
+- ``auto_adjust=True`` is the library default and must be turned **off**: it
+  back-adjusts OHLC for dividends, so a past value would depend on the day it
+  was downloaded.
+- Turning it off does **not** undo the split adjustment. Yahoo divides every
+  price before a split by its ratio and multiplies the volume (AAPL closed at
+  499.23 on 28 August 2020; Yahoo serves 124.81). OHLCV is raw only for an
+  instrument that never split, so ``download`` refuses an ETF or equity for
+  which Yahoo reports a split (checked on 2026-09-13).
 - Splits and dividends are fetched separately and stored as their own table.
+  Past dividends are split-adjusted the same way (AAPL's 0.77 of February 2020
+  is served as 0.1925): the normalizer multiplies them back.
 - The daily index is tz-aware, in the exchange's local time
   (``datetime64[s, America/New_York]`` for SPY with yfinance 1.7.0). Do not
   assume it stays so; check and normalise in the normalizer.
@@ -26,6 +33,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 
+import pandas as pd
 import yfinance
 
 from quant_backtester.data.instruments import AssetType, Instrument
@@ -63,6 +71,44 @@ def _require_known_symbol(ticker: yfinance.Ticker, symbol: str) -> None:
         raise ValueError(f"Yahoo does not know symbol {symbol!r} (unknown or delisted)")
 
 
+YAHOO_SPLIT_COLUMN = "Stock Splits"
+"""Column of ``Ticker.actions`` holding split ratios, ``0.0`` on days without one."""
+
+
+def _require_no_split(ticker: yfinance.Ticker, symbol: str) -> None:
+    """Raise if Yahoo reports any split for ``symbol``.
+
+    Yahoo divides every price before a split by its ratio, even with
+    ``auto_adjust=False``: the bars of an instrument that ever split are
+    restated, not raw, and must come from another source.
+
+    Parameters
+    ----------
+    ticker : yfinance.Ticker
+        Ticker about to be downloaded.
+    symbol : str
+        Yahoo symbol, for the error message.
+
+    Raises
+    ------
+    ValueError
+        If the actions feed holds a split, naming the latest one.
+    """
+    actions = ticker.actions
+    if actions.empty or YAHOO_SPLIT_COLUMN not in actions.columns:
+        return
+    ex_dates = [
+        pd.Timestamp(str(ex_date)).date()
+        for ex_date, ratio in actions[YAHOO_SPLIT_COLUMN].items()
+        if ratio > 0
+    ]
+    if ex_dates:
+        raise ValueError(
+            f"Yahoo restates {symbol} for {len(ex_dates)} split(s), the latest on "
+            f"{max(ex_dates)}: its bars are not raw, take them from another source"
+        )
+
+
 class YahooSource:
     """Download daily bars and corporate actions from Yahoo Finance.
 
@@ -97,8 +143,9 @@ class YahooSource:
         Raises
         ------
         ValueError
-            If ``start`` is after ``end``, if the clock is not UTC, or if Yahoo
-            does not know ``instrument.source_symbol``.
+            If ``start`` is after ``end``, if the clock is not UTC, if Yahoo
+            reports a split for an ETF or equity (its bars would be restated),
+            or if Yahoo does not know ``instrument.source_symbol``.
 
         Notes
         -----
@@ -132,6 +179,12 @@ class YahooSource:
         retrieved_at_utc = self._clock()
         fetch_id = make_fetch_id(retrieved_at_utc)
         ticker = yfinance.Ticker(instrument.source_symbol)
+        # Checked before the bars are fetched: restated bars must never reach raw/.
+        if instrument.asset_type in ASSET_TYPES_WITH_ACTIONS:
+            _require_no_split(ticker, instrument.source_symbol)
+            request["split_check"] = "no split reported"
+        else:
+            request["split_check"] = "not applicable"
         frame = ticker.history(
             start=start, end=end_sent, interval="1d", auto_adjust=False, actions=False
         )

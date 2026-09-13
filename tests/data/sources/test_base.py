@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 
-from quant_backtester.data.normalizer import EcbNormalizer, FredNormalizer, YahooNormalizer
+from quant_backtester.data.normalizer import NORMALIZERS
 from quant_backtester.data.sources.base import (
     HTTP_TIMEOUT_SECONDS,
     DataSource,
@@ -27,6 +27,7 @@ from quant_backtester.data.sources.base import (
     utc_now,
 )
 from quant_backtester.data.sources.ecb import EcbSource
+from quant_backtester.data.sources.euronext import EuronextSource
 from quant_backtester.data.sources.fred import FredSource
 from quant_backtester.data.sources.yahoo import YahooSource
 
@@ -160,7 +161,7 @@ def test_raw_download_is_immutable() -> None:
         download.fetch_id = "20260913T000000Z"  # type: ignore[misc]
 
 
-ALL_SOURCES: tuple[DataSource, ...] = (YahooSource(), FredSource(), EcbSource())
+ALL_SOURCES: tuple[DataSource, ...] = (YahooSource(), EuronextSource(), FredSource(), EcbSource())
 """Every adapter, typed as the protocol: pyright rejects one that breaks the contract."""
 
 
@@ -173,5 +174,4 @@ def test_every_source_exposes_both_download_methods() -> None:
 def test_source_ids_are_unique_and_each_has_a_normalizer() -> None:
     source_ids = [source.source_id for source in ALL_SOURCES]
     assert len(set(source_ids)) == len(source_ids)
-    normalizer_ids = [YahooNormalizer.source_id, FredNormalizer.source_id, EcbNormalizer.source_id]
-    assert sorted(source_ids) == sorted(normalizer_ids)
+    assert sorted(source_ids) == sorted(NORMALIZERS)

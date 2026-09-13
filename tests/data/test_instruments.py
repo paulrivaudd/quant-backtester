@@ -18,6 +18,7 @@ import pytest
 from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.instruments import (
     AssetType,
+    CheckSource,
     DataType,
     Instrument,
     InstrumentRegistry,
@@ -460,6 +461,132 @@ def test_from_toml_accepts_the_native_toml_local_time(tmp_path):
 
     assert rule is not None
     assert rule.publication_time == time(16, 15)
+
+
+# --- check sources ------------------------------------------------------------
+
+EURONEXT_CW8 = CheckSource(source="EURONEXT", source_symbol="LU1681043599-XPAR")
+"""The committed second opinion on CW8: Euronext, under its ISIN."""
+
+
+def test_an_instrument_has_no_check_source_by_default() -> None:
+    """A single-source series needs no extra configuration."""
+    instrument = make_instrument()
+
+    assert instrument.check_sources == ()
+    assert instrument.sources == ("YAHOO",)
+
+
+def test_sources_list_the_primary_first_then_check_sources_in_order() -> None:
+    """The order is the declared one, so downloads and reports are reproducible."""
+    stooq = CheckSource(source="STOOQ", source_symbol="CW8")
+    instrument = make_instrument(check_sources=(EURONEXT_CW8, stooq))
+
+    assert instrument.sources == ("YAHOO", "EURONEXT", "STOOQ")
+
+
+def test_for_source_of_the_primary_is_the_instrument_itself() -> None:
+    """Asking for the primary source changes nothing."""
+    instrument = make_instrument(check_sources=(EURONEXT_CW8,))
+
+    assert instrument.for_source("YAHOO") is instrument
+
+
+def test_for_source_of_a_check_source_swaps_source_and_symbol_only() -> None:
+    """The adapter sees its own symbol; the download still lands under the same id."""
+    instrument = make_instrument(id="ETF_WORLD", check_sources=(EURONEXT_CW8,))
+
+    seen = instrument.for_source("EURONEXT")
+
+    assert (seen.primary_source, seen.source_symbol) == ("EURONEXT", "LU1681043599-XPAR")
+    assert seen.check_sources == ()
+    assert (seen.id, seen.calendar_id, seen.asset_type) == ("ETF_WORLD", "XPAR", AssetType.ETF)
+
+
+def test_for_source_of_an_unknown_source_raises_key_error() -> None:
+    """A source the instrument does not declare is a lookup miss, named in the message."""
+    with pytest.raises(KeyError, match="FRED"):
+        make_instrument(check_sources=(EURONEXT_CW8,)).for_source("FRED")
+
+
+@pytest.mark.parametrize(
+    "check_sources",
+    [
+        (CheckSource(source="YAHOO", source_symbol="CW8.PA"),),
+        (EURONEXT_CW8, CheckSource(source="EURONEXT", source_symbol="CW8")),
+    ],
+    ids=["primary-repeated", "check-source-repeated"],
+)
+def test_a_source_listed_twice_is_rejected(check_sources: tuple[CheckSource, ...]) -> None:
+    """Comparing a provider with itself would confirm anything."""
+    with pytest.raises(ValueError, match="more than once"):
+        make_instrument(check_sources=check_sources)
+
+
+def test_a_level_cannot_be_cross_checked() -> None:
+    """Only bars are compared across sources."""
+    with pytest.raises(ValueError, match="LEVEL"):
+        make_instrument(**LEVEL_FIELDS, check_sources=(EURONEXT_CW8,))
+
+
+def test_check_sources_must_be_a_tuple_of_check_sources() -> None:
+    """A list would make the frozen instrument mutable through its field."""
+    with pytest.raises(ValueError, match="tuple of CheckSource"):
+        make_instrument(check_sources=[EURONEXT_CW8])
+
+
+CHECKED_TOML = """
+[[instrument]]
+id = "ETF_WORLD"
+name = "Amundi MSCI World (PEA)"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "CW8.PA"
+calendar_id = "XPAR"
+tradable = true
+
+  [[instrument.check_sources]]
+  source = "EURONEXT"
+  source_symbol = "LU1681043599-XPAR"
+"""
+"""One cross-checked BAR, as ``instruments.toml`` declares CW8."""
+
+
+def test_from_toml_reads_check_sources(tmp_path: Path) -> None:
+    """An array of tables becomes a tuple of ``CheckSource``."""
+    registry = InstrumentRegistry.from_toml(write_toml(tmp_path, CHECKED_TOML))
+
+    assert registry.get("ETF_WORLD").check_sources == (EURONEXT_CW8,)
+
+
+def test_from_toml_rejects_an_unknown_key_in_a_check_source(tmp_path: Path) -> None:
+    """A typo in a check source fails loudly, naming the entry."""
+    typo = CHECKED_TOML.replace('source_symbol = "LU', 'symbol = "LU', 1)
+
+    with pytest.raises(ValueError, match="symbol") as excinfo:
+        InstrumentRegistry.from_toml(write_toml(tmp_path, typo))
+
+    assert "ETF_WORLD" in str(excinfo.value)
+
+
+def test_from_toml_names_a_check_source_missing_its_symbol(tmp_path: Path) -> None:
+    """Each check source needs its own symbol: none is inherited from the primary."""
+    without_symbol = CHECKED_TOML.replace('  source_symbol = "LU1681043599-XPAR"\n', "", 1)
+
+    with pytest.raises(ValueError, match="source_symbol") as excinfo:
+        InstrumentRegistry.from_toml(write_toml(tmp_path, without_symbol))
+
+    assert "check_sources[0]" in str(excinfo.value)
+
+
+def test_from_toml_rejects_check_sources_that_are_not_tables(tmp_path: Path) -> None:
+    """``check_sources = "EURONEXT"`` is not a shorthand: it would lose the symbol."""
+    flat = CHECKED_TOML.split("  [[instrument.check_sources]]")[0] + 'check_sources = "EURONEXT"\n'
+
+    with pytest.raises(ValueError, match="array"):
+        InstrumentRegistry.from_toml(write_toml(tmp_path, flat))
 
 
 COMMITTED_INSTRUMENTS = (
