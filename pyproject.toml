@@ -20,6 +20,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "exchange-calendars>=4.13.2",
+    "pyright>=1.1.414",
     "pytest>=9.1.1",
     "ruff>=0.16.7",
 ]
@@ -75,3 +76,12 @@ markers = [
     "network: tests that hit a live data provider (deselected by default, run with -m network)",
 ]
 filterwarnings = ["error"]
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+# pandas and pyarrow ship partial stubs; a missing one is not a finding we act on.
+reportMissingTypeStubs = false
