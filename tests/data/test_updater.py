@@ -1,8 +1,16 @@
-"""Ingestion: revision policy and the reproducibility property."""
+"""Ingestion: the pipeline, the revision policy and the reproducibility property.
+
+The sources and normalizers here are fakes: the updater's contract is with the
+two protocols, not with Yahoo. What is real is everything it decides - what gets
+archived, what gets promoted, what is refused, and what a replay of the archive
+rebuilds.
+"""
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from collections.abc import Callable, Mapping, Sequence
+from datetime import UTC, date, datetime, time, timedelta
+from pathlib import Path
 from typing import BinaryIO
 
 import pandas as pd
@@ -10,41 +18,669 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from quant_backtester.data.repository import write_parquet_atomic
-from quant_backtester.data.schemas import LEVELS_SCHEMA
+from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
+from quant_backtester.data.crosscheck import CrossCheckPolicy
+from quant_backtester.data.instruments import (
+    AssetType,
+    CheckSource,
+    DataType,
+    Instrument,
+    InstrumentRegistry,
+    PublicationRule,
+)
+from quant_backtester.data.normalizer import NormalizedData, bar_availability
+from quant_backtester.data.repository import MarketDataRepository, write_parquet_atomic
+from quant_backtester.data.revisions import AcceptedRevision, AcceptedRevisions
+from quant_backtester.data.schemas import (
+    BARS_SCHEMA,
+    CORPORATE_ACTIONS_SCHEMA,
+    LEVELS_SCHEMA,
+    ActionType,
+    CheckStatus,
+)
+from quant_backtester.data.sources.base import RawDownload, make_fetch_id
+from quant_backtester.data.updater import MarketDataUpdater
+
+FIRST_TICK = datetime(2026, 3, 13, 21, 0, tzinfo=UTC)
+"""Instant of the first fetch of a test. Every later one is a second apart."""
+
+RATE_RULE = PublicationRule(publication_time=time(16, 15), timezone="UTC")
+"""Trivial release rule: 16:15 UTC on the observation date."""
+
+MONDAY = date(2026, 3, 9)
+TUESDAY = date(2026, 3, 10)
+WEDNESDAY = date(2026, 3, 11)
+THURSDAY = date(2026, 3, 12)
+FRIDAY = date(2026, 3, 13)
+SESSIONS = (MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY)
+"""One ordinary week, open in Paris and in New York alike."""
+
+POLICY = CrossCheckPolicy(price_rel_tolerance=1e-6, volume_rel_tolerance=0.0)
+"""The committed tolerances, restated here so a change to the file is visible."""
 
 
-@pytest.mark.skip(reason="Exercice 9.5 - test 3/3")
-def test_rebuild_is_idempotent(market_root):
-    """Rebuilding the clean layer twice produces identical files.
+class Clock:
+    """A clock that advances one second per read, so fetch ids never collide."""
 
-    This is the test everyone forgets to write, and the one that proves the
-    pipeline has no hidden state: no clock read, no dictionary ordering, no
-    absolute path leaking into the output.
+    def __init__(self, start: datetime = FIRST_TICK) -> None:
+        self.now = start
+
+    def __call__(self) -> datetime:
+        """Return the current instant and move on by one second."""
+        instant = self.now
+        self.now = instant + timedelta(seconds=1)
+        return instant
+
+
+def raw_bars(rows: Sequence[tuple[date, float]], *, volume: float = 1_000.0) -> pd.DataFrame:
+    """Build a provider-shaped bars frame from ``(date, close)`` pairs.
+
+    The high and low sit one unit either side of the close, so a test that moves
+    one field by a cent produces a revision rather than an OHLC_ORDER error.
+    """
+    return pd.DataFrame(
+        [
+            {
+                "date": session_date,
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": volume,
+            }
+            for session_date, close in rows
+        ]
+    )
+
+
+def raw_levels(rows: Sequence[tuple[date, float]]) -> pd.DataFrame:
+    """Build a provider-shaped levels frame from ``(date, value)`` pairs."""
+    return pd.DataFrame([{"date": day, "value": value} for day, value in rows])
+
+
+def raw_actions(rows: Sequence[tuple[date, ActionType, float]]) -> pd.DataFrame:
+    """Build a provider-shaped actions frame from ``(ex_date, type, value)`` triples."""
+    return pd.DataFrame(
+        [
+            {"ex_date": ex_date, "action_type": action_type.value, "value": value}
+            for ex_date, action_type, value in rows
+        ],
+        columns=["ex_date", "action_type", "value"],
+    )
+
+
+class FakeSource:
+    """A provider serving the rows it was handed, restricted to the asked range.
+
+    Attributes
+    ----------
+    rows : dict[str, pd.DataFrame]
+        Bars or levels per instrument id; rewrite one to simulate a provider
+        changing its mind.
+    actions : dict[str, pd.DataFrame]
+        Corporate actions per instrument id. An instrument absent from it has no
+        action feed, like an index.
+    calls : list[tuple[str, date, date]]
+        Every range asked of it, in order.
     """
 
+    def __init__(
+        self,
+        source_id: str,
+        clock: Callable[[], datetime],
+        rows: Mapping[str, pd.DataFrame] | None = None,
+        actions: Mapping[str, pd.DataFrame] | None = None,
+    ) -> None:
+        self.source_id = source_id
+        self._clock = clock
+        self.rows: dict[str, pd.DataFrame] = dict(rows or {})
+        self.actions: dict[str, pd.DataFrame] = dict(actions or {})
+        self.calls: list[tuple[str, date, date]] = []
 
-@pytest.mark.skip(reason="Exercice 7.5")
-def test_unaccepted_revision_leaves_history_unchanged(market_root):
+    def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
+        """Return the rows of ``instrument`` inside ``[start, end]``."""
+        self.calls.append((instrument.id, start, end))
+        frame = self.rows.get(instrument.id, pd.DataFrame(columns=["date"]))
+        served = frame.loc[(frame["date"] >= start) & (frame["date"] <= end)]
+        retrieved = self._clock()
+        return RawDownload(
+            instrument_id=instrument.id,
+            source=self.source_id,
+            fetch_id=make_fetch_id(retrieved),
+            retrieved_at_utc=retrieved,
+            frame=served.reset_index(drop=True),
+            request={
+                "symbol": instrument.source_symbol,
+                "endpoint": "history",
+                "start": start.isoformat(),
+                "end_inclusive": end.isoformat(),
+            },
+        )
+
+    def download_corporate_actions(
+        self, instrument: Instrument, start: date, end: date
+    ) -> RawDownload | None:
+        """Return the actions of ``instrument`` inside ``[start, end]``, if it has a feed."""
+        if instrument.id not in self.actions:
+            return None
+        frame = self.actions[instrument.id]
+        served = frame.loc[(frame["ex_date"] >= start) & (frame["ex_date"] <= end)]
+        retrieved = self._clock()
+        return RawDownload(
+            instrument_id=instrument.id,
+            source=self.source_id,
+            fetch_id=f"{make_fetch_id(retrieved)}-actions",
+            retrieved_at_utc=retrieved,
+            frame=served.reset_index(drop=True),
+            request={
+                "symbol": instrument.source_symbol,
+                "endpoint": "actions",
+                "start": start.isoformat(),
+                "end_inclusive": end.isoformat(),
+            },
+        )
+
+
+class FakeNormalizer:
+    """Turn the fake provider's frames into canonical ones.
+
+    It does what a real normalizer does and nothing more: rename the date
+    column, stamp availability from the calendar, and copy the lineage of the
+    fetch onto every row.
+    """
+
+    def __init__(self, source_id: str) -> None:
+        self.source_id = source_id
+
+    def normalize(
+        self,
+        instrument: Instrument,
+        download: RawDownload,
+        calendar: TradingCalendar | None = None,
+    ) -> NormalizedData:
+        """Convert one response to canonical frames."""
+        if download.request.get("endpoint") == "actions":
+            return NormalizedData(corporate_actions=self._actions(instrument, download, calendar))
+        if instrument.data_type is DataType.BAR:
+            return NormalizedData(bars=self._bars(instrument, download, calendar))
+        return NormalizedData(levels=self._levels(instrument, download))
+
+    def _bars(
+        self, instrument: Instrument, download: RawDownload, calendar: TradingCalendar | None
+    ) -> pd.DataFrame:
+        if calendar is None:
+            raise ValueError(f"{instrument.id} is a BAR instrument and needs a calendar")
+        rows = []
+        for record in download.frame.to_dict("records"):
+            session_date = record["date"]
+            open_available, close_available = bar_availability(session_date, calendar)
+            rows.append(
+                {
+                    "instrument_id": instrument.id,
+                    "session_date": session_date,
+                    "open": float(record["open"]),
+                    "high": float(record["high"]),
+                    "low": float(record["low"]),
+                    "close": float(record["close"]),
+                    "volume": float(record["volume"]),
+                    "open_available_at_utc": pd.Timestamp(open_available),
+                    "close_available_at_utc": pd.Timestamp(close_available),
+                    "source": download.source,
+                    "source_fetch_id": download.fetch_id,
+                }
+            )
+        return _typed(rows, BARS_SCHEMA, ("open_available_at_utc", "close_available_at_utc"))
+
+    def _levels(self, instrument: Instrument, download: RawDownload) -> pd.DataFrame:
+        rule = instrument.publication_rule
+        if rule is None:
+            raise ValueError(f"{instrument.id} is a LEVEL instrument and needs a publication rule")
+        rows = [
+            {
+                "instrument_id": instrument.id,
+                "observation_date": record["date"],
+                "value": float(record["value"]),
+                "available_at_utc": pd.Timestamp(rule.available_at(record["date"])),
+                "source": download.source,
+                "source_fetch_id": download.fetch_id,
+            }
+            for record in download.frame.to_dict("records")
+        ]
+        return _typed(rows, LEVELS_SCHEMA, ("available_at_utc",))
+
+    def _actions(
+        self, instrument: Instrument, download: RawDownload, calendar: TradingCalendar | None
+    ) -> pd.DataFrame:
+        if calendar is None:
+            raise ValueError(f"{instrument.id} needs a calendar to date its actions")
+        rows = []
+        for record in download.frame.to_dict("records"):
+            ex_date = record["ex_date"]
+            _, close_available = bar_availability(ex_date, calendar)
+            rows.append(
+                {
+                    "instrument_id": instrument.id,
+                    "action_type": record["action_type"],
+                    "ex_date": ex_date,
+                    "value": float(record["value"]),
+                    "available_at_utc": pd.Timestamp(close_available),
+                    "source": download.source,
+                    "source_fetch_id": download.fetch_id,
+                }
+            )
+        return _typed(rows, CORPORATE_ACTIONS_SCHEMA, ("available_at_utc",))
+
+
+def _typed(
+    rows: list[dict[str, object]], schema: pa.Schema, instants: Sequence[str]
+) -> pd.DataFrame:
+    """Return the rows as a frame with the schema's columns and UTC instants."""
+    if not rows:
+        return schema.empty_table().to_pandas()
+    frame = pd.DataFrame(rows, columns=list(schema.names))
+    for column in instants:
+        frame[column] = frame[column].astype("datetime64[us, UTC]")
+    return frame
+
+
+@pytest.fixture
+def clock() -> Clock:
+    """Return the advancing clock shared by the sources and the updater."""
+    return Clock()
+
+
+@pytest.fixture
+def calendars(xnys: TradingCalendar, xpar: TradingCalendar) -> CalendarRegistry:
+    """Return the two venue calendars."""
+    return CalendarRegistry([xnys, xpar])
+
+
+@pytest.fixture
+def instruments() -> InstrumentRegistry:
+    """Return a single-source ETF, a two-source ETF, an index and a rate."""
+    return InstrumentRegistry(
+        [
+            Instrument(
+                id="ETF_EU",
+                name="Paris ETF",
+                asset_type=AssetType.ETF,
+                data_type=DataType.BAR,
+                currency="EUR",
+                primary_source="YAHOO",
+                source_symbol="CW8.PA",
+                tradable=True,
+                calendar_id="XPAR",
+                first_session=MONDAY,
+            ),
+            Instrument(
+                id="IDX_US",
+                name="US index",
+                asset_type=AssetType.INDEX,
+                data_type=DataType.BAR,
+                currency="USD",
+                primary_source="YAHOO",
+                source_symbol="^GSPC",
+                tradable=False,
+                calendar_id="XNYS",
+                first_session=MONDAY,
+            ),
+            Instrument(
+                id="RATE_US",
+                name="US rate",
+                asset_type=AssetType.RATE,
+                data_type=DataType.LEVEL,
+                currency="NA",
+                primary_source="FRED",
+                source_symbol="DGS10",
+                tradable=False,
+                publication_rule=RATE_RULE,
+                first_session=MONDAY,
+            ),
+        ]
+    )
+
+
+@pytest.fixture
+def repository(market_root: Path) -> MarketDataRepository:
+    """Return an empty repository on a temporary tree."""
+    return MarketDataRepository(market_root)
+
+
+@pytest.fixture
+def yahoo(clock: Clock) -> FakeSource:
+    """Return the primary source, serving one flat week for every instrument."""
+    return FakeSource(
+        "YAHOO",
+        clock,
+        rows={
+            "ETF_EU": raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)]),
+            "IDX_US": raw_bars([(day, 5_000.0 + index) for index, day in enumerate(SESSIONS)]),
+        },
+        actions={"ETF_EU": raw_actions([(WEDNESDAY, ActionType.DIVIDEND, 0.5)])},
+    )
+
+
+@pytest.fixture
+def fred(clock: Clock) -> FakeSource:
+    """Return the level source."""
+    return FakeSource(
+        "FRED",
+        clock,
+        rows={
+            "RATE_US": raw_levels([(day, 4.0 + index / 10) for index, day in enumerate(SESSIONS)])
+        },
+    )
+
+
+def build_updater(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    sources: Mapping[str, FakeSource],
+    clock: Clock,
+    accepted: AcceptedRevisions | None = None,
+    overlap_sessions: int = 5,
+) -> MarketDataUpdater:
+    """Wire an updater onto the fakes."""
+    return MarketDataUpdater(
+        repository=repository,
+        instruments=instruments,
+        calendars=calendars,
+        sources=dict(sources),
+        normalizers={source_id: FakeNormalizer(source_id) for source_id in sources},
+        accepted_revisions=accepted or AcceptedRevisions([]),
+        cross_check_policy=POLICY,
+        overlap_sessions=overlap_sessions,
+        clock=clock,
+    )
+
+
+@pytest.fixture
+def updater(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> MarketDataUpdater:
+    """Return an updater over the two fake sources."""
+    return build_updater(repository, instruments, calendars, {"YAHOO": yahoo, "FRED": fred}, clock)
+
+
+def codes(report) -> list[str]:
+    """Return the codes of a report's issues, in order."""
+    return [issue.code for issue in report.issues]
+
+
+# ---------------------------------------------------------------------------
+# Exercice 9.1 - construction
+# ---------------------------------------------------------------------------
+
+
+def test_a_negative_overlap_is_rejected(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """Re-fetching a negative number of sessions is a caller bug."""
+    with pytest.raises(ValueError, match="overlap_sessions"):
+        build_updater(repository, instruments, calendars, {}, clock, overlap_sessions=-1)
+
+
+# ---------------------------------------------------------------------------
+# Exercice 9.2 - download
+# ---------------------------------------------------------------------------
+
+
+def test_download_archives_raw_then_promotes(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """The happy path: raw archived, clean written, checked series written."""
+    report = updater.download("ETF_EU", MONDAY, FRIDAY)
+    assert report.valid
+
+    fetches = repository.list_raw_fetches("ETF_EU", "YAHOO")
+    assert len(fetches) == 2  # the bars fetch and the actions fetch
+
+    bars = repository.load_bars("ETF_EU")
+    assert list(bars["session_date"]) == list(SESSIONS)
+    assert list(bars["close"]) == [100.0, 101.0, 102.0, 103.0, 104.0]
+
+    checked = repository.load_checked_bars("ETF_EU")
+    assert list(checked["session_date"]) == list(SESSIONS)
+    assert set(checked["check_status"]) == {CheckStatus.SINGLE_SOURCE.value}
+
+    actions = repository.load_corporate_actions("ETF_EU")
+    assert list(actions["ex_date"]) == [WEDNESDAY]
+
+
+def test_download_of_a_level_writes_the_levels_table(
+    updater: MarketDataUpdater, repository: MarketDataRepository
+) -> None:
+    """A published series takes the same path, without a calendar."""
+    report = updater.download("RATE_US", MONDAY, FRIDAY)
+    assert report.valid
+    levels = repository.load_levels("RATE_US")
+    assert list(levels["observation_date"]) == list(SESSIONS)
+    assert repository.load_bars("RATE_US").empty
+
+
+def test_invalid_frame_is_archived_raw_but_not_promoted(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """A failed validation keeps the raw snapshot and leaves clean untouched."""
+    broken = raw_bars([(day, 100.0) for day in SESSIONS])
+    broken.loc[2, "low"] = 500.0  # low above high: OHLC_ORDER
+    yahoo.rows["ETF_EU"] = broken
+
+    report = updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert not report.valid
+    assert "OHLC_ORDER" in codes(report)
+    assert repository.list_raw_fetches("ETF_EU", "YAHOO")
+    assert repository.load_bars("ETF_EU").empty
+    assert repository.load_checked_bars("ETF_EU").empty
+    log = pq.read_table(repository.root / "validation" / "validation_log.parquet").to_pandas()
+    assert "OHLC_ORDER" in set(log["code"])
+
+
+def test_download_refuses_an_inverted_range(updater: MarketDataUpdater) -> None:
+    """An inverted range is a caller bug, not an empty fetch."""
+    with pytest.raises(ValueError, match="is after end"):
+        updater.download("ETF_EU", FRIDAY, MONDAY)
+
+
+def test_two_sources_that_agree_are_confirmed(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """A check source that matches turns SINGLE_SOURCE into CONFIRMED."""
+    checked_instrument = Instrument(
+        id="ETF_EU",
+        name="Paris ETF",
+        asset_type=AssetType.ETF,
+        data_type=DataType.BAR,
+        currency="EUR",
+        primary_source="YAHOO",
+        source_symbol="CW8.PA",
+        tradable=True,
+        calendar_id="XPAR",
+        first_session=MONDAY,
+        check_sources=(
+            __import__("quant_backtester.data.instruments", fromlist=["CheckSource"]).CheckSource(
+                source="EURONEXT", source_symbol="LU-XPAR"
+            ),
+        ),
+    )
+    registry = InstrumentRegistry([checked_instrument])
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    sources = {
+        "YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}),
+        "EURONEXT": FakeSource("EURONEXT", clock, rows={"ETF_EU": week.copy()}),
+    }
+    updater = build_updater(repository, registry, calendars, sources, clock)
+
+    report = updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert report.valid
+    checked = repository.load_checked_bars("ETF_EU")
+    assert set(checked["check_status"]) == {CheckStatus.CONFIRMED.value}
+    assert set(checked["checked_sources"]) == {"EURONEXT,YAHOO"}
+    # The stored bars stay the reference source's.
+    assert set(repository.load_bars("ETF_EU")["source"]) == {"YAHOO"}
+
+
+def test_two_sources_that_disagree_are_a_conflict(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """One session out of tolerance is marked, and the others are not."""
+    registry = InstrumentRegistry(
+        [
+            Instrument(
+                id="ETF_EU",
+                name="Paris ETF",
+                asset_type=AssetType.ETF,
+                data_type=DataType.BAR,
+                currency="EUR",
+                primary_source="YAHOO",
+                source_symbol="CW8.PA",
+                tradable=True,
+                calendar_id="XPAR",
+                first_session=MONDAY,
+                check_sources=(CheckSource(source="EURONEXT", source_symbol="LU-XPAR"),),
+            )
+        ]
+    )
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    other = week.copy()
+    other.loc[2, ["open", "high", "low", "close"]] = 90.0
+    sources = {
+        "YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}),
+        "EURONEXT": FakeSource("EURONEXT", clock, rows={"ETF_EU": other}),
+    }
+    updater = build_updater(repository, registry, calendars, sources, clock)
+
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    checked = repository.load_checked_bars("ETF_EU")
+    verdicts = dict(zip(checked["session_date"], checked["check_status"], strict=True))
+    assert verdicts[WEDNESDAY] == CheckStatus.CONFLICT.value
+    assert verdicts[TUESDAY] == CheckStatus.CONFIRMED.value
+
+
+# ---------------------------------------------------------------------------
+# Exercice 9.3 - update and the revision policy
+# ---------------------------------------------------------------------------
+
+
+def test_update_refetches_the_overlap_only(updater: MarketDataUpdater, yahoo: FakeSource) -> None:
+    """The second call starts `overlap_sessions` stored dates back, not at the beginning."""
+    updater.download("ETF_EU", MONDAY, WEDNESDAY)
+    yahoo.calls.clear()
+
+    updater.update("ETF_EU")
+
+    instrument_id, start, _ = yahoo.calls[0]
+    assert instrument_id == "ETF_EU"
+    # Three sessions stored, an overlap of five: back to the first of them.
+    assert start == MONDAY
+
+
+def test_update_of_an_empty_store_starts_at_the_first_session(
+    updater: MarketDataUpdater, yahoo: FakeSource, repository: MarketDataRepository
+) -> None:
+    """With nothing stored, the instrument's declared first session is the start."""
+    updater.update("ETF_EU")
+    assert yahoo.calls[0][1] == MONDAY
+    assert list(repository.load_bars("ETF_EU")["session_date"]) == list(SESSIONS)
+
+
+def test_new_observations_are_not_reported_as_revisions(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """A date present only in the incoming frame is new data, not a revision."""
+    updater.download("ETF_EU", MONDAY, WEDNESDAY)
+    report = updater.update("ETF_EU")
+
+    assert list(repository.load_bars("ETF_EU")["session_date"]) == list(SESSIONS)
+    assert repository.load_revisions("ETF_EU").empty
+    assert "VALUE_REVISED" not in codes(report)
+
+
+def test_unaccepted_revision_leaves_history_unchanged(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
     """A provider changing a stored value is logged and ignored by default.
 
     The same backtest must not print a different number three weeks later
     because Yahoo adjusted a past close by a cent.
     """
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    moved = yahoo.rows["ETF_EU"].copy()
+    moved.loc[1, "close"] = 101.01
+    yahoo.rows["ETF_EU"] = moved
+
+    report = updater.update("ETF_EU")
+
+    stored = repository.load_bars("ETF_EU")
+    assert dict(zip(stored["session_date"], stored["close"], strict=True))[TUESDAY] == 101.0
+    revisions = repository.load_revisions("ETF_EU")
+    assert list(revisions["field"]) == ["close"]
+    assert list(revisions["old_value"]) == [101.0]
+    assert list(revisions["new_value"]) == [101.01]
+    assert "VALUE_REVISED" in codes(report)
+    assert "kept as stored" in report.issues[codes(report).index("VALUE_REVISED")].message
 
 
-@pytest.mark.skip(reason="Exercice 7.5")
-def test_accepted_revision_is_applied(market_root):
+def test_accepted_revision_is_applied(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
     """A revision listed in accepted_revisions.toml does get applied."""
+    accepted = AcceptedRevisions(
+        [
+            AcceptedRevision(
+                instrument_id="ETF_EU",
+                table="bars",
+                observation_date=TUESDAY,
+                field="close",
+                reason="Provider confirmed the Tuesday close was mispriced",
+            )
+        ]
+    )
+    updater = build_updater(
+        repository, instruments, calendars, {"YAHOO": yahoo, "FRED": fred}, clock, accepted
+    )
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    first_fetch = repository.load_bars("ETF_EU")["source_fetch_id"].iloc[1]
+    moved = yahoo.rows["ETF_EU"].copy()
+    moved.loc[1, "close"] = 101.01
+    yahoo.rows["ETF_EU"] = moved
+
+    updater.update("ETF_EU")
+
+    stored = repository.load_bars("ETF_EU")
+    row = stored.loc[stored["session_date"] == TUESDAY].iloc[0]
+    assert row["close"] == 101.01
+    # The row now answers to the fetch that moved it.
+    assert row["source_fetch_id"] != first_fetch
+    # And the unreviewed open of the same day did not travel with it.
+    assert row["open"] == 101.0
 
 
-@pytest.mark.skip(reason="Exercice 7.4")
-def test_new_observations_are_not_reported_as_revisions(market_root):
-    """A date present only in the incoming frame is new data, not a revision."""
-
-
-@pytest.mark.skip(reason="Exercice 9.3")
-def test_constant_factor_shift_triggers_a_full_refetch(market_root):
+def test_constant_factor_shift_triggers_a_full_refetch(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
     """A whole-series rebasing is not a revision and must not be merged partially.
 
     If the overlap differs from the stored rows by a constant factor, the
@@ -52,6 +688,361 @@ def test_constant_factor_shift_triggers_a_full_refetch(market_root):
     fabricate a fake move in the middle of the series - one that passes every
     other check.
     """
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    before = repository.load_bars("ETF_EU").copy()
+    rebased = yahoo.rows["ETF_EU"].copy()
+    for column in ("open", "high", "low", "close"):
+        rebased[column] = rebased[column] / 4.0
+    yahoo.rows["ETF_EU"] = rebased
+    yahoo.calls.clear()
+
+    report = updater.update("ETF_EU")
+
+    assert not report.valid
+    assert "SERIES_REBASED" in codes(report)
+    # Not one value moved, and the checked series did not move either.
+    pd.testing.assert_frame_equal(repository.load_bars("ETF_EU"), before)
+    # The new basis is on disk as evidence: the overlap fetch, then the full one.
+    assert yahoo.calls[-1] == ("ETF_EU", MONDAY, FRIDAY)
+    assert len(repository.list_raw_fetches("ETF_EU", "YAHOO")) == 6
+
+
+def test_a_single_changed_value_is_not_read_as_a_rebasing(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """One field moving is the ordinary revision path, guard or no guard."""
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    moved = yahoo.rows["ETF_EU"].copy()
+    moved.loc[1, "close"] = 101.01
+    yahoo.rows["ETF_EU"] = moved
+
+    report = updater.update("ETF_EU")
+
+    assert report.valid
+    assert "SERIES_REBASED" not in codes(report)
+
+
+def test_a_rebased_level_series_is_caught_too(
+    updater: MarketDataUpdater, repository: MarketDataRepository, fred: FakeSource
+) -> None:
+    """A rate switching from percent to fraction is the same failure, unpriced."""
+    updater.download("RATE_US", MONDAY, FRIDAY)
+    before = repository.load_levels("RATE_US").copy()
+    rebased = fred.rows["RATE_US"].copy()
+    rebased["value"] = rebased["value"] / 100.0
+    fred.rows["RATE_US"] = rebased
+
+    report = updater.update("RATE_US")
+
+    assert "SERIES_REBASED" in codes(report)
+    pd.testing.assert_frame_equal(repository.load_levels("RATE_US"), before)
+
+
+def test_a_verdict_change_is_reported(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """A check source arriving late may downgrade a session, and must say so."""
+    instrument = Instrument(
+        id="ETF_EU",
+        name="Paris ETF",
+        asset_type=AssetType.ETF,
+        data_type=DataType.BAR,
+        currency="EUR",
+        primary_source="YAHOO",
+        source_symbol="CW8.PA",
+        tradable=True,
+        calendar_id="XPAR",
+        first_session=MONDAY,
+        check_sources=(CheckSource(source="EURONEXT", source_symbol="LU-XPAR"),),
+    )
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    disagreeing = week.copy()
+    disagreeing.loc[2, ["open", "high", "low", "close"]] = 90.0
+    euronext = FakeSource("EURONEXT", clock, rows={"ETF_EU": week.copy()})
+    updater = build_updater(
+        repository,
+        InstrumentRegistry([instrument]),
+        calendars,
+        {"YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}), "EURONEXT": euronext},
+        clock,
+    )
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    euronext.rows["ETF_EU"] = disagreeing
+
+    report = updater.update("ETF_EU")
+
+    assert "CHECK_STATUS_CHANGED" in codes(report)
+    checked = repository.load_checked_bars("ETF_EU")
+    verdicts = dict(zip(checked["session_date"], checked["check_status"], strict=True))
+    assert verdicts[WEDNESDAY] == CheckStatus.CONFLICT.value
+
+
+def test_a_stored_corporate_action_is_never_rewritten(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """A restated dividend is reported and the stored one is kept.
+
+    Applying it would move every adjusted price before that ex-date, silently.
+    """
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    yahoo.actions["ETF_EU"] = raw_actions([(WEDNESDAY, ActionType.DIVIDEND, 0.75)])
+
+    report = updater.update("ETF_EU")
+
+    actions = repository.load_corporate_actions("ETF_EU")
+    assert list(actions["value"]) == [0.5]
+    assert "ACTION_REVISED" in codes(report)
+
+
+def test_a_new_corporate_action_is_added(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """An event we did not have is stored, next to the one we did."""
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    yahoo.actions["ETF_EU"] = raw_actions(
+        [(WEDNESDAY, ActionType.DIVIDEND, 0.5), (THURSDAY, ActionType.SPLIT, 4.0)]
+    )
+
+    updater.update("ETF_EU")
+
+    actions = repository.load_corporate_actions("ETF_EU")
+    assert list(zip(actions["ex_date"], actions["action_type"], strict=True)) == [
+        (WEDNESDAY, "DIVIDEND"),
+        (THURSDAY, "SPLIT"),
+    ]
+
+
+def test_an_action_withdrawn_by_the_provider_is_reported_and_kept(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """A dividend that disappears from a fetch covering its ex-date is loud."""
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    yahoo.actions["ETF_EU"] = raw_actions([])
+
+    report = updater.update("ETF_EU")
+
+    assert "ACTION_ABSENT" in codes(report)
+    assert list(repository.load_corporate_actions("ETF_EU")["value"]) == [0.5]
+
+
+def test_corporate_actions_of_other_instruments_survive(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """The actions table is global: writing one instrument must not empty it."""
+    yahoo.actions["IDX_US"] = raw_actions([(TUESDAY, ActionType.DIVIDEND, 0.1)])
+    updater.download("IDX_US", MONDAY, FRIDAY)
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert list(repository.load_corporate_actions("IDX_US")["value"]) == [0.1]
+    assert list(repository.load_corporate_actions("ETF_EU")["value"]) == [0.5]
+
+
+# ---------------------------------------------------------------------------
+# Exercice 9.4 - update_all
+# ---------------------------------------------------------------------------
+
+
+def test_update_all_reports_every_instrument(
+    updater: MarketDataUpdater, repository: MarketDataRepository
+) -> None:
+    """Every registered instrument comes back with a report."""
+    reports = updater.update_all()
+    assert sorted(reports) == ["ETF_EU", "IDX_US", "RATE_US"]
+    assert all(report.valid for report in reports.values())
+    assert not repository.load_bars("IDX_US").empty
+
+
+def test_one_failing_instrument_does_not_stop_the_others(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    clock: Clock,
+) -> None:
+    """A source missing for one instrument is an error on that one alone."""
+    # No FRED adapter: RATE_US cannot be fetched.
+    updater = build_updater(repository, instruments, calendars, {"YAHOO": yahoo}, clock)
+
+    reports = updater.update_all()
+
+    assert codes(reports["RATE_US"]) == ["UPDATE_FAILED"]
+    assert not reports["RATE_US"].valid
+    assert reports["ETF_EU"].valid
+    assert not repository.load_bars("ETF_EU").empty
+    log = pq.read_table(repository.root / "validation" / "validation_log.parquet").to_pandas()
+    assert "UPDATE_FAILED" in set(log["code"])
+
+
+# ---------------------------------------------------------------------------
+# Exercice 9.5 - rebuild
+# ---------------------------------------------------------------------------
+
+
+def test_rebuild_is_idempotent(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """Rebuilding the clean layer twice produces identical files.
+
+    This is the test everyone forgets to write, and the one that proves the
+    pipeline has no hidden state: no clock read, no dictionary ordering, no
+    absolute path leaking into the output.
+    """
+    updater.download("ETF_EU", MONDAY, WEDNESDAY)
+    updater.update("ETF_EU")
+    live = _clean_bytes(repository, "ETF_EU")
+
+    updater.rebuild_clean("ETF_EU")
+    first = _clean_bytes(repository, "ETF_EU")
+    updater.rebuild_clean("ETF_EU")
+    second = _clean_bytes(repository, "ETF_EU")
+
+    assert first == second
+    # And a rebuild reproduces what the live pipeline had written.
+    assert first == live
+
+
+def test_rebuild_replays_the_policy_not_the_last_fetch(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """The first value stored wins on replay, exactly as it did live."""
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    moved = yahoo.rows["ETF_EU"].copy()
+    moved.loc[1, "close"] = 101.01
+    yahoo.rows["ETF_EU"] = moved
+    updater.update("ETF_EU")
+
+    updater.rebuild_clean("ETF_EU")
+
+    stored = repository.load_bars("ETF_EU")
+    assert dict(zip(stored["session_date"], stored["close"], strict=True))[TUESDAY] == 101.0
+
+
+def test_rebuild_does_not_append_to_the_logs(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """Replaying the archive is not a second arrival of the data."""
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    moved = yahoo.rows["ETF_EU"].copy()
+    moved.loc[1, "close"] = 101.01
+    yahoo.rows["ETF_EU"] = moved
+    updater.update("ETF_EU")
+    revisions_before = len(repository.load_revisions("ETF_EU"))
+    log_before = len(
+        pq.read_table(repository.root / "validation" / "validation_log.parquet").to_pandas()
+    )
+
+    report = updater.rebuild_clean("ETF_EU")
+
+    assert len(repository.load_revisions("ETF_EU")) == revisions_before
+    assert (
+        len(pq.read_table(repository.root / "validation" / "validation_log.parquet").to_pandas())
+        == log_before
+    )
+    # The issues are still reported to the caller.
+    assert report.instrument_id == "ETF_EU"
+
+
+@pytest.mark.parametrize("euronext_first", [False, True])
+def test_rebuild_reproduces_a_two_source_checked_series(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+    euronext_first: bool,
+) -> None:
+    """Replaying one archived fetch at a time must reach the verdicts of the live run.
+
+    The live path downloads every source in one go and cross-checks them
+    together; a replay meets them one fetch at a time. Judging each fetch on its
+    own would quietly turn every CONFIRMED and CONFLICT back into
+    SINGLE_SOURCE - the rebuilt series would look clean and mean less.
+
+    The two orders matter: sources fetched within the same second share a fetch
+    id, and the replay then starts with the check source.
+    """
+    instrument = Instrument(
+        id="ETF_EU",
+        name="Paris ETF",
+        asset_type=AssetType.ETF,
+        data_type=DataType.BAR,
+        currency="EUR",
+        primary_source="YAHOO",
+        source_symbol="CW8.PA",
+        tradable=True,
+        calendar_id="XPAR",
+        first_session=MONDAY,
+        check_sources=(CheckSource(source="EURONEXT", source_symbol="LU-XPAR"),),
+    )
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    disagreeing = week.copy()
+    disagreeing.loc[2, ["open", "high", "low", "close"]] = 90.0
+    # A frozen clock for the check source puts both fetches in the same second,
+    # so the replay starts with EURONEXT rather than with the primary source.
+    euronext_clock = Clock() if not euronext_first else (lambda: FIRST_TICK)
+    sources = {
+        "YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}),
+        "EURONEXT": FakeSource("EURONEXT", euronext_clock, rows={"ETF_EU": disagreeing}),
+    }
+    updater = build_updater(repository, InstrumentRegistry([instrument]), calendars, sources, clock)
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    live = _clean_bytes(repository, "ETF_EU")
+    live_verdicts = dict(
+        zip(
+            repository.load_checked_bars("ETF_EU")["session_date"],
+            repository.load_checked_bars("ETF_EU")["check_status"],
+            strict=True,
+        )
+    )
+    assert live_verdicts[WEDNESDAY] == CheckStatus.CONFLICT.value
+    assert live_verdicts[TUESDAY] == CheckStatus.CONFIRMED.value
+
+    updater.rebuild_clean("ETF_EU")
+
+    assert _clean_bytes(repository, "ETF_EU") == live
+
+
+def test_rebuild_leaves_other_instruments_alone(
+    updater: MarketDataUpdater, repository: MarketDataRepository
+) -> None:
+    """Rebuilding one instrument must not touch another's rows or actions."""
+    updater.download("IDX_US", MONDAY, FRIDAY)
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    before = repository.load_bars("IDX_US")
+
+    updater.rebuild_clean("ETF_EU")
+
+    pd.testing.assert_frame_equal(repository.load_bars("IDX_US"), before)
+    assert list(repository.load_corporate_actions("ETF_EU")["value"]) == [0.5]
+
+
+def test_rebuild_needs_no_network(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """The archive is enough: a rebuild asks the provider nothing."""
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    yahoo.calls.clear()
+
+    updater.rebuild_clean("ETF_EU")
+
+    assert yahoo.calls == []
+    assert list(repository.load_bars("ETF_EU")["session_date"]) == list(SESSIONS)
+
+
+def _clean_bytes(repository: MarketDataRepository, instrument_id: str) -> dict[str, bytes]:
+    """Return the raw bytes of an instrument's clean files, keyed by table."""
+    clean = repository.root / "clean"
+    files = {
+        "bars": clean / "bars" / f"{instrument_id}.parquet",
+        "checked_bars": clean / "checked_bars" / f"{instrument_id}.parquet",
+        "corporate_actions": clean / "corporate_actions.parquet",
+    }
+    return {name: path.read_bytes() for name, path in files.items() if path.exists()}
+
+
+# ---------------------------------------------------------------------------
+# Storage safety, independent of any exercise
+# ---------------------------------------------------------------------------
 
 
 def test_interrupted_write_leaves_the_previous_file_intact(market_root, monkeypatch):
@@ -82,8 +1073,3 @@ def test_interrupted_write_leaves_the_previous_file_intact(market_root, monkeypa
 
     assert path.read_bytes() == before
     assert [p.name for p in path.parent.iterdir()] == ["US10Y.parquet"]
-
-
-@pytest.mark.skip(reason="Exercice 9.2")
-def test_invalid_frame_is_archived_raw_but_not_promoted(market_root):
-    """A failed validation keeps the raw snapshot and leaves clean untouched."""
