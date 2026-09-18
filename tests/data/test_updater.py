@@ -29,6 +29,7 @@ from quant_backtester.data.instruments import (
     PublicationRule,
 )
 from quant_backtester.data.normalizer import NormalizedData, bar_availability
+from quant_backtester.data.reader import MarketDataReader, ObservationStatus
 from quant_backtester.data.repository import MarketDataRepository, write_parquet_atomic
 from quant_backtester.data.revisions import AcceptedRevision, AcceptedRevisions
 from quant_backtester.data.schemas import (
@@ -942,6 +943,63 @@ def test_rebuild_does_not_append_to_the_logs(
     )
     # The issues are still reported to the caller.
     assert report.instrument_id == "ETF_EU"
+
+
+def test_an_incomplete_primary_bar_is_replaced_by_the_complete_one(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """The CW8 case of 2026-09-17, end to end.
+
+    Yahoo served the session without a close while Euronext had the full bar.
+    The checked row must carry the exchange's close, the session must not be
+    condemned over a value only one source held, and the reader must serve it.
+    """
+    instrument = Instrument(
+        id="ETF_EU",
+        name="Paris ETF",
+        asset_type=AssetType.ETF,
+        data_type=DataType.BAR,
+        currency="EUR",
+        primary_source="YAHOO",
+        source_symbol="CW8.PA",
+        tradable=True,
+        calendar_id="XPAR",
+        first_session=MONDAY,
+        check_sources=(CheckSource(source="EURONEXT", source_symbol="LU-XPAR"),),
+    )
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    incomplete = week.copy()
+    incomplete.loc[4, "close"] = float("nan")
+    registry = InstrumentRegistry([instrument])
+    updater = build_updater(
+        repository,
+        registry,
+        calendars,
+        {
+            "YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": incomplete}),
+            "EURONEXT": FakeSource("EURONEXT", clock, rows={"ETF_EU": week}),
+        },
+        clock,
+    )
+
+    report = updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert report.valid
+    assert "MISSING_PRICE" in codes(report)  # the hole is still said out loud
+    checked = repository.load_checked_bars("ETF_EU")
+    friday_row = checked.loc[checked["session_date"] == FRIDAY].iloc[0]
+    assert friday_row["close"] == 104.0
+    assert friday_row["source"] == "EURONEXT"
+    assert friday_row["check_status"] == CheckStatus.CONFIRMED.value
+    assert friday_row["conflicting_fields"] == ""
+
+    reader = MarketDataReader(repository, registry, calendars, reference_calendar_id="XPAR")
+    values = reader.at(datetime(2026, 3, 13, 21, 0, tzinfo=UTC)).values(["ETF_EU"])
+    assert values.loc["ETF_EU", "value"] == 104.0
+    assert values.loc["ETF_EU", "status"] is ObservationStatus.OK
 
 
 @pytest.mark.parametrize("euronext_first", [False, True])

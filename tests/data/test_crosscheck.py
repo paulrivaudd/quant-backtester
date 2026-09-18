@@ -42,6 +42,7 @@ def bars(
     source: str,
     sessions: list[date] = SESSIONS,
     closes: list[float] | None = None,
+    lows: list[float] | None = None,
     volumes: list[float] | None = None,
     instrument_id: str = "ETF_WORLD",
 ) -> pd.DataFrame:
@@ -58,7 +59,7 @@ def bars(
             "session_date": sessions,
             "open": [99.0 + offset for offset in offsets],
             "high": [101.0 + offset for offset in offsets],
-            "low": [98.0 + offset for offset in offsets],
+            "low": lows if lows is not None else [98.0 + offset for offset in offsets],
             "close": closes if closes is not None else [100.0 + offset for offset in offsets],
             "volume": volumes if volumes is not None else [1000.0] * count,
             "open_available_at_utc": [
@@ -148,18 +149,68 @@ def test_a_volume_mismatch_is_a_conflict_even_with_equal_prices() -> None:
     assert checked["max_volume_rel_diff"].tolist()[0] == 1.0
 
 
-def test_a_value_missing_on_one_side_only_is_a_conflict() -> None:
+def test_a_value_missing_on_one_side_only_is_unconfirmed_not_conflicting() -> None:
+    """An absence says nothing about the value the other source holds.
+
+    This is the CW8 bar of 2026-09-17: Yahoo served open, high and low with no
+    close, Euronext had the full bar. Counting the absence as an infinite
+    difference discarded the whole session, and with it the exchange's own
+    close - the reader then reported the instrument missing for that day.
+    """
     yahoo = bars("YAHOO", closes=[math.nan, 101.0, 102.0])
     checked = check({"YAHOO": yahoo, "EURONEXT": bars("EURONEXT")})
-    assert checked["check_status"].tolist()[0] == "CONFLICT"
-    assert checked["max_price_rel_diff"].tolist()[0] == math.inf
+    assert checked["check_status"].tolist()[0] == "CONFIRMED"
+    assert checked["conflicting_fields"].tolist()[0] == ""
+    assert checked["unconfirmed_fields"].tolist()[0] == "close"
+    # The differences ignore the field nobody could compare.
+    assert checked["max_price_rel_diff"].tolist()[0] == 0.0
 
 
-def test_a_value_missing_on_both_sides_does_not_conflict() -> None:
+def test_an_incomplete_reference_row_gives_way_to_a_complete_one() -> None:
+    """The stored row is the one that has the prices, not the one we prefer.
+
+    Provenance stays single: the row comes from one source and one fetch, so it
+    is still verifiable against a single raw snapshot.
+    """
+    yahoo = bars("YAHOO", closes=[math.nan, 101.0, 102.0])
+    checked = check({"YAHOO": yahoo, "EURONEXT": bars("EURONEXT")}, reference="YAHOO")
+    assert checked["close"].tolist()[0] == 100.0
+    assert checked["source"].tolist()[0] == "EURONEXT"
+    assert checked["source_fetch_id"].tolist()[0] == FETCH_IDS["EURONEXT"]
+    # The reference keeps its rows wherever it is complete.
+    assert checked["source"].tolist()[1:] == ["YAHOO", "YAHOO"]
+
+
+def test_a_row_incomplete_everywhere_is_stored_as_it_is() -> None:
+    """When no source has the close, the gap is stored rather than invented."""
     yahoo = bars("YAHOO", closes=[math.nan, 101.0, 102.0])
     euronext = bars("EURONEXT", closes=[math.nan, 101.0, 102.0])
     checked = check({"YAHOO": yahoo, "EURONEXT": euronext})
+    assert math.isnan(checked["close"].tolist()[0])
     assert checked["check_status"].tolist()[0] == "CONFIRMED"
+    assert checked["unconfirmed_fields"].tolist()[0] == "close"
+
+
+def test_only_the_disagreeing_field_is_reported() -> None:
+    """The real CW8 case: the lows differ, everything else matches to the cent.
+
+    Withholding the close because of the low is how a good number ends up
+    hidden behind a bad one.
+    """
+    yahoo = bars("YAHOO", lows=[98.2, 99.0, 100.0])
+    euronext = bars("EURONEXT", lows=[98.0, 99.0, 100.0])
+    checked = check({"YAHOO": yahoo, "EURONEXT": euronext})
+    assert checked["check_status"].tolist()[0] == "CONFLICT"
+    assert checked["conflicting_fields"].tolist()[0] == "low"
+    assert checked["unconfirmed_fields"].tolist()[0] == ""
+
+
+def test_a_single_source_leaves_every_field_unconfirmed() -> None:
+    """Nothing was corroborated, and the row says so field by field."""
+    checked = check({"YAHOO": bars("YAHOO")})
+    assert checked["check_status"].tolist()[0] == "SINGLE_SOURCE"
+    assert checked["unconfirmed_fields"].tolist()[0] == "close,high,low,open,volume"
+    assert checked["conflicting_fields"].tolist()[0] == ""
 
 
 def test_a_conflict_keeps_the_reference_values_and_lineage() -> None:

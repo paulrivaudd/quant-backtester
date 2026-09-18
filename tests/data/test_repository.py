@@ -541,6 +541,8 @@ def make_checked_bars(
         check_status=[status] * count,
         checked_sources=["EURONEXT,YAHOO"] * count,
         checked_fetch_ids=[f"EURONEXT:{FETCH_ID},YAHOO:{FETCH_ID}"] * count,
+        conflicting_fields=[""] * count,
+        unconfirmed_fields=[""] * count,
         max_price_rel_diff=[0.0] * count,
         max_volume_rel_diff=[0.0] * count,
     )
@@ -563,6 +565,7 @@ def test_checked_bars_keep_every_status_and_missing_differences(market_root: Pat
     repository = MarketDataRepository(market_root)
     checked = make_checked_bars(status="SINGLE_SOURCE").assign(
         checked_sources=["YAHOO"] * len(SESSIONS),
+        unconfirmed_fields=["close,high,low,open,volume"] * len(SESSIONS),
         max_price_rel_diff=[float("nan")] * len(SESSIONS),
         max_volume_rel_diff=[float("nan")] * len(SESSIONS),
     )

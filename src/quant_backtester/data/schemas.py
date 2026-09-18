@@ -127,20 +127,35 @@ CHECKED_BARS_SCHEMA: Final = pa.schema(
         pa.field("check_status", pa.string(), nullable=False),
         pa.field("checked_sources", pa.string(), nullable=False),
         pa.field("checked_fetch_ids", pa.string(), nullable=False),
+        pa.field("conflicting_fields", pa.string(), nullable=False),
+        pa.field("unconfirmed_fields", pa.string(), nullable=False),
         pa.field("max_price_rel_diff", pa.float64()),
         pa.field("max_volume_rel_diff", pa.float64()),
     ]
 )
 """Bars after cross-checking every source configured for an instrument.
 
-The bar fields are the reference source's whenever it holds the session, so a
-``CONFIRMED`` row is the reference bar with a second opinion attached, and
-``source``/``source_fetch_id`` name the provider the values were taken from.
-``checked_sources`` lists the sources holding the session, sorted and
-comma-separated; ``checked_fetch_ids`` pairs each with its fetch as
-``SOURCE:fetch_id``. The relative differences are the largest seen between any
-two sources: ``NaN`` with a single source, ``inf`` when a value is missing on one
-side only.
+The bar fields come from the reference source whenever it holds the session with
+a complete row, so a ``CONFIRMED`` row is normally the reference bar with a
+second opinion attached, and ``source``/``source_fetch_id`` name the provider
+the values were taken from. ``checked_sources`` lists the sources holding the
+session, sorted and comma-separated; ``checked_fetch_ids`` pairs each with its
+fetch as ``SOURCE:fetch_id``.
+
+**Agreement is a property of the field, not of the row**, for the same reason
+availability is. Two providers routinely agree on the close of a session to the
+last cent and differ on its low, and withholding the close because of the low
+would hide a good number behind a bad one. ``conflicting_fields`` lists the
+fields two sources hold and disagree on beyond the declared tolerance;
+``unconfirmed_fields`` lists those fewer than two sources hold a value for, so a
+field nobody could corroborate is never mistaken for one that was. Both are
+sorted, comma-separated, and empty strings when they hold nothing.
+``check_status`` summarises them: ``CONFLICT`` as soon as one field conflicts,
+``SINGLE_SOURCE`` when no field could be compared at all, ``CONFIRMED``
+otherwise.
+
+The relative differences are the largest seen between any two sources over the
+fields that could be compared, and ``NaN`` when none could be.
 """
 
 REVISIONS_SCHEMA: Final = pa.schema(

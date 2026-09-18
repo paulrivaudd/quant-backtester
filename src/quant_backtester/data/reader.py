@@ -21,11 +21,16 @@ Two conventions this module is the only place to state.
 cross-check produced, so a strategy consumes prices that a second source
 confirmed, or that carry ``SINGLE_SOURCE`` because no second source holds the
 session. ``clean/bars/`` stays what it is - the normalizer's output for one
-source - and no strategy reads it. A ``CONFLICT`` session is **not served**: two
-providers disagreed beyond the declared tolerance, so there is no number to
-return. The session leaves a shorter history and, when it is the one a decision
-is owed, a ``MISSING`` status - a hole, loudly, rather than a price nobody
-stands behind or a stale one quietly carried over.
+source - and no strategy reads it.
+
+**A contested value is not served, field by field.** The reader drops a session
+from the series of a field listed in that row's ``conflicting_fields``, not from
+every field because one of them is contested: two providers routinely agree on a
+close to the cent and differ on the low of the same session, and withholding the
+close would hide a good number behind a bad one. What is dropped leaves a
+shorter history and, when it is the value a decision is owed, a ``MISSING``
+status - a hole, loudly, rather than a price nobody stands behind or a stale one
+quietly carried over.
 
 **Staleness is counted on the reference calendar**, the one the engine advances
 time on, not on each instrument's own venue calendar. Counted at its own venue,
@@ -58,7 +63,6 @@ from quant_backtester.data.schemas import (
     AVAILABILITY_COLUMN,
     ActionType,
     BarField,
-    CheckStatus,
 )
 
 
@@ -160,6 +164,30 @@ def _as_instant(value: datetime, context: str) -> pd.Timestamp:
     if not isinstance(timestamp, pd.Timestamp):
         raise ValueError(f"{context}: availability timestamp is missing")
     return timestamp
+
+
+def _is_contested(conflicting_fields: object, field: BarField) -> bool:
+    """Return whether the cross-check found this field's value contested.
+
+    Parameters
+    ----------
+    conflicting_fields : object
+        The row's ``conflicting_fields`` cell: field names, sorted and
+        comma-separated, empty when the sources agreed on everything they could
+        compare.
+    field : BarField
+        Field about to be served.
+
+    Returns
+    -------
+    bool
+        ``True`` when this field is one two sources disagreed on beyond the
+        declared tolerance. A field they could not compare is not contested: it
+        is unconfirmed, which is the ordinary state of every single-source
+        series in the registry.
+    """
+    listed = str(conflicting_fields)
+    return bool(listed) and field.value in listed.split(",")
 
 
 def _field_availability(session: Session, field: BarField) -> datetime:
@@ -336,9 +364,12 @@ class PointInTimeReader:
         s'arretant a t.
 
         Le meme argument vaut pour les trous : une valeur stockee vide et une
-        seance ``CONFLICT`` sont absentes de la serie plutot que presentes en
-        ``NaN``. L'index s'appelle ``observation_date`` pour les deux types
-        d'instrument, comme la colonne de meme nom dans :meth:`values`.
+        valeur que deux sources contestent sont absentes de la serie plutot que
+        presentes en ``NaN``. Le filtre porte sur le champ demande, pas sur la
+        seance : un desaccord sur le ``low`` ne retire pas le ``close``.
+
+        L'index s'appelle ``observation_date`` pour les deux types d'instrument,
+        comme la colonne de meme nom dans :meth:`values`.
         """
         instrument = self._instruments.get(instrument_id)
         rows = self._available_rows(instrument, field, start=start, end=end)
@@ -612,12 +643,15 @@ class PointInTimeReader:
         pd.DataFrame
             Columns ``observation_date``, ``value`` and ``available_at_utc``,
             sorted by observation date. Rows whose value is absent are dropped,
-            as are ``CONFLICT`` sessions: neither is a number to hand a
-            strategy.
+            as are sessions where this very field is contested: neither is a
+            number to hand a strategy. A session contested on another field is
+            kept, since nothing is wrong with the value asked for.
         """
         if instrument.data_type is DataType.BAR:
             stored = self._repository.load_checked_bars(instrument.id, start=start, end=end)
-            stored = stored.loc[stored["check_status"] != CheckStatus.CONFLICT.value]
+            stored = stored.loc[
+                [not _is_contested(cell, field) for cell in stored["conflicting_fields"]]
+            ]
             observation_date = stored["session_date"]
             value = stored[field.value]
             available_at = stored[AVAILABILITY_COLUMN[field]]

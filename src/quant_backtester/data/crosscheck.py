@@ -135,32 +135,57 @@ def relative_difference(a: float, b: float) -> float:
     return 0.0 if scale == 0 else abs(a - b) / scale
 
 
-def _largest_difference(bars: list[dict[str, Any]], fields: tuple[str, ...]) -> float:
-    """Return the largest relative difference between any two bars on ``fields``.
+def _field_difference(bars: list[dict[str, Any]], field: str) -> float:
+    """Return how far apart the sources holding a value for ``field`` are.
 
     Parameters
     ----------
     bars : list[dict[str, Any]]
         One canonical bar per source, all for the same session.
-    fields : tuple[str, ...]
-        Fields to compare.
+    field : str
+        Field to compare.
 
     Returns
     -------
     float
-        The largest pairwise difference; ``NaN`` for fewer than two bars.
+        The largest pairwise relative difference between the values that are
+        present; ``NaN`` when fewer than two sources hold one.
+
+    Notes
+    -----
+    A value absent from one source is dropped rather than compared, so
+    :func:`relative_difference` never meets a missing value here. An absence is
+    not a disagreement: it says nothing about the value the other source holds,
+    and treating it as an infinite difference used to discard a whole session
+    because one provider served an incomplete bar. The field is reported as
+    unconfirmed instead - see :func:`cross_check_bars`.
     """
-    if len(bars) < 2:
+    values = [value for value in (float(bar[field]) for bar in bars) if not math.isnan(value)]
+    if len(values) < 2:
         return math.nan
     largest = 0.0
-    for first in range(len(bars)):
-        for second in range(first + 1, len(bars)):
-            for field in fields:
-                difference = relative_difference(
-                    float(bars[first][field]), float(bars[second][field])
-                )
-                largest = max(largest, difference)
+    for first in range(len(values)):
+        for second in range(first + 1, len(values)):
+            largest = max(largest, relative_difference(values[first], values[second]))
     return largest
+
+
+def _is_complete(bar: Mapping[str, Any]) -> bool:
+    """Return whether a bar holds every price field.
+
+    Parameters
+    ----------
+    bar : Mapping[str, Any]
+        One canonical bar.
+
+    Returns
+    -------
+    bool
+        ``True`` when open, high, low and close are all present. Volume is not
+        part of it: a provider leaving it empty is ordinary and no price is
+        derived from it.
+    """
+    return all(not math.isnan(float(bar[field])) for field in PRICE_FIELDS)
 
 
 def _bars_by_session(
@@ -207,6 +232,50 @@ def _bars_by_session(
     return by_session
 
 
+def _preferred_source(
+    by_source: Mapping[str, dict[date, dict[str, Any]]],
+    holders: list[str],
+    reference_source: str,
+    session: date,
+) -> str:
+    """Return the source whose row is stored for one session.
+
+    Parameters
+    ----------
+    by_source : Mapping[str, dict[date, dict[str, Any]]]
+        Every source's bars, indexed by session.
+    holders : list[str]
+        Sources holding this session, in source order.
+    reference_source : str
+        Source whose values are kept when it can be.
+    session : date
+        Session concerned.
+
+    Returns
+    -------
+    str
+        The reference source when it holds the session with a complete row;
+        otherwise the first other holder whose row is complete; otherwise the
+        reference source, or the first holder when it does not hold the session
+        at all. A row that is missing a price everywhere is stored as it is,
+        with the gap visible.
+
+    Notes
+    -----
+    Verified live on 2026-09-18: Yahoo served CW8 on 2026-09-17 without a close
+    while Euronext had the full bar. Keeping the reference's row regardless
+    stored a ``NaN`` close and left the exchange's own number on disk, unused.
+    """
+    complete = [source for source in holders if _is_complete(by_source[source][session])]
+    if reference_source in complete:
+        return reference_source
+    if complete:
+        return complete[0]
+    if reference_source in holders:
+        return reference_source
+    return holders[0]
+
+
 def cross_check_bars(
     instrument_id: str,
     frames: Mapping[str, pd.DataFrame],
@@ -231,9 +300,16 @@ def cross_check_bars(
     -------
     pd.DataFrame
         One row per session held by any source, sorted by ``session_date``,
-        columns in ``CHECKED_BARS_SCHEMA`` order. A session missing from the
-        reference source takes the values of the first other source holding it,
-        in source order, and is ``SINGLE_SOURCE`` or checked like any other.
+        columns in ``CHECKED_BARS_SCHEMA`` order. Values come from the reference
+        source when it holds the session with a complete row, and otherwise from
+        the first other source that does - see :func:`_preferred_source`.
+
+        Every field is compared on its own: a field two sources hold and
+        disagree on beyond its tolerance lands in ``conflicting_fields``, a
+        field fewer than two sources hold a value for lands in
+        ``unconfirmed_fields``, and ``check_status`` summarises the two. An
+        absence is never a disagreement, so an incomplete bar from one provider
+        no longer condemns the fields the others agree on.
 
     Raises
     ------
@@ -264,26 +340,40 @@ def cross_check_bars(
                     f"Sources {', '.join(holders)} disagree on {field} of {instrument_id} "
                     f"on {session}: they must share one calendar"
                 )
-        chosen = by_source[reference_source if reference_source in holders else holders[0]]
-        price_difference = _largest_difference(bars, PRICE_FIELDS)
-        volume_difference = _largest_difference(bars, VOLUME_FIELDS)
-        if len(holders) == 1:
-            status = CheckStatus.SINGLE_SOURCE
-        elif (
-            price_difference <= policy.price_rel_tolerance
-            and volume_difference <= policy.volume_rel_tolerance
-        ):
-            status = CheckStatus.CONFIRMED
-        else:
+        conflicting: list[str] = []
+        unconfirmed: list[str] = []
+        price_differences: list[float] = []
+        volume_differences: list[float] = []
+        for field in (*PRICE_FIELDS, *VOLUME_FIELDS):
+            is_price = field in PRICE_FIELDS
+            difference = _field_difference(bars, field)
+            if math.isnan(difference):
+                unconfirmed.append(field)
+                continue
+            (price_differences if is_price else volume_differences).append(difference)
+            tolerance = policy.price_rel_tolerance if is_price else policy.volume_rel_tolerance
+            if difference > tolerance:
+                conflicting.append(field)
+        if conflicting:
             status = CheckStatus.CONFLICT
-        row = {field: chosen[session][field] for field in BARS_SCHEMA.names}
+        elif len(unconfirmed) == len(PRICE_FIELDS) + len(VOLUME_FIELDS):
+            status = CheckStatus.SINGLE_SOURCE
+        else:
+            status = CheckStatus.CONFIRMED
+        # The values come from one source, so a row stays verifiable against a
+        # single raw snapshot; a complete one is preferred to the reference's
+        # own when the reference served a bar with a price missing.
+        chosen_source = _preferred_source(by_source, holders, reference_source, session)
+        row = {field: by_source[chosen_source][session][field] for field in BARS_SCHEMA.names}
         row["check_status"] = status.value
         row["checked_sources"] = ",".join(holders)
         row["checked_fetch_ids"] = ",".join(
             f"{source}:{by_source[source][session]['source_fetch_id']}" for source in holders
         )
-        row["max_price_rel_diff"] = price_difference
-        row["max_volume_rel_diff"] = volume_difference
+        row["conflicting_fields"] = ",".join(sorted(conflicting))
+        row["unconfirmed_fields"] = ",".join(sorted(unconfirmed))
+        row["max_price_rel_diff"] = max(price_differences) if price_differences else math.nan
+        row["max_volume_rel_diff"] = max(volume_differences) if volume_differences else math.nan
         rows.append(row)
     if not rows:
         return CHECKED_BARS_SCHEMA.empty_table().to_pandas()

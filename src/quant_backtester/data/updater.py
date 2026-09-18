@@ -151,6 +151,17 @@ def _earliest_wins(
     )
 
 
+def _verdict_of(row: Mapping[str, Any]) -> tuple[str, str]:
+    """Return one checked row's verdict: its status and the fields it contests."""
+    return str(row["check_status"]), str(row["conflicting_fields"])
+
+
+def _verdict_label(verdict: tuple[str, str]) -> str:
+    """Return a verdict as one readable phrase for the log."""
+    status, conflicting = verdict
+    return f"{status} on {conflicting}" if conflicting else status
+
+
 def _rebasing_factor(
     stored: pd.DataFrame, incoming: pd.DataFrame, key_column: str, fields: Sequence[str]
 ) -> float | None:
@@ -941,7 +952,10 @@ class MarketDataUpdater:
         another day.
         """
         stored = self._repository.load_checked_bars(instrument.id)
-        previous = {row["session_date"]: row["check_status"] for row in _records(stored)}
+        previous = {
+            row["session_date"]: (row["check_status"], row["conflicting_fields"])
+            for row in _records(stored)
+        }
         judged: set[date] = set()
         for frame in frames.values():
             judged |= set(frame["session_date"])
@@ -971,13 +985,12 @@ class MarketDataUpdater:
                 instrument.id,
                 row["session_date"],
                 f"{instrument.id} session {row['session_date']} was "
-                f"{previous[row['session_date']]} and is now {row['check_status']} "
-                f"({row['checked_sources']})",
-                {"from": previous[row["session_date"]], "to": row["check_status"]},
+                f"{_verdict_label(previous[row['session_date']])} and is now "
+                f"{_verdict_label(_verdict_of(row))} ({row['checked_sources']})",
+                {"from": previous[row["session_date"]], "to": _verdict_of(row)},
             )
             for row in _records(fresh)
-            if row["session_date"] in previous
-            and previous[row["session_date"]] != row["check_status"]
+            if row["session_date"] in previous and previous[row["session_date"]] != _verdict_of(row)
         ]
         return checked, issues
 

@@ -61,13 +61,17 @@ def paris(day: date, hour: int, minute: int = 0) -> datetime:
     return datetime(day.year, day.month, day.day, hour, minute, tzinfo=PARIS)
 
 
+ALL_BAR_FIELDS = ",".join(sorted(field.value for field in BarField))
+"""Every field of a bar, as the cross-check spells an unconfirmed set."""
+
+
 def checked_bars(
     instrument_id: str,
     calendar: TradingCalendar,
     closes: Sequence[tuple[date, float]],
     *,
     opens: Mapping[date, float] | None = None,
-    statuses: Mapping[date, CheckStatus] | None = None,
+    conflicts: Mapping[date, Sequence[BarField]] | None = None,
 ) -> pd.DataFrame:
     """Build a checked bars frame, availability stamped by the calendar.
 
@@ -82,8 +86,10 @@ def checked_bars(
         stored row whose value is absent.
     opens : Mapping[date, float] | None
         Opens, defaulting to the close of the session.
-    statuses : Mapping[date, CheckStatus] | None
-        Cross-check outcome per session, defaulting to ``CONFIRMED``.
+    conflicts : Mapping[date, Sequence[BarField]] | None
+        Fields two sources disagreed on, per session. A session with none is
+        single-sourced, as most of the registry is; a session with some was
+        cross-checked against Euronext.
 
     Returns
     -------
@@ -93,7 +99,8 @@ def checked_bars(
     rows = []
     for session_date, close in closes:
         open_available, close_available = bar_availability(session_date, calendar)
-        status = (statuses or {}).get(session_date, CheckStatus.CONFIRMED)
+        contested = sorted(field.value for field in (conflicts or {}).get(session_date, ()))
+        status = CheckStatus.CONFLICT if contested else CheckStatus.SINGLE_SOURCE
         rows.append(
             {
                 "instrument_id": instrument_id,
@@ -108,9 +115,11 @@ def checked_bars(
                 "source": "YAHOO",
                 "source_fetch_id": "20260401T000000Z-aaaaaaaa",
                 "check_status": status.value,
-                "checked_sources": "YAHOO",
+                "checked_sources": "EURONEXT,YAHOO" if contested else "YAHOO",
                 "checked_fetch_ids": "YAHOO:20260401T000000Z-aaaaaaaa",
-                "max_price_rel_diff": float("nan"),
+                "conflicting_fields": ",".join(contested),
+                "unconfirmed_fields": "" if contested else ALL_BAR_FIELDS,
+                "max_price_rel_diff": 1e-3 if contested else float("nan"),
                 "max_volume_rel_diff": float("nan"),
             }
         )
@@ -380,21 +389,43 @@ def test_history_of_a_level_uses_the_publication_rule(
     assert after_release.history("RATE_US", BarField.OPEN).name == "value"
 
 
-def test_history_skips_a_conflicting_session(
+def test_history_skips_a_session_contested_on_that_field(
     reader: MarketDataReader, repository: MarketDataRepository, xpar: TradingCalendar
 ) -> None:
-    """Two sources disagreeing beyond tolerance leave no number to serve."""
+    """Two sources disagreeing on the close leave no close to serve."""
     repository.save_checked_bars(
         "ETF_EU",
         checked_bars(
             "ETF_EU",
             xpar,
             [(MONDAY, 100.0), (TUESDAY, 101.0), (WEDNESDAY, 102.0)],
-            statuses={TUESDAY: CheckStatus.CONFLICT},
+            conflicts={TUESDAY: [BarField.CLOSE]},
         ),
     )
-    series = reader.at(paris(WEDNESDAY, 23, 0)).history("ETF_EU")
+    series = reader.at(paris(WEDNESDAY, 23, 0)).history("ETF_EU", BarField.CLOSE)
     assert list(series.index) == [MONDAY, WEDNESDAY]
+
+
+def test_history_keeps_a_session_contested_on_another_field(
+    reader: MarketDataReader, repository: MarketDataRepository, xpar: TradingCalendar
+) -> None:
+    """The real CW8 case: the two sources differ on the low, not on the close.
+
+    Withholding the close because of the low hides a number both providers
+    agree on, behind one they do not.
+    """
+    repository.save_checked_bars(
+        "ETF_EU",
+        checked_bars(
+            "ETF_EU",
+            xpar,
+            [(MONDAY, 100.0), (TUESDAY, 101.0), (WEDNESDAY, 102.0)],
+            conflicts={TUESDAY: [BarField.LOW]},
+        ),
+    )
+    pit = reader.at(paris(WEDNESDAY, 23, 0))
+    assert list(pit.history("ETF_EU", BarField.CLOSE).index) == [MONDAY, TUESDAY, WEDNESDAY]
+    assert list(pit.history("ETF_EU", BarField.LOW).index) == [MONDAY, WEDNESDAY]
 
 
 def test_history_skips_a_stored_row_without_a_value(
@@ -533,22 +564,40 @@ def test_a_delisted_instrument_is_not_listed(
     assert pd.isna(frame.loc["ETF_GONE", "value"])
 
 
-def test_a_conflicting_latest_session_is_a_hole(
+def test_a_contested_latest_value_is_a_hole(
     reader: MarketDataReader, repository: MarketDataRepository, xpar: TradingCalendar
 ) -> None:
-    """A CONFLICT on the due session is MISSING, not the previous close served on."""
+    """A contested close on the due session is MISSING, not the previous one served on."""
     repository.save_checked_bars(
         "ETF_EU",
         checked_bars(
             "ETF_EU",
             xpar,
             [(MONDAY, 100.0), (TUESDAY, 101.0)],
-            statuses={TUESDAY: CheckStatus.CONFLICT},
+            conflicts={TUESDAY: [BarField.CLOSE]},
         ),
     )
     frame = reader.at(paris(TUESDAY, 23, 0)).values(["ETF_EU"])
     assert frame.loc["ETF_EU", "status"] is ObservationStatus.MISSING
     assert pd.isna(frame.loc["ETF_EU", "value"])
+
+
+def test_a_conflict_on_another_field_leaves_this_one_alone(
+    reader: MarketDataReader, repository: MarketDataRepository, xpar: TradingCalendar
+) -> None:
+    """The universe does not lose an instrument because its low is disputed."""
+    repository.save_checked_bars(
+        "ETF_EU",
+        checked_bars(
+            "ETF_EU",
+            xpar,
+            [(MONDAY, 100.0), (TUESDAY, 101.0)],
+            conflicts={TUESDAY: [BarField.LOW]},
+        ),
+    )
+    frame = reader.at(paris(TUESDAY, 23, 0)).values(["ETF_EU"])
+    assert frame.loc["ETF_EU", "status"] is ObservationStatus.OK
+    assert frame.loc["ETF_EU", "value"] == 101.0
 
 
 def test_a_listed_instrument_with_no_session_due_is_not_listed(
