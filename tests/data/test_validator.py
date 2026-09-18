@@ -13,7 +13,13 @@ import pandas as pd
 import pytest
 
 from quant_backtester.data.calendars import TradingCalendar
-from quant_backtester.data.instruments import AssetType, DataType, Instrument, PublicationRule
+from quant_backtester.data.instruments import (
+    AssetType,
+    DataType,
+    DistributionPolicy,
+    Instrument,
+    PublicationRule,
+)
 from quant_backtester.data.validator import (
     Severity,
     ValidationIssue,
@@ -631,9 +637,39 @@ def test_the_same_type_twice_on_one_ex_date_is_an_error() -> None:
 
 def test_an_unknown_action_type_is_an_error() -> None:
     report = validate_corporate_actions(
-        make_instrument(), actions([("SPIN_OFF", date(2023, 1, 4), 1.281)])
+        make_instrument(), actions([("RIGHTS_ISSUE", date(2023, 1, 4), 1.281)])
     )
     assert codes(report) == ["UNKNOWN_ACTION_TYPE"]
+
+
+def test_a_spin_off_and_a_special_dividend_are_valid_shapes() -> None:
+    """Both exist because a provider mislabels them, not because they are odd."""
+    report = validate_corporate_actions(
+        make_instrument(),
+        actions(
+            [
+                ("SPIN_OFF", date(2023, 1, 4), 1.281),
+                ("SPECIAL_DIVIDEND", date(2023, 12, 27), 15.0),
+            ]
+        ),
+    )
+    assert report.issues == []
+
+
+def test_a_non_positive_spin_off_factor_is_an_error() -> None:
+    """Dividing earlier prices by zero or less is not an adjustment."""
+    report = validate_corporate_actions(
+        make_instrument(), actions([("SPIN_OFF", date(2023, 1, 4), 0.0)])
+    )
+    assert codes(report) == ["INVALID_SPIN_OFF_FACTOR"]
+
+
+def test_a_special_dividend_must_be_positive() -> None:
+    """A one-off payment is still a payment."""
+    report = validate_corporate_actions(
+        make_instrument(), actions([("SPECIAL_DIVIDEND", date(2023, 12, 27), 0.0)])
+    )
+    assert codes(report) == ["NON_POSITIVE_DIVIDEND"]
 
 
 def test_an_action_without_availability_is_an_error() -> None:
@@ -841,3 +877,65 @@ def test_later_sessions_do_not_change_an_earlier_stale_open_issue(spring: list[d
         if issue.observation_date is not None and issue.observation_date <= spring[39]
     ]
     assert earlier == baseline
+
+
+# --- provider placeholders and share class policy -----------------------------
+
+
+def test_a_flat_bar_with_no_volume_is_a_placeholder(xnys: TradingCalendar) -> None:
+    """Yahoo served exactly this for CW8 on 2025-10-24.
+
+    Four identical prices and no volume is not a session, it is a provider
+    filling a hole. Every other rule passes it: the OHLC order holds, the prices
+    are positive, the volume is not negative.
+    """
+    placeholder = bar(TUE, open_=500.0, high=500.0, low=500.0, close=500.0, volume=0.0)
+    report = validate_bars(make_instrument(), frame(placeholder), xnys)
+
+    flat = issues_of(report, "FLAT_ZERO_VOLUME")
+    assert [issue.observation_date for issue in flat] == [TUE]
+    assert flat[0].severity is Severity.WARNING
+    # A warning: the cross-check and the reader deal with it, the series still updates.
+    assert report.valid
+
+
+def test_a_flat_bar_that_traded_is_not_a_placeholder(xnys: TradingCalendar) -> None:
+    """An illiquid session can print one price all day, and it is a real one."""
+    traded = bar(TUE, open_=500.0, high=500.0, low=500.0, close=500.0, volume=120.0)
+    assert "FLAT_ZERO_VOLUME" not in codes(validate_bars(make_instrument(), frame(traded), xnys))
+
+
+def test_a_zero_volume_bar_that_moved_is_not_a_placeholder(xnys: TradingCalendar) -> None:
+    """An index reports no volume at all; only a flat one is suspicious."""
+    index = make_instrument(AssetType.INDEX)
+    moved = bar(TUE, volume=0.0)
+    assert "FLAT_ZERO_VOLUME" not in codes(validate_bars(index, frame(moved), xnys))
+
+
+def test_an_accumulating_share_class_cannot_pay_a_dividend() -> None:
+    """CW8 reinvests its income, so a dividend on it is bad data, not an event.
+
+    Without the declared policy, an empty action feed and a provider that lost
+    the dividends look identical - and so do a real distribution and a stray row.
+    """
+    accumulating = make_instrument(distribution_policy=DistributionPolicy.ACCUMULATING)
+    report = validate_corporate_actions(accumulating, actions([("DIVIDEND", TUE, 0.5)]))
+
+    unexpected = issues_of(report, "UNEXPECTED_DISTRIBUTION")
+    assert [issue.observation_date for issue in unexpected] == [TUE]
+    assert unexpected[0].severity is Severity.ERROR
+    assert not report.valid
+
+
+def test_an_accumulating_share_class_may_still_split() -> None:
+    """The policy is about income, not about share counts."""
+    accumulating = make_instrument(distribution_policy=DistributionPolicy.ACCUMULATING)
+    report = validate_corporate_actions(accumulating, actions([("SPLIT", TUE, 4.0)]))
+    assert report.issues == []
+
+
+def test_a_distributing_fund_pays_dividends_without_complaint() -> None:
+    """The rule fires on the declared policy, not on every fund."""
+    distributing = make_instrument(distribution_policy=DistributionPolicy.DISTRIBUTING)
+    report = validate_corporate_actions(distributing, actions([("DIVIDEND", TUE, 0.5)]))
+    assert report.issues == []

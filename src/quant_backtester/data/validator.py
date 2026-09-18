@@ -24,7 +24,12 @@ from typing import Any
 import pandas as pd
 
 from quant_backtester.data.calendars import CalendarCoverageError, TradingCalendar
-from quant_backtester.data.instruments import AssetType, DataType, Instrument
+from quant_backtester.data.instruments import (
+    AssetType,
+    DataType,
+    DistributionPolicy,
+    Instrument,
+)
 from quant_backtester.data.schemas import ActionType
 
 
@@ -413,6 +418,19 @@ def _check_row(instrument: Instrument, row: Mapping[str, Any]) -> list[Validatio
             )
 
     volume = _number(row["volume"])
+    present = [value for value in prices.values() if value is not None]
+    if len(present) == len(BAR_PRICE_FIELDS) and len(set(present)) == 1 and volume == 0:
+        issues.append(
+            _issue(
+                "FLAT_ZERO_VOLUME",
+                Severity.WARNING,
+                instrument,
+                day,
+                f"Bar of {day} is flat at {present[0]} with no volume: a provider "
+                "placeholder rather than a session",
+                {"price": present[0]},
+            )
+        )
     if volume is not None and volume < 0:
         issues.append(
             _issue(
@@ -973,8 +991,10 @@ def validate_corporate_actions(instrument: Instrument, frame: pd.DataFrame) -> V
         ``DUPLICATE_ACTION`` (same type twice on one ex-date),
         ``UNKNOWN_ACTION_TYPE``, ``INVALID_SPLIT_RATIO`` (a split ratio must be
         positive and not 1; below 1 is a reverse split, and valid),
-        ``NON_POSITIVE_DIVIDEND`` and ``MISSING_AVAILABILITY``. ``frame`` is never
-        modified.
+        ``NON_POSITIVE_DIVIDEND`` (ordinary or special),
+        ``INVALID_SPIN_OFF_FACTOR``, ``MISSING_AVAILABILITY`` and
+        ``UNEXPECTED_DISTRIBUTION`` (a distribution on an accumulating share
+        class). ``frame`` is never modified.
 
     Raises
     ------
@@ -988,9 +1008,11 @@ def validate_corporate_actions(instrument: Instrument, frame: pd.DataFrame) -> V
     different de 1 ; un ``DIVIDEND`` a un montant strictement positif. Deux
     actions du meme type a la meme ex-date sont une erreur.
 
-    Only the shape is checked. Whether a ratio is plausible - a spin-off reported
-    as a fractional split, a split the prices do not show - needs the bars, and
-    belongs to the corporate action review of the architecture pass.
+    Only the shape is checked. Whether a ratio is plausible - a split the prices
+    do not show - needs the bars, and belongs to a review this layer does not
+    run. What an event *was*, when the provider mislabelled it, is a reviewed
+    decision in ``metadata/corporate_actions.toml``; see
+    :mod:`quant_backtester.data.corporate_actions`.
     """
     if instrument.data_type != DataType.BAR:
         raise ValueError(
@@ -1044,7 +1066,21 @@ def validate_corporate_actions(instrument: Instrument, frame: pd.DataFrame) -> V
                     context,
                 )
             )
-        elif action_type == ActionType.DIVIDEND.value and (value is None or value <= 0):
+        elif action_type == ActionType.SPIN_OFF.value and (value is None or value <= 0):
+            issues.append(
+                _issue(
+                    "INVALID_SPIN_OFF_FACTOR",
+                    Severity.ERROR,
+                    instrument,
+                    ex_date,
+                    f"Spin-off factor {row['value']} on {ex_date} must be positive",
+                    context,
+                )
+            )
+        elif action_type in (
+            ActionType.DIVIDEND.value,
+            ActionType.SPECIAL_DIVIDEND.value,
+        ) and (value is None or value <= 0):
             issues.append(
                 _issue(
                     "NON_POSITIVE_DIVIDEND",
@@ -1052,6 +1088,21 @@ def validate_corporate_actions(instrument: Instrument, frame: pd.DataFrame) -> V
                     instrument,
                     ex_date,
                     f"Dividend {row['value']} on {ex_date} must be a positive amount",
+                    context,
+                )
+            )
+        if (
+            action_type in (ActionType.DIVIDEND.value, ActionType.SPECIAL_DIVIDEND.value)
+            and instrument.distribution_policy is DistributionPolicy.ACCUMULATING
+        ):
+            issues.append(
+                _issue(
+                    "UNEXPECTED_DISTRIBUTION",
+                    Severity.ERROR,
+                    instrument,
+                    ex_date,
+                    f"{instrument.id} is an accumulating share class and cannot pay the "
+                    f"dividend of {row['value']} reported on {ex_date}",
                     context,
                 )
             )

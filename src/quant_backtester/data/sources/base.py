@@ -138,8 +138,13 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-HTTP_TIMEOUT_SECONDS = 30.0
-"""Socket timeout of :func:`http_get_text`, in seconds. Infrastructure, not research."""
+HTTP_TIMEOUT_SECONDS = 120.0
+"""Socket timeout of :func:`http_get_text`, in seconds. Infrastructure, not research.
+
+Generous because a first ingestion asks for a whole history in one request: the
+ECB needs well over thirty seconds to serve the daily euro reference rates since
+1999, and timing out there leaves the series unfetchable rather than slow.
+"""
 
 
 def http_get_text(url: str) -> str:

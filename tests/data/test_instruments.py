@@ -20,6 +20,7 @@ from quant_backtester.data.instruments import (
     AssetType,
     CheckSource,
     DataType,
+    DistributionPolicy,
     Instrument,
     InstrumentRegistry,
     PublicationRule,
@@ -815,9 +816,31 @@ def test_the_committed_registry_pins_its_availability_decisions() -> None:
         calendar_id="XNYS",
     )
 
+    etf = registry.get("ETF_WORLD")
+    assert etf.distribution_policy is DistributionPolicy.ACCUMULATING
+
     vix = registry.get("VIX")
     assert vix.data_type is DataType.LEVEL
     assert (vix.primary_source, vix.source_symbol) == ("FRED", "VIXCLS")
     assert vix.calendar_id is None
     assert vix.publication_rule is not None
     assert vix.publication_rule.lag_sessions == 0
+
+
+def test_distribution_policy_belongs_to_a_fund() -> None:
+    """An index distributes nothing, and a single share's dividend is not a fund rule."""
+    with pytest.raises(ValueError, match="distribution_policy"):
+        make_instrument(
+            asset_type=AssetType.INDEX, distribution_policy=DistributionPolicy.ACCUMULATING
+        )
+
+
+def test_an_accumulating_policy_loads_from_the_config(tmp_path) -> None:
+    """The policy is declared configuration, like everything else that moves a result."""
+    config = SAMPLE_TOML.replace(
+        'calendar_id = "XNYS"', 'calendar_id = "XNYS"\ndistribution_policy = "ACCUMULATING"', 1
+    ).replace('asset_type = "INDEX"', 'asset_type = "ETF"', 1)
+
+    registry = InstrumentRegistry.from_toml(write_toml(tmp_path, config))
+
+    assert registry.get("SP500").distribution_policy is DistributionPolicy.ACCUMULATING

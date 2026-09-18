@@ -46,11 +46,16 @@ class NormalizedData:
     corporate_actions : pd.DataFrame | None
         Rows matching
         :data:`~quant_backtester.data.schemas.CORPORATE_ACTIONS_SCHEMA`.
+    rejected_sessions : tuple[date, ...]
+        Dates the provider sent a row for although the venue held no session
+        then. They carry no availability instant, so they cannot be stored; the
+        updater reports them rather than letting them disappear.
     """
 
     bars: pd.DataFrame | None = None
     levels: pd.DataFrame | None = None
     corporate_actions: pd.DataFrame | None = None
+    rejected_sessions: tuple[date, ...] = ()
 
 
 def bar_availability(session_date: date, calendar: TradingCalendar) -> tuple[datetime, datetime]:
@@ -377,7 +382,7 @@ def _bars_frame(
     calendar: TradingCalendar,
     session_dates: Sequence[date],
     values: Mapping[str, list[float]],
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, tuple[date, ...]]:
     """Assemble canonical bars once a provider's columns are mapped to fields.
 
     Parameters
@@ -399,11 +404,17 @@ def _bars_frame(
     pd.DataFrame
         Bars in ``BARS_SCHEMA`` column order, in the order of ``session_dates``.
 
+    Returns
+    -------
+    tuple[pd.DataFrame, tuple[date, ...]]
+        The canonical bars, and the dates dropped because the venue held no
+        session on them.
+
     Raises
     ------
     ValueError
-        If ``values`` does not supply exactly the bar fields, a session appears
-        twice, or a bar falls on a day the venue was closed.
+        If ``values`` does not supply exactly the bar fields or a session
+        appears twice.
     CalendarCoverageError
         If a bar falls outside the period the calendar covers.
     """
@@ -415,19 +426,26 @@ def _bars_frame(
             f"{download.source} bars of {instrument.id} repeat session(s): "
             f"{', '.join(map(str, repeated))}"
         )
-    # Raises on a closed day or outside the coverage: never caught here.
-    availability = [bar_availability(day, calendar) for day in session_dates]
-    row_count = len(session_dates)
+    # A bar on a day the venue did not trade cannot be given an availability
+    # instant, so it cannot be stored. It is dropped and named, never guessed
+    # at: Yahoo serves one for CW8 on 2019-12-25, a Christmas Euronext was shut.
+    # Outside the calendar's coverage the calendar still raises - there we do
+    # not know whether the venue traded, which is a different problem.
+    kept = [index for index, day in enumerate(session_dates) if calendar.is_open(day)]
+    rejected = tuple(day for index, day in enumerate(session_dates) if index not in set(kept))
+    days = [session_dates[index] for index in kept]
+    availability = [bar_availability(day, calendar) for day in days]
+    row_count = len(days)
     columns: dict[str, object] = {
         "instrument_id": [instrument.id] * row_count,
-        "session_date": list(session_dates),
-        **values,
+        "session_date": days,
+        **{field: [column[index] for index in kept] for field, column in values.items()},
         "open_available_at_utc": [open_at for open_at, _ in availability],
         "close_available_at_utc": [close_at for _, close_at in availability],
         "source": [download.source] * row_count,
         "source_fetch_id": [download.fetch_id] * row_count,
     }
-    return pd.DataFrame(columns, columns=list(BARS_SCHEMA.names))
+    return pd.DataFrame(columns, columns=list(BARS_SCHEMA.names)), rejected
 
 
 def _levels_frame(
@@ -474,7 +492,7 @@ def _levels_frame(
 
 def _normalize_yahoo_bars(
     instrument: Instrument, download: RawDownload, calendar: TradingCalendar
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, tuple[date, ...]]:
     """Turn a raw Yahoo ``history`` frame into rows of ``BARS_SCHEMA``.
 
     Parameters
@@ -502,7 +520,7 @@ def _normalize_yahoo_bars(
     """
     raw = download.frame
     if raw.empty:
-        return _empty_frame(BARS_SCHEMA)
+        return _empty_frame(BARS_SCHEMA), ()
     missing = sorted(set(YAHOO_BAR_COLUMNS) - set(raw.columns))
     if missing:
         raise ValueError(f"Yahoo bars of {instrument.id} lack column(s): {', '.join(missing)}")
@@ -546,7 +564,7 @@ def _later_split_factor(position: int, ex_dates: Sequence[date], splits: Sequenc
 
 def _normalize_yahoo_actions(
     instrument: Instrument, download: RawDownload, calendar: TradingCalendar
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, tuple[date, ...]]:
     """Turn a raw Yahoo ``actions`` frame into rows of ``CORPORATE_ACTIONS_SCHEMA``.
 
     Yahoo sends the whole history (``period="max"``): only ex-dates inside the
@@ -557,7 +575,7 @@ def _normalize_yahoo_actions(
     ``Stock Splits`` column, checked on 2026-09-13): an absent column counts as
     zeros. Dividends are multiplied back by the later splits Yahoo divided them
     by (see :func:`_later_split_factor`), and each action becomes available at
-    the close of its ex-date.
+    the open of its ex-date, together with the first price it affects.
 
     Parameters
     ----------
@@ -587,7 +605,7 @@ def _normalize_yahoo_actions(
     """
     raw = download.frame
     if raw.empty:
-        return _empty_frame(CORPORATE_ACTIONS_SCHEMA)
+        return _empty_frame(CORPORATE_ACTIONS_SCHEMA), ()
     if not any(column in raw.columns for column in YAHOO_ACTION_COLUMNS):
         raise ValueError(
             f"Yahoo actions of {instrument.id} have none of the columns "
@@ -595,6 +613,7 @@ def _normalize_yahoo_actions(
         )
     start = _requested_date(download, "start")
     end = _requested_date(download, "end_inclusive")
+    rejected: list[date] = []
     ex_dates = _session_dates(raw.index, calendar)
     # Yahoo drops a column that never held an event: absent means zeros, not an error.
     values: dict[str, list[float]] = {
@@ -625,7 +644,14 @@ def _normalize_yahoo_actions(
             events.append((action_type, value))
         if not events:
             continue
-        _, close_at = bar_availability(ex_date, calendar)
+        if not calendar.is_open(ex_date):
+            # No session, no open to be adjusted at: the event cannot be dated.
+            rejected.append(ex_date)
+            continue
+        # The ex-date open is already adjusted, so the action must be known by
+        # then: stamped at the close, a 4-for-1 split would show a strategy
+        # trading that open a -75% gap that never happened.
+        open_at, _ = bar_availability(ex_date, calendar)
         for action_type, value in events:
             rows.append(
                 {
@@ -633,19 +659,19 @@ def _normalize_yahoo_actions(
                     "action_type": action_type.value,
                     "ex_date": ex_date,
                     "value": value,
-                    "available_at_utc": close_at,
+                    "available_at_utc": open_at,
                     "source": download.source,
                     "source_fetch_id": download.fetch_id,
                 }
             )
     if not rows:
-        return _empty_frame(CORPORATE_ACTIONS_SCHEMA)
-    return pd.DataFrame(rows, columns=list(CORPORATE_ACTIONS_SCHEMA.names))
+        return _empty_frame(CORPORATE_ACTIONS_SCHEMA), tuple(rejected)
+    return pd.DataFrame(rows, columns=list(CORPORATE_ACTIONS_SCHEMA.names)), tuple(rejected)
 
 
 def _normalize_euronext_bars(
     instrument: Instrument, download: RawDownload, calendar: TradingCalendar
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, tuple[date, ...]]:
     """Turn a raw Euronext export into rows of ``BARS_SCHEMA``.
 
     Parameters
@@ -675,7 +701,7 @@ def _normalize_euronext_bars(
     """
     raw = download.frame
     if raw.empty:
-        return _empty_frame(BARS_SCHEMA)
+        return _empty_frame(BARS_SCHEMA), ()
     missing = sorted({EURONEXT_DATE_COLUMN, *EURONEXT_BAR_COLUMNS} - set(raw.columns))
     if missing:
         raise ValueError(f"Euronext bars of {instrument.id} lack column(s): {', '.join(missing)}")
@@ -788,10 +814,10 @@ class YahooNormalizer:
         venue = _require_bar_call("YahooNormalizer", self.source_id, instrument, download, calendar)
         # Bars and corporate actions share the YAHOO source id: the request tells them apart.
         if download.request.get("endpoint") == "actions":
-            return NormalizedData(
-                corporate_actions=_normalize_yahoo_actions(instrument, download, venue)
-            )
-        return NormalizedData(bars=_normalize_yahoo_bars(instrument, download, venue))
+            actions, rejected = _normalize_yahoo_actions(instrument, download, venue)
+            return NormalizedData(corporate_actions=actions, rejected_sessions=rejected)
+        bars, rejected = _normalize_yahoo_bars(instrument, download, venue)
+        return NormalizedData(bars=bars, rejected_sessions=rejected)
 
 
 class EuronextNormalizer:
@@ -839,7 +865,8 @@ class EuronextNormalizer:
         venue = _require_bar_call(
             "EuronextNormalizer", self.source_id, instrument, download, calendar
         )
-        return NormalizedData(bars=_normalize_euronext_bars(instrument, download, venue))
+        bars, rejected = _normalize_euronext_bars(instrument, download, venue)
+        return NormalizedData(bars=bars, rejected_sessions=rejected)
 
 
 class FredNormalizer:

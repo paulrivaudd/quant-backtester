@@ -45,6 +45,18 @@ class AssetType(Enum):
     VOLATILITY = "VOLATILITY"
 
 
+class DistributionPolicy(Enum):
+    """What a fund does with the income of the assets it holds."""
+
+    DISTRIBUTING = "DISTRIBUTING"
+    """Pays it out, so an empty dividend feed is a data gap."""
+
+    ACCUMULATING = "ACCUMULATING"
+    """Reinvests it, so no dividend ever reaches the holder and an empty feed is
+    the expected state. Without this field, a provider that simply lost the
+    dividends of a distributing fund looks exactly the same."""
+
+
 @dataclass(frozen=True, slots=True)
 class PublicationRule:
     """When a LEVEL observation becomes publicly available.
@@ -215,6 +227,10 @@ class Instrument:
     check_sources : tuple[CheckSource, ...]
         Further providers whose bars are compared with the primary source's, in
         declared order. Empty for a series with a single source.
+    distribution_policy : DistributionPolicy | None
+        For a fund or a share class, whether income is paid out or reinvested.
+        ``None`` for anything else - an index distributes nothing, and a single
+        share's policy is the issuer's dividend decision, not a fund rule.
     """
 
     id: str
@@ -230,6 +246,7 @@ class Instrument:
     first_session: date | None = None
     last_session: date | None = None
     check_sources: tuple[CheckSource, ...] = ()
+    distribution_policy: DistributionPolicy | None = None
 
     def __post_init__(self) -> None:
         """Reject an instrument whose availability could not be computed.
@@ -266,6 +283,11 @@ class Instrument:
         if repeated:
             raise ValueError(
                 f"Instrument {self.id} lists source(s) {', '.join(repeated)} more than once"
+            )
+        if self.distribution_policy is not None and self.asset_type != AssetType.ETF:
+            raise ValueError(
+                f"Instrument {self.id} is a {self.asset_type.value}: "
+                "distribution_policy describes a fund share class"
             )
         if self.check_sources and self.data_type != DataType.BAR:
             raise ValueError(
@@ -558,6 +580,11 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
         source_symbol=table["source_symbol"],
         tradable=table["tradable"],
         calendar_id=table.get("calendar_id"),
+        distribution_policy=(
+            None
+            if table.get("distribution_policy") is None
+            else DistributionPolicy(table["distribution_policy"])
+        ),
         publication_rule=publication_rule,
         first_session=_as_session_date(table.get("first_session"), "first_session", context),
         last_session=_as_session_date(table.get("last_session"), "last_session", context),

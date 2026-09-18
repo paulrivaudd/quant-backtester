@@ -19,6 +19,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
+from quant_backtester.data.corporate_actions import ActionCorrection, ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy
 from quant_backtester.data.instruments import (
     AssetType,
@@ -380,6 +381,7 @@ def build_updater(
     sources: Mapping[str, FakeSource],
     clock: Clock,
     accepted: AcceptedRevisions | None = None,
+    corrections: ActionCorrections | None = None,
     overlap_sessions: int = 5,
 ) -> MarketDataUpdater:
     """Wire an updater onto the fakes."""
@@ -390,6 +392,7 @@ def build_updater(
         sources=dict(sources),
         normalizers={source_id: FakeNormalizer(source_id) for source_id in sources},
         accepted_revisions=accepted or AcceptedRevisions([]),
+        action_corrections=corrections or ActionCorrections([]),
         cross_check_policy=POLICY,
         overlap_sessions=overlap_sessions,
         clock=clock,
@@ -797,6 +800,52 @@ def test_a_stored_corporate_action_is_never_rewritten(
     assert "ACTION_REVISED" in codes(report)
 
 
+def test_a_reviewed_correction_is_applied_when_the_action_is_stored(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    """A spin-off Yahoo reports as a fractional split is stored as a spin-off.
+
+    The price adjustment is identical either way, so nothing in the series
+    moves; what changes is that no layer above can read a share multiplication
+    into an event where no share was multiplied.
+    """
+    yahoo.actions["ETF_EU"] = raw_actions([(WEDNESDAY, ActionType.SPLIT, 1.281)])
+    corrections = ActionCorrections(
+        [
+            ActionCorrection(
+                instrument_id="ETF_EU",
+                ex_date=WEDNESDAY,
+                from_type=ActionType.SPLIT,
+                to_type=ActionType.SPIN_OFF,
+                reason="Spin-off reported as a fractional split",
+            )
+        ]
+    )
+    updater = build_updater(
+        repository,
+        instruments,
+        calendars,
+        {"YAHOO": yahoo, "FRED": fred},
+        clock,
+        corrections=corrections,
+    )
+
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    stored = repository.load_corporate_actions("ETF_EU")
+    assert stored["action_type"].tolist() == ["SPIN_OFF"]
+    assert stored["value"].tolist() == [1.281]
+
+    # Refetching does not add the provider's version next to the corrected one.
+    updater.update("ETF_EU")
+    assert repository.load_corporate_actions("ETF_EU")["action_type"].tolist() == ["SPIN_OFF"]
+
+
 def test_a_new_corporate_action_is_added(
     updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
 ) -> None:
@@ -1000,6 +1049,82 @@ def test_an_incomplete_primary_bar_is_replaced_by_the_complete_one(
     values = reader.at(datetime(2026, 3, 13, 21, 0, tzinfo=UTC)).values(["ETF_EU"])
     assert values.loc["ETF_EU", "value"] == 104.0
     assert values.loc["ETF_EU", "status"] is ObservationStatus.OK
+
+
+def test_an_unavailable_check_source_does_not_lose_the_instrument(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """Euronext refuses anything older than its rolling two-year window.
+
+    Asked for a history that starts in 2018, it raises - and used to take the
+    whole instrument down with it, primary data included. A second opinion that
+    cannot be obtained leaves the sessions single-sourced; it does not delete
+    them.
+    """
+
+    class RefusingSource(FakeSource):
+        def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
+            raise ValueError(f"{instrument.source_symbol} is served only from 2024-09-19")
+
+    instrument = Instrument(
+        id="ETF_EU",
+        name="Paris ETF",
+        asset_type=AssetType.ETF,
+        data_type=DataType.BAR,
+        currency="EUR",
+        primary_source="YAHOO",
+        source_symbol="CW8.PA",
+        tradable=True,
+        calendar_id="XPAR",
+        first_session=MONDAY,
+        check_sources=(CheckSource(source="EURONEXT", source_symbol="LU-XPAR"),),
+    )
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    updater = build_updater(
+        repository,
+        InstrumentRegistry([instrument]),
+        calendars,
+        {
+            "YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}),
+            "EURONEXT": RefusingSource("EURONEXT", clock),
+        },
+        clock,
+    )
+
+    report = updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert report.valid
+    assert "CHECK_SOURCE_UNAVAILABLE" in codes(report)
+    assert list(repository.load_bars("ETF_EU")["session_date"]) == list(SESSIONS)
+    checked = repository.load_checked_bars("ETF_EU")
+    assert set(checked["check_status"]) == {CheckStatus.SINGLE_SOURCE.value}
+
+
+def test_a_failing_primary_source_still_stops_the_instrument(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    """There is nothing to fall back on, so the failure must surface."""
+
+    class BrokenSource(FakeSource):
+        def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
+            raise ConnectionError("provider down")
+
+    updater = build_updater(
+        repository,
+        instruments,
+        calendars,
+        {"YAHOO": BrokenSource("YAHOO", clock), "FRED": fred},
+        clock,
+    )
+
+    with pytest.raises(ConnectionError, match="provider down"):
+        updater.download("ETF_EU", MONDAY, FRIDAY)
 
 
 @pytest.mark.parametrize("euronext_first", [False, True])

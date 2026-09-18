@@ -26,6 +26,9 @@ source_symbol = "CW8.PA"
 calendar_id = "XPAR"
 tradable = true
 first_session = 2018-01-02
+# Accumulating (C) share class: no dividend ever reaches the holder, so an empty
+# action feed is the expected state and not a provider losing them.
+distribution_policy = "ACCUMULATING"
 
   # Yahoo reports no split for CW8, so its bars are raw (checked 2026-09-13).
   # Euronext serves about two years only: older sessions stay SINGLE_SOURCE.

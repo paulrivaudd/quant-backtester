@@ -18,6 +18,11 @@ dist/
 # Local market data and research output (reproducible from code + config)
 data/**
 !data/**/
+
+# The market data tree: metadata is committed, everything the pipeline writes is not.
+market_data/raw/
+market_data/clean/
+market_data/validation/
 !data/**/.gitkeep
 results/
 *.parquet

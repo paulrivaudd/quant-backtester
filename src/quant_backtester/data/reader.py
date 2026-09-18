@@ -526,7 +526,15 @@ class PointInTimeReader:
         2. construis un facteur cumule retrograde depuis la derniere seance ;
         3. un split de ratio r divise les prix anterieurs a l'ex-date par r ;
         4. un dividende d sur un close c ajoute un facteur ``(1 - d / c)`` aux
-           prix anterieurs, avec ``c`` le close precedant l'ex-date.
+           prix anterieurs, avec ``c`` le close precedant l'ex-date ;
+        5. un ``SPIN_OFF`` s'ajuste comme un split et un ``SPECIAL_DIVIDEND``
+           comme un dividende : le prix bouge pareil, seul le sens de
+           l'evenement differe - et c'est lui que les couches au-dessus lisent.
+
+        Une action est disponible a l'**ouverture** de son ex-date, en meme temps
+        que le premier prix qu'elle affecte : le reader d'execution de l'ex-date
+        voit l'open deja ajuste *et* l'action, celui de la veille au soir ne voit
+        ni l'un ni l'autre, et aucun des deux n'affiche de faux saut.
 
         Le test a ecrire en meme temps : une serie plate a 100 avec un split 4:1,
         ajustee, doit etre parfaitement plate a 25 avant l'ex-date - aucun saut
@@ -596,16 +604,21 @@ class PointInTimeReader:
         Returns
         -------
         float
-            ``1 / ratio`` for a split, ``1 - dividend / close`` for a dividend.
+            ``1 / ratio`` for a split, and for a spin-off, whose price
+            adjustment is the same although no share was multiplied;
+            ``1 - amount / close`` for a dividend, ordinary or special.
 
         Raises
         ------
         ValueError
             If the factor would be zero or negative.
         """
-        if action_type is ActionType.SPLIT:
+        if action_type in (ActionType.SPLIT, ActionType.SPIN_OFF):
             if value <= 0.0:
-                raise ValueError(f"{instrument_id}: split ratio {value} is not strictly positive")
+                raise ValueError(
+                    f"{instrument_id}: {action_type.value.lower().replace('_', '-')} factor "
+                    f"{value} is not strictly positive"
+                )
             return 1.0 / value
         if previous_close <= 0.0:
             raise ValueError(

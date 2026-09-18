@@ -1,0 +1,23 @@
+# Reviewed corrections to what a provider called a corporate action - committed
+# configuration, like metadata/accepted_revisions.toml.
+#
+# A provider gives one label to events that are not the same thing: Yahoo
+# encodes a spin-off as a fractional stock split, and a special dividend as an
+# ordinary one. Neither can be guessed from the numbers, so each is a reviewed
+# entry with the reason it was made.
+#
+# A correction never changes a value or a date, and the price adjustment is the
+# same on both sides of every allowed pair, so applying one cannot move a stored
+# series. What it changes is what the layers above are allowed to read into the
+# event - a share count that never moved, a yield that never recurred.
+#
+# Empty on purpose: none of the five committed instruments has had such an event.
+# SP500 and VIX are indices, CW8 accumulates, and the two rates pay nothing.
+# Adding an equity to instruments.toml is what will make entries appear here.
+#
+#   [[correction]]
+#   instrument_id = "GE"
+#   ex_date = 2023-01-04
+#   from_type = "SPLIT"
+#   to_type = "SPIN_OFF"
+#   reason = "GE HealthCare spin-off; Yahoo reports it as a 1.281 stock split"

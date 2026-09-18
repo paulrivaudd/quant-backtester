@@ -44,6 +44,7 @@ from typing import Any, Final
 import pandas as pd
 
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
+from quant_backtester.data.corporate_actions import ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy, cross_check_bars
 from quant_backtester.data.instruments import DataType, Instrument, InstrumentRegistry
 from quant_backtester.data.normalizer import NormalizedData, Normalizer
@@ -233,6 +234,11 @@ class MarketDataUpdater:
         Normalizers, keyed by source identifier.
     accepted_revisions : AcceptedRevisions
         Reviewed decisions to apply.
+    action_corrections : ActionCorrections
+        Reviewed decisions about what a mislabelled corporate action really was,
+        declared in ``metadata/corporate_actions.toml``. Required for the same
+        reason the accepted revisions are: an empty set is a state someone chose,
+        not a default.
     cross_check_policy : CrossCheckPolicy
         Tolerances deciding when two sources agree, declared in
         ``metadata/crosscheck.toml``. Required, and passed in like the accepted
@@ -258,6 +264,7 @@ class MarketDataUpdater:
         sources: Mapping[str, DataSource],
         normalizers: Mapping[str, Normalizer],
         accepted_revisions: AcceptedRevisions,
+        action_corrections: ActionCorrections,
         cross_check_policy: CrossCheckPolicy,
         overlap_sessions: int = 5,
         clock: Callable[[], datetime] = utc_now,
@@ -270,6 +277,7 @@ class MarketDataUpdater:
         self._sources = dict(sources)
         self._normalizers = dict(normalizers)
         self._accepted_revisions = accepted_revisions
+        self._action_corrections = action_corrections
         self._cross_check_policy = cross_check_policy
         self._overlap_sessions = overlap_sessions
         self._clock = clock
@@ -310,7 +318,7 @@ class MarketDataUpdater:
         instrument = self._instruments.get(instrument_id)
         if start > end:
             raise ValueError(f"{instrument_id}: start {start} is after end {end}")
-        downloads, actions_download = self._fetch(instrument, start, end)
+        downloads, actions_download, fetch_issues = self._fetch(instrument, start, end)
         frames, actions, issues = self._normalize_all(instrument, downloads, actions_download)
         return self._ingest(
             instrument,
@@ -319,7 +327,7 @@ class MarketDataUpdater:
             fetch_id=downloads[instrument.primary_source].fetch_id,
             checked_at=downloads[instrument.primary_source].retrieved_at_utc,
             requested=(start, end),
-            extra_issues=issues,
+            extra_issues=fetch_issues + issues,
         )
 
     def update(self, instrument_id: str) -> ValidationReport:
@@ -385,8 +393,9 @@ class MarketDataUpdater:
                 f"{instrument_id}: the clock says {end}, before the range start {start}"
             )
 
-        downloads, actions_download = self._fetch(instrument, start, end)
+        downloads, actions_download, fetch_issues = self._fetch(instrument, start, end)
         frames, actions, issues = self._normalize_all(instrument, downloads, actions_download)
+        issues = fetch_issues + issues
         primary = downloads[instrument.primary_source]
         incoming = frames.get(instrument.primary_source)
         factor = (
@@ -519,7 +528,7 @@ class MarketDataUpdater:
 
     def _fetch(
         self, instrument: Instrument, start: date, end: date
-    ) -> tuple[dict[str, RawDownload], RawDownload | None]:
+    ) -> tuple[dict[str, RawDownload], RawDownload | None, list[ValidationIssue]]:
         """Download every source of an instrument and archive each response.
 
         Parameters
@@ -531,15 +540,40 @@ class MarketDataUpdater:
 
         Returns
         -------
-        tuple[dict[str, RawDownload], RawDownload | None]
-            One download per source, and the corporate actions download of the
-            primary source when it has one.
+        tuple[dict[str, RawDownload], RawDownload | None, list[ValidationIssue]]
+            One download per source that answered, the corporate actions
+            download of the primary source when it has one, and a
+            ``CHECK_SOURCE_UNAVAILABLE`` warning for every check source that
+            could not.
         """
         downloads: dict[str, RawDownload] = {}
+        issues: list[ValidationIssue] = []
         for source_id in instrument.sources:
-            download = self._source(source_id).download(
-                instrument.for_source(source_id), start, end
-            )
+            try:
+                download = self._source(source_id).download(
+                    instrument.for_source(source_id), start, end
+                )
+            except Exception as error:
+                # A second opinion that cannot be obtained is not a reason to
+                # lose the primary data: Euronext serves a rolling two-year
+                # window and refuses anything older, and a provider can simply
+                # be down. The sessions it would have confirmed stay
+                # SINGLE_SOURCE, which is what that status means. The primary
+                # source failing is another matter and propagates.
+                if source_id == instrument.primary_source:
+                    raise
+                issues.append(
+                    _issue(
+                        "CHECK_SOURCE_UNAVAILABLE",
+                        Severity.WARNING,
+                        instrument.id,
+                        None,
+                        f"{source_id} could not serve {instrument.id} from {start} to {end} "
+                        f"({type(error).__name__}: {error}); the sessions it would have "
+                        f"confirmed stay single-sourced",
+                    )
+                )
+                continue
             self._repository.save_raw(download)
             downloads[source_id] = download
         # Actions come from the primary source only: two providers' event feeds
@@ -549,7 +583,7 @@ class MarketDataUpdater:
         )
         if actions is not None:
             self._repository.save_raw(actions)
-        return downloads, actions
+        return downloads, actions, issues
 
     def _normalize_all(
         self,
@@ -579,6 +613,7 @@ class MarketDataUpdater:
         issues: list[ValidationIssue] = []
         for source_id, download in downloads.items():
             data = self._normalize(instrument, source_id, download)
+            issues += self._rejected_issues(instrument, source_id, data)
             frame = data.bars if instrument.data_type is DataType.BAR else data.levels
             if frame is None:
                 issues.append(
@@ -595,10 +630,51 @@ class MarketDataUpdater:
             frames[source_id] = frame
         actions = None
         if actions_download is not None:
-            actions = self._normalize(
-                instrument, instrument.primary_source, actions_download
-            ).corporate_actions
+            normalized = self._normalize(instrument, instrument.primary_source, actions_download)
+            issues += self._rejected_issues(instrument, instrument.primary_source, normalized)
+            actions = normalized.corporate_actions
         return frames, actions, issues
+
+    @staticmethod
+    def _rejected_issues(
+        instrument: Instrument, source_id: str, data: NormalizedData
+    ) -> list[ValidationIssue]:
+        """Report the rows a provider dated on a day its venue did not trade.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Instrument concerned.
+        source_id : str
+            Source that sent them.
+        data : NormalizedData
+            What the normalizer kept, and what it could not date.
+
+        Returns
+        -------
+        list[ValidationIssue]
+            One ``NON_SESSION_ROW`` warning per dropped date.
+
+        Notes
+        -----
+        The row cannot be stored - there is no session, so there is no instant
+        at which it became knowable - but dropping it in silence is how a
+        provider's junk becomes invisible. Yahoo sends one for CW8 on
+        2019-12-25, a Christmas Euronext was shut. A warning rather than an
+        error: one junk day from 2019 must not stop a series from updating
+        today.
+        """
+        return [
+            _issue(
+                "NON_SESSION_ROW",
+                Severity.WARNING,
+                instrument.id,
+                day,
+                f"{source_id} sent a row for {instrument.id} on {day}, a day its venue held "
+                f"no session; it cannot be dated and was dropped",
+            )
+            for day in data.rejected_sessions
+        ]
 
     def _normalize(
         self, instrument: Instrument, source_id: str, download: RawDownload
@@ -854,6 +930,12 @@ class MarketDataUpdater:
 
         Notes
         -----
+        The reviewed corrections are applied before anything else, so a spin-off
+        Yahoo reported as a fractional split is stored as a ``SPIN_OFF`` and
+        compared as one. The correction changes no value and no date, and both
+        sides of every allowed pair adjust prices identically, so it cannot move
+        a stored series.
+
         An action is keyed by ``(ex_date, action_type)``: a dividend and a split
         can share an ex-date, so the date alone is not a key. A stored action
         whose value changed is reported and kept as stored - the accepted
@@ -862,6 +944,9 @@ class MarketDataUpdater:
         every adjusted price before that ex-date.
         """
         issues: list[ValidationIssue] = []
+        # Reviewed labels first: what is compared with the stored table, and what
+        # is added to it, is what the event was - not what the provider called it.
+        incoming = self._action_corrections.apply(incoming)
         stored_all = self._repository.load_corporate_actions()
         mine = stored_all.loc[stored_all["instrument_id"] == instrument.id]
         others = stored_all.loc[stored_all["instrument_id"] != instrument.id]

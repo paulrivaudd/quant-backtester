@@ -699,7 +699,8 @@ def split_series(repository: MarketDataRepository, xnys: TradingCalendar) -> Non
     """Store a flat 100 series that splits 4:1 on Wednesday, quoting 25 after.
 
     The raw series is economically flat: 100 before the split, 25 from the
-    ex-date on. The action is knowable at the ex-date close, as the schema says.
+    ex-date on. The action is knowable at the ex-date open, as the schema says -
+    the same instant as the first price it affects.
     """
     repository.save_checked_bars(
         "EQ_US",
@@ -717,7 +718,7 @@ def split_series(repository: MarketDataRepository, xnys: TradingCalendar) -> Non
                     ActionType.SPLIT,
                     WEDNESDAY,
                     4.0,
-                    datetime(2026, 3, 11, 16, 0, tzinfo=NEW_YORK),
+                    datetime(2026, 3, 11, 9, 30, tzinfo=NEW_YORK),
                 )
             ]
         )
@@ -781,14 +782,14 @@ def test_future_data_does_not_change_the_past(
                     ActionType.SPLIT,
                     WEDNESDAY,
                     4.0,
-                    datetime(2026, 3, 11, 16, 0, tzinfo=NEW_YORK),
+                    datetime(2026, 3, 11, 9, 30, tzinfo=NEW_YORK),
                 ),
                 (
                     "EQ_US",
                     ActionType.SPLIT,
                     date(2026, 3, 13),
                     2.0,
-                    datetime(2026, 3, 13, 16, 0, tzinfo=NEW_YORK),
+                    datetime(2026, 3, 13, 9, 30, tzinfo=NEW_YORK),
                 ),
             ]
         )
@@ -813,13 +814,40 @@ def test_a_dividend_adjusts_earlier_prices_only(
                     ActionType.DIVIDEND,
                     WEDNESDAY,
                     2.0,
-                    datetime(2026, 3, 11, 16, 0, tzinfo=NEW_YORK),
+                    datetime(2026, 3, 11, 9, 30, tzinfo=NEW_YORK),
                 )
             ]
         )
     )
     adjusted = reader.at(paris(WEDNESDAY, 23, 0)).total_return_history("EQ_US")
     assert list(adjusted) == [98.0, 98.0, 98.0]
+
+
+def test_no_fake_gap_between_the_adjusted_close_and_the_ex_date_open(
+    reader: MarketDataReader, repository: MarketDataRepository, split_series: None
+) -> None:
+    """The reader that executes at the open sees the split and the price together.
+
+    This is what the ex-date open availability buys. At 09:31 New York on the
+    ex-date the strategy holds an adjusted history ending at 25 the day before
+    and an open of 25 - a flat move. With the action stamped at the close
+    instead, the history would still end at 100 and the very same open would
+    read as a 75% collapse.
+    """
+    execution = reader.at(datetime(2026, 3, 11, 9, 31, tzinfo=NEW_YORK))
+
+    assert list(execution.corporate_actions("EQ_US")["ex_date"]) == [WEDNESDAY]
+    adjusted = execution.total_return_history("EQ_US")
+    assert list(adjusted.index) == [MONDAY, TUESDAY]
+    assert list(adjusted) == [25.0, 25.0]
+    open_price = execution.history("EQ_US", BarField.OPEN).iloc[-1]
+    assert open_price == 25.0
+    assert adjusted.iloc[-1] == open_price
+
+    # The evening before, neither the action nor the adjustment exists yet.
+    decision = reader.at(paris(TUESDAY, 23, 0))
+    assert decision.corporate_actions("EQ_US").empty
+    assert list(decision.total_return_history("EQ_US")) == [100.0, 100.0]
 
 
 def test_adjustment_happens_before_the_window_is_cut(
@@ -853,7 +881,7 @@ def test_a_dividend_larger_than_the_close_is_refused(
                     ActionType.DIVIDEND,
                     TUESDAY,
                     20.0,
-                    datetime(2026, 3, 10, 16, 0, tzinfo=NEW_YORK),
+                    datetime(2026, 3, 10, 9, 30, tzinfo=NEW_YORK),
                 )
             ]
         )
@@ -877,7 +905,7 @@ def test_a_non_positive_split_ratio_is_refused(
                     ActionType.SPLIT,
                     TUESDAY,
                     0.0,
-                    datetime(2026, 3, 10, 16, 0, tzinfo=NEW_YORK),
+                    datetime(2026, 3, 10, 9, 30, tzinfo=NEW_YORK),
                 )
             ]
         )

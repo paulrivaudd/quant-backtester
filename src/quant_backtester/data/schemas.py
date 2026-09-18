@@ -54,10 +54,25 @@ class ActionType(Enum):
     """Kind of corporate action."""
 
     SPLIT = "SPLIT"
-    """``value`` is the split ratio: 4.0 for a 4-for-1."""
+    """``value`` is the split ratio: 4.0 for a 4-for-1, 0.125 for a 1-for-8 reverse
+    split. Every holding is multiplied by it and every earlier price divided."""
 
     DIVIDEND = "DIVIDEND"
-    """``value`` is the cash amount per share, in the instrument currency."""
+    """``value`` is the gross cash amount per share, in the instrument currency."""
+
+    SPIN_OFF = "SPIN_OFF"
+    """``value`` is the price adjustment factor: earlier prices are divided by it
+    exactly as for a split, but no share was multiplied - the holder received
+    stock in another company. Providers report it as a fractional split (Yahoo
+    gives GE 1.281 for the GE HealthCare spin-off of 2023-01-04), so only a
+    reviewed correction turns one into a ``SPIN_OFF``."""
+
+    SPECIAL_DIVIDEND = "SPECIAL_DIVIDEND"
+    """``value`` is the gross cash amount per share of a one-off distribution,
+    adjusted for exactly like an ordinary dividend. Providers mix the two (Yahoo
+    gives COST 15.00 on 2023-12-27 as a plain dividend), and a strategy that
+    extrapolates a yield from one is extrapolating from an accident - so only a
+    reviewed correction turns one into a ``SPECIAL_DIVIDEND``."""
 
 
 BARS_SCHEMA: Final = pa.schema(
@@ -102,9 +117,17 @@ CORPORATE_ACTIONS_SCHEMA: Final = pa.schema(
 )
 """Corporate actions.
 
-``available_at_utc`` is set to the ex-date close, not the announcement date,
-which the provider does not give us. That is deliberately conservative: we learn
-of a split later than the market did, so the backtest can never gain from it.
+``available_at_utc`` is the **open** of the ex-date. The raw open of that session
+is already post-split and ex-dividend, so the action has to be knowable no later
+than the first price it affects: stamped at the close, a 4-for-1 split would
+show a strategy trading that open a -75% gap that never happened. The
+announcement date, which the provider does not give us, is earlier still, so
+this instant never lets a backtest use information the market did not have.
+
+Only the ex-date is known: no declaration, record or payment date. Cash reaches
+the holder weeks later, and ``value`` is a **gross** amount for a dividend -
+withholding depends on the account and the treaty, so it is applied downstream
+and never stored here.
 """
 
 

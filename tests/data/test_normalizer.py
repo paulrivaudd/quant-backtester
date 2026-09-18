@@ -437,10 +437,23 @@ def test_yahoo_bars_single_row(spy_etf: Instrument, xnys: TradingCalendar) -> No
     assert bars["session_date"].tolist() == [date(2026, 9, 10)]
 
 
-def test_yahoo_bars_on_a_holiday_raise(spy_etf: Instrument, xnys: TradingCalendar) -> None:
+def test_yahoo_bars_on_a_holiday_are_dropped_and_named(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    """A bar on a day the venue was shut has no instant at which it was knowable.
+
+    It cannot be stored, so it is dropped - and named, because Yahoo really
+    sends them: one for CW8 on 2019-12-25, a Christmas Euronext was closed.
+    Raising instead used to take the whole instrument down with it, its thirty
+    good years included.
+    """
     raw = yahoo_bars(["2026-09-04", "2026-09-07"])  # Labor Day
-    with pytest.raises(ValueError, match="XNYS"):
-        NORMALIZER.normalize(spy_etf, bars_download(raw), xnys)
+
+    normalized = NORMALIZER.normalize(spy_etf, bars_download(raw), xnys)
+
+    assert normalized.bars is not None
+    assert normalized.bars["session_date"].tolist() == [date(2026, 9, 4)]
+    assert normalized.rejected_sessions == (date(2026, 9, 7),)
 
 
 def test_yahoo_bars_outside_calendar_coverage_raise_a_coverage_error(
@@ -572,14 +585,24 @@ def test_yahoo_actions_range_bounds_are_inclusive(
     assert actions["value"].tolist() == [1.0, 2.0]
 
 
-def test_yahoo_actions_become_available_at_the_ex_date_close(
+def test_yahoo_actions_become_available_at_the_ex_date_open(
     spy_etf: Instrument, xnys: TradingCalendar
 ) -> None:
+    """An action is knowable at the first price it affects, not a session later.
+
+    The raw open of an ex-date is already post-split and ex-dividend. Stamped at
+    the close, a 4-for-1 split would show a strategy executing at that open a
+    -75% gap that never happened - and this project executes at the open.
+
+    27 November is a half day closing 13:00 ET, and its open is unmoved: the
+    early close is exactly the kind of detail an availability anchored on the
+    close would drag in for no reason.
+    """
     raw = yahoo_actions([("2026-06-10", 0.0, 4.0), ("2026-11-27", 1.5, 0.0)])
     actions = actions_of(NORMALIZER.normalize(spy_etf, actions_download(raw), xnys))
     assert actions["available_at_utc"].tolist() == [
-        utc(2026, 6, 10, 20, 0),
-        utc(2026, 11, 27, 18, 0),
+        utc(2026, 6, 10, 13, 30),
+        utc(2026, 11, 27, 14, 30),
     ]
 
 
@@ -614,12 +637,17 @@ def test_yahoo_actions_without_event_in_range_give_an_empty_canonical_frame(
     assert table.num_rows == 0
 
 
-def test_yahoo_actions_on_a_closed_ex_date_raise(
+def test_yahoo_actions_on_a_closed_ex_date_are_dropped_and_named(
     spy_etf: Instrument, xnys: TradingCalendar
 ) -> None:
+    """No session means no open for the action to be knowable at."""
     raw = yahoo_actions([("2026-09-07", 1.74, 0.0)])
-    with pytest.raises(ValueError, match="XNYS"):
-        NORMALIZER.normalize(spy_etf, actions_download(raw), xnys)
+
+    normalized = NORMALIZER.normalize(spy_etf, actions_download(raw), xnys)
+
+    assert normalized.corporate_actions is not None
+    assert normalized.corporate_actions.empty
+    assert normalized.rejected_sessions == (date(2026, 9, 7),)
 
 
 @pytest.mark.parametrize(
@@ -943,10 +971,17 @@ def test_euronext_bars_missing_column_raises(cw8: Instrument, xpar: TradingCalen
         EURONEXT_NORMALIZER.normalize(cw8, broken, xpar)
 
 
-def test_euronext_bars_on_a_holiday_raise(cw8: Instrument, xpar: TradingCalendar) -> None:
+def test_euronext_bars_on_a_holiday_are_dropped_and_named(
+    cw8: Instrument, xpar: TradingCalendar
+) -> None:
+    """Same rule for the exchange's own export, where it should never happen."""
     rows = [euronext_row("07/04/2026"), euronext_row("06/04/2026")]  # Easter Monday
-    with pytest.raises(ValueError, match="XPAR"):
-        EURONEXT_NORMALIZER.normalize(cw8, euronext_download(rows), xpar)
+
+    normalized = EURONEXT_NORMALIZER.normalize(cw8, euronext_download(rows), xpar)
+
+    assert normalized.bars is not None
+    assert normalized.bars["session_date"].tolist() == [date(2026, 4, 7)]
+    assert normalized.rejected_sessions == (date(2026, 4, 6),)
 
 
 def test_euronext_bars_repeated_session_raises(cw8: Instrument, xpar: TradingCalendar) -> None:
