@@ -1079,9 +1079,18 @@ def test_fred_levels_are_available_by_the_publication_rule_in_every_season(
     ]
 
 
-def test_fred_levels_publication_lag_delays_availability(dgs10: Instrument) -> None:
-    next_day = PublicationRule(
-        publication_time=time(16, 15), timezone="America/New_York", lag_days=1
+def test_fred_levels_publication_lag_delays_availability(dgs10: Instrument, xnys) -> None:
+    """A lag of one session skips Christmas and the weekend behind it.
+
+    24 December 2026 is a session (a half day), the 25th is a holiday and the
+    26th and 27th are the weekend, so the value observed on the 24th is public
+    on Monday the 28th - not on the 25th, when nothing was published.
+    """
+    next_session = PublicationRule(
+        publication_time=time(16, 15),
+        timezone="America/New_York",
+        lag_sessions=1,
+        calendar_id="XNYS",
     )
     lagged = Instrument(
         id=dgs10.id,
@@ -1092,10 +1101,12 @@ def test_fred_levels_publication_lag_delays_availability(dgs10: Instrument) -> N
         primary_source=dgs10.primary_source,
         source_symbol=dgs10.source_symbol,
         tradable=dgs10.tradable,
-        publication_rule=next_day,
+        publication_rule=next_session,
     )
-    levels = levels_of(FRED_NORMALIZER.normalize(lagged, fred_download([("2024-12-23", "4.59")])))
-    assert levels["available_at_utc"].tolist() == [utc(2024, 12, 24, 21, 15)]
+    levels = levels_of(
+        FRED_NORMALIZER.normalize(lagged, fred_download([("2026-12-24", "4.59")]), xnys)
+    )
+    assert levels["available_at_utc"].tolist() == [utc(2026, 12, 28, 21, 15)]
 
 
 def test_fred_levels_convert_to_the_arrow_schema(dgs10: Instrument) -> None:

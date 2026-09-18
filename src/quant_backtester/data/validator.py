@@ -832,7 +832,9 @@ def _by_date(issues: list[ValidationIssue]) -> list[ValidationIssue]:
     )
 
 
-def validate_levels(instrument: Instrument, frame: pd.DataFrame) -> ValidationReport:
+def validate_levels(
+    instrument: Instrument, frame: pd.DataFrame, calendar: TradingCalendar | None = None
+) -> ValidationReport:
     """Check a canonical levels frame.
 
     Parameters
@@ -841,6 +843,10 @@ def validate_levels(instrument: Instrument, frame: pd.DataFrame) -> ValidationRe
         Instrument the frame belongs to.
     frame : pd.DataFrame
         Candidate rows, already normalised.
+    calendar : TradingCalendar | None
+        Calendar the instrument's publication rule counts its lag on, needed to
+        recompute the expected availability. Only a same-day release can do
+        without one.
 
     Returns
     -------
@@ -922,7 +928,7 @@ def validate_levels(instrument: Instrument, frame: pd.DataFrame) -> ValidationRe
             )
             continue
         published_on = available.tz_convert(rule.timezone).date()
-        expected = pd.Timestamp(rule.available_at(day))
+        expected = pd.Timestamp(rule.available_at(day, calendar))
         if published_on < day:
             issues.append(
                 _issue(

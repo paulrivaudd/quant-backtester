@@ -15,11 +15,13 @@ from __future__ import annotations
 import tomllib
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, fields, replace
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time
 from enum import Enum
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
+
+from quant_backtester.data.calendars import TradingCalendar
 
 
 class DataType(Enum):
@@ -47,9 +49,10 @@ class AssetType(Enum):
 class PublicationRule:
     """When a LEVEL observation becomes publicly available.
 
-    A published series has no exchange calendar: its availability is set by the
-    publisher's release schedule. ECB reference rates are published around 16:00
-    CET for the same day; a FRED series may land the following business day.
+    A published series has no exchange calendar of its own: its availability is
+    set by the publisher's release schedule. ECB reference rates are published
+    around 16:00 CET for the same day; a FRED series lands on the next business
+    day of its publisher.
 
     Attributes
     ----------
@@ -58,40 +61,102 @@ class PublicationRule:
     timezone : str
         IANA zone name, e.g. ``"Europe/Paris"``. Never a fixed UTC offset: the
         release time is a local wall clock and moves with DST.
-    lag_days : int
-        Calendar days between the observation date and the release date.
+    lag_sessions : int
+        Sessions of ``calendar_id`` between the observation date and the release
+        date. ``0`` means the value is published on the day it describes.
+    calendar_id : str | None
+        Calendar the lag is counted on, required when ``lag_sessions`` is not
+        zero and forbidden when it is - a calendar with nothing to count would
+        only suggest the rule consults one.
+
+    Raises
+    ------
+    ValueError
+        If ``lag_sessions`` is negative, or if it and ``calendar_id`` do not
+        agree as described above.
+
+    Notes
+    -----
+    The lag counts **sessions, not calendar days**. A rate observed on a Friday
+    and released "the next day" is readable on Monday, and on Tuesday when the
+    Monday is a holiday. Counting calendar days would make it readable on the
+    Saturday, which is a decision taken on data nobody had - the exact look-ahead
+    this project exists to prevent. It is also why there is no weekday-only
+    option: holidays are data held by a calendar, never a ``freq="B"``
+    assumption.
     """
 
     publication_time: time
     timezone: str
-    lag_days: int = 0
+    lag_sessions: int = 0
+    calendar_id: str | None = None
 
-    def available_at(self, observation_date: date) -> datetime:
+    def __post_init__(self) -> None:
+        """Reject a lag that cannot be counted, or a calendar with nothing to count."""
+        if self.lag_sessions < 0:
+            raise ValueError(f"lag_sessions must be zero or more, got {self.lag_sessions}")
+        if self.lag_sessions > 0 and self.calendar_id is None:
+            raise ValueError(
+                f"A lag of {self.lag_sessions} session(s) needs a calendar_id to count them on"
+            )
+        if self.lag_sessions == 0 and self.calendar_id is not None:
+            raise ValueError(
+                f"calendar_id {self.calendar_id!r} is set but lag_sessions is zero: "
+                "a same-day release counts nothing"
+            )
+
+    def available_at(
+        self, observation_date: date, calendar: TradingCalendar | None = None
+    ) -> datetime:
         """Return the UTC instant at which ``observation_date`` becomes public.
 
         Parameters
         ----------
         observation_date : date
             Calendar day the observation describes.
+        calendar : TradingCalendar | None
+            Calendar named by :attr:`calendar_id`, required as soon as
+            :attr:`lag_sessions` is not zero and ignored otherwise.
 
         Returns
         -------
         datetime
             Timezone-aware UTC instant.
 
+        Raises
+        ------
+        ValueError
+            If the rule counts sessions and ``calendar`` is missing or is not
+            the one it names.
+        CalendarCoverageError
+            If the release date falls outside the calendar's covered period.
+
         Notes
         -----
-        Exercice 1.1 (facile). Compose ``observation_date + lag_days`` avec
+        Exercice 1.1 (facile). Compose la date de diffusion avec
         ``publication_time`` dans ``ZoneInfo(self.timezone)``, puis convertis en
         UTC. Piege : ne construis jamais un datetime naif puis ne lui greffe un
         fuseau apres coup - passe ``tzinfo`` a la construction.
         """
-        # Le lag porte sur la date, pas sur l'instant : les jours sont ajoutes au
-        # calendrier local avant la conversion. Ajouter 24 h a l'instant UTC
-        # decalerait la publication d'une heure autour d'un changement d'heure.
-        jour_de_diffusion = observation_date + timedelta(days=self.lag_days)
+        release_date = observation_date
+        if self.lag_sessions:
+            if calendar is None:
+                raise ValueError(
+                    f"A lag of {self.lag_sessions} session(s) needs the {self.calendar_id} "
+                    "calendar to resolve a release date"
+                )
+            if calendar.calendar_id != self.calendar_id:
+                raise ValueError(
+                    f"The rule counts sessions of {self.calendar_id}, "
+                    f"got the {calendar.calendar_id} calendar"
+                )
+            for _ in range(self.lag_sessions):
+                release_date = calendar.next_session(release_date).session_date
+        # Le lag porte sur la date, pas sur l'instant : les seances sont comptees
+        # sur le calendrier local avant la conversion. Ajouter 24 h a l'instant
+        # UTC decalerait la publication d'une heure autour d'un changement d'heure.
         zone = ZoneInfo(self.timezone)
-        local_time = datetime.combine(jour_de_diffusion, self.publication_time, tzinfo=zone)
+        local_time = datetime.combine(release_date, self.publication_time, tzinfo=zone)
         return local_time.astimezone(UTC)
 
 
@@ -281,8 +346,8 @@ PUBLICATION_RULE_KEYS = frozenset(f.name for f in fields(PublicationRule))
 """Legitimate keys of an ``[instrument.publication_rule]`` sub-table.
 
 Derived for the same reason as :data:`INSTRUMENT_KEYS`, and checked for a
-sharper one: ``lag_days`` carries a default, so a mistyped key falls back to
-zero rather than failing, and a series released on D+1 silently becomes
+sharper one: ``lag_sessions`` carries a default, so a mistyped key falls back
+to zero rather than failing, and a series released on D+1 silently becomes
 readable on D. That is look-ahead bias introduced by a typo.
 """
 
@@ -449,7 +514,8 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
         publication_rule = PublicationRule(
             publication_time=publication_time,
             timezone=raw_rule["timezone"],
-            lag_days=raw_rule.get("lag_days", 0),
+            lag_sessions=raw_rule.get("lag_sessions", 0),
+            calendar_id=raw_rule.get("calendar_id"),
         )
 
     raw_checks = table.get("check_sources", [])

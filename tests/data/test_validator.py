@@ -383,14 +383,36 @@ def level_instrument(rule: PublicationRule = SAME_DAY_PARIS) -> Instrument:
     )
 
 
-def levels(rows: list[tuple[date, float]], rule: PublicationRule = SAME_DAY_PARIS) -> pd.DataFrame:
+AUGUST_2019 = TradingCalendar(
+    calendar_id="XNYS",
+    timezone="America/New_York",
+    regular_open=time(9, 30),
+    regular_close=time(16, 0),
+    holidays=frozenset(),
+    early_closes={},
+    covered_from=date(2019, 8, 1),
+    covered_until=date(2019, 8, 31),
+)
+"""August 2019 held no NYSE holiday, so only the weekends interrupt it."""
+
+NEXT_SESSION_NY = PublicationRule(
+    time(16, 15), "America/New_York", lag_sessions=1, calendar_id="XNYS"
+)
+"""Released one session after the day it describes, the corrected DGS10 rule."""
+
+
+def levels(
+    rows: list[tuple[date, float]],
+    rule: PublicationRule = SAME_DAY_PARIS,
+    calendar: TradingCalendar | None = None,
+) -> pd.DataFrame:
     """Return canonical levels stamped exactly as ``rule`` makes them available."""
     return pd.DataFrame(
         {
             "instrument_id": ["DE10Y"] * len(rows),
             "observation_date": [day for day, _ in rows],
             "value": [value for _, value in rows],
-            "available_at_utc": [pd.Timestamp(rule.available_at(day)) for day, _ in rows],
+            "available_at_utc": [pd.Timestamp(rule.available_at(day, calendar)) for day, _ in rows],
             "source": ["ECB"] * len(rows),
             "source_fetch_id": ["20260912T210311Z"] * len(rows),
         }
@@ -460,18 +482,35 @@ def test_an_availability_the_rule_does_not_give_is_an_error() -> None:
 
 
 def test_levels_stamped_under_an_old_rule_fail_after_the_rule_is_corrected() -> None:
-    # Stamped same day, while the corrected rule publishes the next day: rebuild needed.
-    next_day = PublicationRule(time(16, 15), "America/New_York", lag_days=1)
-    same_day = PublicationRule(time(16, 15), "America/New_York", lag_days=0)
+    # Stamped same day, while the corrected rule publishes the next session:
+    # exactly what US10Y looked like before its lag was fixed, and the reason
+    # the fix has to be followed by a rebuild.
+    same_day = PublicationRule(time(16, 15), "America/New_York")
     stale = levels([(MON, 1.7)], rule=same_day)
-    report = validate_levels(level_instrument(next_day), stale)
+    report = validate_levels(level_instrument(NEXT_SESSION_NY), stale, AUGUST_2019)
     assert codes(report) == ["AVAILABILITY_MISMATCH"]
 
 
 def test_a_publication_lag_is_accepted_when_consistent_with_the_rule() -> None:
-    next_day = PublicationRule(time(16, 15), "America/New_York", lag_days=1)
-    report = validate_levels(level_instrument(next_day), levels([(MON, 1.7)], rule=next_day))
+    report = validate_levels(
+        level_instrument(NEXT_SESSION_NY),
+        levels([(MON, 1.7)], rule=NEXT_SESSION_NY, calendar=AUGUST_2019),
+        AUGUST_2019,
+    )
     assert report.issues == []
+
+
+def test_a_lagged_friday_is_published_after_the_weekend() -> None:
+    """Friday 16 August 2019 plus one session is Monday the 19th.
+
+    A lag counted in calendar days would have made it readable on the Saturday,
+    a decision taken on a number nobody had yet.
+    """
+    friday = date(2019, 8, 16)
+    stamped = levels([(friday, 1.7)], rule=NEXT_SESSION_NY, calendar=AUGUST_2019)
+
+    assert stamped["available_at_utc"].iloc[0] == pd.Timestamp("2019-08-19 20:15", tz="UTC")
+    assert validate_levels(level_instrument(NEXT_SESSION_NY), stamped, AUGUST_2019).issues == []
 
 
 def test_the_publication_day_is_judged_in_the_publication_timezone() -> None:

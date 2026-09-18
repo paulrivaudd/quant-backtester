@@ -677,7 +677,9 @@ class MarketDataUpdater:
             if instrument.data_type is DataType.BAR:
                 issues += list(validate_bars(instrument, frame, self._venue_of(instrument)).issues)
             else:
-                issues += list(validate_levels(instrument, frame).issues)
+                issues += list(
+                    validate_levels(instrument, frame, self._calendar_of(instrument)).issues
+                )
         if actions is not None:
             issues += list(validate_corporate_actions(instrument, actions).issues)
         return issues
@@ -1068,10 +1070,30 @@ class MarketDataUpdater:
         return source
 
     def _calendar_of(self, instrument: Instrument) -> TradingCalendar | None:
-        """Return the venue calendar of a ``BAR``, ``None`` for a ``LEVEL``."""
-        if instrument.data_type is not DataType.BAR or instrument.calendar_id is None:
+        """Return the calendar an instrument's availability depends on.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Instrument concerned.
+
+        Returns
+        -------
+        TradingCalendar | None
+            The venue calendar of a ``BAR``; for a ``LEVEL``, the calendar its
+            publication rule counts its lag on, and ``None`` for a same-day
+            release, which needs none.
+        """
+        if instrument.data_type is DataType.BAR:
+            return (
+                None
+                if instrument.calendar_id is None
+                else self._calendars.get(instrument.calendar_id)
+            )
+        rule = instrument.publication_rule
+        if rule is None or rule.calendar_id is None:
             return None
-        return self._calendars.get(instrument.calendar_id)
+        return self._calendars.get(rule.calendar_id)
 
     def _venue_of(self, instrument: Instrument) -> TradingCalendar:
         """Return the venue calendar of a ``BAR``, which it always has."""

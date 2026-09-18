@@ -56,10 +56,17 @@ source_symbol = "DGS10"
 tradable = false
 first_session = 1990-01-02
 
+  # H.15 is released at 16:15 New York, but ALFRED vintages show the value for a
+  # day D first appearing the next business day: D = 2024-12-19 in the 12-20
+  # vintage, and Friday 2024-12-20 in the Monday 12-23 vintage. The lag is
+  # counted on XNYS sessions - a proxy for Federal Reserve business days that
+  # errs on the late side (Good Friday is a session for the Fed and not for
+  # NYSE), which is the only safe direction for an availability instant.
   [instrument.publication_rule]
   publication_time = "16:15:00"
   timezone = "America/New_York"
-  lag_days = 0
+  lag_sessions = 1
+  calendar_id = "XNYS"
 
 [[instrument]]
 id = "ECB_EURUSD"
@@ -72,7 +79,7 @@ source_symbol = "EXR.D.USD.EUR.SP00.A"
 tradable = false
 first_session = 1999-01-04
 
+  # Published around 16:00 CET for the same day, so no lag and no calendar.
   [instrument.publication_rule]
   publication_time = "16:00:00"
   timezone = "Europe/Paris"
-  lag_days = 0

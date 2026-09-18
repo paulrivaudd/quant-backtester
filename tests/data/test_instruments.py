@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from quant_backtester.data.calendars import CalendarRegistry
+from quant_backtester.data.calendars import CalendarCoverageError, CalendarRegistry
 from quant_backtester.data.instruments import (
     AssetType,
     CheckSource,
@@ -31,8 +31,13 @@ FRED_US10Y = PublicationRule(publication_time=time(16, 15), timezone="America/Ne
 ECB_FX = PublicationRule(publication_time=time(16, 0), timezone="Europe/Paris")
 """ECB reference rates, 16:00 Paris wall clock, same day."""
 
-NEXT_DAY = PublicationRule(publication_time=time(16, 15), timezone="America/New_York", lag_days=1)
-"""Same release time, published the following calendar day."""
+NEXT_DAY = PublicationRule(
+    publication_time=time(16, 15),
+    timezone="America/New_York",
+    lag_sessions=1,
+    calendar_id="XNYS",
+)
+"""Same release time, published one XNYS session after the day it describes."""
 
 
 def make_instrument(**overrides: object) -> Instrument:
@@ -102,48 +107,89 @@ def test_release_time_is_a_wall_clock_that_moves_with_dst(rule, observation_date
     assert rule.available_at(observation_date) == expected
 
 
-def test_lag_applies_to_the_date_not_to_the_instant():
-    """A lag crossing a DST switch adds a calendar day, not 24 hours.
+def test_lag_applies_to_the_date_not_to_the_instant(xnys):
+    """A lag crossing a DST switch moves to a session, not by 24 hours.
 
-    9 March 2024 + one day is the 10th, the day the US moves to EDT. Publication
-    is still at 16:15 local, so the UTC instant is 20:15 - not the 21:15 that
-    adding 24 hours to the previous day's instant would give.
+    Friday 6 March 2026 plus one session is Monday the 9th, and the US moved to
+    EDT on the 8th. Publication is still at 16:15 local, so the UTC instant is
+    20:15 - not the 21:15 that adding 24 hours per day would give.
     """
-    assert NEXT_DAY.available_at(date(2024, 3, 9)) == datetime(2024, 3, 10, 20, 15, tzinfo=UTC)
+    assert NEXT_DAY.available_at(date(2026, 3, 6), xnys) == datetime(2026, 3, 9, 20, 15, tzinfo=UTC)
 
 
-@pytest.mark.parametrize(
-    ("observation_date", "expected"),
-    [
-        (date(2024, 2, 29), datetime(2024, 3, 1, 21, 15, tzinfo=UTC)),  # leap day to March
-        (date(2024, 12, 31), datetime(2025, 1, 1, 21, 15, tzinfo=UTC)),  # year rollover
-    ],
-)
-def test_lag_crosses_month_and_year_boundaries(observation_date, expected):
-    """Date arithmetic, not string manipulation: the rollovers are handled."""
-    assert NEXT_DAY.available_at(observation_date) == expected
+def test_the_lag_skips_weekends_and_holidays(xnys):
+    """A Friday before a long weekend is published on the Tuesday.
 
-
-def test_lag_days_counts_calendar_days_not_business_days():
-    """A Friday observation with a one-day lag lands on the Saturday.
-
-    Documented limitation rather than a bug: ``lag_days`` is calendar days by
-    definition. A publisher releasing "the next business day" cannot be modelled
-    by this field, and must not be approximated with it.
+    This is the whole point of counting sessions. Friday 16 January 2026 plus
+    one "day" would be the Saturday; plus one weekday would be Monday the 19th,
+    which is Martin Luther King Day and publishes nothing. The value is readable
+    on Tuesday the 20th, and a strategy deciding on the Monday must not see it.
     """
-    friday = date(2024, 3, 8)
+    friday = date(2026, 1, 16)
 
-    available_at = NEXT_DAY.available_at(friday)
+    available_at = NEXT_DAY.available_at(friday, xnys)
 
-    assert available_at.astimezone(ZoneInfo("America/New_York")).date() == date(2024, 3, 9)
-    assert available_at == datetime(2024, 3, 9, 21, 15, tzinfo=UTC)
+    assert available_at.astimezone(ZoneInfo("America/New_York")).date() == date(2026, 1, 20)
+    assert available_at == datetime(2026, 1, 20, 21, 15, tzinfo=UTC)
+
+
+def test_lag_crosses_a_month_boundary(xnys):
+    """Session arithmetic, not string manipulation: the rollover is handled."""
+    assert NEXT_DAY.available_at(date(2026, 1, 30), xnys) == datetime(
+        2026, 2, 2, 21, 15, tzinfo=UTC
+    )
+
+
+def test_a_lag_walking_out_of_the_covered_period_raises(xnys):
+    """The calendar refuses to answer past its coverage rather than guess.
+
+    31 December 2026 is the last day XNYS covers, so the session after it is
+    unknown. Inventing one would date a publication on an assumption.
+    """
+    with pytest.raises(CalendarCoverageError):
+        NEXT_DAY.available_at(date(2026, 12, 31), xnys)
+
+
+def test_a_lag_needs_its_calendar_at_call_time():
+    """Counting sessions without the calendar is refused, never approximated."""
+    with pytest.raises(ValueError, match="XNYS"):
+        NEXT_DAY.available_at(date(2026, 1, 16))
+
+
+def test_a_foreign_calendar_is_refused(xpar):
+    """The rule names the calendar it counts on; another venue is not it."""
+    with pytest.raises(ValueError, match="XPAR"):
+        NEXT_DAY.available_at(date(2026, 1, 16), xpar)
+
+
+def test_a_lag_without_a_calendar_is_refused_at_construction():
+    """A rule that cannot say where its lag is counted is not a rule."""
+    with pytest.raises(ValueError, match="calendar_id"):
+        PublicationRule(publication_time=time(16, 15), timezone="America/New_York", lag_sessions=1)
+
+
+def test_a_calendar_without_a_lag_is_refused_at_construction():
+    """A same-day release counts nothing, so naming a calendar only misleads."""
+    with pytest.raises(ValueError, match="lag_sessions is zero"):
+        PublicationRule(publication_time=time(16, 0), timezone="Europe/Paris", calendar_id="XPAR")
+
+
+def test_a_negative_lag_is_refused():
+    """Publishing before the observation is not a lag."""
+    with pytest.raises(ValueError, match="lag_sessions"):
+        PublicationRule(
+            publication_time=time(16, 0),
+            timezone="Europe/Paris",
+            lag_sessions=-1,
+            calendar_id="XPAR",
+        )
 
 
 @pytest.mark.parametrize("rule", [FRED_US10Y, ECB_FX, NEXT_DAY])
 @pytest.mark.parametrize(
-    "observation_date", [date(2024, 1, 10), date(2024, 3, 9), date(2024, 7, 1)]
+    "observation_date", [date(2026, 1, 12), date(2026, 3, 6), date(2026, 7, 1)]
 )
-def test_availability_never_precedes_the_observed_day(rule, observation_date):
+def test_availability_never_precedes_the_observed_day(rule, observation_date, xnys):
     """The look-ahead guard: a value describing day *d* is never public before *d* begins.
 
     Availability moving earlier than the day it describes is the shape of the bug
@@ -151,7 +197,7 @@ def test_availability_never_precedes_the_observed_day(rule, observation_date):
     """
     day_starts = datetime.combine(observation_date, time(0, 0), tzinfo=ZoneInfo(rule.timezone))
 
-    assert rule.available_at(observation_date) >= day_starts
+    assert rule.available_at(observation_date, xnys) >= day_starts
 
 
 def test_rule_is_immutable():
@@ -319,7 +365,8 @@ first_session = 1990-01-02
   [instrument.publication_rule]
   publication_time = "16:15:00"
   timezone = "America/New_York"
-  lag_days = 0
+  lag_sessions = 1
+  calendar_id = "XNYS"
 """
 """A two-entry config: one BAR, one LEVEL. Synthetic, so the committed registry
 can grow without breaking these tests."""
@@ -353,7 +400,7 @@ def test_from_toml_reads_dates_enums_and_publication_rules(tmp_path):
     assert level.calendar_id is None
 
 
-def test_from_toml_produces_a_usable_publication_rule(tmp_path):
+def test_from_toml_produces_a_usable_publication_rule(tmp_path, xnys):
     """The loaded rule computes an availability, end to end.
 
     The regression this pins: ``publication_time`` left as the string
@@ -365,9 +412,9 @@ def test_from_toml_produces_a_usable_publication_rule(tmp_path):
     rule = registry.get("US10Y").publication_rule
 
     assert rule is not None
-    available_at = rule.available_at(date(2024, 3, 14))
+    available_at = rule.available_at(date(2026, 3, 12), xnys)
 
-    assert available_at == datetime(2024, 3, 14, 20, 15, tzinfo=UTC)
+    assert available_at == datetime(2026, 3, 13, 20, 15, tzinfo=UTC)
 
 
 def test_from_toml_rejects_an_unknown_key(tmp_path):
@@ -388,15 +435,15 @@ def test_from_toml_rejects_an_unknown_key(tmp_path):
 def test_from_toml_rejects_an_unknown_key_in_the_publication_rule(tmp_path):
     """A typo inside the sub-table is look-ahead bias, so it must fail too.
 
-    This is the sharper half of the unknown-key check. ``lag_days`` carries a
-    default of zero, so ``lag_dayz = 1`` builds a rule without complaint and
-    publishes a D+1 series on D - the strategy then reads a value that did not
-    exist yet. The top-level check alone does not see it: the sub-table is a
+    This is the sharper half of the unknown-key check. ``lag_sessions`` carries
+    a default of zero, so ``lag_sesions = 1`` builds a rule without complaint
+    and publishes a D+1 series on D - the strategy then reads a value that did
+    not exist yet. The top-level check alone does not see it: the sub-table is a
     nested dict, and ``publication_rule`` is itself a legitimate key.
     """
-    typo = SAMPLE_TOML.replace("lag_days = 0", "lag_dayz = 1", 1)
+    typo = SAMPLE_TOML.replace("lag_sessions = 1", "lag_sesions = 1", 1)
 
-    with pytest.raises(ValueError, match="lag_dayz") as excinfo:
+    with pytest.raises(ValueError, match="lag_sesions") as excinfo:
         InstrumentRegistry.from_toml(write_toml(tmp_path, typo))
 
     assert "US10Y" in str(excinfo.value)

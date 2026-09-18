@@ -64,7 +64,10 @@ def dgs10() -> Instrument:
         source_symbol="DGS10",
         tradable=False,
         publication_rule=PublicationRule(
-            publication_time=time(16, 15), timezone="America/New_York", lag_days=1
+            publication_time=time(16, 15),
+            timezone="America/New_York",
+            lag_sessions=1,
+            calendar_id="XNYS",
         ),
     )
 

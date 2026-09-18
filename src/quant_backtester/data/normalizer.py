@@ -435,6 +435,7 @@ def _levels_frame(
     download: RawDownload,
     rule: PublicationRule,
     observations: Mapping[date, float],
+    calendar: TradingCalendar | None = None,
 ) -> pd.DataFrame:
     """Assemble canonical levels, each stamped by the publication rule.
 
@@ -448,6 +449,9 @@ def _levels_frame(
         When each observation became public.
     observations : Mapping[date, float]
         Published value per observation date.
+    calendar : TradingCalendar | None
+        Calendar the rule counts its lag on; required as soon as the rule has
+        one, ignored for a same-day release.
 
     Returns
     -------
@@ -461,7 +465,7 @@ def _levels_frame(
         "instrument_id": [instrument.id] * len(dates),
         "observation_date": dates,
         "value": [observations[day] for day in dates],
-        "available_at_utc": [rule.available_at(day) for day in dates],
+        "available_at_utc": [rule.available_at(day, calendar) for day in dates],
         "source": [download.source] * len(dates),
         "source_fetch_id": [download.fetch_id] * len(dates),
     }
@@ -908,7 +912,9 @@ class FredNormalizer:
                 continue
             what = f"FRED {value_column} of {instrument.id} on {observation}"
             observations[observation] = _finite_number(text, what)
-        return NormalizedData(levels=_levels_frame(instrument, download, rule, observations))
+        return NormalizedData(
+            levels=_levels_frame(instrument, download, rule, observations, calendar)
+        )
 
 
 class EcbNormalizer:
@@ -987,7 +993,9 @@ class EcbNormalizer:
                 continue
             what = f"ECB {ECB_VALUE_COLUMN} of {instrument.id} on {observation}"
             observations[observation] = _finite_number(text, what)
-        return NormalizedData(levels=_levels_frame(instrument, download, rule, observations))
+        return NormalizedData(
+            levels=_levels_frame(instrument, download, rule, observations, calendar)
+        )
 
 
 NORMALIZERS: Mapping[str, Normalizer] = {
