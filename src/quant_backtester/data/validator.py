@@ -335,15 +335,41 @@ def _check_row(instrument: Instrument, row: Mapping[str, Any]) -> list[Validatio
     Returns
     -------
     list[ValidationIssue]
-        At most one of each, all ``ERROR``: ``OHLC_ORDER`` (``low <= open <=
-        high``, ``low <= close <= high``, compared only between prices present),
+        At most one of each. ``ERROR``: ``OHLC_ORDER`` (``low <= open <= high``,
+        ``low <= close <= high``, compared only between prices present),
         ``NON_POSITIVE_PRICE`` (only for :data:`POSITIVE_PRICE_ASSET_TYPES`),
         ``NEGATIVE_VOLUME`` and ``AVAILABILITY_ORDER`` (the open must become
-        available strictly before the close).
+        available strictly before the close). ``WARNING``: ``MISSING_PRICE``.
+
+    Notes
+    -----
+    ``MISSING_PRICE`` exists because every other rule here skips a price that is
+    absent, so a bar with no close used to pass in silence - Yahoo served
+    exactly that for CW8 on 2026-09-17, open, high and low present and no close.
+    It is a warning rather than an error: one incomplete recent bar must not
+    block a whole series from being updated, and nothing downstream will use the
+    value anyway. The cross-check marks the session against a second source and
+    the reader drops a missing value from the series it serves.
+
+    Volume is deliberately out of it: a provider leaving it empty on an index is
+    ordinary, and no price is derived from it.
     """
     day: date = row["session_date"]
     prices = {field: _number(row[field]) for field in BAR_PRICE_FIELDS}
     issues: list[ValidationIssue] = []
+
+    absent = [field for field, value in prices.items() if value is None]
+    if absent:
+        issues.append(
+            _issue(
+                "MISSING_PRICE",
+                Severity.WARNING,
+                instrument,
+                day,
+                f"Bar of {day} has no {', '.join(absent)}",
+                {"missing": absent},
+            )
+        )
 
     low, high = prices["low"], prices["high"]
     broken: list[str] = []
@@ -558,9 +584,11 @@ def validate_bars(
     Ne modifie jamais la frame ici. Un validateur qui corrige est un validateur
     qu'on ne peut plus auditer.
 
-    Two codes beyond the statement, both ``ERROR``: ``MISSING_COLUMN`` (nothing
+    Three codes beyond the statement. Two ``ERROR``: ``MISSING_COLUMN`` (nothing
     else can be checked) and ``OUTSIDE_CALENDAR_COVERAGE`` (the calendar cannot
-    say whether the day was a session, so the row cannot be trusted either).
+    say whether the day was a session, so the row cannot be trusted either). One
+    ``WARNING``: ``MISSING_PRICE``, a bar whose open, high, low or close is
+    absent - see :func:`_check_row`.
     Issues are sorted by date, whole-frame issues first.
     """
     missing = [column for column in REQUIRED_BAR_COLUMNS if column not in frame.columns]

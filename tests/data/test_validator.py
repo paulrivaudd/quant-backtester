@@ -274,14 +274,37 @@ def test_single_bar_has_no_move_and_no_gap(xnys: TradingCalendar) -> None:
 def test_missing_prices_are_not_ohlc_errors(xnys: TradingCalendar) -> None:
     holey = bar(TUE, open_=math.nan, high=math.nan, close=math.nan)
     report = validate_bars(make_instrument(), frame(holey), xnys)
-    assert report.issues == []
+    assert codes(report) == ["MISSING_PRICE"]
+    assert report.valid
+
+
+def test_a_missing_price_is_reported_once_and_names_the_fields(xnys: TradingCalendar) -> None:
+    """A bar with no close passed in silence before this rule existed.
+
+    Yahoo served exactly that for CW8 on 2026-09-17: open, high and low present,
+    no close. Every other rule skips a price that is absent, so nothing said a
+    word about it.
+    """
+    report = validate_bars(make_instrument(), frame(bar(TUE, close=math.nan)), xnys)
+    missing = issues_of(report, "MISSING_PRICE")
+    assert len(missing) == 1
+    assert missing[0].severity is Severity.WARNING
+    assert missing[0].observation_date == TUE
+    assert missing[0].context["missing"] == ["close"]
+
+
+def test_a_missing_volume_is_not_reported(xnys: TradingCalendar) -> None:
+    """A provider leaving the volume empty on an index is ordinary."""
+    report = validate_bars(make_instrument(), frame(bar(TUE, volume=math.nan)), xnys)
+    assert "MISSING_PRICE" not in codes(report)
 
 
 def test_a_missing_close_is_skipped_by_the_move_check(xnys: TradingCalendar) -> None:
     # 101 -> (missing) -> 102: compared with the last valid close, no move reported.
     missing = bar(WED, close=math.nan)
     report = validate_bars(make_instrument(), frame(bar(TUE), missing, bar(THU, close=102.0)), xnys)
-    assert report.issues == []
+    assert codes(report) == ["MISSING_PRICE"]
+    assert "EXTREME_MOVE" not in codes(report)
 
 
 def test_gap_while_not_listed_is_not_reported(xnys: TradingCalendar) -> None:
