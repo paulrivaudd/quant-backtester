@@ -33,17 +33,34 @@ first_session = 2018-01-02
   source = "EURONEXT"
   source_symbol = "LU1681043599-XPAR"
 
+# VIX is a published index, not an exchange-traded series, and modelling it as
+# bars on XNYS was simply wrong: Cboe computes it on days NYSE is closed
+# (2026-05-25, 2026-09-07), so the normalizer refused the whole download. Two
+# independent sources agree on those days - Yahoo's ^VIX close and FRED's
+# VIXCLS both give 15.30 on 2026-09-07 - so the values are real and it is the
+# venue-session model that does not fit them.
+#
+# FRED's VIXCLS is the official Cboe close and needs no calendar. ALFRED
+# vintages checked on 2026-09-18 show it published same day: the 2026-09-17
+# vintage already carries the 2026-09-17 value, unlike DGS10, whose vintage of
+# a day stops at the day before. The release time is the 16:15 New York options
+# close, when the index is final, the same convention as the H.15 rate above.
+# The open, high and low are lost with the switch; VIX is signal-only and never
+# traded here, so nothing used them.
 [[instrument]]
 id = "VIX"
 name = "CBOE Volatility Index"
 asset_type = "VOLATILITY"
-data_type = "BAR"
+data_type = "LEVEL"
 currency = "NA"
-primary_source = "YAHOO"
-source_symbol = "^VIX"
-calendar_id = "XNYS"
+primary_source = "FRED"
+source_symbol = "VIXCLS"
 tradable = false
 first_session = 1990-01-02
+
+  [instrument.publication_rule]
+  publication_time = "16:15:00"
+  timezone = "America/New_York"
 
 [[instrument]]
 id = "US10Y"

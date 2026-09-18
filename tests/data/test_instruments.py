@@ -25,8 +25,12 @@ from quant_backtester.data.instruments import (
     PublicationRule,
 )
 
+COMMITTED_INSTRUMENTS = (
+    Path(__file__).resolve().parents[2] / "market_data" / "metadata" / "instruments.toml"
+)
+
 FRED_US10Y = PublicationRule(publication_time=time(16, 15), timezone="America/New_York")
-"""FRED publishes DGS10 at 16:15 New York wall clock, for the same day."""
+"""A same-day release at 16:15 New York wall clock."""
 
 ECB_FX = PublicationRule(publication_time=time(16, 0), timezone="Europe/Paris")
 """ECB reference rates, 16:00 Paris wall clock, same day."""
@@ -784,3 +788,36 @@ def test_registry_supports_len_iteration_and_contains(registry):
     assert [instrument.id for instrument in registry] == [i.id for i in registry.list_all()]
     assert "VIX" in registry
     assert "NOT_A_REAL_ID" not in registry
+
+
+# --- the committed registry ---------------------------------------------------
+
+
+def test_the_committed_registry_pins_its_availability_decisions() -> None:
+    """Two reviewed decisions live in that file and nowhere else.
+
+    Both were settled against ALFRED vintages on 2026-09-18. The vintage of a
+    day holds DGS10 only up to the day before, so a US10Y observation is public
+    one business day later; the same vintage already holds VIXCLS for the day
+    itself, so that one is same-day.
+
+    VIX is a LEVEL because Cboe computes the index on days NYSE is closed - the
+    2026-09-07 value is 15.30 in both Yahoo and FRED - which no venue calendar
+    can describe. Reverting either line silently changes what a strategy could
+    have known, so the file is not the only place they are written down.
+    """
+    registry = InstrumentRegistry.from_toml(COMMITTED_INSTRUMENTS)
+
+    assert registry.get("US10Y").publication_rule == PublicationRule(
+        publication_time=time(16, 15),
+        timezone="America/New_York",
+        lag_sessions=1,
+        calendar_id="XNYS",
+    )
+
+    vix = registry.get("VIX")
+    assert vix.data_type is DataType.LEVEL
+    assert (vix.primary_source, vix.source_symbol) == ("FRED", "VIXCLS")
+    assert vix.calendar_id is None
+    assert vix.publication_rule is not None
+    assert vix.publication_rule.lag_sessions == 0
