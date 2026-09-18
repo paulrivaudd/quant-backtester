@@ -332,7 +332,25 @@ def test_corporate_actions_labels_and_timestamps_from_the_clock(
     assert result.instrument_id == "US_SPY"
     assert result.source == "YAHOO"
     assert result.retrieved_at_utc == RETRIEVED_AT
-    assert result.fetch_id == "20260912T210311Z"
+    assert result.fetch_id == "20260912T210311Z-actions"
+
+
+def test_bars_and_actions_of_one_clock_read_do_not_share_a_fetch_id(
+    spy: TickerSpy, spy_etf: Instrument, source: YahooSource
+) -> None:
+    """Both endpoints archive under one directory, so their ids must differ.
+
+    The clock is frozen here, which is exactly the case two calls a few hundred
+    milliseconds apart produce in production: same second, same id, and the raw
+    archive - append-only by design - refuses the second fetch.
+    """
+    bars = source.download(spy_etf, date(2026, 1, 1), date(2026, 9, 11))
+    actions = source.download_corporate_actions(spy_etf, date(2026, 1, 1), date(2026, 9, 11))
+    assert actions is not None
+    assert bars.retrieved_at_utc == actions.retrieved_at_utc
+    assert bars.fetch_id != actions.fetch_id
+    # Still sorts chronologically, which is what a rebuild replays on.
+    assert sorted([actions.fetch_id, bars.fetch_id]) == [bars.fetch_id, actions.fetch_id]
 
 
 def test_corporate_actions_records_that_the_range_is_not_applied(

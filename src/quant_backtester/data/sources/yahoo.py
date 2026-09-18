@@ -42,6 +42,13 @@ from quant_backtester.data.sources.base import RawDownload, make_fetch_id, utc_n
 ASSET_TYPES_WITH_ACTIONS = frozenset({AssetType.ETF, AssetType.EQUITY})
 """Asset types that can pay dividends or split. INDEX, RATE, FX, VOLATILITY cannot."""
 
+ACTIONS_FETCH_SUFFIX = "-actions"
+"""Appended to an actions fetch id, so it cannot collide with a bars fetch id.
+
+Both endpoints archive under ``raw/YAHOO/<instrument>/``, and two calls made in
+the same second would otherwise produce the same file name.
+"""
+
 YAHOO_TIMEZONE_KEY = "exchangeTimezoneName"
 """History metadata key Yahoo fills for every symbol it lists, even over an empty range."""
 
@@ -250,7 +257,11 @@ class YahooSource:
             "yfinance_version": yfinance.__version__,
         }
         retrieved_at_utc = self._clock()
-        fetch_id = make_fetch_id(retrieved_at_utc)
+        # Bars and actions share one source id, so they share one raw directory:
+        # two calls landing in the same second would collide on the file name and
+        # the archive would refuse the second one. The suffix keeps the id unique
+        # and still sorts chronologically.
+        fetch_id = f"{make_fetch_id(retrieved_at_utc)}{ACTIONS_FETCH_SUFFIX}"
         ticker = yfinance.Ticker(instrument.source_symbol)
         frame = ticker.actions
         if frame.empty:
