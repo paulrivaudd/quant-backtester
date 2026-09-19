@@ -1700,6 +1700,28 @@ def test_a_running_session_is_refused_even_when_asked_for(
     assert "VALUE_REVISED" not in codes(report)
 
 
+def test_a_clean_layer_left_half_written_is_refused(
+    updater: MarketDataUpdater, repository: MarketDataRepository
+) -> None:
+    """One writer at a time, and a crash between two writes has to be visible.
+
+    An update rewrites several files and each write is atomic on its own; the
+    set of them is not. A run that died after the bars and before the verdicts
+    left a clean layer whose two halves describe different sessions, and the
+    next update merged into it without a word.
+    """
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    checked = repository.load_checked_bars("ETF_EU")
+    repository.save_checked_bars("ETF_EU", checked.iloc[:-1].reset_index(drop=True))
+
+    with pytest.raises(ValueError, match="inconsistent"):
+        updater.update("ETF_EU")
+
+    # And the repair is the one the message names.
+    updater.rebuild_clean("ETF_EU")
+    updater.update("ETF_EU")
+
+
 # ---------------------------------------------------------------------------
 # Storage safety, independent of any exercise
 # ---------------------------------------------------------------------------

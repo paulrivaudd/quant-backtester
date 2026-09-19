@@ -11,6 +11,17 @@ The pipeline for one instrument::
              -> merge under the revision policy
              -> repository.save_clean (atomic)
 
+One writer at a time. An update rewrites several files - the bars, each check
+source's series, the checked series, the actions - and each write is atomic on
+its own, but the set of them is not. Nothing here takes a lock: reading the
+clean layer while an update runs, or running two updates at once, is outside
+what this module supports. A crash between two writes leaves the checked series
+behind the bars; :meth:`MarketDataUpdater.update` notices that at the next run
+and says so rather than building on it, and :meth:`rebuild_clean` repairs it
+from the archive. A staging directory and a version pointer would make the set
+atomic, and would be worth it the day something schedules this or reads it
+concurrently - not for one process run by hand.
+
 Three rules decide what this module may and may not do to stored history.
 
 **Nothing is promoted while an error stands.** The raw snapshot is archived
@@ -351,7 +362,8 @@ class MarketDataUpdater:
         Raises
         ------
         ValueError
-            If ``start`` is after ``end``.
+            If ``start`` is after ``end``, or the clean layer was left half
+            written by an interrupted run.
         KeyError
             If the instrument, one of its sources, one of its normalizers or its
             calendar is not registered.
@@ -368,6 +380,7 @@ class MarketDataUpdater:
         instrument = self._instruments.get(instrument_id)
         if start > end:
             raise ValueError(f"{instrument_id}: start {start} is after end {end}")
+        self._require_consistent_clean(instrument)
         downloads, actions_download, fetch_issues = self._fetch(instrument, start, end)
         frames, actions, issues = self._normalize_all(instrument, downloads, actions_download)
         return self._ingest(
@@ -426,6 +439,7 @@ class MarketDataUpdater:
         same bug the guard exists to prevent, one order of magnitude larger.
         """
         instrument = self._instruments.get(instrument_id)
+        self._require_consistent_clean(instrument)
         key_column = self._key_column(instrument)
         stored = self._stored_frame(instrument)
         end = safe_end_date(instrument, self._calendar_of(instrument), self._clock())
@@ -620,6 +634,41 @@ class MarketDataUpdater:
         if actions is not None:
             self._repository.save_raw(actions)
         return downloads, actions, issues
+
+    def _require_consistent_clean(self, instrument: Instrument) -> None:
+        """Refuse to build on a clean layer left half written.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Instrument about to be updated.
+
+        Raises
+        ------
+        ValueError
+            If the checked series and the bars disagree on which sessions are
+            stored, which only happens when a previous run died between the two
+            writes.
+
+        Notes
+        -----
+        Cheap, and it runs before anything is fetched: the alternative is an
+        update that merges into a series whose verdicts belong to a different
+        set of sessions, and says nothing.
+        """
+        if instrument.data_type is not DataType.BAR:
+            return
+        bars = set(self._repository.load_bars(instrument.id)["session_date"])
+        checked = set(self._repository.load_checked_bars(instrument.id)["session_date"])
+        if bars == checked:
+            return
+        missing = len(bars - checked)
+        extra = len(checked - bars)
+        raise ValueError(
+            f"{instrument.id}: the clean layer is inconsistent - {missing} session(s) have "
+            f"bars and no verdict, {extra} the other way round. A run was interrupted "
+            f"between two writes; rebuild_clean({instrument.id!r}) repairs it from raw/."
+        )
 
     def _check_download(
         self,

@@ -355,15 +355,20 @@ def committed(calendar_id: str) -> TradingCalendar:
 
 
 def test_committed_calendars_cover_their_declared_periods():
-    """NYSE from 1990, Paris from 2002, both through 2026; earlier Paris dates raise.
+    """NYSE from 1990, Paris from 2002, both through 2027; earlier Paris dates raise.
 
     The committed files once held 2026 alone while instruments started in 1990,
     and every earlier holiday read as a session.
+
+    The end date is pinned rather than compared to today: a test that read the
+    wall clock would turn red one morning with no code having changed. Whether
+    the horizon is still far enough away is an operational question, and
+    ``scripts/check_calendar_coverage.py`` is what answers it.
     """
     xnys, xpar = committed("XNYS"), committed("XPAR")
 
-    assert (xnys.covered_from, xnys.covered_until) == (date(1990, 1, 1), date(2026, 12, 31))
-    assert (xpar.covered_from, xpar.covered_until) == (date(2002, 1, 1), date(2026, 12, 31))
+    assert (xnys.covered_from, xnys.covered_until) == (date(1990, 1, 1), date(2027, 12, 31))
+    assert (xpar.covered_from, xpar.covered_until) == (date(2002, 1, 1), date(2027, 12, 31))
     with pytest.raises(CalendarCoverageError):
         xpar.is_open(date(2001, 7, 13))
 

@@ -10,6 +10,12 @@ Run it when a covered period is extended or the library publishes a correction::
 
     uv run python scripts/generate_calendars.py
 
+Extend the horizon by about a year at a time, not ten. An exchange announces an
+exceptional closure - a state funeral, a market holiday moved - months ahead,
+not decades, so a calendar generated far into the future is a list of guesses
+that nothing would ever contradict. ``scripts/check_calendar_coverage.py`` says
+when the next extension is due.
+
 A file is only written once it has been checked: loaded back through
 ``TradingCalendar.from_toml``, every session in the covered period must have the
 same date, UTC open and UTC close as the library's schedule, and the venue must
@@ -66,7 +72,7 @@ VENUES = (
         title="NYSE trading calendar.",
         timezone="America/New_York",
         covered_from=date(1990, 1, 1),
-        covered_until=date(2026, 12, 31),
+        covered_until=date(2027, 12, 31),
         coverage_note="From 1990, the first session of the earliest NYSE instrument.",
     ),
     Venue(
@@ -74,7 +80,7 @@ VENUES = (
         title="Euronext Paris trading calendar.",
         timezone="Europe/Paris",
         covered_from=date(2002, 1, 1),
-        covered_until=date(2026, 12, 31),
+        covered_until=date(2027, 12, 31),
         coverage_note=(
             "From 2002, when Euronext harmonised the Paris holidays. The library also\n"
             "# models the earlier regime (Whit Monday, Bastille Day), but it has not been\n"

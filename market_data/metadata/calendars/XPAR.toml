@@ -14,7 +14,7 @@ regular_close = "17:30:00"
 # models the earlier regime (Whit Monday, Bastille Day), but it has not been
 # checked against an independent source: extend only after checking it.
 covered_from = 2002-01-01
-covered_until = 2026-12-31
+covered_until = 2027-12-31
 
 # Weekdays without a session: public holidays and exceptional closures.
 holidays = [
@@ -140,6 +140,9 @@ holidays = [
   2026-04-06,
   2026-05-01,
   2026-12-25,
+  2027-01-01,
+  2027-03-26,
+  2027-03-29,
 ]
 
 # Sessions closing early, with their local close time.
@@ -180,3 +183,5 @@ holidays = [
 2025-12-31 = "14:05:00"
 2026-12-24 = "14:05:00"
 2026-12-31 = "14:05:00"
+2027-12-24 = "14:05:00"
+2027-12-31 = "14:05:00"
