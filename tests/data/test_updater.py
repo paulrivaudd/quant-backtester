@@ -710,6 +710,8 @@ def test_accepted_revision_is_applied(
                 table="bars",
                 observation_date=TUESDAY,
                 field="close",
+                old_value=101.0,
+                new_value=101.01,
                 reason="Provider confirmed the Tuesday close was mispriced",
             )
         ]
@@ -792,6 +794,51 @@ def test_a_rebased_level_series_is_caught_too(
 
     assert "SERIES_REBASED" in codes(report)
     pd.testing.assert_frame_equal(repository.load_levels("RATE_US"), before)
+
+
+def test_an_acceptance_covers_one_correction_and_not_the_next(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    clock: Clock,
+) -> None:
+    """A decision is about one transition, never a standing permission.
+
+    Keyed on the field and the date alone, one review let every later change of
+    that close through, unreviewed and for ever: accepting 101.0 -> 101.01 also
+    accepted 101.01 -> 101.9, and whatever the provider served after that.
+    """
+    accepted = AcceptedRevisions(
+        [
+            AcceptedRevision(
+                instrument_id="ETF_EU",
+                table="bars",
+                observation_date=TUESDAY,
+                field="close",
+                old_value=101.0,
+                new_value=101.01,
+                reason="Provider confirmed the Tuesday close was mispriced",
+            )
+        ]
+    )
+    updater = build_updater(repository, instruments, calendars, {"YAHOO": yahoo}, clock, accepted)
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    reviewed = yahoo.rows["ETF_EU"].copy()
+    reviewed.loc[1, "close"] = 101.01
+    yahoo.rows["ETF_EU"] = reviewed
+    updater.update("ETF_EU")
+    assert repository.load_bars("ETF_EU")["close"].iloc[1] == 101.01
+
+    # A second move of the same field, which nobody reviewed.
+    again = yahoo.rows["ETF_EU"].copy()
+    again.loc[1, "close"] = 101.9
+    yahoo.rows["ETF_EU"] = again
+
+    report = updater.update("ETF_EU")
+
+    assert repository.load_bars("ETF_EU")["close"].iloc[1] == 101.01
+    assert "VALUE_REVISED" in codes(report)
 
 
 def test_a_verdict_change_is_reported(

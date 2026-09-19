@@ -1287,7 +1287,12 @@ class MarketDataUpdater:
     def _is_accepted(self, instrument: Instrument, table: str, row: Mapping[str, Any]) -> bool:
         """Return whether one detected revision was reviewed into the policy."""
         return self._accepted_revisions.is_accepted(
-            instrument.id, table, row["observation_date"], str(row["field"])
+            instrument.id,
+            table,
+            row["observation_date"],
+            str(row["field"]),
+            float(row["old_value"]),
+            float(row["new_value"]),
         )
 
     def _report_rebasing(

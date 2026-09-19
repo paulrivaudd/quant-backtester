@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 
@@ -28,11 +29,19 @@ COMMITTED = (
     Path(__file__).resolve().parents[2] / "market_data" / "metadata" / "accepted_revisions.toml"
 )
 
+SP500_MOVE = (6590.25, 6591.1)
+"""The one transition reviewed on the SP500 close of 10 September."""
+
+US10Y_MOVE = (4.1, 4.12)
+"""The one transition reviewed on the US10Y value of 9 September."""
+
 SP500_CLOSE = AcceptedRevision(
     instrument_id="SP500",
     table="bars",
     observation_date=date(2026, 9, 10),
     field="close",
+    old_value=SP500_MOVE[0],
+    new_value=SP500_MOVE[1],
     reason="Yahoo corrected an obviously wrong print; checked against another source.",
 )
 
@@ -41,6 +50,8 @@ US10Y_VALUE = AcceptedRevision(
     table="levels",
     observation_date=date(2026, 9, 9),
     field="value",
+    old_value=US10Y_MOVE[0],
+    new_value=US10Y_MOVE[1],
     reason="FRED restated the H.15 value.",
 )
 
@@ -57,6 +68,8 @@ instrument_id = "SP500"
 table = "bars"
 observation_date = 2026-09-10
 field = "close"
+old_value = 6590.25
+new_value = 6591.1
 reason = "Yahoo corrected an obviously wrong print; checked against another source."
 
 [[revision]]
@@ -64,6 +77,8 @@ instrument_id = "US10Y"
 table = "levels"
 observation_date = 2026-09-09
 field = "value"
+old_value = 4.1
+new_value = 4.12
 reason = "FRED restated the H.15 value."
 """
 
@@ -73,13 +88,13 @@ reason = "FRED restated the H.15 value."
 
 def test_no_decision_is_valid_and_accepts_nothing() -> None:
     accepted = AcceptedRevisions([])
-    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close")
+    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close", *SP500_MOVE)
 
 
 def test_decisions_are_accepted_for_bars_and_levels() -> None:
     accepted = AcceptedRevisions([SP500_CLOSE, US10Y_VALUE])
-    assert accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close")
-    assert accepted.is_accepted("US10Y", "levels", date(2026, 9, 9), "value")
+    assert accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close", *SP500_MOVE)
+    assert accepted.is_accepted("US10Y", "levels", date(2026, 9, 9), "value", *US10Y_MOVE)
 
 
 @pytest.mark.parametrize(
@@ -98,6 +113,8 @@ def test_an_invalid_decision_is_rejected(overrides: dict[str, object], match: st
         "table": "bars",
         "observation_date": date(2026, 9, 10),
         "field": "close",
+        "old_value": SP500_MOVE[0],
+        "new_value": SP500_MOVE[1],
         "reason": "Checked.",
     }
     fields.update(overrides)
@@ -111,6 +128,8 @@ def test_the_same_correction_accepted_twice_is_rejected() -> None:
         table="bars",
         observation_date=date(2026, 9, 10),
         field="close",
+        old_value=SP500_MOVE[0],
+        new_value=SP500_MOVE[1],
         reason="A second, different review of the same correction.",
     )
     with pytest.raises(ValueError, match="more than once"):
@@ -123,17 +142,19 @@ def test_the_same_day_on_two_fields_is_two_distinct_decisions() -> None:
         table="bars",
         observation_date=date(2026, 9, 10),
         field="open",
+        old_value=SP500_MOVE[0],
+        new_value=SP500_MOVE[1],
         reason="The open was corrected as well.",
     )
     accepted = AcceptedRevisions([SP500_CLOSE, open_too])
-    assert accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "open")
+    assert accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "open", *SP500_MOVE)
 
 
 def test_decisions_do_not_change_when_the_callers_list_does() -> None:
     decisions = [SP500_CLOSE]
     accepted = AcceptedRevisions(decisions)
     decisions.append(US10Y_VALUE)
-    assert not accepted.is_accepted("US10Y", "levels", date(2026, 9, 9), "value")
+    assert not accepted.is_accepted("US10Y", "levels", date(2026, 9, 9), "value", *US10Y_MOVE)
 
 
 # --- 7.3 is_accepted ----------------------------------------------------------
@@ -153,13 +174,13 @@ def test_a_correction_differing_in_any_part_is_not_accepted(
     instrument_id: str, table: str, observation_date: date, field: str
 ) -> None:
     accepted = AcceptedRevisions([SP500_CLOSE])
-    assert not accepted.is_accepted(instrument_id, table, observation_date, field)
+    assert not accepted.is_accepted(instrument_id, table, observation_date, field, *SP500_MOVE)
 
 
 def test_a_datetime_never_matches_the_date_of_a_decision() -> None:
     accepted = AcceptedRevisions([SP500_CLOSE])
     at_midnight = datetime(2026, 9, 10)
-    assert not accepted.is_accepted("SP500", "bars", at_midnight, "close")
+    assert not accepted.is_accepted("SP500", "bars", at_midnight, "close", *SP500_MOVE)
 
 
 # --- 7.2 from_toml ------------------------------------------------------------
@@ -167,24 +188,24 @@ def test_a_datetime_never_matches_the_date_of_a_decision() -> None:
 
 def test_the_committed_file_loads_and_accepts_nothing_yet() -> None:
     accepted = AcceptedRevisions.from_toml(COMMITTED)
-    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close")
+    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close", *SP500_MOVE)
 
 
 def test_a_missing_file_means_nothing_accepted(tmp_path: Path) -> None:
     accepted = AcceptedRevisions.from_toml(tmp_path / "absent.toml")
-    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close")
+    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close", *SP500_MOVE)
 
 
 def test_a_file_with_comments_only_accepts_nothing(tmp_path: Path) -> None:
     accepted = AcceptedRevisions.from_toml(write(tmp_path, "# Nothing reviewed yet.\n"))
-    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close")
+    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close", *SP500_MOVE)
 
 
 def test_from_toml_reads_every_revision_table(tmp_path: Path) -> None:
     accepted = AcceptedRevisions.from_toml(write(tmp_path, TWO_REVISIONS))
-    assert accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close")
-    assert accepted.is_accepted("US10Y", "levels", date(2026, 9, 9), "value")
-    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "open")
+    assert accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close", *SP500_MOVE)
+    assert accepted.is_accepted("US10Y", "levels", date(2026, 9, 9), "value", *US10Y_MOVE)
+    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "open", *SP500_MOVE)
 
 
 def test_the_example_documented_in_the_committed_file_is_valid(tmp_path: Path) -> None:
@@ -195,7 +216,7 @@ def test_the_example_documented_in_the_committed_file_is_valid(tmp_path: Path) -
         if line.startswith("# [[revision]]") or (line.startswith("# ") and " = " in line)
     )
     accepted = AcceptedRevisions.from_toml(write(tmp_path, example))
-    assert accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close")
+    assert accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close", *SP500_MOVE)
 
 
 @pytest.mark.parametrize(
@@ -674,8 +695,15 @@ def accepting(
     observation_date: date = SESSIONS[1],
     instrument_id: str = "SPY",
     table: str = "bars",
+    old_value: float = 101.0,
+    new_value: float = 101.5,
 ) -> AcceptedRevisions:
-    """Build the reviewed decision letting one date's ``fields`` through."""
+    """Build the reviewed decision letting one transition of one date through.
+
+    The defaults are the move the frames below make: the middle session's close
+    from 101.0 to 101.5. A decision names the values, so a test that moves a
+    field somewhere else has to say so.
+    """
     return AcceptedRevisions(
         [
             AcceptedRevision(
@@ -683,6 +711,8 @@ def accepting(
                 table=table,
                 observation_date=observation_date,
                 field=field,
+                old_value=old_value,
+                new_value=new_value,
                 reason="Checked against a second source.",
             )
             for field in fields
@@ -754,7 +784,7 @@ def test_an_applied_correction_takes_the_incoming_fetch_id() -> None:
 
 def test_an_accepted_field_that_did_not_move_leaves_provenance_alone() -> None:
     """Acceptance is permission, not an instruction: nothing moved, nothing is rewritten."""
-    merged = merge(bars(), bars(fetch_id=NEW_FETCH), accepting("close"))
+    merged = merge(bars(), bars(fetch_id=NEW_FETCH), accepting("close"))  # nothing moved
 
     assert merged["source_fetch_id"].tolist() == [OLD_FETCH] * 3
 
@@ -796,7 +826,7 @@ def test_a_reviewed_disappearance_is_applied() -> None:
     stored = bars()
     refetched = bars(fetch_id=NEW_FETCH, closes=[100.0, math.nan, 102.0])
 
-    merged = merge(stored, refetched, accepting("close"))
+    merged = merge(stored, refetched, accepting("close", new_value=math.nan))
 
     assert math.isnan(merged["close"].iloc[1])
 
@@ -808,11 +838,17 @@ def test_a_reviewed_disappearance_is_applied() -> None:
         accepting("close", table="levels"),
         accepting("close", observation_date=SESSIONS[0]),
         accepting("open"),
+        accepting("close", new_value=101.9),
     ],
-    ids=["other-instrument", "other-table", "other-date", "other-field"],
+    ids=["other-instrument", "other-table", "other-date", "other-field", "other-value"],
 )
 def test_a_decision_differing_in_any_part_does_not_apply(accepted: AcceptedRevisions) -> None:
-    """The four parts of a decision are one key; a near miss is a miss."""
+    """The six parts of a decision are one key; a near miss is a miss.
+
+    ``other-value`` is the one that was missing. Keyed on the field and the date
+    alone, a decision reviewed once stood for ever: accepting 101.0 -> 101.5 also
+    accepted every later move of that close, unreviewed.
+    """
     stored = bars()
     refetched = bars(fetch_id=NEW_FETCH, closes=[100.0, 101.5, 102.0])
 
@@ -885,7 +921,13 @@ def test_levels_merge_on_their_own_key_column() -> None:
     merged = merge_with_policy(
         stored,
         refetched,
-        accepting("value", instrument_id="US10Y", table="levels"),
+        accepting(
+            "value",
+            instrument_id="US10Y",
+            table="levels",
+            old_value=4.11,
+            new_value=4.15,
+        ),
         table="levels",
         key_column="observation_date",
         value_columns=("value",),
@@ -936,3 +978,26 @@ def test_the_merge_rejects_frames_without_a_compared_column() -> None:
 
     with pytest.raises(ValueError, match="close"):
         merge(stored, refetched)
+
+
+def test_a_value_that_is_not_a_number_is_rejected(tmp_path: Path) -> None:
+    """The transition is the key: a string or a boolean cannot stand for a value."""
+    content = TWO_REVISIONS.replace("old_value = 6590.25", 'old_value = "6590.25"')
+    with pytest.raises(ValueError, match="old_value"):
+        AcceptedRevisions.from_toml(write(tmp_path, content))
+
+
+def test_a_withdrawal_is_written_nan(tmp_path: Path) -> None:
+    """A value vanishing is a correction like any other, and reviewable like one."""
+    content = TWO_REVISIONS.replace("new_value = 6591.1", "new_value = nan")
+    accepted = AcceptedRevisions.from_toml(write(tmp_path, content))
+    assert accepted.is_accepted(
+        "SP500", "bars", date(2026, 9, 10), "close", SP500_MOVE[0], math.nan
+    )
+    assert not accepted.is_accepted("SP500", "bars", date(2026, 9, 10), "close", *SP500_MOVE)
+
+
+def test_a_decision_that_moves_nothing_is_rejected() -> None:
+    """Accepting a value onto itself is not a decision, it is a typo."""
+    with pytest.raises(ValueError, match="the same"):
+        AcceptedRevisions([replace(SP500_CLOSE, new_value=SP500_CLOSE.old_value)])

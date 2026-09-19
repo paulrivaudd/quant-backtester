@@ -44,16 +44,94 @@ class AcceptedRevision:
         Row concerned.
     field : str
         Column concerned, e.g. ``"close"``.
+    old_value : float
+        Value as stored, ``nan`` when nothing was published for it.
+    new_value : float
+        Value the provider now serves, ``nan`` when it has withdrawn it.
     reason : str
         Why it was accepted. Required: a decision without a reason cannot be
         re-examined later.
+
+    Notes
+    -----
+    The two values are what makes this a decision about one correction rather
+    than a standing permission. Keyed on the field and the date alone, an entry
+    reviewed once let every later change of that same field through, unreviewed
+    and for good: accepting 101.0 -> 101.5 also accepted 101.5 -> 101.9, and
+    whatever came after it.
     """
 
     instrument_id: str
     table: str
     observation_date: date
     field: str
+    old_value: float
+    new_value: float
     reason: str
+
+
+RevisionKey = tuple[str, str, date, str, float | str, float | str]
+"""Identity of one reviewed correction: where it applies and which move it is."""
+
+
+def _same_value(left: float, right: float) -> bool:
+    """Return whether two values are the same, ``nan`` counting as equal to itself."""
+    if math.isnan(left) and math.isnan(right):
+        return True
+    return left == right
+
+
+def _key_value(value: float) -> float | str:
+    """Return a value usable in a key. ``nan`` never equals itself, so it becomes a label."""
+    return "missing" if math.isnan(value) else float(value)
+
+
+def _revision_key(
+    instrument_id: str,
+    table: str,
+    observation_date: date,
+    field: str,
+    old_value: float,
+    new_value: float,
+) -> RevisionKey:
+    """Return the identity of one correction, values included."""
+    return (
+        instrument_id,
+        table,
+        observation_date,
+        field,
+        _key_value(old_value),
+        _key_value(new_value),
+    )
+
+
+def _as_value(raw: object, context: str) -> float:
+    """Return a TOML cell as a value of a revision.
+
+    Parameters
+    ----------
+    raw : Any
+        Cell as ``tomllib`` returned it. ``nan`` is the way the file spells a
+        value the provider did not publish.
+    context : str
+        Quoted in the error message.
+
+    Returns
+    -------
+    float
+        The value.
+
+    Raises
+    ------
+    ValueError
+        If the cell is not a finite number or ``nan``.
+    """
+    if isinstance(raw, bool) or not isinstance(raw, float | int):
+        raise ValueError(f"{context} = {raw!r}; expected a number")
+    value = float(raw)
+    if math.isinf(value):
+        raise ValueError(f"{context} = {raw!r}; expected a finite number or nan")
+    return value
 
 
 REVISION_TABLES = frozenset({"bars", "levels"})
@@ -86,7 +164,7 @@ class AcceptedRevisions:
     """
 
     def __init__(self, revisions: Sequence[AcceptedRevision]) -> None:
-        keys: set[tuple[str, str, date, str]] = set()
+        keys: set[RevisionKey] = set()
         for revision in revisions:
             label = (
                 f"Accepted revision of {revision.instrument_id} {revision.table}."
@@ -99,11 +177,21 @@ class AcceptedRevisions:
                 raise ValueError(f"{label}: observation_date must be a plain date")
             if not revision.reason.strip():
                 raise ValueError(f"{label}: a reason is required")
-            key = (
+            sides = (("old_value", revision.old_value), ("new_value", revision.new_value))
+            for side, value in sides:
+                if isinstance(value, bool) or not isinstance(value, float | int):
+                    raise ValueError(f"{label}: {side} must be a number, got {value!r}")
+                if math.isinf(value):
+                    raise ValueError(f"{label}: {side} must be finite, got {value!r}")
+            if _same_value(revision.old_value, revision.new_value):
+                raise ValueError(f"{label}: old_value and new_value are the same")
+            key = _revision_key(
                 revision.instrument_id,
                 revision.table,
                 revision.observation_date,
                 revision.field,
+                revision.old_value,
+                revision.new_value,
             )
             if key in keys:
                 raise ValueError(f"{label}: accepted more than once")
@@ -176,6 +264,8 @@ class AcceptedRevisions:
                     table=entry["table"],
                     observation_date=observation_date,
                     field=entry["field"],
+                    old_value=_as_value(entry["old_value"], f"{context} old_value"),
+                    new_value=_as_value(entry["new_value"], f"{context} new_value"),
                     reason=entry["reason"],
                 )
             )
@@ -185,7 +275,13 @@ class AcceptedRevisions:
             raise ValueError(f"{path}: {exc}") from None
 
     def is_accepted(
-        self, instrument_id: str, table: str, observation_date: date, field: str
+        self,
+        instrument_id: str,
+        table: str,
+        observation_date: date,
+        field: str,
+        old_value: float,
+        new_value: float,
     ) -> bool:
         """Return whether one specific correction was approved.
 
@@ -199,6 +295,8 @@ class AcceptedRevisions:
             Row concerned.
         field : str
             Column concerned.
+        old_value, new_value : float
+            The transition detected, ``nan`` for a value that was not published.
 
         Returns
         -------
@@ -209,11 +307,19 @@ class AcceptedRevisions:
         -----
         Exercice 7.3 (facile).
 
-        All four parts must match exactly. Accepting the close of a session does
-        not accept its open, and a ``datetime`` never equals the ``date`` of a
-        decision.
+        All six parts must match exactly. Accepting the close of a session does
+        not accept its open, a ``datetime`` never equals the ``date`` of a
+        decision, and a correction to a different value is a different decision:
+        what was reviewed was one transition, not a licence over that field.
+
+        Values compare exactly. A float written by hand rarely matches one a
+        provider served, which is why the entry is generated from a row of
+        ``clean/revisions.parquet`` rather than typed.
         """
-        return (instrument_id, table, observation_date, field) in self._keys
+        return (
+            _revision_key(instrument_id, table, observation_date, field, old_value, new_value)
+            in self._keys
+        )
 
 
 def _rows_by_date(frame: pd.DataFrame, key_column: str, side: str) -> dict[date, dict[str, Any]]:
@@ -536,9 +642,12 @@ def merge_with_policy(
         row = dict(stored_row)
         moved = False
         for field in value_columns:
-            if not _has_changed(float(stored_row[field]), float(incoming_row[field]), 0.0):
+            was, now = float(stored_row[field]), float(incoming_row[field])
+            if not _has_changed(was, now, 0.0):
                 continue
-            if not accepted.is_accepted(str(instrument_id), table, observation_date, field):
+            if not accepted.is_accepted(
+                str(instrument_id), table, observation_date, field, was, now
+            ):
                 continue
             row[field] = incoming_row[field]
             moved = True

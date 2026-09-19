@@ -5,9 +5,24 @@
 # Every entry changes numbers that were already produced, which is why this
 # file is in git and requires a reason.
 #
+# An entry names the transition, not just the field: old_value and new_value
+# are part of the key. Without them, one review stood for ever - accepting
+# 6590.25 -> 6591.10 also accepted whatever that close became next, unreviewed.
+#
+# The values must match what was detected exactly, so the entry is generated
+# rather than typed:
+#
+#   uv run python scripts/accept_revision.py SP500 2026-09-10 close
+#
+# A value the provider did not publish is written `nan`, on either side: a
+# value appearing or vanishing changes a past result exactly as a value moving
+# does.
+#
 # [[revision]]
 # instrument_id = "SP500"
 # table = "bars"
 # observation_date = 2026-09-10
 # field = "close"
+# old_value = 6590.25
+# new_value = 6591.1
 # reason = "Yahoo corrected an obviously wrong print; checked against Stooq."
