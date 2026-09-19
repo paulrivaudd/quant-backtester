@@ -7,14 +7,9 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from quant_backtester.signals.base import (
-    RESULT_COLUMNS,
-    Signal,
-    SignalResult,
-    require_positive_int,
-)
+from quant_backtester.signals.base import RESULT_COLUMNS, Signal, SignalResult
 from quant_backtester.signals.context import SignalContext
-from quant_backtester.signals.types import SignalStatus, SignalUnit
+from quant_backtester.signals.types import SignalStatus, SignalUnit, require_positive_int
 
 CROSS_SECTION_SIZE = "cross_section_size"
 """Extra diagnostic column: how many instruments the ranking was made among.
@@ -53,6 +48,11 @@ class CrossSectionalRank(Signal):
 
     Notes
     -----
+    When too few instruments are usable, the ones that were get
+    ``INSUFFICIENT_CROSS_SECTION`` rather than ``INVALID_INPUT``: their own
+    numbers were fine, and a strategy wants to tell "the universe was thin
+    today" from "this name's arithmetic broke".
+
     An instrument whose own signal is not ``OK`` is left out of the sample and
     keeps its own status. It never receives a rank of ``0.0``: that would read
     as "the worst of the universe" when what happened is "we do not know", and
@@ -99,7 +99,9 @@ class CrossSectionalRank(Signal):
             # Not a ranking anyone can act on. The instruments that had no
             # number keep their own reason; the ones that had one are told the
             # cross-section was too thin, rather than handed a rank of 1.0.
-            frame.loc[usable, "status"] = SignalStatus.INVALID_INPUT
+            # Its own status, and not INVALID_INPUT: nothing was wrong with
+            # their arithmetic, there was simply nobody to compare them with.
+            frame.loc[usable, "status"] = SignalStatus.INSUFFICIENT_CROSS_SECTION
             frame["value"] = float("nan")
             return self._result(inner, frame)
 

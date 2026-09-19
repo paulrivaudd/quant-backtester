@@ -159,3 +159,15 @@ def test_a_nested_definition_is_frozen_too(context: SignalContext) -> None:
     assert isinstance(nested, Mapping)
     with pytest.raises(TypeError):
         nested["lookback_sessions"] = 999  # type: ignore[index]
+
+
+def test_a_result_filed_under_another_name_is_refused(snapshot: SignalSnapshot) -> None:
+    """The key and the result have to be the same signal.
+
+    The engine builds the mapping itself, but this constructor is public: a
+    snapshot where the two disagree would answer
+    ``result("momentum").signal_id == "return_4d"``, and every log, report and
+    attribution built on it would be wrong about what it was reading.
+    """
+    with pytest.raises(ValueError, match="filed under"):
+        SignalSnapshot(as_of=snapshot.as_of, results={"momentum_60d": snapshot.result("return_4d")})

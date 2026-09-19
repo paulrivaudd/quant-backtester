@@ -94,9 +94,80 @@ class SignalStatus(Enum):
     """Enough observations, but a session the venue held is missing between
     them. The window would span more time than it was asked for."""
 
+    INSUFFICIENT_CROSS_SECTION = "INSUFFICIENT_CROSS_SECTION"
+    """Too few instruments had a usable signal to compare them with each other.
+
+    Not the same thing as the formula failing: nothing was wrong with this
+    instrument's own number, there was simply nobody to rank it against. A
+    strategy that holds the top of a ranking wants to tell "the universe was
+    too thin today" from "this name's arithmetic broke"."""
+
     INVALID_INPUT = "INVALID_INPUT"
     """The formula cannot be evaluated on these numbers: a zero denominator, a
     non-positive price where a ratio is taken."""
+
+
+def require_positive_int(value: int, name: str) -> None:
+    """Raise unless ``value`` is a positive integer.
+
+    Parameters
+    ----------
+    value : int
+        Parameter to check.
+    name : str
+        Its name, quoted in the message.
+
+    Raises
+    ------
+    ValueError
+        If it is not. A window of zero or of ``"20"`` is a configuration
+        mistake, and it stops the run rather than producing a status: no
+        instrument would have been computed correctly either.
+    """
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{name} must be a positive integer, got {value!r}")
+
+
+def require_non_negative_int(value: int, name: str) -> None:
+    """Raise unless ``value`` is a non-negative integer.
+
+    Parameters
+    ----------
+    value : int
+        Parameter to check.
+    name : str
+        Its name, quoted in the message.
+
+    Raises
+    ------
+    ValueError
+        If it is not. ``True`` counts as an integer to Python and would mean
+        one session; ``0.5`` compares like zero. Both are a parameter written
+        wrong, and neither should quietly mean something else.
+    """
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{name} must be a non-negative integer, got {value!r}")
+
+
+def require_identifier(value: str, name: str) -> None:
+    """Raise unless ``value`` is a name something can be called by.
+
+    Parameters
+    ----------
+    value : str
+        Identifier to check.
+    name : str
+        Its name, quoted in the message.
+
+    Raises
+    ------
+    ValueError
+        If it is not a string, or holds nothing but spaces. An empty id makes
+        a log, a report and a snapshot key unreadable, and the snapshot would
+        happily hold one.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be a non-empty name, got {value!r}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,8 +186,20 @@ class WindowSpec:
     Raises
     ------
     ValueError
-        If fewer than two observations are asked for. One point is not a
-        window, and every formula here needs at least two.
+        If fewer than two observations are asked for - one point is not a
+        window, and every formula here needs at least two - or if ``mode`` is
+        not a :class:`WindowMode`.
+
+    Notes
+    -----
+    The mode is checked at runtime although it is typed, and that check is not
+    ceremony. The code that acts on it asks ``mode is
+    WindowMode.CONSECUTIVE_SESSIONS``; the string ``"CONSECUTIVE_SESSIONS"`` is
+    not that object, so passing one would leave both the continuity check and
+    the refusal of a published series switched off, and a signal would quietly
+    measure something other than what it asked for. That is the exact failure
+    this module exists to make impossible, so it cannot be left to a type
+    checker nobody has to run.
     """
 
     observations: int
@@ -128,3 +211,8 @@ class WindowSpec:
             raise ValueError(f"observations must be an int, got {self.observations!r}")
         if self.observations < 2:
             raise ValueError(f"A window needs at least 2 observations, got {self.observations}")
+        if not isinstance(self.mode, WindowMode):
+            raise ValueError(
+                f"mode must be a WindowMode, got {self.mode!r}; a string that reads like one "
+                f"would switch the window's checks off instead of turning them on"
+            )

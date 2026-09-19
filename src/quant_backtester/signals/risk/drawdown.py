@@ -6,18 +6,15 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from quant_backtester.data.schemas import BarField
-from quant_backtester.signals.base import (
-    Signal,
-    SignalResult,
-    require_non_negative_int,
-    require_positive_int,
-)
+from quant_backtester.signals.base import Signal, SignalResult
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.types import (
     PriceBasis,
     SignalUnit,
     WindowMode,
     WindowSpec,
+    require_non_negative_int,
+    require_positive_int,
 )
 from quant_backtester.signals.windows import LoadedWindow
 

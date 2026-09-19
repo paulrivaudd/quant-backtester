@@ -274,3 +274,70 @@ def test_one_signal_cannot_mutate_the_series_the_next_one_sees(
     after_the_vandal = SignalEngine().compute(context, [Vandal(), plain], ["ETF_EU"])
 
     assert after_the_vandal.value("return_4d", "ETF_EU") == alone
+
+
+@dataclass(frozen=True, slots=True)
+class Misrecorded(Signal):
+    """A signal that computes one way and writes down another."""
+
+    signal_id: str = "misrecorded"
+    recorded: int = 20
+
+    def definition(self) -> Mapping[str, object]:
+        """Return the definition of this instance, lookback included."""
+        return {"type": "Misrecorded", "lookback_sessions": self.recorded}
+
+    def compute(self, context: SignalContext, instrument_ids: Sequence[str]) -> SignalResult:
+        """Return a result carrying a definition that is not this signal's."""
+        rows = {
+            instrument_id: result_row(1.0, LoadedWindow(status=SignalStatus.OK, points=(1.0,)))
+            for instrument_id in instrument_ids
+        }
+        return SignalResult(
+            signal_id=self.signal_id,
+            as_of=context.as_of,
+            _frame=build_result_frame(rows),
+            definition={"type": "Misrecorded", "lookback_sessions": 60},
+        )
+
+
+def test_a_result_describing_another_calculation_is_refused(context: SignalContext) -> None:
+    """The definition is the audit trail, and a wrong one is worse than none.
+
+    A signal that computed over sixty sessions and recorded twenty gives a
+    number nobody can reproduce from what was written down, and a fingerprint
+    saying two different experiments were the same one.
+    """
+    with pytest.raises(ValueError, match="definition that is not its own"):
+        SignalEngine().compute(context, [Misrecorded()], ["ETF_EU"])
+
+
+def test_a_definition_holding_a_sequence_is_still_its_own(context: SignalContext) -> None:
+    """Freezing turns a list into a tuple, which is not a disagreement.
+
+    A cross-asset signal naming its inputs carries one, and comparing the
+    frozen forms is what keeps it from failing on the shape of its container.
+    """
+
+    @dataclass(frozen=True, slots=True)
+    class Listed(Signal):
+        signal_id: str = "listed"
+
+        def definition(self) -> Mapping[str, object]:
+            return {"type": "Listed", "inputs": ["ETF_EU", "IDX_US"]}
+
+        def compute(self, context: SignalContext, instrument_ids: Sequence[str]) -> SignalResult:
+            rows = {
+                instrument_id: result_row(1.0, LoadedWindow(status=SignalStatus.OK, points=(1.0,)))
+                for instrument_id in instrument_ids
+            }
+            return SignalResult(
+                signal_id=self.signal_id,
+                as_of=context.as_of,
+                _frame=build_result_frame(rows),
+                definition=self.definition(),
+            )
+
+    snapshot = SignalEngine().compute(context, [Listed()], ["ETF_EU"])
+
+    assert snapshot.result("listed").definition["inputs"] == ("ETF_EU", "IDX_US")

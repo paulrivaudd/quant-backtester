@@ -37,12 +37,27 @@ class SignalSnapshot:
     results: Mapping[str, SignalResult]
 
     def __post_init__(self) -> None:
-        """Freeze the mapping and refuse a result from another instant."""
+        """Freeze the mapping and refuse a result that does not belong to its key.
+
+        Raises
+        ------
+        ValueError
+            If a result was computed at another instant, or is filed under a
+            name that is not its own. The engine builds the mapping correctly,
+            but this constructor is public: a snapshot whose key and whose
+            result disagree would answer ``result("momentum").signal_id ==
+            "return_20d"``, and every log and report built on it would be
+            wrong about what it was reading.
+        """
         for signal_id, result in self.results.items():
             if result.as_of != self.as_of:
                 raise ValueError(
                     f"{signal_id} was computed at {result.as_of}, "
                     f"not at the snapshot's {self.as_of}"
+                )
+            if result.signal_id != signal_id:
+                raise ValueError(
+                    f"A result named {result.signal_id!r} is filed under {signal_id!r}"
                 )
         object.__setattr__(self, "results", MappingProxyType(dict(self.results)))
 

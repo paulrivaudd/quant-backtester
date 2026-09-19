@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -25,7 +26,12 @@ import pandas as pd
 
 from quant_backtester.data.schemas import BarField
 from quant_backtester.signals.context import SignalContext
-from quant_backtester.signals.types import PriceBasis, SignalStatus, WindowSpec
+from quant_backtester.signals.types import (
+    PriceBasis,
+    SignalStatus,
+    WindowSpec,
+    require_identifier,
+)
 from quant_backtester.signals.windows import LoadedWindow, load_window
 
 RESULT_COLUMNS: Final[tuple[str, ...]] = (
@@ -42,6 +48,29 @@ The diagnostics are not decoration. A strategy that drops an instrument wants to
 know whether it was not listed or whether the data is late, and a result that
 says only ``NaN`` cannot tell it.
 """
+
+
+def unfreeze(value: object) -> object:
+    """Return a value made of plain built-ins again, ready to be serialised.
+
+    Parameters
+    ----------
+    value : object
+        A frozen definition, or one of its parts.
+
+    Returns
+    -------
+    object
+        Dictionaries in place of read-only views and lists in place of tuples,
+        all the way down. :func:`freeze` protects a definition from being
+        edited; this turns it back into something ``json.dumps`` accepts, which
+        is what recording an experiment beside its numbers needs.
+    """
+    if isinstance(value, Mapping):
+        return {key: unfreeze(item) for key, item in value.items()}
+    if isinstance(value, tuple | list):
+        return [unfreeze(item) for item in value]
+    return value
 
 
 def freeze(value: object) -> object:
@@ -91,10 +120,12 @@ class SignalResult:
     Raises
     ------
     ValueError
-        If the frame does not hold the required columns, repeats an
-        instrument, or carries anything other than a :class:`SignalStatus` in
-        its status column. Checked here rather than in the engine so that it
-        holds for every result, including one a strategy builds itself.
+        If the signal has no name, or the frame does not hold the required
+        columns, repeats an instrument, carries anything other than a
+        :class:`SignalStatus` in its status column, holds a number beside a
+        status that says there is none, or the other way round. Checked here
+        rather than in the engine so that it holds for every result, including
+        one a future model builds for itself.
     """
 
     signal_id: str
@@ -103,8 +134,13 @@ class SignalResult:
     definition: Mapping[str, object]
 
     def __post_init__(self) -> None:
-        """Freeze the definition and refuse a frame that breaks the contract."""
+        """Take a copy of the frame, freeze the definition, and check both."""
+        require_identifier(self.signal_id, "signal_id")
         object.__setattr__(self, "definition", freeze(self.definition))
+        # A copy, and not the caller's object. A signal that kept a reference
+        # to the frame it built could otherwise rewrite a result after handing
+        # it over, and the snapshot would be immutable only through its own API.
+        object.__setattr__(self, "_frame", self._frame.copy(deep=True))
         frame = self._frame
         missing = [column for column in RESULT_COLUMNS if column not in frame.columns]
         if missing:
@@ -119,6 +155,69 @@ class SignalResult:
             raise ValueError(
                 f"{self.signal_id}: result holds a status that is not a SignalStatus: {wrong[0]!r}"
             )
+        self._require_value_matches_status(frame)
+        self._require_sensible_diagnostics(frame)
+
+    def _require_value_matches_status(self, frame: pd.DataFrame) -> None:
+        """Refuse a row whose number and whose status say different things.
+
+        Raises
+        ------
+        ValueError
+            If a row is ``OK`` without a finite number, or carries a number
+            although it is not ``OK``.
+
+        Notes
+        -----
+        The pair is the whole contract of a result, and nothing downstream
+        re-checks it. A cross-section that counts an ``OK`` row holding ``NaN``
+        believes it is ranking three instruments while pandas can only rank
+        two, and normalises by a size one too large: the best name comes out at
+        0.5 instead of 1.0, in the right order and on the wrong scale. A
+        strategy taking the top few is unaffected; one with a threshold quietly
+        holds nothing.
+
+        The other direction matters as much. A number travelling beside
+        ``MISSING_INPUT`` is a number nobody vouched for, and the statuses
+        exist so that it cannot be used by accident.
+        """
+        for name, value, status in zip(frame.index, frame["value"], frame["status"], strict=True):
+            # A missing number may arrive as a float NaN or as pandas' own
+            # missing value, depending on how the frame was built. Both say the
+            # same thing: there is no number here.
+            number = float("nan") if value is pd.NA or value is None else float(value)
+            if status is SignalStatus.OK:
+                if not math.isfinite(number):
+                    raise ValueError(
+                        f"{self.signal_id}: {name} is OK but its value is {number}; a status "
+                        f"of OK is what says a number can be used"
+                    )
+            elif math.isfinite(number):
+                raise ValueError(
+                    f"{self.signal_id}: {name} is {status.value} and still carries "
+                    f"{number}; a value nobody vouched for must not travel"
+                )
+
+    def _require_sensible_diagnostics(self, frame: pd.DataFrame) -> None:
+        """Refuse a count of observations or an age that cannot describe anything.
+
+        Raises
+        ------
+        ValueError
+            If either diagnostic is negative where it is present.
+        """
+        for column in ("observations_used", "max_input_age_sessions"):
+            for name, diagnostic in zip(frame.index, frame[column], strict=True):
+                if diagnostic is pd.NA or diagnostic is None:
+                    continue
+                # A frame built by hand can hold a float NaN here rather than
+                # the Int64 missing value, and neither says anything wrong.
+                count = float(diagnostic)
+                if math.isfinite(count) and count < 0:
+                    raise ValueError(
+                        f"{self.signal_id}: {column} is {diagnostic} for {name}; "
+                        f"it counts something"
+                    )
 
     @property
     def frame(self) -> pd.DataFrame:
@@ -232,46 +331,6 @@ def build_result_frame(rows: Mapping[str, Mapping[str, object]]) -> pd.DataFrame
             "max_input_age_sessions": "Int64",
         }
     )
-
-
-def require_positive_int(value: int, name: str) -> None:
-    """Raise unless ``value`` is a positive integer.
-
-    Parameters
-    ----------
-    value : int
-        Parameter to check.
-    name : str
-        Its name, quoted in the message.
-
-    Raises
-    ------
-    ValueError
-        If it is not. A window of zero or of ``"20"`` is a configuration
-        mistake, and it stops the run rather than producing a status: no
-        instrument would have been computed correctly either.
-    """
-    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise ValueError(f"{name} must be a positive integer, got {value!r}")
-
-
-def require_non_negative_int(value: int, name: str) -> None:
-    """Raise unless ``value`` is a non-negative integer.
-
-    Parameters
-    ----------
-    value : int
-        Parameter to check.
-    name : str
-        Its name, quoted in the message.
-
-    Raises
-    ------
-    ValueError
-        If it is not.
-    """
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise ValueError(f"{name} must be a non-negative integer, got {value!r}")
 
 
 class Signal(ABC):
@@ -389,6 +448,21 @@ class Signal(ABC):
             definition=self.definition(),
         )
 
+    def definition_json(self) -> dict[str, object]:
+        """Return the definition as plain built-ins, ready to be serialised.
+
+        Returns
+        -------
+        dict[str, object]
+            The same content as :meth:`definition`, made of dictionaries, lists
+            and scalars, so that ``json.dumps`` accepts it. The frozen form
+            protects the definition from being edited; recording an experiment
+            needs one that can be written down.
+        """
+        thawed = unfreeze(self.definition())
+        assert isinstance(thawed, dict)
+        return thawed
+
     def fingerprint(self) -> str:
         """Return a stable hash of this instance's definition.
 
@@ -398,6 +472,13 @@ class Signal(ABC):
             SHA-256 of the definition rendered as canonical JSON. Two signals
             with the same fingerprint compute the same thing; the project's
             commit is what identifies the code that does it.
+
+        Notes
+        -----
+        Taken of :meth:`definition_json` rather than of the definition itself,
+        so that a composite signal carrying a frozen definition inside its own
+        - what a result hands back - can still be hashed. The rendering is the
+        same either way: ``json.dumps`` writes a tuple as a list already.
         """
-        canonical = json.dumps(dict(self.definition()), sort_keys=True, separators=(",", ":"))
+        canonical = json.dumps(self.definition_json(), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()

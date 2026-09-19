@@ -147,7 +147,7 @@ def test_a_cross_section_too_thin_is_refused(context: SignalContext) -> None:
     """One usable instrument is both the best and the worst of itself."""
     result = ranked(context, {"ETF_EU": 0.15, "IDX_US": SignalStatus.MISSING_INPUT})
 
-    assert result.status("ETF_EU") is SignalStatus.INVALID_INPUT
+    assert result.status("ETF_EU") is SignalStatus.INSUFFICIENT_CROSS_SECTION
     assert result.value("ETF_EU") != result.value("ETF_EU")
     assert result.status("IDX_US") is SignalStatus.MISSING_INPUT
 
@@ -160,7 +160,7 @@ def test_how_thin_is_too_thin_is_declared(context: SignalContext) -> None:
     strict = ranked(context, values, min_instruments=4)
 
     assert loose.status("ETF_EU") is SignalStatus.OK
-    assert strict.status("ETF_EU") is SignalStatus.INVALID_INPUT
+    assert strict.status("ETF_EU") is SignalStatus.INSUFFICIENT_CROSS_SECTION
 
 
 def test_the_diagnostics_of_the_ranked_signal_are_carried_through(
@@ -204,7 +204,7 @@ def test_a_window_that_is_not_one_is_never_ranked(
     result = rank.compute(context, ["ETF_EU", "IDX_US"])
 
     assert result.status("ETF_EU") is SignalStatus.NON_CONSECUTIVE_HISTORY
-    assert result.status("IDX_US") is SignalStatus.INVALID_INPUT  # one name left
+    assert result.status("IDX_US") is SignalStatus.INSUFFICIENT_CROSS_SECTION  # one name left
 
 
 def test_the_source_is_part_of_the_identity(context: SignalContext) -> None:

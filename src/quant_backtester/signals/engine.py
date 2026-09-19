@@ -18,7 +18,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from quant_backtester.signals.base import Signal, SignalResult
+from quant_backtester.signals.base import Signal, SignalResult, freeze
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.snapshot import SignalSnapshot
 
@@ -54,9 +54,10 @@ class SignalEngine:
         ValueError
             If two signals share an id, an instrument is asked for twice, or a
             signal returns a result that is not an answer to what was asked -
-            another instant, another name, or another set of instruments. All
-            of them are configuration or implementation mistakes, and none of
-            them is a data problem, so none becomes a status.
+            another instant, another name, another set of instruments, or a
+            definition that is not the one it was configured with. All of them
+            are configuration or implementation mistakes, and none of them is a
+            data problem, so none becomes a status.
         """
         seen: set[str] = set()
         for signal in signals:
@@ -100,7 +101,8 @@ class SignalEngine:
         ------
         ValueError
             If the result is stamped at another instant, names another signal,
-            or speaks about another set of instruments.
+            speaks about another set of instruments, or carries a definition
+            that is not the signal's own.
 
         Notes
         -----
@@ -108,8 +110,18 @@ class SignalEngine:
         ranking a universe it believes is complete, and one carrying a name
         nobody asked about would put that instrument in a portfolio. The shape
         of the frame itself - the required columns, a unique index, real
-        statuses - is checked by :class:`SignalResult` when it is built, so it
-        holds for a result nothing here produced too.
+        statuses, a number that matches what its status says - is checked by
+        :class:`SignalResult` when it is built, so it holds for a result
+        nothing here produced too.
+
+        The definition is checked because it is the audit trail. A signal that
+        computed with a lookback of sixty and recorded twenty would give a
+        number nobody could reproduce from what was written down, and a
+        fingerprint that says two different experiments were the same. The
+        comparison is made on the frozen forms because freezing turns a list
+        into a tuple, and a definition holding one - a cross-asset signal
+        naming its inputs, soon - would otherwise fail on the shape of its own
+        container.
         """
         if result.as_of != context.as_of:
             raise ValueError(
@@ -118,6 +130,11 @@ class SignalEngine:
             )
         if result.signal_id != signal.signal_id:
             raise ValueError(f"{signal.signal_id} returned a result named {result.signal_id!r}")
+        if result.definition != freeze(signal.definition()):
+            raise ValueError(
+                f"{signal.signal_id} returned a definition that is not its own; the record "
+                f"would describe a calculation that did not happen"
+            )
         answered = result.instruments()
         if answered != tuple(instrument_ids):
             missing = sorted(set(instrument_ids) - set(answered))

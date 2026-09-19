@@ -21,7 +21,13 @@ from quant_backtester.data.instruments import DataType, Instrument
 from quant_backtester.data.reader import ObservationStatus
 from quant_backtester.data.schemas import BarField
 from quant_backtester.signals.context import SignalContext
-from quant_backtester.signals.types import PriceBasis, SignalStatus, WindowMode, WindowSpec
+from quant_backtester.signals.types import (
+    PriceBasis,
+    SignalStatus,
+    WindowMode,
+    WindowSpec,
+    require_non_negative_int,
+)
 
 _STATUS_OF_OBSERVATION = {
     ObservationStatus.NOT_LISTED: SignalStatus.NOT_LISTED,
@@ -106,10 +112,11 @@ def load_window(
     KeyError
         If the instrument is not registered.
     ValueError
-        If ``max_age_sessions`` is negative, if consecutive sessions are asked
-        of a published series, which has no venue calendar to count them on, or
-        if a bars instrument declares no calendar. All configuration mistakes,
-        so they stop the run rather than become a status.
+        If ``max_age_sessions`` is not a non-negative whole number of sessions,
+        if consecutive sessions are asked of a published series, which has no
+        venue calendar to count them on, or if a bars instrument declares no
+        calendar. All configuration mistakes, so they stop the run rather than
+        become a status.
 
     Notes
     -----
@@ -118,8 +125,12 @@ def load_window(
     there enough history? Is that history really consecutive? Each question is
     only worth asking once the one before it is answered.
     """
-    if max_age_sessions < 0:
-        raise ValueError(f"max_age_sessions must be >= 0, got {max_age_sessions}")
+    # Checked here and not only in the signals that call it: this function is
+    # the contract of a window, and a future signal that does not use the usual
+    # helpers must not be able to step around it. A threshold of 0.5 compares
+    # like zero and True counts as one session, so either would quietly mean
+    # something other than what was written.
+    require_non_negative_int(max_age_sessions, "max_age_sessions")
     instrument = context.instruments.get(instrument_id)
     if spec.mode is WindowMode.CONSECUTIVE_SESSIONS and instrument.data_type is not DataType.BAR:
         raise ValueError(

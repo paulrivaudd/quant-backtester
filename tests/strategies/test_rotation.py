@@ -175,7 +175,7 @@ def test_a_universe_degraded_to_one_name_is_a_flat_day(context: SignalContext) -
 
     assert allocation.selected == ()
     assert allocation.invested == 0.0
-    assert allocation.skipped["A"] is SignalStatus.INVALID_INPUT
+    assert allocation.skipped["A"] is SignalStatus.INSUFFICIENT_CROSS_SECTION
 
 
 def test_a_universe_with_nothing_usable_is_a_flat_day(context: SignalContext) -> None:
