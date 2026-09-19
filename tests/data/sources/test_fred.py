@@ -17,6 +17,7 @@ import pandas as pd
 import pytest
 
 from quant_backtester.data.instruments import AssetType, DataType, Instrument, PublicationRule
+from quant_backtester.data.sources.base import ProviderResponseError
 from quant_backtester.data.sources.fred import FredSource
 
 RETRIEVED_AT = datetime(2026, 9, 12, 21, 3, 11, tzinfo=UTC)
@@ -236,9 +237,10 @@ def test_download_live_dgs10_christmas_2024(dgs10: Instrument) -> None:
 def test_download_live_unknown_series_raises_http_404(dgs10: Instrument) -> None:
     unknown = replace(dgs10, id="UNKNOWN", source_symbol="NOT_A_SERIES_XYZ")
     # http_get_text closes the error's response itself: no socket may leak here.
-    with pytest.raises(HTTPError) as raised:
+    with pytest.raises(ProviderResponseError) as raised:
         FredSource().download(unknown, date(2024, 12, 23), date(2024, 12, 27))
-    assert raised.value.code == 404
+    assert isinstance(raised.value.__cause__, HTTPError)
+    assert raised.value.__cause__.code == 404
 
 
 def test_corporate_actions_is_always_none_without_any_http(

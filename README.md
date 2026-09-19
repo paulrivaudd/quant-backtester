@@ -114,8 +114,8 @@ reader = MarketDataReader(
 
 # 23:00 in Paris: the US and European closes of the day are knowable.
 decision = reader.at(datetime(2026, 9, 17, 23, 0, tzinfo=ZoneInfo("Europe/Paris")))
-prices = decision.history("SP500")           # nothing after the decision instant
-state = decision.values(["SP500", "VIX"])    # value, age in sessions, and why
+prices = decision.history("SP500")  # nothing after the decision instant
+state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
 ```
 
 Other scripts: `generate_calendars.py` rewrites the committed calendars from

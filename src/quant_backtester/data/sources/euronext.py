@@ -149,9 +149,14 @@ def _require_served_range(
 
     The expected span runs from ``start`` (or the first session, if later) to
     ``end`` (or the last session, or the retrieval day, if earlier). A week of it
-    without a row at the start means an unknown ISIN or a request older than the
-    two-year window; the end is not checked, since the latest session may not be
-    published yet.
+    without a row at the start means something is wrong; the end is not checked,
+    since the latest session may not be published yet.
+
+    An empty answer has two causes and they are not the same problem. When the
+    whole span lies before the rolling window, the export has nothing to give
+    and the range is what is unavailable. When it lies inside the window, the
+    export should have rows and has none: the symbol is unknown to it, which
+    nothing should absorb quietly.
 
     Parameters
     ----------
@@ -166,9 +171,13 @@ def _require_served_range(
 
     Raises
     ------
+    ProviderRangeUnavailable
+        If the expected span starts more than a week before what the export
+        served, or lies entirely before the rolling window.
+    ProviderResponseError
+        If nothing was served for a week of a span the window does cover.
     ValueError
-        If the first row, or the absence of any, leaves a week of the expected
-        span uncovered, or if a date is not ``dd/mm/yyyy``.
+        If a date is not ``dd/mm/yyyy``.
     """
     expected_start = start
     if instrument.first_session is not None:
@@ -178,16 +187,24 @@ def _require_served_range(
         expected_end = min(expected_end, instrument.last_session)
     if expected_end < expected_start:
         return
+    window_start = retrieved_on - EURONEXT_WINDOW
     if frame.empty:
         # expected_end - expected_start >= 6 days means seven calendar days.
-        if expected_end - expected_start >= SESSION_FREE_SPAN - timedelta(days=1):
-            raise ProviderResponseError(
+        if expected_end - expected_start < SESSION_FREE_SPAN - timedelta(days=1):
+            return
+        if expected_end < window_start:
+            raise ProviderRangeUnavailable(
                 f"Euronext served no row for {instrument.source_symbol} from {expected_start} "
-                f"to {expected_end}: the ISIN is unknown to it. Loud on purpose - the "
-                f"request is already cut to EURONEXT_WINDOW, so an empty answer over a "
-                f"week is a symbol that moved, not a window that ended"
+                f"to {expected_end}: the whole range is older than its two-year window, "
+                f"which starts around {window_start}",
+                available_from=window_start,
             )
-        return
+        raise ProviderResponseError(
+            f"Euronext served no row for {instrument.source_symbol} from {expected_start} "
+            f"to {expected_end}, inside the window that starts around {window_start}: "
+            f"the ISIN is unknown to it. Loud on purpose - a symbol that moved must be "
+            f"seen, not absorbed as a provider having a bad day"
+        )
     first = min(
         datetime.strptime(str(value), EURONEXT_DATE_FORMAT).date() for value in frame["Date"]
     )

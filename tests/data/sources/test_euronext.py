@@ -385,8 +385,10 @@ def test_download_live_unknown_isin_raises(cw8: Instrument) -> None:
 
 @pytest.mark.network
 def test_download_live_request_older_than_the_window_raises(cw8: Instrument) -> None:
-    with pytest.raises(ProviderRangeUnavailable, match="two-year window"):
+    with pytest.raises(ProviderRangeUnavailable, match="two-year window") as raised:
         EuronextSource().download(cw8, date(2018, 1, 2), date(2018, 3, 1))
+    # It names where its window starts, so a caller can ask again from there.
+    assert raised.value.available_from is not None
 
 
 def test_available_from_declares_the_rolling_window(

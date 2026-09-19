@@ -18,6 +18,7 @@ import pandas as pd
 import pytest
 
 from quant_backtester.data.instruments import AssetType, DataType, Instrument, PublicationRule
+from quant_backtester.data.sources.base import ProviderResponseError
 from quant_backtester.data.sources.ecb import EcbSource, split_ecb_symbol
 
 RETRIEVED_AT = datetime(2026, 9, 12, 21, 3, 11, tzinfo=UTC)
@@ -275,6 +276,7 @@ def test_download_live_weekend_gives_an_empty_frame(eurusd: Instrument) -> None:
 @pytest.mark.network
 def test_download_live_unknown_series_raises_http_404(eurusd: Instrument) -> None:
     unknown = replace(eurusd, id="UNKNOWN", source_symbol="EXR.D.XXX.EUR.SP00.A")
-    with pytest.raises(HTTPError) as raised:
+    with pytest.raises(ProviderResponseError) as raised:
         EcbSource().download(unknown, date(2024, 12, 23), date(2024, 12, 27))
-    assert raised.value.code == 404
+    assert isinstance(raised.value.__cause__, HTTPError)
+    assert raised.value.__cause__.code == 404
