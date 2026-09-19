@@ -200,18 +200,21 @@ state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
 
 ```python
 engine = BacktestEngine(
-    reader=reader, calendars=calendars, reference_calendar_id="XPAR",
+    reader=reader,
+    calendars=calendars,
+    reference_calendar_id="XPAR",
     signals=[momentum, CrossSectionalRank(signal_id="momentum_60d_rank", source=momentum)],
     strategy=TopRankRotation(signal_id="momentum_60d_rank", top_n=1),
     universe=["ETF_WORLD", "SP500"],
     initial_cash=100_000.0,
     limits=PositionLimits(max_weight=1.0, max_gross=1.0),
     execution=ExecutionModel(
-        costs=CostModel(commission_rate=0.0005, minimum_commission=1.0,
-                        half_spread=0.0002, slippage_rate=0.0001),
+        costs=CostModel(
+            commission_rate=0.0005, minimum_commission=1.0, half_spread=0.0002, slippage_rate=0.0001
+        ),
         minimum_trade_value=500.0,
     ),
-    timetable=Timetable(),          # decide at 23:00 Paris, fill at 09:01 the next session
+    timetable=Timetable(),  # decide at 23:00 Paris, fill at 09:01 the next session
 )
 result = engine.run(date(2025, 1, 2), date(2026, 9, 17))
 ```
