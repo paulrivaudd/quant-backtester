@@ -16,6 +16,10 @@ window which is not what it claims to be, six signals built on it — return,
 momentum, moving-average trend, realised volatility, current drawdown and mean
 reversion — and a cross-sectional ranking over any of them.
 
+One strategy sits on top of it — hold the best-ranked instruments of a universe
+— and it is there to prove a boundary rather than to make money: it imports
+nothing from the data layer, and takes a `SignalSnapshot` as its only argument.
+
 Portfolio construction, execution, the event loop and analytics are not written
 yet. Those packages exist with their contracts stated and nothing else.
 
@@ -57,7 +61,7 @@ src/quant_backtester/
     execution/   target positions -> fills and costs           (to write)
     backtest/    the event loop                                (to write)
     analytics/   performance and risk                          (to write)
-    strategies/  concrete strategies                           (to write)
+    strategies/  concrete strategies                           (one, minimal)
 tests/           mirrors the package layout
 market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
 ```
@@ -188,6 +192,35 @@ decision = reader.at(datetime(2026, 9, 17, 23, 0, tzinfo=ZoneInfo("Europe/Paris"
 prices = decision.history("SP500")  # nothing after the decision instant
 state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
 ```
+
+## A decision, end to end
+
+```python
+momentum = MomentumSignal(
+    signal_id="momentum_60d",
+    lookback_sessions=60,
+    skip_recent_sessions=0,
+    price_basis=PriceBasis.TOTAL_RETURN,
+)
+snapshot = SignalEngine().compute(
+    context,
+    [momentum, CrossSectionalRank(signal_id="momentum_60d_rank", source=momentum)],
+    ["ETF_WORLD", "SP500"],
+)
+
+TopRankRotation(signal_id="momentum_60d_rank", top_n=1).decide(snapshot)
+# selected ('SP500',)  weights {'SP500': 1.0}  invested 100%  considered 2
+```
+
+`decide` takes the snapshot and nothing else. A strategy holding a reader could
+write its own `tail(20)`; a strategy holding a repository could read a price
+nobody had decided was knowable yet. It holds neither, and a test reads the
+source of `strategies/` to check that no import of the data layer has appeared.
+
+A name whose signal is not usable is never held, and the allocation says which
+of the reasons it was. A rotation meant to hold two names that can only find one
+holds it at half the capital rather than doubling a bet because a provider was
+late.
 
 Other scripts: `generate_calendars.py` rewrites the committed calendars from
 `exchange_calendars`, `check_calendar_coverage.py` says when they need

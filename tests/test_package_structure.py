@@ -14,8 +14,14 @@ from pathlib import Path
 
 import pytest
 
-SIGNALS = Path(__file__).resolve().parents[1] / "src" / "quant_backtester" / "signals"
-"""Source of the signals layer, read rather than imported."""
+PACKAGE = Path(__file__).resolve().parents[1] / "src" / "quant_backtester"
+"""Source of the package, read rather than imported."""
+
+SIGNALS = PACKAGE / "signals"
+"""Source of the signals layer."""
+
+STRATEGIES = PACKAGE / "strategies"
+"""Source of the strategies layer."""
 
 FORBIDDEN_IN_SIGNALS = (
     "quant_backtester.data.sources",
@@ -85,3 +91,21 @@ def test_signals_import_no_network_library():
     network = {"urllib", "urllib.request", "requests", "httpx", "yfinance"}
     for path in SIGNALS.rglob("*.py"):
         assert not imported_modules(path) & network, f"{path.name} imports a network library"
+
+
+@pytest.mark.parametrize("path", sorted(STRATEGIES.rglob("*.py")), ids=lambda path: path.stem)
+def test_strategies_see_signals_and_nothing_below(path: Path):
+    """A strategy reaches the market through the signals, or not at all.
+
+    Given a reader it could write its own ``history(...).tail(20)`` and get
+    twenty observations spanning twenty-six sessions - the one mistake the
+    window loader exists to make impossible. Given a repository it could read a
+    price nobody decided was knowable yet. So it is given neither: every import
+    of the data layer is refused here, not only the ones the signals layer
+    refuses.
+    """
+    reaching_down = sorted(
+        name for name in imported_modules(path) if name.startswith("quant_backtester.data")
+    )
+
+    assert not reaching_down, f"{path.name} imports {', '.join(reaching_down)}"
