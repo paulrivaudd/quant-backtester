@@ -11,7 +11,7 @@ import urllib.request
 from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime, timedelta, timezone
 from email.message import Message
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -21,6 +21,10 @@ from quant_backtester.data.normalizer import NORMALIZERS
 from quant_backtester.data.sources.base import (
     HTTP_TIMEOUT_SECONDS,
     DataSource,
+    ProviderError,
+    ProviderRateLimited,
+    ProviderResponseError,
+    ProviderUnavailable,
     RawDownload,
     http_get_text,
     make_fetch_id,
@@ -133,19 +137,47 @@ def test_http_get_text_empty_body_is_an_empty_string(monkeypatch: pytest.MonkeyP
     assert http_get_text("https://example.test/empty.csv") == ""
 
 
-def test_http_get_text_closes_the_error_response_and_reraises(
+def test_http_get_text_closes_the_error_response_and_translates_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """A 404 is the provider answering something unusable, and the socket closes."""
     error_body = io.BytesIO(b"<html>Not Found</html>")
 
     def fake_urlopen(url: str, timeout: float) -> FakeResponse:
         raise HTTPError(url, 404, "Not Found", Message(), error_body)
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-    with pytest.raises(HTTPError) as raised:
+    with pytest.raises(ProviderResponseError) as raised:
         http_get_text("https://example.test/missing.csv")
-    assert raised.value.code == 404
+    assert isinstance(raised.value.__cause__, HTTPError)
+    assert raised.value.__cause__.code == 404
     assert error_body.closed
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [(429, ProviderRateLimited), (500, ProviderUnavailable), (503, ProviderUnavailable)],
+)
+def test_http_get_text_tells_a_busy_provider_from_a_broken_answer(
+    monkeypatch: pytest.MonkeyPatch, status: int, expected: type[ProviderError]
+) -> None:
+    """Rate limiting and an outage are transient; an unreadable answer is not."""
+
+    def fake_urlopen(url: str, timeout: float) -> FakeResponse:
+        raise HTTPError(url, status, "", Message(), None)
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(expected):
+        http_get_text("https://example.test/series.csv")
+
+
+def test_http_get_text_translates_an_unreachable_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(url: str, timeout: float) -> FakeResponse:
+        raise URLError("name or service not known")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(ProviderUnavailable, match="could not be reached"):
+        http_get_text("https://example.test/series.csv")
 
 
 def test_raw_download_is_immutable() -> None:

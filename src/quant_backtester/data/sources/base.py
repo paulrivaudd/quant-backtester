@@ -14,6 +14,62 @@ import pandas as pd
 from quant_backtester.data.instruments import Instrument
 
 
+class ProviderError(Exception):
+    """A provider failed to serve what was asked of it.
+
+    Every adapter raises one of these, and nothing else, when the fault lies
+    with the provider. That is the whole point of the family: a missing second
+    opinion is degraded into a warning and the ingestion carries on, while a
+    ``TypeError`` or an ``AttributeError`` - a bug in our own parsing - keeps
+    travelling up and stops the run. Catching every exception made the two
+    indistinguishable, and a broken adapter looked exactly like a provider
+    being down.
+    """
+
+
+class ProviderUnavailable(ProviderError):
+    """The provider could not answer: down, unreachable, or timing out."""
+
+
+class ProviderRateLimited(ProviderUnavailable):
+    """The provider refused to answer this soon. A retry later may work."""
+
+
+class ProviderResponseError(ProviderError):
+    """The provider answered something this adapter cannot read.
+
+    An HTML error page where a CSV was expected, a body echoing another series,
+    a header that moved. The response is evidence, not data.
+    """
+
+
+class ProviderRangeUnavailable(ProviderError):
+    """The provider does not hold the whole requested range.
+
+    Not a failure of the provider, and not a reason to lose it: Euronext keeps
+    a rolling window of about two years and simply has nothing older. Asking it
+    for 2018 must cost the sessions of 2018 only, not the cross-check of every
+    session since.
+
+    Parameters
+    ----------
+    message : str
+        What was asked and what was served.
+    available_from : date | None
+        Earliest date the provider turned out to hold, when its answer says so.
+        The caller retries from there rather than giving the source up.
+
+    Attributes
+    ----------
+    available_from : date | None
+        As above.
+    """
+
+    def __init__(self, message: str, *, available_from: date | None = None) -> None:
+        super().__init__(message)
+        self.available_from = available_from
+
+
 @dataclass(frozen=True, slots=True)
 class RawDownload:
     """One immutable provider response.
@@ -54,6 +110,23 @@ class DataSource(Protocol):
     """
 
     source_id: str
+
+    def available_from(self, instrument: Instrument) -> date | None:
+        """Return the earliest date this provider can serve for ``instrument``.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Instrument concerned; a window may depend on it.
+
+        Returns
+        -------
+        date | None
+            ``None`` when the provider has no such limit. Declared rather than
+            discovered so an ordinary update does not have to fail once to find
+            out - the failure remains the safety net when a window moves.
+        """
+        ...
 
     def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
         """Fetch observations for one instrument.
@@ -138,6 +211,12 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+HTTP_TOO_MANY_REQUESTS = 429
+"""Status a provider answers when it refuses to be asked this often."""
+
+HTTP_SERVER_ERROR = 500
+"""First status that means the provider, not the request, is at fault."""
+
 HTTP_TIMEOUT_SECONDS = 120.0
 """Socket timeout of :func:`http_get_text`, in seconds. Infrastructure, not research.
 
@@ -165,16 +244,38 @@ def http_get_text(url: str) -> str:
 
     Raises
     ------
-    urllib.error.HTTPError
-        If the server answers with an error status. The error's response is
-        closed before it propagates, so the caller has nothing to clean up.
+    ProviderRateLimited
+        If the server answers 429.
+    ProviderUnavailable
+        If the server answers 5xx, or could not be reached at all.
+    ProviderResponseError
+        If the server answers any other error status.
+
+    Notes
+    -----
+    Every failure here is the provider's, so every one of them is translated
+    into the :class:`ProviderError` family. The underlying ``HTTPError`` or
+    ``URLError`` stays chained as the cause, and its response is closed before
+    it propagates: left to the garbage collector, the socket surfaces as a
+    ``ResourceWarning``, which the test suite treats as an error.
+
+    The distinction the layers above act on is between a provider that cannot
+    answer and one that answers something unreadable. The first is transient and
+    costs a cross-check; the second means a symbol or a format moved, and has to
+    be looked at rather than absorbed.
     """
     try:
         with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT_SECONDS) as response:
             body: bytes = response.read()
     except urllib.error.HTTPError as error:
-        # The error wraps the still-open response: close it, or the socket is
-        # left for the garbage collector and surfaces as a ResourceWarning.
         error.close()
-        raise
+        if error.code == HTTP_TOO_MANY_REQUESTS:
+            raise ProviderRateLimited(f"HTTP {error.code} on {url}") from error
+        if error.code >= HTTP_SERVER_ERROR:
+            raise ProviderUnavailable(f"HTTP {error.code} on {url}") from error
+        raise ProviderResponseError(f"HTTP {error.code} on {url}") from error
+    except urllib.error.URLError as error:
+        raise ProviderUnavailable(f"{url} could not be reached: {error.reason}") from error
+    except TimeoutError as error:
+        raise ProviderUnavailable(f"{url} timed out after {HTTP_TIMEOUT_SECONDS}s") from error
     return body.decode("utf-8")

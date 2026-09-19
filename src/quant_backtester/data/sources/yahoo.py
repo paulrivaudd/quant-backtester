@@ -131,6 +131,21 @@ class YahooSource:
     def __init__(self, clock: Callable[[], datetime] = utc_now) -> None:
         self._clock = clock
 
+    def available_from(self, instrument: Instrument) -> None:
+        """Return ``None``: this provider serves its whole history.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Ignored.
+
+        Returns
+        -------
+        None
+            No window to work around.
+        """
+        return None
+
     def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
         """Fetch daily bars.
 

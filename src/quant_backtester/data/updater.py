@@ -58,7 +58,14 @@ from quant_backtester.data.revisions import (
     merge_with_policy,
 )
 from quant_backtester.data.schemas import BARS_SCHEMA, LEVELS_SCHEMA
-from quant_backtester.data.sources.base import DataSource, RawDownload, utc_now
+from quant_backtester.data.sources.base import (
+    DataSource,
+    ProviderError,
+    ProviderRangeUnavailable,
+    ProviderResponseError,
+    RawDownload,
+    utc_now,
+)
 from quant_backtester.data.validator import (
     Severity,
     ValidationIssue,
@@ -626,30 +633,17 @@ class MarketDataUpdater:
         downloads: dict[str, RawDownload] = {}
         issues: list[ValidationIssue] = []
         for source_id in instrument.sources:
-            try:
-                download = self._source(source_id).download(
-                    instrument.for_source(source_id), start, end
-                )
-            except Exception as error:
-                # A second opinion that cannot be obtained is not a reason to
-                # lose the primary data: Euronext serves a rolling two-year
-                # window and refuses anything older, and a provider can simply
-                # be down. The sessions it would have confirmed stay
-                # SINGLE_SOURCE, which is what that status means. The primary
-                # source failing is another matter and propagates.
-                if source_id == instrument.primary_source:
-                    raise
-                issues.append(
-                    _issue(
-                        "CHECK_SOURCE_UNAVAILABLE",
-                        Severity.WARNING,
-                        instrument.id,
-                        None,
-                        f"{source_id} could not serve {instrument.id} from {start} to {end} "
-                        f"({type(error).__name__}: {error}); the sessions it would have "
-                        f"confirmed stay single-sourced",
-                    )
-                )
+            source = self._source(source_id)
+            asked = instrument.for_source(source_id)
+            if source_id == instrument.primary_source:
+                download = source.download(asked, start, end)
+                self._repository.save_raw(download)
+                downloads[source_id] = download
+                continue
+            download, issue = self._check_download(instrument, source, asked, start, end)
+            if issue is not None:
+                issues.append(issue)
+            if download is None:
                 continue
             self._repository.save_raw(download)
             downloads[source_id] = download
@@ -661,6 +655,98 @@ class MarketDataUpdater:
         if actions is not None:
             self._repository.save_raw(actions)
         return downloads, actions, issues
+
+    def _check_download(
+        self,
+        instrument: Instrument,
+        source: DataSource,
+        asked: Instrument,
+        start: date,
+        end: date,
+    ) -> tuple[RawDownload | None, ValidationIssue | None]:
+        """Fetch one check source over the range it can actually serve.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Instrument being fetched, for the messages.
+        source : DataSource
+            Check source to ask.
+        asked : Instrument
+            The instrument as that source knows it, symbol included.
+        start, end : date
+            Range the primary source was asked for.
+
+        Returns
+        -------
+        tuple[RawDownload | None, ValidationIssue | None]
+            The response, and a ``CHECK_SOURCE_UNAVAILABLE`` warning when there
+            is none.
+
+        Notes
+        -----
+        A second opinion that cannot be obtained is not a reason to lose the
+        primary data, so an outage is a warning and the sessions it would have
+        confirmed stay ``SINGLE_SOURCE`` - which is what that status means.
+
+        But a window is not an outage. Euronext keeps about two years and
+        refuses anything older; asking it for 2018 used to lose the whole
+        request, and with it the cross-check of every session since - 2230 of
+        them on ETF_WORLD, none of them ever confirmed. The range is therefore
+        cut to what the source declares it holds, and if the window has moved
+        since, its refusal names the date it did serve from and the request is
+        made again from there. Once: a source that keeps moving its answer is a
+        source to look at.
+
+        An unreadable answer is neither, and does not degrade. A format that
+        changed or a symbol that moved has to be seen, not absorbed for months
+        behind a warning nobody reads, so :class:`ProviderResponseError`
+        propagates. :meth:`update_all` keeps the other instruments going.
+        """
+        floor = source.available_from(asked)
+        source_start = max(start, floor) if floor is not None else start
+        for attempt in range(2):
+            if source_start > end:
+                return None, self._check_unavailable(
+                    instrument,
+                    source,
+                    start,
+                    end,
+                    f"it holds nothing before {source_start}",
+                )
+            try:
+                return source.download(asked, source_start, end), None
+            except ProviderResponseError:
+                raise
+            except ProviderRangeUnavailable as error:
+                retry = error.available_from
+                if attempt == 0 and retry is not None and retry > source_start:
+                    source_start = retry
+                    continue
+                return None, self._check_unavailable(instrument, source, start, end, str(error))
+            except ProviderError as error:
+                return None, self._check_unavailable(
+                    instrument, source, start, end, f"{type(error).__name__}: {error}"
+                )
+        raise AssertionError("unreachable: the loop returns on every path")
+
+    @staticmethod
+    def _check_unavailable(
+        instrument: Instrument,
+        source: DataSource,
+        start: date,
+        end: date,
+        reason: str,
+    ) -> ValidationIssue:
+        """Build the warning left when a check source cannot answer."""
+        return _issue(
+            "CHECK_SOURCE_UNAVAILABLE",
+            Severity.WARNING,
+            instrument.id,
+            None,
+            f"{source.source_id} could not serve {instrument.id} from {start} to {end} "
+            f"({reason}); the sessions it would have confirmed stay single-sourced",
+        )
 
     def _normalize_all(
         self,

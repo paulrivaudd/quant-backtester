@@ -35,6 +35,8 @@ import pandas as pd
 
 from quant_backtester.data.instruments import Instrument
 from quant_backtester.data.sources.base import (
+    ProviderRangeUnavailable,
+    ProviderResponseError,
     RawDownload,
     http_get_text,
     make_fetch_id,
@@ -58,6 +60,17 @@ EURONEXT_SYMBOL = re.compile(r"^(?P<isin>[A-Z]{2}[A-Z0-9]{9}[0-9])-(?P<mic>[A-Z]
 
 SESSION_FREE_SPAN = timedelta(days=7)
 """No Euronext venue closes for a week: seven days without a row is not a holiday."""
+
+EURONEXT_WINDOW = timedelta(days=730)
+"""Depth of the rolling window the export serves.
+
+Measured, not assumed: asked for 2018 on 2026-09-18, it answered from
+2024-09-19, which is 729 days. Declared here so an ordinary request is cut to
+what the provider holds instead of failing and losing the cross-check of every
+session since. Two years is inside :data:`SESSION_FREE_SPAN` of the real edge,
+so a request built from it does not sit on the boundary; when the window does
+move, the request fails and the caller retries from the date the answer names.
+"""
 
 
 def split_euronext_symbol(source_symbol: str) -> tuple[str, str]:
@@ -109,12 +122,16 @@ def parse_euronext_csv(text: str, isin: str) -> pd.DataFrame:
     """
     lines = text.lstrip("﻿").splitlines()
     if len(lines) < 4 or lines[0].strip() != EURONEXT_TITLE:
-        raise ValueError(f"Euronext answer for {isin} is not a price export: {text[:100]!r}")
+        raise ProviderResponseError(
+            f"Euronext answer for {isin} is not a price export: {text[:100]!r}"
+        )
     if lines[2].strip() != isin:
-        raise ValueError(f"Euronext answer for {isin} describes {lines[2].strip()!r}")
+        raise ProviderResponseError(f"Euronext answer for {isin} describes {lines[2].strip()!r}")
     header = next(csv.reader([lines[3]], delimiter=";"))
     if tuple(header[: len(EURONEXT_HEADER_PREFIX)]) != EURONEXT_HEADER_PREFIX:
-        raise ValueError(f"Euronext answer for {isin} has an unexpected header: {lines[3]!r}")
+        raise ProviderResponseError(
+            f"Euronext answer for {isin} has an unexpected header: {lines[3]!r}"
+        )
     rows = [next(csv.reader([line], delimiter=";")) for line in lines[4:] if line.strip()]
     if not rows:
         return pd.DataFrame(columns=header)
@@ -164,18 +181,21 @@ def _require_served_range(
     if frame.empty:
         # expected_end - expected_start >= 6 days means seven calendar days.
         if expected_end - expected_start >= SESSION_FREE_SPAN - timedelta(days=1):
-            raise ValueError(
+            raise ProviderResponseError(
                 f"Euronext served no row for {instrument.source_symbol} from {expected_start} "
-                f"to {expected_end}: unknown ISIN, or older than its two-year window"
+                f"to {expected_end}: the ISIN is unknown to it. Loud on purpose - the "
+                f"request is already cut to EURONEXT_WINDOW, so an empty answer over a "
+                f"week is a symbol that moved, not a window that ended"
             )
         return
     first = min(
         datetime.strptime(str(value), EURONEXT_DATE_FORMAT).date() for value in frame["Date"]
     )
     if first - expected_start >= SESSION_FREE_SPAN:
-        raise ValueError(
+        raise ProviderRangeUnavailable(
             f"Euronext served {instrument.source_symbol} only from {first}, not from "
-            f"{expected_start}: the request is older than its two-year window"
+            f"{expected_start}: the request is older than its two-year window",
+            available_from=first,
         )
 
 
@@ -202,6 +222,21 @@ class EuronextSource:
         self._clock = clock
         self._fetch_text = fetch_text
 
+    def available_from(self, instrument: Instrument) -> date:
+        """Return the earliest date the export can serve today.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Ignored: the window is the provider's, not the instrument's.
+
+        Returns
+        -------
+        date
+            ``EURONEXT_WINDOW`` before the day of the clock.
+        """
+        return self._clock().date() - EURONEXT_WINDOW
+
     def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
         """Fetch daily bars.
 
@@ -220,11 +255,17 @@ class EuronextSource:
         Raises
         ------
         ValueError
-            If ``start`` is after ``end``, the symbol is malformed, the clock is
-            not UTC, the body is not a Euronext export, or less than the
-            requested range was served (see :func:`_require_served_range`).
-        urllib.error.HTTPError
-            If Euronext answers with an HTTP error status.
+            If ``start`` is after ``end``, the symbol is malformed, or the clock
+            is not UTC. Our own mistakes, and none of them the provider's.
+        ProviderResponseError
+            If the body is not a Euronext export of this ISIN, or the symbol is
+            unknown to it.
+        ProviderRangeUnavailable
+            If the export starts later than ``start`` by more than a week: the
+            request reached past the rolling window. It carries the date the
+            export did start from.
+        ProviderUnavailable
+            If Euronext could not be reached or answered 5xx.
         """
         if start > end:
             raise ValueError(f"start {start} is after end {end}")

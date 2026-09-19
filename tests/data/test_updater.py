@@ -46,7 +46,13 @@ from quant_backtester.data.schemas import (
     ActionType,
     CheckStatus,
 )
-from quant_backtester.data.sources.base import RawDownload, make_fetch_id
+from quant_backtester.data.sources.base import (
+    ProviderRangeUnavailable,
+    ProviderResponseError,
+    ProviderUnavailable,
+    RawDownload,
+    make_fetch_id,
+)
 from quant_backtester.data.updater import MarketDataUpdater, safe_end_date
 
 FIRST_TICK = datetime(2026, 3, 13, 21, 0, tzinfo=UTC)
@@ -130,6 +136,8 @@ class FakeSource:
         action feed, like an index.
     calls : list[tuple[str, date, date]]
         Every range asked of it, in order.
+    window_start : date | None
+        Earliest date it declares it can serve; ``None`` for a full history.
     """
 
     def __init__(
@@ -138,12 +146,18 @@ class FakeSource:
         clock: Callable[[], datetime],
         rows: Mapping[str, pd.DataFrame] | None = None,
         actions: Mapping[str, pd.DataFrame] | None = None,
+        window_start: date | None = None,
     ) -> None:
         self.source_id = source_id
         self._clock = clock
         self.rows: dict[str, pd.DataFrame] = dict(rows or {})
         self.actions: dict[str, pd.DataFrame] = dict(actions or {})
         self.calls: list[tuple[str, date, date]] = []
+        self.window_start = window_start
+
+    def available_from(self, instrument: Instrument) -> date | None:
+        """Return the earliest date this provider declares it holds."""
+        return self.window_start
 
     def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
         """Return the rows of ``instrument`` inside ``[start, end]``."""
@@ -1104,7 +1118,7 @@ def test_an_unavailable_check_source_does_not_lose_the_instrument(
 
     class RefusingSource(FakeSource):
         def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
-            raise ValueError(f"{instrument.source_symbol} is served only from 2024-09-19")
+            raise ProviderUnavailable(f"{instrument.source_symbol} is down")
 
     instrument = Instrument(
         id="ETF_EU",
@@ -1151,7 +1165,7 @@ def test_a_failing_primary_source_still_stops_the_instrument(
 
     class BrokenSource(FakeSource):
         def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
-            raise ConnectionError("provider down")
+            raise ProviderUnavailable("provider down")
 
     updater = build_updater(
         repository,
@@ -1161,7 +1175,132 @@ def test_a_failing_primary_source_still_stops_the_instrument(
         clock,
     )
 
-    with pytest.raises(ConnectionError, match="provider down"):
+    with pytest.raises(ProviderUnavailable, match="provider down"):
+        updater.download("ETF_EU", MONDAY, FRIDAY)
+
+
+def two_source_etf() -> Instrument:
+    """Return the Paris ETF with one check source."""
+    return Instrument(
+        id="ETF_EU",
+        name="Paris ETF",
+        asset_type=AssetType.ETF,
+        data_type=DataType.BAR,
+        currency="EUR",
+        primary_source="YAHOO",
+        source_symbol="CW8.PA",
+        tradable=True,
+        calendar_id="XPAR",
+        first_session=MONDAY,
+        check_sources=(CheckSource(source="EURONEXT", source_symbol="LU-XPAR"),),
+    )
+
+
+def verdicts_of(repository: MarketDataRepository, instrument_id: str) -> dict[date, str]:
+    """Return the cross-check status of every stored session."""
+    checked = repository.load_checked_bars(instrument_id)
+    return dict(zip(checked["session_date"], checked["check_status"], strict=True))
+
+
+def test_a_check_source_is_asked_only_for_the_window_it_holds(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """A rolling window costs the sessions before it, and nothing else.
+
+    Euronext serves about two years. Asked for a history starting in 2018 it
+    refused the whole request, and every one of the 2230 sessions of ETF_WORLD
+    stayed SINGLE_SOURCE - the cross-check existed and confirmed nothing.
+    """
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    euronext = FakeSource("EURONEXT", clock, rows={"ETF_EU": week.copy()}, window_start=WEDNESDAY)
+    updater = build_updater(
+        repository,
+        InstrumentRegistry([two_source_etf()]),
+        calendars,
+        {"YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}), "EURONEXT": euronext},
+        clock,
+    )
+
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert euronext.calls == [("ETF_EU", WEDNESDAY, FRIDAY)]
+    verdicts = verdicts_of(repository, "ETF_EU")
+    assert verdicts[MONDAY] == CheckStatus.SINGLE_SOURCE.value
+    assert verdicts[TUESDAY] == CheckStatus.SINGLE_SOURCE.value
+    assert verdicts[WEDNESDAY] == CheckStatus.CONFIRMED.value
+    assert verdicts[FRIDAY] == CheckStatus.CONFIRMED.value
+
+
+def test_a_window_that_moved_is_asked_again_from_the_date_it_names(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """The declared window is a shortcut, not the truth; the provider's answer is."""
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+
+    class MovedWindow(FakeSource):
+        def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
+            if start < THURSDAY:
+                self.calls.append((instrument.id, start, end))
+                raise ProviderRangeUnavailable(
+                    f"served only from {THURSDAY}", available_from=THURSDAY
+                )
+            return super().download(instrument, start, end)
+
+    euronext = MovedWindow("EURONEXT", clock, rows={"ETF_EU": week.copy()})
+    updater = build_updater(
+        repository,
+        InstrumentRegistry([two_source_etf()]),
+        calendars,
+        {"YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}), "EURONEXT": euronext},
+        clock,
+    )
+
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert euronext.calls == [("ETF_EU", MONDAY, FRIDAY), ("ETF_EU", THURSDAY, FRIDAY)]
+    verdicts = verdicts_of(repository, "ETF_EU")
+    assert verdicts[WEDNESDAY] == CheckStatus.SINGLE_SOURCE.value
+    assert verdicts[THURSDAY] == CheckStatus.CONFIRMED.value
+
+
+@pytest.mark.parametrize(
+    "error",
+    [TypeError("NoneType is not subscriptable"), ProviderResponseError("header moved")],
+    ids=["a-bug-in-the-adapter", "an-answer-we-cannot-read"],
+)
+def test_a_check_source_that_is_not_merely_down_is_not_degraded(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+    error: Exception,
+) -> None:
+    """Neither a bug of ours nor a format that moved may hide behind a warning.
+
+    Both used to become CHECK_SOURCE_UNAVAILABLE, which reads like a provider
+    having a bad day and gets ignored for months. Only an outage means that.
+    """
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+
+    class BadSource(FakeSource):
+        def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
+            raise error
+
+    updater = build_updater(
+        repository,
+        InstrumentRegistry([two_source_etf()]),
+        calendars,
+        {
+            "YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}),
+            "EURONEXT": BadSource("EURONEXT", clock),
+        },
+        clock,
+    )
+
+    with pytest.raises(type(error)):
         updater.download("ETF_EU", MONDAY, FRIDAY)
 
 

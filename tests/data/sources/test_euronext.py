@@ -16,7 +16,12 @@ import pandas as pd
 import pytest
 
 from quant_backtester.data.instruments import AssetType, DataType, Instrument
+from quant_backtester.data.sources.base import (
+    ProviderRangeUnavailable,
+    ProviderResponseError,
+)
 from quant_backtester.data.sources.euronext import (
+    EURONEXT_WINDOW,
     EuronextSource,
     parse_euronext_csv,
     split_euronext_symbol,
@@ -228,7 +233,9 @@ def test_download_rejects_a_body_that_is_not_the_requested_export(
     http: FakeHttp, cw8: Instrument, source: EuronextSource, body: str, match: str
 ) -> None:
     http.body = body
-    with pytest.raises(ValueError, match=match):
+    # A body this adapter cannot read is the provider's format, not our bug, and
+    # not a transient outage either: it has to be looked at, never absorbed.
+    with pytest.raises((ProviderResponseError, ValueError), match=match):
         source.download(cw8, date(2024, 12, 27), date(2024, 12, 31))
 
 
@@ -239,7 +246,7 @@ def test_download_no_row_over_a_week_is_an_unknown_isin_or_out_of_window(
     http: FakeHttp, cw8: Instrument, source: EuronextSource
 ) -> None:
     http.body = EMPTY_EXPORT
-    with pytest.raises(ValueError, match="unknown ISIN"):
+    with pytest.raises(ProviderResponseError, match="ISIN is unknown"):
         source.download(cw8, date(2024, 12, 20), date(2024, 12, 31))
 
 
@@ -256,10 +263,12 @@ def test_download_no_row_over_six_days_is_accepted(
 def test_download_cut_to_the_two_year_window_raises(
     cw8: Instrument, source: EuronextSource
 ) -> None:
-    with pytest.raises(ValueError, match="two-year window") as raised:
+    with pytest.raises(ProviderRangeUnavailable, match="two-year window") as raised:
         source.download(cw8, date(2018, 1, 1), date(2024, 12, 31))
     # The listing date, not the requested start, is what was expected.
     assert "2018-01-02" in str(raised.value)
+    # And the date it did serve from, so the caller retries instead of giving up.
+    assert raised.value.available_from == date(2024, 12, 27)
 
 
 def test_download_first_row_within_a_week_of_the_start_is_accepted(
@@ -370,11 +379,18 @@ def test_download_live_cw8_last_month_matches_the_export_shape(cw8: Instrument) 
 def test_download_live_unknown_isin_raises(cw8: Instrument) -> None:
     unknown = replace(cw8, source_symbol="XX0000000000-XPAR")
     end = datetime.now(UTC).date()
-    with pytest.raises(ValueError, match="unknown ISIN"):
+    with pytest.raises(ProviderResponseError, match="ISIN is unknown"):
         EuronextSource().download(unknown, end - timedelta(days=30), end)
 
 
 @pytest.mark.network
 def test_download_live_request_older_than_the_window_raises(cw8: Instrument) -> None:
-    with pytest.raises(ValueError, match="two-year window"):
+    with pytest.raises(ProviderRangeUnavailable, match="two-year window"):
         EuronextSource().download(cw8, date(2018, 1, 2), date(2018, 3, 1))
+
+
+def test_available_from_declares_the_rolling_window(
+    cw8: Instrument, source: EuronextSource
+) -> None:
+    """Declared so an ordinary request is cut to it instead of failing on it."""
+    assert source.available_from(cw8) == RETRIEVED_AT.date() - EURONEXT_WINDOW

@@ -63,6 +63,21 @@ class FredSource:
         self._clock = clock
         self._fetch_text = fetch_text
 
+    def available_from(self, instrument: Instrument) -> None:
+        """Return ``None``: this provider serves its whole history.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Ignored.
+
+        Returns
+        -------
+        None
+            No window to work around.
+        """
+        return None
+
     def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
         """Fetch one published series.
 
