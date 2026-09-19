@@ -1029,3 +1029,67 @@ def test_a_decision_that_moves_nothing_is_rejected() -> None:
     """Accepting a value onto itself is not a decision, it is a typo."""
     with pytest.raises(ValueError, match="the same"):
         AcceptedRevisions([replace(SP500_CLOSE, new_value=SP500_CLOSE.old_value)])
+
+
+# --- the whole decision workflow, end to end --------------------------------
+
+
+def test_a_detected_revision_becomes_an_entry_that_applies_it(tmp_path: Path) -> None:
+    """revisions.parquet -> TOML entry -> from_toml -> the exact correction applies.
+
+    Every link matters and each one has broken at some point: the entry has to
+    name the source and both values, the floats have to round-trip to the bit,
+    and what comes back has to match the correction that was detected rather
+    than merely the field it touched.
+    """
+    stored = bars()
+    refetched = bars(fetch_id=NEW_FETCH, closes=[100.0, 101.5, 102.0])
+    log = detect(stored, refetched)
+    assert len(log) == 1
+
+    entry = AcceptedRevision.from_detected(log.to_dict("records")[0], "Checked against Stooq.")
+    accepted = AcceptedRevisions.from_toml(write(tmp_path, entry.to_toml()))
+
+    merged = merge(stored, refetched, accepted)
+
+    assert merged["close"].tolist() == [100.0, 101.5, 102.0]
+
+
+def test_the_generated_entry_is_about_that_correction_and_no_other(tmp_path: Path) -> None:
+    """The round trip must not quietly widen into a permission over the field."""
+    stored = bars()
+    log = detect(stored, bars(fetch_id=NEW_FETCH, closes=[100.0, 101.5, 102.0]))
+    entry = AcceptedRevision.from_detected(log.to_dict("records")[0], "Checked.")
+    accepted = AcceptedRevisions.from_toml(write(tmp_path, entry.to_toml()))
+
+    # The same field and date, moving somewhere else.
+    merged = merge(stored, bars(fetch_id=NEW_FETCH, closes=[100.0, 101.9, 102.0]), accepted)
+
+    assert merged["close"].tolist() == [100.0, 101.0, 102.0]
+
+
+def test_a_withdrawn_value_round_trips_through_the_entry(tmp_path: Path) -> None:
+    """``nan`` is a value like any other, and has to survive being written down."""
+    stored = bars()
+    refetched = bars(fetch_id=NEW_FETCH, closes=[100.0, math.nan, 102.0])
+    log = detect(stored, refetched)
+
+    entry = AcceptedRevision.from_detected(log.to_dict("records")[0], "The print was wrong.")
+    assert "nan" in entry.to_toml()
+    accepted = AcceptedRevisions.from_toml(write(tmp_path, entry.to_toml()))
+
+    merged = merge(stored, refetched, accepted)
+
+    assert math.isnan(merged["close"].iloc[1])
+
+
+def test_a_reason_holding_a_quote_survives_the_entry(tmp_path: Path) -> None:
+    """A reason is free text: it must not be able to break the file it goes into."""
+    stored = bars()
+    log = detect(stored, bars(fetch_id=NEW_FETCH, closes=[100.0, 101.5, 102.0]))
+    reason = 'Checked against "Stooq", and against the exchange\'s own export.'
+
+    entry = AcceptedRevision.from_detected(log.to_dict("records")[0], reason)
+    accepted = AcceptedRevisions.from_toml(write(tmp_path, entry.to_toml()))
+
+    assert accepted.is_accepted("SPY", "YAHOO", "bars", SESSIONS[1], "close", 101.0, 101.5)

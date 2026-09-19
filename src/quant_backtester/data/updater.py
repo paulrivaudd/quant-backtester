@@ -89,6 +89,12 @@ from quant_backtester.data.validator import (
 BAR_VALUE_COLUMNS: Final[tuple[str, ...]] = ("open", "high", "low", "close", "volume")
 """Bar columns the revision policy governs. Availability and lineage are not values."""
 
+_REPAIR_HINT = (
+    "rebuild_clean({instrument_id!r}) recomputes the whole clean layer from raw/ "
+    "and the committed configuration."
+)
+"""What to do about an inconsistent clean layer, said the same way everywhere."""
+
 MAX_UNPUBLISHED_DAYS: Final[int] = 30
 """Longest run of days walked back looking for a published observation.
 
@@ -96,6 +102,16 @@ A same-day rule needs one step, a D+1 rule over a holiday week a handful.
 Running past it means the publication rule is wrong, not that a publisher went
 quiet for a month.
 """
+
+
+def _fetched_pairs(
+    downloads: Mapping[str, RawDownload], actions: RawDownload | None
+) -> list[tuple[str, str]]:
+    """Return the ``(source, fetch_id)`` pairs one fetch archived."""
+    pairs = [(source_id, download.fetch_id) for source_id, download in downloads.items()]
+    if actions is not None:
+        pairs.append((actions.source, actions.fetch_id))
+    return sorted(pairs)
 
 
 def safe_end_date(
@@ -391,6 +407,7 @@ class MarketDataUpdater:
             checked_at=downloads[instrument.primary_source].retrieved_at_utc,
             requested=(start, end),
             extra_issues=fetch_issues + issues,
+            fetches=_fetched_pairs(downloads, actions_download),
         )
 
     def update(self, instrument_id: str) -> ValidationReport:
@@ -477,6 +494,7 @@ class MarketDataUpdater:
             checked_at=primary.retrieved_at_utc,
             requested=(start, end),
             extra_issues=issues,
+            fetches=_fetched_pairs(downloads, actions_download),
         )
 
     def update_all(self) -> dict[str, ValidationReport]:
@@ -550,14 +568,19 @@ class MarketDataUpdater:
         lue, un ordre de dictionnaire, un chemin absolu - et la reproductibilite
         n'est qu'une intention.
 
+        Only the fetches that completed a promotion are replayed. ``raw/`` also
+        holds downloads the validator refused and runs that died before writing
+        anything to ``clean/``, and replaying those would not rebuild what the
+        live path built: the first value stored wins, so a snapshot that never
+        reached ``clean/`` would win over the one that did. They stay in the
+        archive as evidence, and the report names them.
+
         Two deliberate differences with the live path, and only two. The
         instrument's clean files are emptied first, otherwise the policy would
         compare every replayed row with the rows already there and rebuild
         nothing. And neither the revision log nor the validation log is appended
         to: they record what happened when the data arrived, and replaying the
-        archive is not a second arrival. A fetch whose validation fails is
-        skipped, the replay continues, and its issues come back in the report -
-        one bad old snapshot must not empty the whole series.
+        archive is not a second arrival.
 
         Nothing else differs. Every source has a canonical series governed by
         the revision policy, so meeting the archived fetches one at a time
@@ -567,7 +590,16 @@ class MarketDataUpdater:
         instrument = self._instruments.get(instrument_id)
         self._reset_clean(instrument)
         issues: list[ValidationIssue] = []
+        applied = self._repository.load_applied_fetches(instrument.id)
+        skipped: list[str] = []
         for fetch_id, source_id in self._archived_fetches(instrument):
+            if (source_id, fetch_id) not in applied:
+                # Archived, then never promoted: a download refused by the
+                # validator, or a run that died after writing raw. Replaying it
+                # would let a snapshot the live path never kept win over the one
+                # it did, since the first value stored wins.
+                skipped.append(f"{source_id}:{fetch_id}")
+                continue
             download = self._repository.load_raw(instrument.id, source_id, fetch_id)
             data = self._normalize(instrument, source_id, download)
             frames = {}
@@ -585,6 +617,17 @@ class MarketDataUpdater:
                 log=False,
             )
             issues += list(report.issues)
+        if skipped:
+            issues.append(
+                _issue(
+                    "UNAPPLIED_FETCH_SKIPPED",
+                    Severity.WARNING,
+                    instrument.id,
+                    None,
+                    f"{len(skipped)} archived fetch(es) never completed a promotion and were "
+                    f"not replayed: {', '.join(skipped)}. They stay in raw/ as evidence.",
+                )
+            )
         return ValidationReport(instrument_id=instrument.id, issues=issues)
 
     # -- fetching ----------------------------------------------------------
@@ -646,28 +689,56 @@ class MarketDataUpdater:
         Raises
         ------
         ValueError
-            If the checked series and the bars disagree on which sessions are
-            stored, which only happens when a previous run died between the two
-            writes.
+            If the checked series is not what the stored series produce, which
+            means a previous run died between two writes, or the cross-check
+            policy changed after the verdicts were computed.
 
         Notes
         -----
-        Cheap, and it runs before anything is fetched: the alternative is an
-        update that merges into a series whose verdicts belong to a different
-        set of sessions, and says nothing.
+        The verdicts are a function of the stored series and the committed
+        policy, so the check is to compute them again and compare. Matching
+        session dates is not enough: a run that died after writing the bars and
+        before the verdicts leaves two files that agree on which days exist and
+        disagree on what happened on them, which nothing would have noticed.
+
+        It runs before anything is fetched, and on the daily volumes here it
+        costs a few milliseconds - the alternative is an update that merges into
+        a series whose verdicts describe different values, and says nothing.
         """
         if instrument.data_type is not DataType.BAR:
             return
-        bars = set(self._repository.load_bars(instrument.id)["session_date"])
-        checked = set(self._repository.load_checked_bars(instrument.id)["session_date"])
-        if bars == checked:
+        bars = self._repository.load_bars(instrument.id)
+        checked = self._repository.load_checked_bars(instrument.id)
+        stored_days = set(bars["session_date"])
+        checked_days = set(checked["session_date"])
+        if stored_days != checked_days:
+            raise ValueError(
+                f"{instrument.id}: the clean layer is inconsistent - "
+                f"{len(stored_days - checked_days)} session(s) have bars and no verdict, "
+                f"{len(checked_days - stored_days)} the other way round. "
+                f"{_REPAIR_HINT.format(instrument_id=instrument.id)}"
+            )
+        canonical = {instrument.primary_source: bars}
+        for check in instrument.check_sources:
+            canonical[check.source] = self._repository.load_check_bars(instrument.id, check.source)
+        expected = cross_check_bars(
+            instrument.id,
+            canonical,
+            reference_source=instrument.primary_source,
+            policy=self._cross_check_policy,
+        )
+        if expected.equals(checked):
             return
-        missing = len(bars - checked)
-        extra = len(checked - bars)
+        moved = [
+            str(column)
+            for column in checked.columns
+            if not checked[column].equals(expected[column])
+        ]
         raise ValueError(
-            f"{instrument.id}: the clean layer is inconsistent - {missing} session(s) have "
-            f"bars and no verdict, {extra} the other way round. A run was interrupted "
-            f"between two writes; rebuild_clean({instrument.id!r}) repairs it from raw/."
+            f"{instrument.id}: the stored verdicts are not what the stored series produce - "
+            f"{', '.join(moved)} differ(s). Either a run was interrupted between two "
+            f"writes, or metadata/crosscheck.toml changed after they were computed. "
+            f"{_REPAIR_HINT.format(instrument_id=instrument.id)}"
         )
 
     def _check_download(
@@ -903,6 +974,7 @@ class MarketDataUpdater:
         checked_at: datetime,
         requested: tuple[date, date] | None,
         extra_issues: Sequence[ValidationIssue],
+        fetches: Sequence[tuple[str, str]] = (),
         log: bool = True,
     ) -> ValidationReport:
         """Validate one fetch and, if it holds, promote it to the clean layer.
@@ -926,6 +998,10 @@ class MarketDataUpdater:
             when replaying an archive.
         extra_issues : Sequence[ValidationIssue]
             Issues raised before validation, such as a source that sent nothing.
+        fetches : Sequence[tuple[str, str]]
+            ``(source, fetch_id)`` pairs this ingestion consumed, recorded as
+            applied once the promotion has completed. Empty on a replay, which
+            reads that journal rather than writing to it.
         log : bool
             Whether to append to the validation log and the revision log.
 
@@ -947,6 +1023,10 @@ class MarketDataUpdater:
                 log=log,
             )
             report = ValidationReport(instrument_id=instrument.id, issues=issues)
+            # Last, and only once everything above returned: a fetch recorded
+            # here is one a replay will apply, so it must have been applied.
+            if log:
+                self._repository.mark_fetches_applied(instrument.id, fetches, checked_at)
         if log:
             self._repository.append_validation_log([report], checked_at)
         return report

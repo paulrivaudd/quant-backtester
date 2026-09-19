@@ -1425,6 +1425,61 @@ def test_a_check_source_that_is_not_merely_down_is_not_degraded(
         updater.download("ETF_EU", MONDAY, FRIDAY)
 
 
+def test_a_fetch_that_never_completed_is_not_replayed(
+    updater: MarketDataUpdater,
+    repository: MarketDataRepository,
+    yahoo: FakeSource,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """raw/ holds downloads the clean layer never took, and a replay must not take them.
+
+    The snapshot is archived before the pipeline that consumes it runs, so a
+    download the validator refuses is kept rather than lost. The cost is that
+    raw/ also holds fetches the live path never applied - and since the first
+    value stored wins, replaying one would let a value the live path refused
+    beat the value it kept, rebuilding a history that never existed.
+    """
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    before = repository.load_bars("ETF_EU").copy()
+
+    # A run that dies after archiving raw and before the clean layer is whole.
+    crashed = yahoo.rows["ETF_EU"].copy()
+    crashed.loc[1, "close"] = 101.5
+    yahoo.rows["ETF_EU"] = crashed
+    monkeypatch.setattr(
+        repository,
+        "save_checked_bars",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("disk full")),
+    )
+    with pytest.raises(OSError, match="disk full"):
+        updater.download("ETF_EU", MONDAY, FRIDAY)
+    monkeypatch.undo()
+
+    # The archive kept it, and the replay leaves it there.
+    assert len(repository.list_raw_fetches("ETF_EU", "YAHOO")) == 4
+    report = updater.rebuild_clean("ETF_EU")
+
+    assert "UNAPPLIED_FETCH_SKIPPED" in codes(report)
+    pd.testing.assert_frame_equal(repository.load_bars("ETF_EU"), before)
+
+
+def test_a_download_the_validator_refused_is_not_replayed_either(
+    updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
+) -> None:
+    """Same rule, the ordinary case: refused once is refused on the replay."""
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    before = repository.load_bars("ETF_EU").copy()
+    broken = yahoo.rows["ETF_EU"].copy()
+    broken.loc[1, "high"] = 1.0  # high below low: OHLC_ORDER, an error
+    yahoo.rows["ETF_EU"] = broken
+
+    assert not updater.download("ETF_EU", MONDAY, FRIDAY).valid
+
+    updater.rebuild_clean("ETF_EU")
+
+    pd.testing.assert_frame_equal(repository.load_bars("ETF_EU"), before)
+
+
 @pytest.mark.parametrize("euronext_first", [False, True])
 def test_rebuild_reproduces_a_two_source_checked_series(
     repository: MarketDataRepository,
@@ -1700,7 +1755,7 @@ def test_a_running_session_is_refused_even_when_asked_for(
     assert "VALUE_REVISED" not in codes(report)
 
 
-def test_a_clean_layer_left_half_written_is_refused(
+def test_a_clean_layer_missing_a_verdict_is_refused(
     updater: MarketDataUpdater, repository: MarketDataRepository
 ) -> None:
     """One writer at a time, and a crash between two writes has to be visible.
@@ -1720,6 +1775,66 @@ def test_a_clean_layer_left_half_written_is_refused(
     # And the repair is the one the message names.
     updater.rebuild_clean("ETF_EU")
     updater.update("ETF_EU")
+
+
+def test_a_verdict_that_does_not_match_its_bars_is_refused(
+    updater: MarketDataUpdater, repository: MarketDataRepository
+) -> None:
+    """Same dates on both sides is not the same thing as the same data.
+
+    A crash can leave the bars of one fetch beside the verdicts of the one
+    before, describing the same sessions with different values. Comparing the
+    two lists of dates sees nothing; the verdicts are a function of the stored
+    series, so the check is to compute them again.
+    """
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    checked = repository.load_checked_bars("ETF_EU")
+    tampered = checked.copy()
+    tampered.loc[1, "close"] = tampered.loc[1, "close"] + 1.0
+    repository.save_checked_bars("ETF_EU", tampered)
+
+    with pytest.raises(ValueError, match="not what the stored series produce"):
+        updater.update("ETF_EU")
+
+
+def test_a_cross_check_policy_that_moved_is_named_as_such(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """Tolerances decide which bars are confirmed, so changing them changes history.
+
+    Legitimate, reviewed, and it still leaves the stored verdicts describing a
+    policy that is no longer the committed one. The update says so instead of
+    merging into them.
+    """
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    close_enough = week.copy()
+    # A hair above the committed 1e-6 tolerance, well below the 1e-3 tried next.
+    close_enough.loc[2, "close"] = 102.001
+    sources = {
+        "YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}),
+        "EURONEXT": FakeSource("EURONEXT", clock, rows={"ETF_EU": close_enough}),
+    }
+    instruments = InstrumentRegistry([two_source_etf()])
+    strict = build_updater(repository, instruments, calendars, sources, clock)
+    strict.download("ETF_EU", MONDAY, FRIDAY)
+    assert verdicts_of(repository, "ETF_EU")[WEDNESDAY] == CheckStatus.CONFLICT.value
+
+    lenient = MarketDataUpdater(
+        repository=repository,
+        instruments=instruments,
+        calendars=calendars,
+        sources=dict(sources),
+        normalizers={source_id: FakeNormalizer(source_id) for source_id in sources},
+        accepted_revisions=AcceptedRevisions([]),
+        action_corrections=ActionCorrections([]),
+        cross_check_policy=CrossCheckPolicy(price_rel_tolerance=1e-3, volume_rel_tolerance=0.0),
+        clock=clock,
+    )
+
+    with pytest.raises(ValueError, match=r"crosscheck\.toml changed"):
+        lenient.update("ETF_EU")
 
 
 # ---------------------------------------------------------------------------

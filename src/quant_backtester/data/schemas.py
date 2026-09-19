@@ -207,6 +207,27 @@ decision lives in ``metadata/accepted_revisions.toml``, in git, because it
 changes past results and must be reviewable in a diff.
 """
 
+APPLIED_FETCHES_SCHEMA: Final = pa.schema(
+    [
+        pa.field("instrument_id", pa.string(), nullable=False),
+        pa.field("source", pa.string(), nullable=False),
+        pa.field("fetch_id", pa.string(), nullable=False),
+        pa.field("applied_at_utc", TIMESTAMP_UTC, nullable=False),
+    ]
+)
+"""Which archived fetches actually shaped the clean layer.
+
+A raw snapshot is written before the pipeline that consumes it runs, so that a
+download which then fails validation is kept rather than lost - it is precisely
+the one to re-examine. The consequence is that ``raw/`` holds fetches the live
+path never applied, and replaying them all would not rebuild what the live path
+built: the first value stored wins, so a snapshot that never reached ``clean/``
+would win over the one that did.
+
+A fetch is recorded here once its promotion has completed. ``raw/`` keeps
+everything, this says what counts.
+"""
+
 VALIDATION_LOG_SCHEMA: Final = pa.schema(
     [
         pa.field("instrument_id", pa.string(), nullable=False),

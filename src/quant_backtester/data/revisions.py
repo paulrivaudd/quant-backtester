@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import math
 import tomllib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, fields
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -75,9 +75,78 @@ class AcceptedRevision:
     new_value: float
     reason: str
 
+    @classmethod
+    def from_detected(cls, row: Mapping[str, Any], reason: str) -> AcceptedRevision:
+        """Build the decision that would approve one detected revision.
+
+        Parameters
+        ----------
+        row : Mapping[str, Any]
+            One record of ``clean/revisions.parquet``.
+        reason : str
+            Why the correction is accepted.
+
+        Returns
+        -------
+        AcceptedRevision
+            The decision matching that exact correction.
+
+        Notes
+        -----
+        The values come from the log rather than from whoever writes the entry.
+        They have to match to the last bit, and a float read off a report and
+        typed back in rarely does.
+        """
+        return cls(
+            instrument_id=str(row["instrument_id"]),
+            source=str(row["source"]),
+            table=str(row["table"]),
+            observation_date=row["observation_date"],
+            field=str(row["field"]),
+            old_value=float(row["old_value"]),
+            new_value=float(row["new_value"]),
+            reason=reason,
+        )
+
+    def to_toml(self) -> str:
+        """Return this decision as the ``[[revision]]`` table of the committed file.
+
+        Returns
+        -------
+        str
+            A TOML table that :meth:`AcceptedRevisions.from_toml` reads back
+            into an equal decision. Floats are rendered with ``repr``, which
+            round-trips exactly, and a value the provider did not publish is
+            written ``nan``.
+        """
+        return "\n".join(
+            [
+                "[[revision]]",
+                f'instrument_id = "{self.instrument_id}"',
+                f'source = "{self.source}"',
+                f'table = "{self.table}"',
+                f"observation_date = {self.observation_date.isoformat()}",
+                f'field = "{self.field}"',
+                f"old_value = {_toml_value(self.old_value)}",
+                f"new_value = {_toml_value(self.new_value)}",
+                f"reason = {_toml_string(self.reason)}",
+            ]
+        )
+
 
 RevisionKey = tuple[str, str, str, date, str, float | str, float | str]
 """Identity of one reviewed correction: where it applies and which move it is."""
+
+
+def _toml_value(value: float) -> str:
+    """Return a value as TOML, round-tripping exactly. ``nan`` means not published."""
+    return "nan" if math.isnan(value) else repr(float(value))
+
+
+def _toml_string(text: str) -> str:
+    """Return a TOML basic string, escaping what would end it early."""
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def _same_value(left: float, right: float) -> bool:

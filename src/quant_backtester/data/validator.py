@@ -419,14 +419,15 @@ def _check_row(instrument: Instrument, row: Mapping[str, Any]) -> list[Validatio
 
     volume = _number(row["volume"])
     present = [value for value in prices.values() if value is not None]
-    # A warning, deliberately, and not a quarantine. Of the 76 such bars the
-    # first real ingestion found on CW8, 74 were the block before it listed,
-    # which is the listing window's business and not this rule's; the two left
-    # are a session a second source contradicts - the cross-check settles that
-    # one - and 24 December 2018, a half day on a fund then trading a few
-    # hundred shares, where no trade at all is perfectly ordinary. A rule that
-    # withheld prices on this pattern would be wrong about the case it is left
-    # with.
+    # A warning, deliberately, and not a quarantine - and the message says
+    # "possibly" because the two causes are indistinguishable from the row. Of
+    # the 76 such bars the first real ingestion found on CW8, 74 were the block
+    # before it listed, which is the listing window's business and not this
+    # rule's; the two left are a session a second source contradicts - the
+    # cross-check settles that one - and 24 December 2018, a half day on a fund
+    # then trading a few hundred shares, where no trade at all is perfectly
+    # ordinary. A rule that withheld prices on this pattern would be wrong about
+    # the case it is left with.
     if len(present) == len(BAR_PRICE_FIELDS) and len(set(present)) == 1 and volume == 0:
         issues.append(
             _issue(
@@ -434,8 +435,8 @@ def _check_row(instrument: Instrument, row: Mapping[str, Any]) -> list[Validatio
                 Severity.WARNING,
                 instrument,
                 day,
-                f"Bar of {day} is flat at {present[0]} with no volume: a provider "
-                "placeholder rather than a session",
+                f"Bar of {day} is flat at {present[0]} with no volume: possibly a "
+                "provider placeholder, possibly a session where nothing traded",
                 {"price": present[0]},
             )
         )

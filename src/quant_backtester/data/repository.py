@@ -13,6 +13,7 @@ Layout under the market data root::
     clean/checked_bars/<instrument_id>.parquet        bars cross-checked across sources
     clean/levels/<instrument_id>.parquet
     clean/corporate_actions.parquet
+    clean/applied_fetches.parquet                     which fetches shaped the clean layer
     clean/revisions.parquet
     validation/validation_log.parquet
 
@@ -39,6 +40,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from quant_backtester.data.schemas import (
+    APPLIED_FETCHES_SCHEMA,
     BARS_SCHEMA,
     CHECKED_BARS_SCHEMA,
     CORPORATE_ACTIONS_SCHEMA,
@@ -581,6 +583,66 @@ class MarketDataRepository:
         An empty frame leaves the log untouched.
         """
         _append_rows(frame, self.root / "clean" / "revisions.parquet", REVISIONS_SCHEMA)
+
+    def mark_fetches_applied(
+        self, instrument_id: str, fetches: Sequence[tuple[str, str]], applied_at_utc: datetime
+    ) -> None:
+        """Record that these fetches completed their promotion.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument concerned.
+        fetches : Sequence[tuple[str, str]]
+            ``(source, fetch_id)`` pairs the promotion consumed.
+        applied_at_utc : datetime
+            Timezone-aware UTC instant, the fetch's own ``retrieved_at_utc``.
+
+        Raises
+        ------
+        ValueError
+            If ``applied_at_utc`` is not a UTC instant.
+        """
+        if applied_at_utc.tzinfo is None or applied_at_utc.utcoffset() != timedelta(0):
+            raise ValueError(f"applied_at_utc must be a UTC instant, got {applied_at_utc!r}")
+        if not fetches:
+            return
+        frame = pd.DataFrame(
+            {
+                "instrument_id": [instrument_id] * len(fetches),
+                "source": [source for source, _ in fetches],
+                "fetch_id": [fetch_id for _, fetch_id in fetches],
+                "applied_at_utc": pd.Series(
+                    [applied_at_utc] * len(fetches), dtype="datetime64[us, UTC]"
+                ),
+            }
+        )
+        _append_rows(frame, self._applied_fetches_path, APPLIED_FETCHES_SCHEMA)
+
+    def load_applied_fetches(self, instrument_id: str) -> set[tuple[str, str]]:
+        """Return the ``(source, fetch_id)`` pairs whose promotion completed.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument concerned.
+
+        Returns
+        -------
+        set[tuple[str, str]]
+            Empty when nothing was ever recorded for it.
+        """
+        frame = _load_or_empty(self._applied_fetches_path, APPLIED_FETCHES_SCHEMA)
+        mine = frame.loc[frame["instrument_id"] == instrument_id]
+        return {
+            (str(source), str(fetch))
+            for source, fetch in zip(mine["source"], mine["fetch_id"], strict=True)
+        }
+
+    @property
+    def _applied_fetches_path(self) -> Path:
+        """Return where the journal of applied fetches lives."""
+        return self.root / "clean" / "applied_fetches.parquet"
 
     def load_revisions(self, instrument_id: str | None = None) -> pd.DataFrame:
         """Load the detection log.
