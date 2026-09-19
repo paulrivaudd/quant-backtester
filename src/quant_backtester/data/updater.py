@@ -202,40 +202,6 @@ def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     ]
 
 
-def _earliest_wins(
-    known: pd.DataFrame | None, incoming: pd.DataFrame, key_column: str
-) -> pd.DataFrame:
-    """Return one source's rows, the earliest fetch winning on a repeated date.
-
-    Parameters
-    ----------
-    known : pd.DataFrame | None
-        Rows already replayed for that source; ``None`` on its first fetch.
-    incoming : pd.DataFrame
-        Rows of the fetch being replayed.
-    key_column : str
-        Date column.
-
-    Returns
-    -------
-    pd.DataFrame
-        The two frames joined, chronologically sorted, keeping the value a
-        source first sent - the same "stored wins" rule the clean layer applies,
-        so a replay of a check source cannot silently adopt a later value the
-        policy would have refused.
-    """
-    if known is None or known.empty:
-        return incoming
-    if incoming.empty:
-        return known
-    joined = pd.concat([known, incoming], ignore_index=True)
-    return (
-        joined.drop_duplicates(subset=[key_column], keep="first")
-        .sort_values(key_column, kind="stable")
-        .reset_index(drop=True)
-    )
-
-
 def _verdict_of(row: Mapping[str, Any]) -> tuple[str, str]:
     """Return one checked row's verdict: its status and the fields it contests."""
     return str(row["check_status"]), str(row["conflicting_fields"])
@@ -570,22 +536,23 @@ class MarketDataUpdater:
         lue, un ordre de dictionnaire, un chemin absolu - et la reproductibilite
         n'est qu'une intention.
 
-        Two deliberate differences with the live path. The instrument's clean
-        files are emptied first, otherwise the policy would compare every
-        replayed row with the rows already there and rebuild nothing. And
-        neither the revision log nor the validation log is appended to: they
-        record what happened when the data arrived, and replaying the archive is
-        not a second arrival. A fetch whose validation fails is skipped, the
-        replay continues, and its issues come back in the report - one bad old
-        snapshot must not empty the whole series.
+        Two deliberate differences with the live path, and only two. The
+        instrument's clean files are emptied first, otherwise the policy would
+        compare every replayed row with the rows already there and rebuild
+        nothing. And neither the revision log nor the validation log is appended
+        to: they record what happened when the data arrived, and replaying the
+        archive is not a second arrival. A fetch whose validation fails is
+        skipped, the replay continues, and its issues come back in the report -
+        one bad old snapshot must not empty the whole series.
+
+        Nothing else differs. Every source has a canonical series governed by
+        the revision policy, so meeting the archived fetches one at a time
+        reaches the state the live run reached meeting them together, without a
+        replay rule of its own.
         """
         instrument = self._instruments.get(instrument_id)
-        key_column = self._key_column(instrument)
         self._reset_clean(instrument)
         issues: list[ValidationIssue] = []
-        # Every source seen so far, so a fetch replayed alone is still checked
-        # against the sources that arrived with it on the live path.
-        known: dict[str, pd.DataFrame] = {}
         for fetch_id, source_id in self._archived_fetches(instrument):
             download = self._repository.load_raw(instrument.id, source_id, fetch_id)
             data = self._normalize(instrument, source_id, download)
@@ -593,7 +560,6 @@ class MarketDataUpdater:
             frame = data.bars if instrument.data_type is DataType.BAR else data.levels
             if frame is not None:
                 frames[source_id] = frame
-                known[source_id] = _earliest_wins(known.get(source_id), frame, key_column)
             report = self._ingest(
                 instrument,
                 frames,
@@ -602,7 +568,6 @@ class MarketDataUpdater:
                 checked_at=download.retrieved_at_utc,
                 requested=None,
                 extra_issues=[],
-                check_frames=known,
                 log=False,
             )
             issues += list(report.issues)
@@ -889,7 +854,6 @@ class MarketDataUpdater:
         checked_at: datetime,
         requested: tuple[date, date] | None,
         extra_issues: Sequence[ValidationIssue],
-        check_frames: Mapping[str, pd.DataFrame] | None = None,
         log: bool = True,
     ) -> ValidationReport:
         """Validate one fetch and, if it holds, promote it to the clean layer.
@@ -931,7 +895,6 @@ class MarketDataUpdater:
                 fetch_id=fetch_id,
                 checked_at=checked_at,
                 requested=requested,
-                check_frames=check_frames if check_frames is not None else frames,
                 log=log,
             )
             report = ValidationReport(instrument_id=instrument.id, issues=issues)
@@ -967,7 +930,6 @@ class MarketDataUpdater:
         fetch_id: str,
         checked_at: datetime,
         requested: tuple[date, date] | None,
-        check_frames: Mapping[str, pd.DataFrame],
         log: bool,
     ) -> list[ValidationIssue]:
         """Write one validated fetch into the clean layer."""
@@ -975,7 +937,6 @@ class MarketDataUpdater:
             issues = self._promote_bars(
                 instrument,
                 frames,
-                check_frames=check_frames,
                 fetch_id=fetch_id,
                 checked_at=checked_at,
                 log=log,
@@ -993,12 +954,11 @@ class MarketDataUpdater:
         instrument: Instrument,
         frames: Mapping[str, pd.DataFrame],
         *,
-        check_frames: Mapping[str, pd.DataFrame],
         fetch_id: str,
         checked_at: datetime,
         log: bool,
     ) -> list[ValidationIssue]:
-        """Merge the primary source's bars, then rewrite the checked series.
+        """Merge every source's bars, then rewrite the checked series.
 
         Parameters
         ----------
@@ -1020,37 +980,109 @@ class MarketDataUpdater:
         list[ValidationIssue]
             One ``VALUE_REVISED`` warning per changed field, plus the
             cross-check's own issues.
+
+        Notes
+        -----
+        Every source is merged the same way, primary or check. That is what
+        makes the live path and a replay the same function: neither judges a
+        session with the rows of the fetch in hand, both judge it with the
+        canonical series on disk, and a restatement that nobody reviewed moves
+        neither of them.
         """
         issues: list[ValidationIssue] = []
-        stored = self._repository.load_bars(instrument.id)
-        incoming = frames.get(instrument.primary_source)
-        merged = stored
-        if incoming is not None:
-            revisions = detect_revisions(
-                stored,
-                incoming,
-                table="bars",
-                key_column="session_date",
-                value_columns=BAR_VALUE_COLUMNS,
-                new_fetch_id=fetch_id,
-                detected_at_utc=checked_at,
+        merged = self._merge_source(
+            instrument,
+            instrument.primary_source,
+            frames.get(instrument.primary_source),
+            fetch_id=fetch_id,
+            checked_at=checked_at,
+            log=log,
+            issues=issues,
+        )
+        canonical = {instrument.primary_source: merged}
+        for check in instrument.check_sources:
+            canonical[check.source] = self._merge_source(
+                instrument,
+                check.source,
+                frames.get(check.source),
+                fetch_id=fetch_id,
+                checked_at=checked_at,
+                log=log,
+                issues=issues,
             )
-            if not revisions.empty:
-                if log:
-                    self._repository.append_revisions(revisions)
-                issues += self._revision_issues(instrument, revisions, "bars")
-            merged = merge_with_policy(
-                stored,
-                incoming,
-                self._accepted_revisions,
-                table="bars",
-                key_column="session_date",
-                value_columns=BAR_VALUE_COLUMNS,
-            )
-            self._repository.save_bars(instrument.id, merged)
-        checked, checked_issues = self._checked_series(instrument, merged, frames, check_frames)
+        checked, checked_issues = self._checked_series(instrument, canonical, frames)
         self._repository.save_checked_bars(instrument.id, checked)
         return issues + checked_issues
+
+    def _merge_source(
+        self,
+        instrument: Instrument,
+        source_id: str,
+        incoming: pd.DataFrame | None,
+        *,
+        fetch_id: str,
+        checked_at: datetime,
+        log: bool,
+        issues: list[ValidationIssue],
+    ) -> pd.DataFrame:
+        """Merge one source's bars into its canonical series and store it.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Instrument concerned.
+        source_id : str
+            Source whose series this is.
+        incoming : pd.DataFrame | None
+            What this fetch brought from it, ``None`` when it brought nothing.
+        fetch_id : str
+            Fetch that produced ``incoming``.
+        checked_at : datetime
+            Instant recorded in the revision log.
+        log : bool
+            Whether to append detected revisions to the log.
+        issues : list[ValidationIssue]
+            Appended to, one ``VALUE_REVISED`` per changed field.
+
+        Returns
+        -------
+        pd.DataFrame
+            The source's canonical series after the merge.
+        """
+        primary = source_id == instrument.primary_source
+        stored = (
+            self._repository.load_bars(instrument.id)
+            if primary
+            else self._repository.load_check_bars(instrument.id, source_id)
+        )
+        if incoming is None or incoming.empty:
+            return stored
+        revisions = detect_revisions(
+            stored,
+            incoming,
+            table="bars",
+            key_column="session_date",
+            value_columns=BAR_VALUE_COLUMNS,
+            new_fetch_id=fetch_id,
+            detected_at_utc=checked_at,
+        )
+        if not revisions.empty:
+            if log:
+                self._repository.append_revisions(revisions)
+            issues += self._revision_issues(instrument, revisions, "bars")
+        merged = merge_with_policy(
+            stored,
+            incoming,
+            self._accepted_revisions,
+            table="bars",
+            key_column="session_date",
+            value_columns=BAR_VALUE_COLUMNS,
+        )
+        if primary:
+            self._repository.save_bars(instrument.id, merged)
+        else:
+            self._repository.save_check_bars(instrument.id, source_id, merged)
+        return merged
 
     def _promote_levels(
         self,
@@ -1187,9 +1219,8 @@ class MarketDataUpdater:
     def _checked_series(
         self,
         instrument: Instrument,
-        merged: pd.DataFrame,
+        canonical: Mapping[str, pd.DataFrame],
         frames: Mapping[str, pd.DataFrame],
-        check_frames: Mapping[str, pd.DataFrame],
     ) -> tuple[pd.DataFrame, list[ValidationIssue]]:
         """Rebuild the checked series over the sessions this fetch speaks about.
 
@@ -1197,18 +1228,13 @@ class MarketDataUpdater:
         ----------
         instrument : Instrument
             Instrument concerned.
-        merged : pd.DataFrame
-            The instrument's bars after the revision policy: the reference
-            source's values, which is what the checked rows must carry.
+        canonical : Mapping[str, pd.DataFrame]
+            Each source's stored series after the revision policy. They are what
+            a session is judged **with**, primary source included, so the
+            verdict follows the values the layer actually stands behind.
         frames : Mapping[str, pd.DataFrame]
             Canonical bars per source for this fetch. They decide **which**
             sessions are judged again.
-        check_frames : Mapping[str, pd.DataFrame]
-            Canonical bars per source to judge **with**. The same frames on the
-            live path, where every source is fetched at once; on a replay, every
-            source seen so far, so that rebuilding one archived fetch at a time
-            reaches the same verdicts as the fetch that downloaded them
-            together.
 
         Returns
         -------
@@ -1222,7 +1248,12 @@ class MarketDataUpdater:
         when it has no verdict yet. Everything else keeps the verdict it was
         given, so a past cross-check outcome never moves because of data about
         another day.
+
+        Judging from storage rather than from the fetch is what makes a replay
+        of the archive reach the verdicts of the live run: one fetch at a time
+        or every source at once, both read the same canonical series.
         """
+        merged = canonical[instrument.primary_source]
         stored = self._repository.load_checked_bars(instrument.id)
         previous = {
             row["session_date"]: (row["check_status"], row["conflicting_fields"])
@@ -1233,13 +1264,13 @@ class MarketDataUpdater:
             judged |= set(frame["session_date"])
         judged |= set(merged["session_date"]) - set(previous)
         to_judge = sorted(judged)
+        # Every source, empty ones included: a check source that has never
+        # answered leaves its sessions SINGLE_SOURCE, and the reference source
+        # has to be there even when this fetch brought it nothing.
         judge_frames = {
-            instrument.primary_source: merged.loc[merged["session_date"].isin(to_judge)]
+            source_id: frame.loc[frame["session_date"].isin(to_judge)]
+            for source_id, frame in canonical.items()
         }
-        for source_id, frame in check_frames.items():
-            if source_id == instrument.primary_source:
-                continue
-            judge_frames[source_id] = frame.loc[frame["session_date"].isin(to_judge)]
         fresh = cross_check_bars(
             instrument.id,
             judge_frames,
@@ -1288,6 +1319,7 @@ class MarketDataUpdater:
         """Return whether one detected revision was reviewed into the policy."""
         return self._accepted_revisions.is_accepted(
             instrument.id,
+            str(row["source"]),
             table,
             row["observation_date"],
             str(row["field"]),
@@ -1435,6 +1467,12 @@ class MarketDataUpdater:
         if instrument.data_type is DataType.BAR:
             if not self._repository.load_bars(instrument.id).empty:
                 self._repository.save_bars(instrument.id, BARS_SCHEMA.empty_table().to_pandas())
+            for check in instrument.check_sources:
+                stored = self._repository.load_check_bars(instrument.id, check.source)
+                if not stored.empty:
+                    self._repository.save_check_bars(
+                        instrument.id, check.source, BARS_SCHEMA.empty_table().to_pandas()
+                    )
             checked = self._repository.load_checked_bars(instrument.id)
             if not checked.empty:
                 self._repository.save_checked_bars(instrument.id, checked.iloc[0:0])

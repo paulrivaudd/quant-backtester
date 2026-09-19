@@ -707,6 +707,7 @@ def test_accepted_revision_is_applied(
         [
             AcceptedRevision(
                 instrument_id="ETF_EU",
+                source="YAHOO",
                 table="bars",
                 observation_date=TUESDAY,
                 field="close",
@@ -813,6 +814,7 @@ def test_an_acceptance_covers_one_correction_and_not_the_next(
         [
             AcceptedRevision(
                 instrument_id="ETF_EU",
+                source="YAHOO",
                 table="bars",
                 observation_date=TUESDAY,
                 field="close",
@@ -841,35 +843,82 @@ def test_an_acceptance_covers_one_correction_and_not_the_next(
     assert "VALUE_REVISED" in codes(report)
 
 
-def test_a_verdict_change_is_reported(
+def test_a_check_source_restating_the_past_is_logged_and_ignored(
     repository: MarketDataRepository,
     calendars: CalendarRegistry,
     clock: Clock,
 ) -> None:
-    """A check source arriving late may downgrade a session, and must say so."""
-    instrument = Instrument(
-        id="ETF_EU",
-        name="Paris ETF",
-        asset_type=AssetType.ETF,
-        data_type=DataType.BAR,
-        currency="EUR",
-        primary_source="YAHOO",
-        source_symbol="CW8.PA",
-        tradable=True,
-        calendar_id="XPAR",
-        first_session=MONDAY,
-        check_sources=(CheckSource(source="EURONEXT", source_symbol="LU-XPAR"),),
-    )
+    """A second opinion follows the same policy as the series it checks.
+
+    Euronext arriving late with a different value for an old session used to
+    flip that session from CONFIRMED to CONFLICT on the spot, while a replay of
+    the same archive kept the first value and rebuilt CONFIRMED: the live clean
+    layer and the rebuilt one disagreed, which is the one property the module
+    exists to guarantee. A check source now has a canonical series of its own,
+    and a restatement of it is logged and ignored like any other.
+    """
     week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
     disagreeing = week.copy()
     disagreeing.loc[2, ["open", "high", "low", "close"]] = 90.0
     euronext = FakeSource("EURONEXT", clock, rows={"ETF_EU": week.copy()})
     updater = build_updater(
         repository,
-        InstrumentRegistry([instrument]),
+        InstrumentRegistry([two_source_etf()]),
         calendars,
         {"YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}), "EURONEXT": euronext},
         clock,
+    )
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    assert verdicts_of(repository, "ETF_EU")[WEDNESDAY] == CheckStatus.CONFIRMED.value
+    euronext.rows["ETF_EU"] = disagreeing
+
+    report = updater.update("ETF_EU")
+
+    assert "VALUE_REVISED" in codes(report)
+    assert "CHECK_STATUS_CHANGED" not in codes(report)
+    assert verdicts_of(repository, "ETF_EU")[WEDNESDAY] == CheckStatus.CONFIRMED.value
+    # And the log says which provider changed its mind, not just that one did.
+    revisions = repository.load_revisions()
+    assert set(revisions["source"]) == {"EURONEXT"}
+
+
+def test_an_accepted_restatement_of_a_check_source_does_move_the_verdict(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """Ignored by default is not ignored for ever: the decision is reviewable."""
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    disagreeing = week.copy()
+    disagreeing.loc[2, ["open", "high", "low", "close"]] = 90.0
+    euronext = FakeSource("EURONEXT", clock, rows={"ETF_EU": week.copy()})
+    accepted = AcceptedRevisions(
+        [
+            AcceptedRevision(
+                instrument_id="ETF_EU",
+                source="EURONEXT",
+                table="bars",
+                observation_date=WEDNESDAY,
+                field=field,
+                old_value=old,
+                new_value=90.0,
+                reason="Euronext confirmed its first print was wrong.",
+            )
+            for field, old in (
+                ("open", 102.0),
+                ("high", 103.0),
+                ("low", 101.0),
+                ("close", 102.0),
+            )
+        ]
+    )
+    updater = build_updater(
+        repository,
+        InstrumentRegistry([two_source_etf()]),
+        calendars,
+        {"YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}), "EURONEXT": euronext},
+        clock,
+        accepted,
     )
     updater.download("ETF_EU", MONDAY, FRIDAY)
     euronext.rows["ETF_EU"] = disagreeing
@@ -877,9 +926,34 @@ def test_a_verdict_change_is_reported(
     report = updater.update("ETF_EU")
 
     assert "CHECK_STATUS_CHANGED" in codes(report)
-    checked = repository.load_checked_bars("ETF_EU")
-    verdicts = dict(zip(checked["session_date"], checked["check_status"], strict=True))
-    assert verdicts[WEDNESDAY] == CheckStatus.CONFLICT.value
+    assert verdicts_of(repository, "ETF_EU")[WEDNESDAY] == CheckStatus.CONFLICT.value
+
+
+def test_live_and_rebuild_agree_after_a_check_source_restatement(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """The property the whole module is for, on the path that used to break it."""
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    disagreeing = week.copy()
+    disagreeing.loc[2, ["open", "high", "low", "close"]] = 90.0
+    euronext = FakeSource("EURONEXT", clock, rows={"ETF_EU": week.copy()})
+    updater = build_updater(
+        repository,
+        InstrumentRegistry([two_source_etf()]),
+        calendars,
+        {"YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": week}), "EURONEXT": euronext},
+        clock,
+    )
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    euronext.rows["ETF_EU"] = disagreeing
+    updater.update("ETF_EU")
+    live = _clean_bytes(repository, "ETF_EU")
+
+    updater.rebuild_clean("ETF_EU")
+
+    assert _clean_bytes(repository, "ETF_EU") == live
 
 
 def test_a_stored_corporate_action_is_never_rewritten(
@@ -1444,6 +1518,10 @@ def _clean_bytes(repository: MarketDataRepository, instrument_id: str) -> dict[s
         "checked_bars": clean / "checked_bars" / f"{instrument_id}.parquet",
         "corporate_actions": clean / "corporate_actions.parquet",
     }
+    # Each check source's own canonical series counts: it is what the verdicts
+    # are computed from, so a rebuild that reached them differently would show.
+    for path in sorted((clean / "check_bars").glob(f"*/{instrument_id}.parquet")):
+        files[f"check_bars/{path.parent.name}"] = path
     return {name: path.read_bytes() for name, path in files.items() if path.exists()}
 
 

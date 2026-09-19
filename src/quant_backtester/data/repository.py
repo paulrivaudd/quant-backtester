@@ -9,6 +9,7 @@ Layout under the market data root::
     raw/<source>/<instrument_id>/<fetch_id>.parquet   immutable, append-only
     raw/<source>/<instrument_id>/<fetch_id>.json      request manifest
     clean/bars/<instrument_id>.parquet
+    clean/check_bars/<source>/<instrument_id>.parquet  a check source's own canonical bars
     clean/checked_bars/<instrument_id>.parquet        bars cross-checked across sources
     clean/levels/<instrument_id>.parquet
     clean/corporate_actions.parquet
@@ -364,6 +365,69 @@ class MarketDataRepository:
             raise ValueError(f"Unknown check_status value(s): {', '.join(map(str, unknown))}")
         path = self.root / "clean" / "checked_bars" / f"{instrument_id}.parquet"
         write_parquet_atomic(frame, path, CHECKED_BARS_SCHEMA)
+
+    def save_check_bars(self, instrument_id: str, source_id: str, frame: pd.DataFrame) -> None:
+        """Replace one check source's canonical bars for an instrument.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument concerned.
+        source_id : str
+            Check source the rows come from.
+        frame : pd.DataFrame
+            Full canonical frame, chronologically sorted.
+
+        Raises
+        ------
+        ValueError
+            If ``frame`` does not match the bars schema, holds rows of another
+            instrument or another source, or is not sorted by ``session_date``
+            without duplicates.
+
+        Notes
+        -----
+        A second opinion is a series, not a passing remark. Kept only inside the
+        fetch that downloaded it, it escaped the revision policy that governs
+        every other stored value: a provider restating an old session changed a
+        verdict on the spot, while a replay of the same archive kept the first
+        value and rebuilt a different one. Stored, it obeys the same rule as the
+        primary series and the two paths agree by construction.
+        """
+        for field in ("instrument_id", "session_date", "source"):
+            if field not in frame.columns:
+                raise ValueError(f"Missing column {field!r} in check bars frame")
+        if not (frame["instrument_id"] == instrument_id).all():
+            raise ValueError(
+                f"Check bars frame for {instrument_id} holds rows of another instrument"
+            )
+        if not (frame["source"] == source_id).all():
+            raise ValueError(f"Check bars frame for {source_id} holds rows of another source")
+        if not (frame["session_date"].is_monotonic_increasing and frame["session_date"].is_unique):
+            raise ValueError("Check bars frame must be sorted by session_date, without duplicates")
+        write_parquet_atomic(frame, self._check_bars_path(instrument_id, source_id), BARS_SCHEMA)
+
+    def load_check_bars(self, instrument_id: str, source_id: str) -> pd.DataFrame:
+        """Load one check source's canonical bars for an instrument.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument concerned.
+        source_id : str
+            Check source concerned.
+
+        Returns
+        -------
+        pd.DataFrame
+            Its canonical bars; an empty frame with the right columns if it has
+            never served any.
+        """
+        return _load_or_empty(self._check_bars_path(instrument_id, source_id), BARS_SCHEMA)
+
+    def _check_bars_path(self, instrument_id: str, source_id: str) -> Path:
+        """Return where one check source's bars for one instrument live."""
+        return self.root / "clean" / "check_bars" / source_id / f"{instrument_id}.parquet"
 
     def load_checked_bars(
         self, instrument_id: str, start: date | None = None, end: date | None = None

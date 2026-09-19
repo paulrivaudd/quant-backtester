@@ -38,6 +38,11 @@ class AcceptedRevision:
     ----------
     instrument_id : str
         Instrument concerned.
+    source : str
+        Provider whose value moves. Each source has a canonical series of its
+        own - the primary one is what a strategy reads, a check source is the
+        second opinion - and accepting a correction on one says nothing about
+        the other.
     table : str
         ``"bars"`` or ``"levels"``.
     observation_date : date
@@ -62,6 +67,7 @@ class AcceptedRevision:
     """
 
     instrument_id: str
+    source: str
     table: str
     observation_date: date
     field: str
@@ -70,7 +76,7 @@ class AcceptedRevision:
     reason: str
 
 
-RevisionKey = tuple[str, str, date, str, float | str, float | str]
+RevisionKey = tuple[str, str, str, date, str, float | str, float | str]
 """Identity of one reviewed correction: where it applies and which move it is."""
 
 
@@ -88,15 +94,17 @@ def _key_value(value: float) -> float | str:
 
 def _revision_key(
     instrument_id: str,
+    source: str,
     table: str,
     observation_date: date,
     field: str,
     old_value: float,
     new_value: float,
 ) -> RevisionKey:
-    """Return the identity of one correction, values included."""
+    """Return the identity of one correction: whose, where, and which move."""
     return (
         instrument_id,
+        source,
         table,
         observation_date,
         field,
@@ -168,7 +176,8 @@ class AcceptedRevisions:
         for revision in revisions:
             label = (
                 f"Accepted revision of {revision.instrument_id} {revision.table}."
-                f"{revision.field} on {revision.observation_date}"
+                f"{revision.field} on {revision.observation_date} "
+                f"from {revision.source}"
             )
             if revision.table not in REVISION_TABLES:
                 raise ValueError(f"{label}: table must be one of {sorted(REVISION_TABLES)}")
@@ -187,6 +196,7 @@ class AcceptedRevisions:
                 raise ValueError(f"{label}: old_value and new_value are the same")
             key = _revision_key(
                 revision.instrument_id,
+                revision.source,
                 revision.table,
                 revision.observation_date,
                 revision.field,
@@ -261,6 +271,7 @@ class AcceptedRevisions:
             revisions.append(
                 AcceptedRevision(
                     instrument_id=entry["instrument_id"],
+                    source=entry["source"],
                     table=entry["table"],
                     observation_date=observation_date,
                     field=entry["field"],
@@ -277,6 +288,7 @@ class AcceptedRevisions:
     def is_accepted(
         self,
         instrument_id: str,
+        source: str,
         table: str,
         observation_date: date,
         field: str,
@@ -289,6 +301,8 @@ class AcceptedRevisions:
         ----------
         instrument_id : str
             Instrument concerned.
+        source : str
+            Provider whose value moves.
         table : str
             ``"bars"`` or ``"levels"``.
         observation_date : date
@@ -307,7 +321,7 @@ class AcceptedRevisions:
         -----
         Exercice 7.3 (facile).
 
-        All six parts must match exactly. Accepting the close of a session does
+        All seven parts must match exactly. Accepting the close of a session does
         not accept its open, a ``datetime`` never equals the ``date`` of a
         decision, and a correction to a different value is a different decision:
         what was reviewed was one transition, not a licence over that field.
@@ -316,10 +330,10 @@ class AcceptedRevisions:
         provider served, which is why the entry is generated from a row of
         ``clean/revisions.parquet`` rather than typed.
         """
-        return (
-            _revision_key(instrument_id, table, observation_date, field, old_value, new_value)
-            in self._keys
+        key = _revision_key(
+            instrument_id, source, table, observation_date, field, old_value, new_value
         )
+        return key in self._keys
 
 
 def _rows_by_date(frame: pd.DataFrame, key_column: str, side: str) -> dict[date, dict[str, Any]]:
@@ -530,6 +544,7 @@ def detect_revisions(
             rows.append(
                 {
                     "instrument_id": stored_row["instrument_id"],
+                    "source": stored_row["source"],
                     "table": table,
                     "observation_date": observation_date,
                     "field": field,
@@ -646,7 +661,13 @@ def merge_with_policy(
             if not _has_changed(was, now, 0.0):
                 continue
             if not accepted.is_accepted(
-                str(instrument_id), table, observation_date, field, was, now
+                str(instrument_id),
+                str(stored_row["source"]),
+                table,
+                observation_date,
+                field,
+                was,
+                now,
             ):
                 continue
             row[field] = incoming_row[field]

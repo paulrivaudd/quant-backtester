@@ -184,6 +184,7 @@ fields that could be compared, and ``NaN`` when none could be.
 REVISIONS_SCHEMA: Final = pa.schema(
     [
         pa.field("instrument_id", pa.string(), nullable=False),
+        pa.field("source", pa.string(), nullable=False),
         pa.field("table", pa.string(), nullable=False),
         pa.field("observation_date", pa.date32(), nullable=False),
         pa.field("field", pa.string(), nullable=False),
@@ -194,7 +195,12 @@ REVISIONS_SCHEMA: Final = pa.schema(
         pa.field("detected_at_utc", TIMESTAMP_UTC, nullable=False),
     ]
 )
-"""Detection log: the provider changed a value we had already stored.
+"""Detection log: a provider changed a value we had already stored.
+
+``source`` names which one. A check source has a canonical series of its own and
+the same policy applies to it, so a restatement by Euronext is logged here
+exactly like one by Yahoo - and, unaccepted, ignored exactly like one.
+
 
 This file records *what happened*; it never records what we decided. The
 decision lives in ``metadata/accepted_revisions.toml``, in git, because it

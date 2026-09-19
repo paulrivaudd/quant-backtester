@@ -805,11 +805,13 @@ def make_revision(
     instrument_id: str = "SPY",
     observation_date: date = SESSIONS[0],
     old_value: float | None = 100.0,
+    source: str = "YAHOO",
 ) -> pd.DataFrame:
     """Build one detected revision: a stored close changed by a later fetch."""
     return pd.DataFrame(
         {
             "instrument_id": [instrument_id],
+            "source": [source],
             "table": ["bars"],
             "observation_date": [observation_date],
             "field": ["close"],

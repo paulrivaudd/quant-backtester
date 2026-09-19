@@ -5,8 +5,8 @@
 # Every entry changes numbers that were already produced, which is why this
 # file is in git and requires a reason.
 #
-# An entry names the transition, not just the field: old_value and new_value
-# are part of the key. Without them, one review stood for ever - accepting
+# An entry names the source and the transition, not just the field: source,
+# old_value and new_value are part of the key. Without them, one review stood for ever - accepting
 # 6590.25 -> 6591.10 also accepted whatever that close became next, unreviewed.
 #
 # The values must match what was detected exactly, so the entry is generated
@@ -20,6 +20,7 @@
 #
 # [[revision]]
 # instrument_id = "SP500"
+# source = "YAHOO"
 # table = "bars"
 # observation_date = 2026-09-10
 # field = "close"
