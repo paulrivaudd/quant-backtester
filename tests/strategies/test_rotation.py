@@ -15,6 +15,7 @@ from datetime import date, datetime
 import pytest
 
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.base import Signal, SignalResult, build_result_frame, result_row
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.cross_sectional.rank import CrossSectionalRank
@@ -23,7 +24,7 @@ from quant_backtester.signals.price.momentum import MomentumSignal
 from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import PriceBasis, SignalStatus
 from quant_backtester.signals.windows import LoadedWindow
-from quant_backtester.strategies.rotation import TargetAllocation, TopRankRotation
+from quant_backtester.strategies.rotation import TopRankRotation
 
 
 @dataclass(frozen=True, slots=True)

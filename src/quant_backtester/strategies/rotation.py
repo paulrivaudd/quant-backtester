@@ -8,60 +8,18 @@ happened the day after the decision - because the only thing it is given is a
 :class:`~quant_backtester.signals.snapshot.SignalSnapshot`.
 
 What it does is deliberately thin. Read a ranking, keep the top few, weight them
-equally. Everything a portfolio layer exists for - risk parity, a turnover
-budget, a cap per position - is absent, and belongs there rather than here.
+equally. A cap per position, a gross limit, a turnover budget: those are the
+portfolio layer's, and they are applied to what comes out of here rather than
+folded into it, so that a report can say what each of them cost.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
-from types import MappingProxyType
 
+from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import SignalStatus
-
-
-@dataclass(frozen=True, slots=True)
-class TargetAllocation:
-    """What a strategy wants to hold at one decision instant.
-
-    Attributes
-    ----------
-    as_of : datetime
-        The decision this allocation answers. The same instant as the snapshot
-        it was read from, so an allocation cannot be mistaken for another day's.
-    weights : Mapping[str, float]
-        Fraction of capital per instrument. It may sum to less than one: what
-        is not allocated is not invested.
-    selected : tuple[str, ...]
-        The instruments held, best first.
-    considered : int
-        How many instruments had a usable rank to be chosen among. A selection
-        of two out of nine and a selection of two out of two are not the same
-        decision, and only this number tells them apart.
-    skipped : Mapping[str, SignalStatus]
-        Why each instrument of the universe was not eligible. Not listed yet,
-        no history yet, a session missing, a value too old: a strategy that
-        holds nothing today should be able to say which of those it was.
-    """
-
-    as_of: datetime
-    weights: Mapping[str, float]
-    selected: tuple[str, ...]
-    considered: int
-    skipped: Mapping[str, SignalStatus]
-
-    def __post_init__(self) -> None:
-        """Freeze the two mappings, so an allocation cannot be edited after the fact."""
-        object.__setattr__(self, "weights", MappingProxyType(dict(self.weights)))
-        object.__setattr__(self, "skipped", MappingProxyType(dict(self.skipped)))
-
-    @property
-    def invested(self) -> float:
-        """Return the fraction of capital this allocation puts to work."""
-        return sum(self.weights.values())
 
 
 @dataclass(frozen=True, slots=True)

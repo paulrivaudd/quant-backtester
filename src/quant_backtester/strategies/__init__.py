@@ -13,6 +13,6 @@ number comes with a status saying whether it can be used.
 
 from __future__ import annotations
 
-from quant_backtester.strategies.rotation import TargetAllocation, TopRankRotation
+from quant_backtester.strategies.rotation import TopRankRotation
 
-__all__ = ["TargetAllocation", "TopRankRotation"]
+__all__ = ["TopRankRotation"]

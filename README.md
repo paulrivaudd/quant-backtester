@@ -16,12 +16,15 @@ window which is not what it claims to be, six signals built on it — return,
 momentum, moving-average trend, realised volatility, current drawdown and mean
 reversion — and a cross-sectional ranking over any of them.
 
-One strategy sits on top of it — hold the best-ranked instruments of a universe
-— and it is there to prove a boundary rather than to make money: it imports
+**Portfolio, execution and the event loop have minimal versions**, which is
+enough to run a strategy over time and get a curve with costs charged against
+it. One strategy sits on top — hold the best-ranked instruments of a universe —
+and it is there to prove a boundary rather than to make money: it imports
 nothing from the data layer, and takes a `SignalSnapshot` as its only argument.
 
-Portfolio construction, execution, the event loop and analytics are not written
-yet. Those packages exist with their contracts stated and nothing else.
+Analytics is not written yet. Performance and risk statistics do not belong in
+the engine, so the engine reports the two equity curves and the costs, and
+leaves the ratios to the layer that will own them.
 
 ## Design goals
 
@@ -57,9 +60,9 @@ yet. Those packages exist with their contracts stated and nothing else.
 src/quant_backtester/
     data/        providers, Parquet store, trading calendars   (done)
     signals/     information -> forecast scores                (V1 done)
-    portfolio/   forecast scores -> target positions           (to write)
-    execution/   target positions -> fills and costs           (to write)
-    backtest/    the event loop                                (to write)
+    portfolio/   forecast scores -> target positions           (minimal)
+    execution/   target positions -> fills and costs           (minimal)
+    backtest/    the event loop                                (minimal)
     analytics/   performance and risk                          (to write)
     strategies/  concrete strategies                           (one, minimal)
 tests/           mirrors the package layout
@@ -191,6 +194,50 @@ reader = MarketDataReader(
 decision = reader.at(datetime(2026, 9, 17, 23, 0, tzinfo=ZoneInfo("Europe/Paris")))
 prices = decision.history("SP500")  # nothing after the decision instant
 state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
+```
+
+## A run, end to end
+
+```python
+engine = BacktestEngine(
+    reader=reader, calendars=calendars, reference_calendar_id="XPAR",
+    signals=[momentum, CrossSectionalRank(signal_id="momentum_60d_rank", source=momentum)],
+    strategy=TopRankRotation(signal_id="momentum_60d_rank", top_n=1),
+    universe=["ETF_WORLD", "SP500"],
+    initial_cash=100_000.0,
+    limits=PositionLimits(max_weight=1.0, max_gross=1.0),
+    execution=ExecutionModel(
+        costs=CostModel(commission_rate=0.0005, minimum_commission=1.0,
+                        half_spread=0.0002, slippage_rate=0.0001),
+        minimum_trade_value=500.0,
+    ),
+    timetable=Timetable(),          # decide at 23:00 Paris, fill at 09:01 the next session
+)
+result = engine.run(date(2025, 1, 2), date(2026, 9, 17))
+```
+
+```text
+sessions      437
+gross return  +17.54%
+net return    +12.02%
+total cost     5 521   (5.52% of starting capital)
+  commission   3 451
+  market       2 070
+turnover      69.0x initial capital over 65 rebalancings
+```
+
+Five and a half points of return went to execution. A rotation that switches
+between two funds sixty-five times in twenty-one months is expensive, and that
+is the kind of fact a backtest without a cost model cannot show — which is why
+this one refuses to report a return without one.
+
+Inside a session the order is fixed, and it is what stops a strategy buying at
+the close it just read:
+
+```text
+open of session s     the target decided on s-1 is filled here
+close of session s    the portfolio is valued
+after that close      the signals run, and s+1's target is decided
 ```
 
 ## A decision, end to end
