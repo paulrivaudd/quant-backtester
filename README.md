@@ -100,23 +100,28 @@ does not apply" are five different things, and a `NaN` is none of them.
 
 ```python
 from quant_backtester.signals import (
-    MomentumSignal, PriceBasis, SignalContext, SignalEngine,
+    MomentumSignal,
+    PriceBasis,
+    SignalContext,
+    SignalEngine,
 )
 
 context = SignalContext(market=decision, instruments=..., calendars=...)
 snapshot = SignalEngine().compute(
     context,
-    [MomentumSignal(
-        signal_id="momentum_60d",
-        lookback_sessions=60,
-        price_basis=PriceBasis.TOTAL_RETURN,
-    )],
+    [
+        MomentumSignal(
+            signal_id="momentum_60d",
+            lookback_sessions=60,
+            price_basis=PriceBasis.TOTAL_RETURN,
+        )
+    ],
     ["ETF_WORLD", "SP500"],
 )
 
-snapshot.value("momentum_60d", "ETF_WORLD")     # 0.0260
-snapshot.status("momentum_60d", "ETF_WORLD")    # SignalStatus.OK
-snapshot.result("momentum_60d").ok()            # the rows a strategy may use
+snapshot.value("momentum_60d", "ETF_WORLD")  # 0.0260
+snapshot.status("momentum_60d", "ETF_WORLD")  # SignalStatus.OK
+snapshot.result("momentum_60d").ok()  # the rows a strategy may use
 ```
 
 ## Getting started
