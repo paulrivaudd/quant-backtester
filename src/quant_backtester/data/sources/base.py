@@ -87,8 +87,13 @@ class RawDownload:
     retrieved_at_utc : datetime
         Timezone-aware UTC instant of the download.
     frame : pd.DataFrame
-        Exactly what the provider returned: original column names, original
-        dtypes, nothing renamed, nothing dropped.
+        The provider's response parsed, before any canonical normalisation:
+        original column names, original values, nothing renamed, nothing
+        dropped. Not the bytes it sent - the HTTP adapters read their CSV with
+        ``dtype=str`` and no missing-value conversion, so no value is lost, but
+        quoting and exact formatting are. Keeping the payload itself would make
+        the archive fully forensic; it has not been needed yet, and this
+        docstring says what is there rather than promising more.
     request : Mapping[str, object]
         Parameters sent to the provider, plus its library version. Written to
         the manifest so the response can be explained years later.

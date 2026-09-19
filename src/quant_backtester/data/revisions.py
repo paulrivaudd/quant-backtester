@@ -629,6 +629,14 @@ def merge_with_policy(
 
     A date the refetch does not reach is left alone: a shorter window is not the
     provider withdrawing history.
+
+    A row whose close was accepted while its open was not carries the incoming
+    fetch id, although one of its values still comes from the older fetch. That
+    is a deliberate choice, not an oversight: the row names the last fetch that
+    changed it, and ``clean/revisions.parquet`` keeps ``old_fetch_id`` and
+    ``new_fetch_id`` of every correction, so the exact provenance of each value
+    remains reconstructible. Per-field lineage would add a column to the schema
+    for a forensic need nothing has yet had.
     """
     if set(existing.columns) != set(incoming.columns):
         raise ValueError(

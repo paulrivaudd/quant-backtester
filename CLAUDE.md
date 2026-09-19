@@ -38,7 +38,7 @@ src/quant_backtester/
     analytics/    performance, risk, attribution, reporting
     strategies/   concrete strategies composed from the layers above
 tests/            mirrors the package layout
-data/             local Parquet cache (git-ignored)
+market_data/      metadata/ is committed; raw/, clean/ and validation/ are not
 ```
 
 Dependencies flow one way: `data -> signals -> portfolio -> execution ->
@@ -58,6 +58,12 @@ These are not preferences; a change that violates one is a bug.
 - Rolling/statistical windows must be strictly backward-looking. No centred
   windows, no full-sample normalisation, no fitting on data the decision point
   cannot see.
+- A rolling signal declares whether it needs **N expected sessions in a row** or
+  **N available observations**, and the API enforces the one it asked for.
+  `tail(N)` is not a window contract: the reader drops a session it cannot serve
+  rather than returning a `NaN`, so twenty observations may span twenty-six
+  sessions, and a twenty-day momentum computed on them is not a twenty-day
+  momentum.
 - Only the `backtest` layer advances time. Signals and portfolio code receive a
   decision timestamp and the history available at it - nothing else.
 - Provider revisions matter: prices, splits and dividends are restated. Prefer
@@ -76,7 +82,10 @@ These are not preferences; a change that violates one is a bug.
 
 ### 3. Data handling
 
-- Market data is stored locally as **Parquet** under `data/`, never committed.
+- Market data is stored locally as **Parquet** under `market_data/`, never
+  committed. Its `metadata/` is the exception: instrument registry, calendars,
+  cross-check tolerances and reviewed decisions are configuration, and a result
+  follows from committed code plus committed configuration.
 - Multiple providers are supported behind one interface. Provider-specific
   quirks (column names, adjustment conventions, symbology) are normalised
   inside the provider adapter, never leaked downstream.

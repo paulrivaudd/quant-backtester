@@ -15,16 +15,24 @@ dist/
 .mypy_cache/
 .ipynb_checkpoints/
 
-# Local market data and research output (reproducible from code + config)
+# Research output
+results/
+
+# The scaffold's local cache, kept as empty directories.
 data/**
 !data/**/
+!data/**/.gitkeep
 
-# The market data tree: metadata is committed, everything the pipeline writes is not.
+# The market data tree: metadata/ is committed configuration and MUST stay
+# tracked - it determines past results. Everything the pipeline writes is
+# derived from raw/ plus that configuration, and is never committed.
 market_data/raw/
 market_data/clean/
 market_data/validation/
-!data/**/.gitkeep
-results/
+
+# No data file is committed anywhere. Revisit the day a test needs a binary
+# fixture: it would have to be force-added, which is the right amount of
+# friction for a file nobody can read in a diff.
 *.parquet
 *.csv
 
@@ -32,9 +40,3 @@ results/
 .DS_Store
 .idea/
 .vscode/
-
-# Market data tree: raw snapshots and derived clean layer are never committed.
-# metadata/ is configuration and MUST stay tracked - it determines past results.
-market_data/raw/
-market_data/clean/
-market_data/validation/

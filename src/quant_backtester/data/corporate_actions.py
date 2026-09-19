@@ -20,6 +20,15 @@ The file lives at ``metadata/corporate_actions.toml`` and looks like::
     from_type = "SPLIT"
     to_type = "SPIN_OFF"
     reason = "GE HealthCare spin-off; Yahoo reports it as a 1.281 split"
+
+A correction is not point-in-time: it is written the day someone reviews the
+event, and applies to the whole history from then on. That costs nothing for
+price adjustment, since the factor is identical on both sides of every allowed
+pair. It would cost something to a signal: ``action_type`` read as a feature
+would carry, on a date in 2019, a classification made in 2026. **A corrected
+action type is therefore not usable as a predictive feature** until corrections
+are effective-dated - which is a change to make the day a signal wants one, not
+before.
 """
 
 from __future__ import annotations

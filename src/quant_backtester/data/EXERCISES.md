@@ -1,10 +1,18 @@
-# Market data — exercices d'implémentation
+# Market data — les exercices d'implémentation
 
-Le squelette est complet : signatures, types, schémas Parquet et docstrings font foi. Chaque corps de fonction lève `NotImplementedError("Exercice N.x")` et la section `Notes` de sa docstring contient les indications, les pièges et le test associé.
+**Tous terminés.** Le module a été construit en remplissant des corps de
+fonction qui levaient `NotImplementedError("Exercice N.x")`, chacun décrit par
+la section `Notes` de sa docstring — indications, pièges, test associé. Ces
+notes sont restées en place : elles disent pourquoi le code est ce qu'il est, et
+c'est la seule documentation de conception au niveau de la fonction.
 
-## Ordre recommandé
+Ce fichier garde l'ordre dans lequel le module a été écrit, les trois tests qui
+comptent et les trois invariants. Rien ici n'est un reste : c'est ce qu'il faut
+relire avant de toucher à la couche.
 
-Il n'est pas arbitraire : chaque étape est testable hors ligne avant que la
+## L'ordre suivi
+
+Il n'était pas arbitraire : chaque étape est testable hors ligne avant que la
 suivante ne s'appuie dessus.
 
 | # | Module | Contenu | Difficulté |
@@ -19,12 +27,12 @@ suivante ne s'appuie dessus.
 | 8 | `reader.py` | lecture point-in-time, masquage par champ | **difficile** |
 | 9 | `updater.py` | pipeline d'ingestion, rebuild | difficile |
 
-Commence par `calendars.py` malgré l'envie de commencer par Yahoo : c'est lui qui produit `open_available_at_utc` et `close_available_at_utc`. Tant qu'il est faux, tout ce qui est écrit en aval devra être réécrit — et il se teste entièrement hors ligne, sur une poignée de dates choisies.
+`calendars.py` d'abord, malgré l'envie de commencer par Yahoo : c'est lui qui produit `open_available_at_utc` et `close_available_at_utc`. Tant qu'il est faux, tout ce qui est écrit en aval doit être réécrit — et il se teste entièrement hors ligne, sur une poignée de dates choisies.
 
 ## Les trois tests qui comptent
 
-À écrire en même temps que le code, pas après. Ils sont déjà posés dans `tests/`,
-avec leur énoncé en docstring.
+Ils sont dans `tests/`, et ce sont eux qu'il faut relancer en premier après un
+changement de la couche.
 
 1. **Masquage par champ** — `tests/data/test_reader.py::test_field_masking_follows_the_session`
    À 23:00 Paris le jour *t*, le reader expose le close de *t* et refuse l'open
@@ -41,11 +49,11 @@ avec leur énoncé en docstring.
 ## Vérifications avant chaque commit
 
 ```bash
-uv run ruff check . && uv run ruff format --check . && uv run pytest
+uv run ruff check . && uv run ruff format --check . && uv run pytest && uv run pyright
 ```
 
-Les tests posés sont marqués `skip` : retire le marqueur au fur et à mesure que
-tu implémentes. Un exercice n'est terminé que lorsque son test passe.
+Aucun test n'est marqué `skip` et il ne reste aucun `NotImplementedError` : un
+exercice n'était terminé que lorsque son test passait.
 
 ## Les trois invariants à ne pas perdre de vue
 
