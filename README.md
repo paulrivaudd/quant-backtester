@@ -11,9 +11,12 @@ point-in-time reader. It ingests five instruments end to end, and deleting the
 derived layer and rebuilding it from the raw archive gives the same files byte
 for byte.
 
-The engine above it — signals, portfolio construction, execution, the event loop
-and analytics — is not written yet. Those packages exist with their contracts
-stated and nothing else.
+The **signals layer has its first version**: a window loader that refuses a
+window which is not what it claims to be, and five signals built on it — return,
+momentum, moving-average trend, realised volatility and current drawdown.
+
+Portfolio construction, execution, the event loop and analytics are not written
+yet. Those packages exist with their contracts stated and nothing else.
 
 ## Design goals
 
@@ -34,6 +37,10 @@ stated and nothing else.
   the committed configuration, and can be deleted and rebuilt identically. A
   provider changing its mind is logged and ignored until someone reviews the
   exact correction in a diff.
+- **A window of N sessions really is N sessions** — the reader drops a session
+  it cannot serve rather than returning a `NaN`, so twenty observations may span
+  twenty-six sessions. A signal declares which of the two it wants, and the
+  layer refuses the window rather than computing on the wrong one.
 - **Explicit transaction costs** — commission, spread and slippage will be
   named, configurable terms; gross and net results reported side by side.
 
@@ -42,7 +49,7 @@ stated and nothing else.
 ```
 src/quant_backtester/
     data/        providers, Parquet store, trading calendars   (done)
-    signals/     information -> forecast scores                (to write)
+    signals/     information -> forecast scores                (V1 done)
     portfolio/   forecast scores -> target positions           (to write)
     execution/   target positions -> fills and costs           (to write)
     backtest/    the event loop                                (to write)
@@ -73,6 +80,44 @@ Dependencies flow one way, left to right; a lower layer never imports a higher o
 Sources in use: Yahoo Finance (bars and corporate actions), FRED (published
 series), the ECB reference rates, and the Euronext historical export as a second
 opinion on Paris prices.
+
+## The signals layer
+
+| Module | Role |
+|---|---|
+| `types.py` | window modes, price bases, units, and the seven statuses |
+| `context.py` | what a signal may read at one instant, and nothing else |
+| `windows.py` | a window of N sessions, or the reason it is not one |
+| `base.py` | the contract, the result frame and its diagnostics |
+| `engine.py` | several signals over one decision |
+| `snapshot.py` | what a strategy receives |
+| `price/`, `risk/` | the five V1 signals |
+
+A signal never chooses its own instant, never opens a file and never repairs a
+window. Every number comes with a status, because "not listed yet", "no history
+yet", "a session is missing", "the last value is too old" and "the arithmetic
+does not apply" are five different things, and a `NaN` is none of them.
+
+```python
+from quant_backtester.signals import (
+    MomentumSignal, PriceBasis, SignalContext, SignalEngine,
+)
+
+context = SignalContext(market=decision, instruments=..., calendars=...)
+snapshot = SignalEngine().compute(
+    context,
+    [MomentumSignal(
+        signal_id="momentum_60d",
+        lookback_sessions=60,
+        price_basis=PriceBasis.TOTAL_RETURN,
+    )],
+    ["ETF_WORLD", "SP500"],
+)
+
+snapshot.value("momentum_60d", "ETF_WORLD")     # 0.0260
+snapshot.status("momentum_60d", "ETF_WORLD")    # SignalStatus.OK
+snapshot.result("momentum_60d").ok()            # the rows a strategy may use
+```
 
 ## Getting started
 
