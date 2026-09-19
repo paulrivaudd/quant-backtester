@@ -34,6 +34,35 @@ from quant_backtester.data.sources.base import RawDownload
 
 
 @dataclass(frozen=True, slots=True)
+class RejectedRows:
+    """Rows a normalizer refused to store, kept apart so none disappears in silence.
+
+    Attributes
+    ----------
+    non_session : tuple[date, ...]
+        Dates the provider sent a row for although the venue held no session
+        then. They carry no availability instant, so they cannot be stored.
+    unlisted : tuple[date, ...]
+        Dates outside the instrument's listing window. Before a fund lists, a
+        provider still serves a value - a net asset value repeated with no
+        volume - and stored as a bar it becomes a price nobody could trade.
+    unpublished : tuple[date, ...]
+        Dates whose value was not yet public when the fetch happened. A daily
+        bar downloaded mid-session is a snapshot of a price still moving;
+        stamped with the official closing instant, it would freeze an intraday
+        value as the session's canonical close.
+    """
+
+    non_session: tuple[date, ...] = ()
+    unlisted: tuple[date, ...] = ()
+    unpublished: tuple[date, ...] = ()
+
+    def __bool__(self) -> bool:
+        """Return whether anything was rejected at all."""
+        return bool(self.non_session or self.unlisted or self.unpublished)
+
+
+@dataclass(frozen=True, slots=True)
 class NormalizedData:
     """Canonical frames produced from one raw download.
 
@@ -46,16 +75,15 @@ class NormalizedData:
     corporate_actions : pd.DataFrame | None
         Rows matching
         :data:`~quant_backtester.data.schemas.CORPORATE_ACTIONS_SCHEMA`.
-    rejected_sessions : tuple[date, ...]
-        Dates the provider sent a row for although the venue held no session
-        then. They carry no availability instant, so they cannot be stored; the
-        updater reports them rather than letting them disappear.
+    rejected : RejectedRows
+        Rows the normalizer could not store, by reason. The updater reports
+        them rather than letting them disappear.
     """
 
     bars: pd.DataFrame | None = None
     levels: pd.DataFrame | None = None
     corporate_actions: pd.DataFrame | None = None
-    rejected_sessions: tuple[date, ...] = ()
+    rejected: RejectedRows = RejectedRows()
 
 
 def bar_availability(session_date: date, calendar: TradingCalendar) -> tuple[datetime, datetime]:
@@ -382,7 +410,7 @@ def _bars_frame(
     calendar: TradingCalendar,
     session_dates: Sequence[date],
     values: Mapping[str, list[float]],
-) -> tuple[pd.DataFrame, tuple[date, ...]]:
+) -> tuple[pd.DataFrame, RejectedRows]:
     """Assemble canonical bars once a provider's columns are mapped to fields.
 
     Parameters
@@ -401,14 +429,9 @@ def _bars_frame(
 
     Returns
     -------
-    pd.DataFrame
-        Bars in ``BARS_SCHEMA`` column order, in the order of ``session_dates``.
-
-    Returns
-    -------
-    tuple[pd.DataFrame, tuple[date, ...]]
-        The canonical bars, and the dates dropped because the venue held no
-        session on them.
+    tuple[pd.DataFrame, RejectedRows]
+        The canonical bars, in ``BARS_SCHEMA`` column order and in the order of
+        ``session_dates``, and the dates dropped with the reason for each.
 
     Raises
     ------
@@ -426,13 +449,40 @@ def _bars_frame(
             f"{download.source} bars of {instrument.id} repeat session(s): "
             f"{', '.join(map(str, repeated))}"
         )
-    # A bar on a day the venue did not trade cannot be given an availability
-    # instant, so it cannot be stored. It is dropped and named, never guessed
-    # at: Yahoo serves one for CW8 on 2019-12-25, a Christmas Euronext was shut.
+    # A bar is stored only once every one of its fields is knowable. Three
+    # reasons to refuse one, each named rather than guessed at:
+    #
+    #   - outside the listing window, where a provider still serves a value the
+    #     market never made: Yahoo gives CW8 74 flat net asset values before it
+    #     traded, from 2018-01-02 to 2018-04-17;
+    #   - the venue held no session, so there is no instant at which the bar
+    #     became knowable (Yahoo serves one for CW8 on 2019-12-25, a Christmas
+    #     Euronext was shut);
+    #   - the session had not closed when the fetch happened. Such a row is an
+    #     intraday snapshot; stamped with the official closing instant it would
+    #     become the session's canonical close and, stored first, win over the
+    #     real one for good.
+    #
     # Outside the calendar's coverage the calendar still raises - there we do
     # not know whether the venue traded, which is a different problem.
-    kept = [index for index, day in enumerate(session_dates) if calendar.is_open(day)]
-    rejected = tuple(day for index, day in enumerate(session_dates) if index not in set(kept))
+    kept: list[int] = []
+    non_session: list[date] = []
+    unlisted: list[date] = []
+    unpublished: list[date] = []
+    for index, day in enumerate(session_dates):
+        if not instrument.is_listed(day):
+            unlisted.append(day)
+        elif not calendar.is_open(day):
+            non_session.append(day)
+        elif bar_availability(day, calendar)[1] > download.retrieved_at_utc:
+            unpublished.append(day)
+        else:
+            kept.append(index)
+    rejected = RejectedRows(
+        non_session=tuple(non_session),
+        unlisted=tuple(unlisted),
+        unpublished=tuple(unpublished),
+    )
     days = [session_dates[index] for index in kept]
     availability = [bar_availability(day, calendar) for day in days]
     row_count = len(days)
@@ -454,7 +504,7 @@ def _levels_frame(
     rule: PublicationRule,
     observations: Mapping[date, float],
     calendar: TradingCalendar | None = None,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, RejectedRows]:
     """Assemble canonical levels, each stamped by the publication rule.
 
     Parameters
@@ -473,11 +523,33 @@ def _levels_frame(
 
     Returns
     -------
-    pd.DataFrame
-        Levels sorted by ``observation_date``, columns in ``LEVELS_SCHEMA`` order.
+    tuple[pd.DataFrame, RejectedRows]
+        Levels sorted by ``observation_date``, columns in ``LEVELS_SCHEMA``
+        order, and the observations dropped with the reason for each.
+
+    Notes
+    -----
+    A published series has no session, so only two of the three reasons apply:
+    an observation outside the listing window, and one whose release time had
+    not come when the fetch happened. FRED serves the latter - a rate for today
+    appears in the file before the lag its rule declares has elapsed.
     """
     if not observations:
-        return _empty_frame(LEVELS_SCHEMA)
+        return _empty_frame(LEVELS_SCHEMA), RejectedRows()
+    kept: dict[date, float] = {}
+    unlisted: list[date] = []
+    unpublished: list[date] = []
+    for day in sorted(observations):
+        if not instrument.is_listed(day):
+            unlisted.append(day)
+        elif rule.available_at(day, calendar) > download.retrieved_at_utc:
+            unpublished.append(day)
+        else:
+            kept[day] = observations[day]
+    rejected = RejectedRows(unlisted=tuple(unlisted), unpublished=tuple(unpublished))
+    observations = kept
+    if not observations:
+        return _empty_frame(LEVELS_SCHEMA), rejected
     dates = sorted(observations)
     columns: dict[str, object] = {
         "instrument_id": [instrument.id] * len(dates),
@@ -487,12 +559,12 @@ def _levels_frame(
         "source": [download.source] * len(dates),
         "source_fetch_id": [download.fetch_id] * len(dates),
     }
-    return pd.DataFrame(columns, columns=list(LEVELS_SCHEMA.names))
+    return pd.DataFrame(columns, columns=list(LEVELS_SCHEMA.names)), rejected
 
 
 def _normalize_yahoo_bars(
     instrument: Instrument, download: RawDownload, calendar: TradingCalendar
-) -> tuple[pd.DataFrame, tuple[date, ...]]:
+) -> tuple[pd.DataFrame, RejectedRows]:
     """Turn a raw Yahoo ``history`` frame into rows of ``BARS_SCHEMA``.
 
     Parameters
@@ -520,7 +592,7 @@ def _normalize_yahoo_bars(
     """
     raw = download.frame
     if raw.empty:
-        return _empty_frame(BARS_SCHEMA), ()
+        return _empty_frame(BARS_SCHEMA), RejectedRows()
     missing = sorted(set(YAHOO_BAR_COLUMNS) - set(raw.columns))
     if missing:
         raise ValueError(f"Yahoo bars of {instrument.id} lack column(s): {', '.join(missing)}")
@@ -564,7 +636,7 @@ def _later_split_factor(position: int, ex_dates: Sequence[date], splits: Sequenc
 
 def _normalize_yahoo_actions(
     instrument: Instrument, download: RawDownload, calendar: TradingCalendar
-) -> tuple[pd.DataFrame, tuple[date, ...]]:
+) -> tuple[pd.DataFrame, RejectedRows]:
     """Turn a raw Yahoo ``actions`` frame into rows of ``CORPORATE_ACTIONS_SCHEMA``.
 
     Yahoo sends the whole history (``period="max"``): only ex-dates inside the
@@ -605,7 +677,7 @@ def _normalize_yahoo_actions(
     """
     raw = download.frame
     if raw.empty:
-        return _empty_frame(CORPORATE_ACTIONS_SCHEMA), ()
+        return _empty_frame(CORPORATE_ACTIONS_SCHEMA), RejectedRows()
     if not any(column in raw.columns for column in YAHOO_ACTION_COLUMNS):
         raise ValueError(
             f"Yahoo actions of {instrument.id} have none of the columns "
@@ -613,7 +685,9 @@ def _normalize_yahoo_actions(
         )
     start = _requested_date(download, "start")
     end = _requested_date(download, "end_inclusive")
-    rejected: list[date] = []
+    non_session: list[date] = []
+    unlisted: list[date] = []
+    unpublished: list[date] = []
     ex_dates = _session_dates(raw.index, calendar)
     # Yahoo drops a column that never held an event: absent means zeros, not an error.
     values: dict[str, list[float]] = {
@@ -644,14 +718,24 @@ def _normalize_yahoo_actions(
             events.append((action_type, value))
         if not events:
             continue
+        if not instrument.is_listed(ex_date):
+            # The instrument did not exist then: the event belongs to another
+            # history, or the provider dated it wrong.
+            unlisted.append(ex_date)
+            continue
         if not calendar.is_open(ex_date):
             # No session, no open to be adjusted at: the event cannot be dated.
-            rejected.append(ex_date)
+            non_session.append(ex_date)
             continue
         # The ex-date open is already adjusted, so the action must be known by
         # then: stamped at the close, a 4-for-1 split would show a strategy
         # trading that open a -75% gap that never happened.
         open_at, _ = bar_availability(ex_date, calendar)
+        if open_at > download.retrieved_at_utc:
+            # An announced but not yet effective event. Storing it would let a
+            # decision taken before the ex-date adjust prices for it.
+            unpublished.append(ex_date)
+            continue
         for action_type, value in events:
             rows.append(
                 {
@@ -664,14 +748,19 @@ def _normalize_yahoo_actions(
                     "source_fetch_id": download.fetch_id,
                 }
             )
+    rejected = RejectedRows(
+        non_session=tuple(non_session),
+        unlisted=tuple(unlisted),
+        unpublished=tuple(unpublished),
+    )
     if not rows:
-        return _empty_frame(CORPORATE_ACTIONS_SCHEMA), tuple(rejected)
-    return pd.DataFrame(rows, columns=list(CORPORATE_ACTIONS_SCHEMA.names)), tuple(rejected)
+        return _empty_frame(CORPORATE_ACTIONS_SCHEMA), rejected
+    return pd.DataFrame(rows, columns=list(CORPORATE_ACTIONS_SCHEMA.names)), rejected
 
 
 def _normalize_euronext_bars(
     instrument: Instrument, download: RawDownload, calendar: TradingCalendar
-) -> tuple[pd.DataFrame, tuple[date, ...]]:
+) -> tuple[pd.DataFrame, RejectedRows]:
     """Turn a raw Euronext export into rows of ``BARS_SCHEMA``.
 
     Parameters
@@ -701,7 +790,7 @@ def _normalize_euronext_bars(
     """
     raw = download.frame
     if raw.empty:
-        return _empty_frame(BARS_SCHEMA), ()
+        return _empty_frame(BARS_SCHEMA), RejectedRows()
     missing = sorted({EURONEXT_DATE_COLUMN, *EURONEXT_BAR_COLUMNS} - set(raw.columns))
     if missing:
         raise ValueError(f"Euronext bars of {instrument.id} lack column(s): {', '.join(missing)}")
@@ -815,9 +904,9 @@ class YahooNormalizer:
         # Bars and corporate actions share the YAHOO source id: the request tells them apart.
         if download.request.get("endpoint") == "actions":
             actions, rejected = _normalize_yahoo_actions(instrument, download, venue)
-            return NormalizedData(corporate_actions=actions, rejected_sessions=rejected)
+            return NormalizedData(corporate_actions=actions, rejected=rejected)
         bars, rejected = _normalize_yahoo_bars(instrument, download, venue)
-        return NormalizedData(bars=bars, rejected_sessions=rejected)
+        return NormalizedData(bars=bars, rejected=rejected)
 
 
 class EuronextNormalizer:
@@ -866,7 +955,7 @@ class EuronextNormalizer:
             "EuronextNormalizer", self.source_id, instrument, download, calendar
         )
         bars, rejected = _normalize_euronext_bars(instrument, download, venue)
-        return NormalizedData(bars=bars, rejected_sessions=rejected)
+        return NormalizedData(bars=bars, rejected=rejected)
 
 
 class FredNormalizer:
@@ -939,9 +1028,8 @@ class FredNormalizer:
                 continue
             what = f"FRED {value_column} of {instrument.id} on {observation}"
             observations[observation] = _finite_number(text, what)
-        return NormalizedData(
-            levels=_levels_frame(instrument, download, rule, observations, calendar)
-        )
+        levels, rejected = _levels_frame(instrument, download, rule, observations, calendar)
+        return NormalizedData(levels=levels, rejected=rejected)
 
 
 class EcbNormalizer:
@@ -1020,9 +1108,8 @@ class EcbNormalizer:
                 continue
             what = f"ECB {ECB_VALUE_COLUMN} of {instrument.id} on {observation}"
             observations[observation] = _finite_number(text, what)
-        return NormalizedData(
-            levels=_levels_frame(instrument, download, rule, observations, calendar)
-        )
+        levels, rejected = _levels_frame(instrument, download, rule, observations, calendar)
+        return NormalizedData(levels=levels, rejected=rejected)
 
 
 NORMALIZERS: Mapping[str, Normalizer] = {

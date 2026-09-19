@@ -9,6 +9,7 @@ rebuilds.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import BinaryIO
@@ -29,7 +30,12 @@ from quant_backtester.data.instruments import (
     InstrumentRegistry,
     PublicationRule,
 )
-from quant_backtester.data.normalizer import NormalizedData, bar_availability
+from quant_backtester.data.normalizer import (
+    NormalizedData,
+    Normalizer,
+    YahooNormalizer,
+    bar_availability,
+)
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus
 from quant_backtester.data.repository import MarketDataRepository, write_parquet_atomic
 from quant_backtester.data.revisions import AcceptedRevision, AcceptedRevisions
@@ -41,7 +47,7 @@ from quant_backtester.data.schemas import (
     CheckStatus,
 )
 from quant_backtester.data.sources.base import RawDownload, make_fetch_id
-from quant_backtester.data.updater import MarketDataUpdater
+from quant_backtester.data.updater import MarketDataUpdater, safe_end_date
 
 FIRST_TICK = datetime(2026, 3, 13, 21, 0, tzinfo=UTC)
 """Instant of the first fetch of a test. Every later one is a second apart."""
@@ -181,6 +187,31 @@ class FakeSource:
                 "end_inclusive": end.isoformat(),
             },
         )
+
+
+class YahooShapedSource(FakeSource):
+    """A provider whose frames carry Yahoo's own columns and index.
+
+    The fakes above speak the canonical shape, which is enough to exercise what
+    the updater decides. A test about what the *normalizer* refuses needs the
+    real one, and the real one only reads Yahoo's shape.
+    """
+
+    def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
+        """Return the asked range as a raw Yahoo ``history`` frame."""
+        download = super().download(instrument, start, end)
+        frame = download.frame
+        shaped = pd.DataFrame(
+            {
+                "Open": frame["open"].to_numpy(dtype="float64"),
+                "High": frame["high"].to_numpy(dtype="float64"),
+                "Low": frame["low"].to_numpy(dtype="float64"),
+                "Close": frame["close"].to_numpy(dtype="float64"),
+                "Volume": frame["volume"].to_numpy(dtype="float64"),
+            },
+            index=pd.DatetimeIndex([pd.Timestamp(day) for day in frame["date"]], name="Date"),
+        )
+        return replace(download, frame=shaped)
 
 
 class FakeNormalizer:
@@ -383,14 +414,21 @@ def build_updater(
     accepted: AcceptedRevisions | None = None,
     corrections: ActionCorrections | None = None,
     overlap_sessions: int = 5,
+    normalizers: Mapping[str, Normalizer] | None = None,
 ) -> MarketDataUpdater:
-    """Wire an updater onto the fakes."""
+    """Wire an updater onto the fakes.
+
+    ``normalizers`` defaults to the fakes; a test that needs the real refusal
+    rules passes the production normalizer instead.
+    """
     return MarketDataUpdater(
         repository=repository,
         instruments=instruments,
         calendars=calendars,
         sources=dict(sources),
-        normalizers={source_id: FakeNormalizer(source_id) for source_id in sources},
+        normalizers=dict(normalizers)
+        if normalizers is not None
+        else {source_id: FakeNormalizer(source_id) for source_id in sources},
         accepted_revisions=accepted or AcceptedRevisions([]),
         action_corrections=corrections or ActionCorrections([]),
         cross_check_policy=POLICY,
@@ -1221,6 +1259,181 @@ def _clean_bytes(repository: MarketDataRepository, instrument_id: str) -> dict[s
         "corporate_actions": clean / "corporate_actions.parquet",
     }
     return {name: path.read_bytes() for name, path in files.items() if path.exists()}
+
+
+# ---------------------------------------------------------------------------
+# 9.3 Nothing unfinished becomes canonical
+# ---------------------------------------------------------------------------
+
+
+def utc(year: int, month: int, day: int, hour: int, minute: int) -> datetime:
+    """Return a UTC-aware instant."""
+    return datetime(year, month, day, hour, minute, tzinfo=UTC)
+
+
+def bar_on(calendar_id: str) -> Instrument:
+    """Return a BAR instrument quoted on one venue."""
+    return Instrument(
+        id="IDX",
+        name="Index",
+        asset_type=AssetType.INDEX,
+        data_type=DataType.BAR,
+        currency="USD",
+        primary_source="YAHOO",
+        source_symbol="^GSPC",
+        tradable=False,
+        calendar_id=calendar_id,
+    )
+
+
+def level_with(rule: PublicationRule) -> Instrument:
+    """Return a LEVEL instrument published under ``rule``."""
+    return Instrument(
+        id="RATE",
+        name="Rate",
+        asset_type=AssetType.RATE,
+        data_type=DataType.LEVEL,
+        currency="NA",
+        primary_source="FRED",
+        source_symbol="DGS10",
+        tradable=False,
+        publication_rule=rule,
+    )
+
+
+@pytest.mark.parametrize(
+    ("now", "expected"),
+    [
+        # New York closes at 20:00 UTC in March: at 17:00 the session is running.
+        (utc(2026, 3, 13, 17, 0), THURSDAY),
+        # At the closing auction itself the bar is whole, like every other field.
+        (utc(2026, 3, 13, 20, 0), FRIDAY),
+        (utc(2026, 3, 13, 23, 59), FRIDAY),
+        # Saturday: the last closed session is still Friday's.
+        (utc(2026, 3, 14, 12, 0), FRIDAY),
+        # Half day, 27 November: New York closes at 18:00 UTC, and the session
+        # before it is 25 November - Thanksgiving falls in between.
+        (utc(2026, 11, 27, 17, 0), date(2026, 11, 25)),
+        (utc(2026, 11, 27, 18, 0), date(2026, 11, 27)),
+    ],
+    ids=["mid-session", "at-the-close", "after-the-close", "weekend", "half-day", "half-day-close"],
+)
+def test_safe_end_date_stops_at_the_last_closed_session(
+    xnys: TradingCalendar, now: datetime, expected: date
+) -> None:
+    """A bar is fetchable once its session has closed, never before."""
+    assert safe_end_date(bar_on("XNYS"), xnys, now) == expected
+
+
+def test_safe_end_date_follows_the_venue_and_not_the_utc_day(xpar: TradingCalendar) -> None:
+    """On 12 March Paris closes at 16:30 UTC and New York four hours later.
+
+    The two venues are on different sides of the US DST switch that week, which
+    is exactly when a fixed offset would put the cut in the wrong place.
+    """
+    assert safe_end_date(bar_on("XPAR"), xpar, utc(2026, 3, 12, 16, 0)) == WEDNESDAY
+    assert safe_end_date(bar_on("XPAR"), xpar, utc(2026, 3, 12, 16, 30)) == THURSDAY
+
+
+@pytest.mark.parametrize(
+    ("now", "expected"),
+    [
+        (utc(2026, 3, 13, 16, 14), THURSDAY),
+        (utc(2026, 3, 13, 16, 15), FRIDAY),
+    ],
+    ids=["before-the-release", "at-the-release"],
+)
+def test_safe_end_date_of_a_level_follows_its_publication_rule(
+    now: datetime, expected: date
+) -> None:
+    """A published value is fetchable at its release time, not at midnight."""
+    assert safe_end_date(level_with(RATE_RULE), None, now) == expected
+
+
+def test_safe_end_date_of_a_lagged_level_counts_sessions(xnys: TradingCalendar) -> None:
+    """A D+1 rule makes Thursday's value public on Friday, not on Thursday evening."""
+    rule = PublicationRule(
+        publication_time=time(20, 15),
+        timezone="UTC",
+        lag_sessions=1,
+        calendar_id="XNYS",
+    )
+    instrument = level_with(rule)
+    assert safe_end_date(instrument, xnys, utc(2026, 3, 13, 20, 14)) == WEDNESDAY
+    assert safe_end_date(instrument, xnys, utc(2026, 3, 13, 20, 15)) == THURSDAY
+
+
+def test_safe_end_date_refuses_a_naive_instant(xnys: TradingCalendar) -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        safe_end_date(bar_on("XNYS"), xnys, datetime(2026, 3, 13, 21, 0))
+
+
+def test_safe_end_date_refuses_a_bar_without_a_calendar() -> None:
+    with pytest.raises(ValueError, match="no calendar"):
+        safe_end_date(bar_on("XNYS"), None, utc(2026, 3, 13, 21, 0))
+
+
+def test_update_does_not_reach_into_a_running_session(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+) -> None:
+    """The range asked of the provider stops at the last closed session."""
+    clock = Clock(utc(2026, 3, 13, 17, 0))
+    updater = build_updater(repository, instruments, calendars, {"YAHOO": yahoo}, clock)
+
+    updater.update("IDX_US")
+
+    assert yahoo.calls[-1] == ("IDX_US", MONDAY, THURSDAY)
+    assert list(repository.load_bars("IDX_US")["session_date"]) == list(SESSIONS[:4])
+
+
+def test_a_running_session_is_refused_even_when_asked_for(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+) -> None:
+    """The bug of 18 September 2026, reproduced on the fixture week.
+
+    An update run while New York was open stored a bar whose open equalled its
+    high and whose volume was a quarter of a session's. Because a stored value
+    wins, every later refetch of the real close was logged as a revision and
+    refused, and replaying the archive kept the same partial bar. The refusal
+    therefore sits in the normalizer, where the availability instant is known,
+    so that it holds on the replay too - which is what repairs a series already
+    polluted, without anyone deciding on a value by hand.
+    """
+    clock = Clock(utc(2026, 3, 13, 17, 0))
+    source = YahooShapedSource(
+        "YAHOO",
+        clock,
+        rows={"IDX_US": raw_bars([(day, 5_000.0 + index) for index, day in enumerate(SESSIONS)])},
+    )
+    updater = build_updater(
+        repository,
+        instruments,
+        calendars,
+        {"YAHOO": source},
+        clock,
+        normalizers={"YAHOO": YahooNormalizer()},
+    )
+
+    report = updater.download("IDX_US", MONDAY, FRIDAY)
+
+    assert "NOT_YET_AVAILABLE" in codes(report)
+    assert list(repository.load_bars("IDX_US")["session_date"]) == list(SESSIONS[:4])
+
+    updater.rebuild_clean("IDX_US")
+
+    assert list(repository.load_bars("IDX_US")["session_date"]) == list(SESSIONS[:4])
+
+    # The evening brings the real bar, and nothing had to be revised.
+    clock.now = utc(2026, 3, 13, 21, 0)
+    report = updater.update("IDX_US")
+
+    assert list(repository.load_bars("IDX_US")["session_date"]) == list(SESSIONS)
+    assert "VALUE_REVISED" not in codes(report)
 
 
 # ---------------------------------------------------------------------------

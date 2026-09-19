@@ -8,6 +8,7 @@ no filesystem, no network. The calendars are the synthetic 2026 fixtures of
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
@@ -180,8 +181,14 @@ def test_bar_availability_ignores_calendar_events_after_the_session() -> None:
 
 # --- 5.2 YahooNormalizer: builders ----------------------------------------------
 
-FETCH_ID = "20260912T210311Z"
-RETRIEVED_AT = datetime(2026, 9, 12, 21, 3, 11, tzinfo=UTC)
+FETCH_ID = "20261231T230311Z"
+RETRIEVED_AT = datetime(2026, 12, 31, 23, 3, 11, tzinfo=UTC)
+"""Fetch instant of every download below: after the last session of the fixture year.
+
+The normalizer refuses a row that was not public yet when the fetch ran, so a
+test about availability stamping must download after the data existed. Dating
+the fetch at the end of 2026 keeps every fixture date published and leaves the
+guard itself to the tests that exercise it."""
 NORMALIZER = YahooNormalizer()
 
 
@@ -259,14 +266,17 @@ def yahoo_actions(rows: list[tuple[str, float, float]]) -> pd.DataFrame:
 
 
 def bars_download(
-    frame: pd.DataFrame, instrument_id: str = "US_SPY", source: str = "YAHOO"
+    frame: pd.DataFrame,
+    instrument_id: str = "US_SPY",
+    source: str = "YAHOO",
+    retrieved_at: datetime = RETRIEVED_AT,
 ) -> RawDownload:
     """Wrap a raw bars frame the way ``YahooSource.download`` does."""
     return RawDownload(
         instrument_id=instrument_id,
         source=source,
         fetch_id=FETCH_ID,
-        retrieved_at_utc=RETRIEVED_AT,
+        retrieved_at_utc=retrieved_at,
         frame=frame,
         request={
             "symbol": "SPY",
@@ -453,7 +463,7 @@ def test_yahoo_bars_on_a_holiday_are_dropped_and_named(
 
     assert normalized.bars is not None
     assert normalized.bars["session_date"].tolist() == [date(2026, 9, 4)]
-    assert normalized.rejected_sessions == (date(2026, 9, 7),)
+    assert normalized.rejected.non_session == (date(2026, 9, 7),)
 
 
 def test_yahoo_bars_outside_calendar_coverage_raise_a_coverage_error(
@@ -647,7 +657,7 @@ def test_yahoo_actions_on_a_closed_ex_date_are_dropped_and_named(
 
     assert normalized.corporate_actions is not None
     assert normalized.corporate_actions.empty
-    assert normalized.rejected_sessions == (date(2026, 9, 7),)
+    assert normalized.rejected.non_session == (date(2026, 9, 7),)
 
 
 @pytest.mark.parametrize(
@@ -981,7 +991,7 @@ def test_euronext_bars_on_a_holiday_are_dropped_and_named(
 
     assert normalized.bars is not None
     assert normalized.bars["session_date"].tolist() == [date(2026, 4, 7)]
-    assert normalized.rejected_sessions == (date(2026, 4, 6),)
+    assert normalized.rejected.non_session == (date(2026, 4, 6),)
 
 
 def test_euronext_bars_repeated_session_raises(cw8: Instrument, xpar: TradingCalendar) -> None:
@@ -1057,14 +1067,17 @@ def dgs10() -> Instrument:
 
 
 def fred_download(
-    rows: list[tuple[str, str]], value_column: str = "DGS10", source: str = "FRED"
+    rows: list[tuple[str, str]],
+    value_column: str = "DGS10",
+    source: str = "FRED",
+    retrieved_at: datetime = RETRIEVED_AT,
 ) -> RawDownload:
     """Wrap raw ``fredgraph.csv`` rows the way ``FredSource.download`` does."""
     return RawDownload(
         instrument_id="US10Y",
         source=source,
         fetch_id=FETCH_ID,
-        retrieved_at_utc=RETRIEVED_AT,
+        retrieved_at_utc=retrieved_at,
         frame=pd.DataFrame(rows, columns=["observation_date", value_column], dtype=str),
         request={"series_id": "DGS10", "start": "2024-12-23", "end_inclusive": "2024-12-27"},
     )
@@ -1388,3 +1401,97 @@ def test_every_source_of_the_committed_registry_has_a_normalizer() -> None:
     }
     assert sources <= set(NORMALIZERS)
     assert "EURONEXT" in sources
+
+
+# --- Rows a normalizer refuses to store ---------------------------------------
+#
+# Three reasons, all of them a drop plus a name, never a silent keep: outside
+# the listing window, on a day the venue was shut, or not yet public when the
+# fetch ran. The last one is what froze an intraday SP500 bar on 18 September
+# 2026, and it is the one the replay of an archive has to keep applying.
+
+
+def test_a_bar_of_a_session_still_running_is_dropped_and_named(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    """New York closes at 20:00 UTC in September; at 17:00 the bar is provisional."""
+    download = bars_download(
+        yahoo_bars(["2026-09-09", "2026-09-10"]), retrieved_at=utc(2026, 9, 10, 17, 0)
+    )
+
+    normalized = NORMALIZER.normalize(spy_etf, download, xnys)
+
+    assert normalized.bars is not None
+    assert normalized.bars["session_date"].tolist() == [date(2026, 9, 9)]
+    assert normalized.rejected.unpublished == (date(2026, 9, 10),)
+
+
+def test_a_bar_is_kept_from_the_closing_auction_on(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    """The close is available at the close, here as everywhere else."""
+    download = bars_download(yahoo_bars(["2026-09-10"]), retrieved_at=utc(2026, 9, 10, 20, 0))
+
+    normalized = NORMALIZER.normalize(spy_etf, download, xnys)
+
+    assert normalized.bars is not None
+    assert normalized.bars["session_date"].tolist() == [date(2026, 9, 10)]
+    assert not normalized.rejected
+
+
+def test_a_bar_before_the_listing_window_is_dropped_and_named(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    """A provider serves a value before a fund lists; the market never made it.
+
+    Yahoo gives CW8 74 flat net asset values from 2018-01-02 to 2018-04-17,
+    before it traded. Stored as bars they are prices nobody could have got.
+    """
+    listed = replace(spy_etf, first_session=date(2026, 9, 10))
+    download = bars_download(yahoo_bars(["2026-09-09", "2026-09-10"]))
+
+    normalized = NORMALIZER.normalize(listed, download, xnys)
+
+    assert normalized.bars is not None
+    assert normalized.bars["session_date"].tolist() == [date(2026, 9, 10)]
+    assert normalized.rejected.unlisted == (date(2026, 9, 9),)
+
+
+def test_a_level_not_yet_released_is_dropped_and_named(dgs10: Instrument) -> None:
+    """DGS10 is published at 16:15 New York: at 15:00 the file may already show it."""
+    download = fred_download(
+        [("2026-09-09", "4.10"), ("2026-09-10", "4.12")],
+        retrieved_at=utc(2026, 9, 10, 19, 0),
+    )
+
+    normalized = FRED_NORMALIZER.normalize(dgs10, download)
+
+    assert levels_of(normalized)["observation_date"].tolist() == [date(2026, 9, 9)]
+    assert normalized.rejected.unpublished == (date(2026, 9, 10),)
+
+
+def test_a_level_before_the_listing_window_is_dropped_and_named(dgs10: Instrument) -> None:
+    """A series that did not exist yet cannot have been published either."""
+    listed = replace(dgs10, first_session=date(2026, 9, 10))
+    download = fred_download([("2026-09-09", "4.10"), ("2026-09-10", "4.12")])
+
+    normalized = FRED_NORMALIZER.normalize(listed, download)
+
+    assert levels_of(normalized)["observation_date"].tolist() == [date(2026, 9, 10)]
+    assert normalized.rejected.unlisted == (date(2026, 9, 9),)
+
+
+def test_an_action_not_yet_effective_is_dropped_and_named(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    """An announced dividend is not an event a decision may adjust prices for."""
+    download = actions_download(
+        yahoo_actions([("2026-09-10", 1.5, 0.0)]), start="2026-01-01", end="2026-12-31"
+    )
+    download = replace(download, retrieved_at_utc=utc(2026, 9, 9, 21, 0))
+
+    normalized = NORMALIZER.normalize(spy_etf, download, xnys)
+
+    assert normalized.corporate_actions is not None
+    assert normalized.corporate_actions.empty
+    assert normalized.rejected.unpublished == (date(2026, 9, 10),)

@@ -29,16 +29,19 @@ given unless this fetch brings fresh rows for it, so a past cross-check outcome
 never moves on its own.
 
 Only one wall-clock read exists here, in :meth:`MarketDataUpdater.update`, to
-decide how far to fetch. Everything else is stamped with the fetch's own
+decide how far to fetch - and it decides it through :func:`safe_end_date`, so
+the hour a script happens to run at cannot turn a session still trading into a
+stored bar. Everything else is stamped with the fetch's own
 ``retrieved_at_utc``, which is what makes :meth:`MarketDataUpdater.rebuild_clean`
-able to reproduce ``clean/`` byte for byte from the archive alone.
+able to reproduce ``clean/`` byte for byte from the archive alone - and what
+makes the normalizer's refusal of an unpublished row hold on a replay too.
 """
 
 from __future__ import annotations
 
 import math
 from collections.abc import Callable, Mapping, Sequence
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Final
 
 import pandas as pd
@@ -67,6 +70,80 @@ from quant_backtester.data.validator import (
 
 BAR_VALUE_COLUMNS: Final[tuple[str, ...]] = ("open", "high", "low", "close", "volume")
 """Bar columns the revision policy governs. Availability and lineage are not values."""
+
+MAX_UNPUBLISHED_DAYS: Final[int] = 30
+"""Longest run of days walked back looking for a published observation.
+
+A same-day rule needs one step, a D+1 rule over a holiday week a handful.
+Running past it means the publication rule is wrong, not that a publisher went
+quiet for a month.
+"""
+
+
+def safe_end_date(
+    instrument: Instrument, calendar: TradingCalendar | None, now_utc: datetime
+) -> date:
+    """Return the latest observation date entirely published at ``now_utc``.
+
+    Parameters
+    ----------
+    instrument : Instrument
+        Instrument to fetch.
+    calendar : TradingCalendar | None
+        Venue calendar of a ``BAR``; for a ``LEVEL``, the calendar its
+        publication rule counts its lag on, and ``None`` for a same-day release.
+    now_utc : datetime
+        Timezone-aware instant the fetch is planned at.
+
+    Returns
+    -------
+    date
+        Last session whose close is already published, for a ``BAR``; last
+        observation date whose release time has passed, for a ``LEVEL``.
+
+    Raises
+    ------
+    ValueError
+        If ``now_utc`` is naive, a ``BAR`` has no calendar, a ``LEVEL`` has no
+        publication rule, or no published observation is found within
+        ``MAX_UNPUBLISHED_DAYS`` days.
+
+    Notes
+    -----
+    Asking a provider for today is asking for whatever it has so far. A daily
+    bar downloaded at noon is a session still running, and the pipeline would
+    stamp it with the official closing instant and store it as canonical - the
+    first value stored wins, so the real close that evening would then arrive as
+    a revision and be refused. The guard belongs here rather than in the human
+    workflow: a script run at the wrong hour must not be able to change history.
+
+    The rule mirrors availability exactly. A bar is whole at the closing
+    auction, which is what ``close_available_at_utc`` records, so the last
+    fetchable session is the last one that has closed. A published level is
+    whole at its release instant, lag included.
+    """
+    if now_utc.tzinfo is None:
+        raise ValueError(f"now_utc must be timezone-aware, got {now_utc!r}")
+    today = now_utc.astimezone(UTC).date()
+    if instrument.data_type is DataType.BAR:
+        if calendar is None:
+            raise ValueError(f"BAR instrument {instrument.id} has no calendar")
+        session = calendar.session(today)
+        while session is None or session.close_utc > now_utc:
+            session = calendar.previous_session(today if session is None else session.session_date)
+        return session.session_date
+    rule = instrument.publication_rule
+    if rule is None:
+        raise ValueError(f"LEVEL instrument {instrument.id} has no publication rule")
+    day = today
+    for _ in range(MAX_UNPUBLISHED_DAYS):
+        if rule.available_at(day, calendar) <= now_utc:
+            return day
+        day -= timedelta(days=1)
+    raise ValueError(
+        f"{instrument.id}: nothing published within {MAX_UNPUBLISHED_DAYS} days of {today}"
+    )
+
 
 LEVEL_VALUE_COLUMNS: Final[tuple[str, ...]] = ("value",)
 """The only value a level carries."""
@@ -378,7 +455,7 @@ class MarketDataUpdater:
         instrument = self._instruments.get(instrument_id)
         key_column = self._key_column(instrument)
         stored = self._stored_frame(instrument)
-        end = self._clock().astimezone(UTC).date()
+        end = safe_end_date(instrument, self._calendar_of(instrument), self._clock())
         if stored.empty:
             if instrument.first_session is None:
                 raise ValueError(
@@ -639,7 +716,7 @@ class MarketDataUpdater:
     def _rejected_issues(
         instrument: Instrument, source_id: str, data: NormalizedData
     ) -> list[ValidationIssue]:
-        """Report the rows a provider dated on a day its venue did not trade.
+        """Report the rows the normalizer refused to store, by reason.
 
         Parameters
         ----------
@@ -648,33 +725,57 @@ class MarketDataUpdater:
         source_id : str
             Source that sent them.
         data : NormalizedData
-            What the normalizer kept, and what it could not date.
+            What the normalizer kept, and what it refused.
 
         Returns
         -------
         list[ValidationIssue]
-            One ``NON_SESSION_ROW`` warning per dropped date.
+            One warning per dropped date, coded by reason.
 
         Notes
         -----
-        The row cannot be stored - there is no session, so there is no instant
-        at which it became knowable - but dropping it in silence is how a
-        provider's junk becomes invisible. Yahoo sends one for CW8 on
-        2019-12-25, a Christmas Euronext was shut. A warning rather than an
-        error: one junk day from 2019 must not stop a series from updating
-        today.
+        Warnings rather than errors, all three: a junk day from 2019, a value
+        the market had not yet made, or a bar of a session still running must
+        not stop a series from updating today. What they must not do is vanish,
+        because dropping a row in silence is how a provider's junk becomes
+        invisible.
         """
-        return [
-            _issue(
-                "NON_SESSION_ROW",
-                Severity.WARNING,
-                instrument.id,
-                day,
-                f"{source_id} sent a row for {instrument.id} on {day}, a day its venue held "
-                f"no session; it cannot be dated and was dropped",
-            )
-            for day in data.rejected_sessions
-        ]
+        rejected = data.rejected
+        return (
+            [
+                _issue(
+                    "NON_SESSION_ROW",
+                    Severity.WARNING,
+                    instrument.id,
+                    day,
+                    f"{source_id} sent a row for {instrument.id} on {day}, a day its venue held "
+                    f"no session; it cannot be dated and was dropped",
+                )
+                for day in rejected.non_session
+            ]
+            + [
+                _issue(
+                    "OUTSIDE_LISTING_WINDOW",
+                    Severity.WARNING,
+                    instrument.id,
+                    day,
+                    f"{source_id} sent a row for {instrument.id} on {day}, outside its listing "
+                    f"window; it is not a price the market made and was dropped",
+                )
+                for day in rejected.unlisted
+            ]
+            + [
+                _issue(
+                    "NOT_YET_AVAILABLE",
+                    Severity.WARNING,
+                    instrument.id,
+                    day,
+                    f"{source_id} sent a row for {instrument.id} on {day} that was not public yet "
+                    f"when the fetch ran; it would have frozen a provisional value and was dropped",
+                )
+                for day in rejected.unpublished
+            ]
+        )
 
     def _normalize(
         self, instrument: Instrument, source_id: str, download: RawDownload
