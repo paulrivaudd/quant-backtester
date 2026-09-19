@@ -38,9 +38,13 @@ class LoadedWindow:
     ----------
     status : SignalStatus
         ``OK`` when the window is what was asked for. Anything else explains
-        what was missing, and leaves the other fields empty.
+        what was missing.
     points : tuple[float, ...]
-        The observations, oldest first.
+        The observations, oldest first. On a refused window these are what
+        there was: seventeen observations where twenty-one were wanted, or the
+        twenty-one that turned out to span twenty-six sessions. A signal never
+        computes on them - the status decides that - but a diagnostic saying
+        only "not enough history" is a diagnostic nobody can act on.
     dates : tuple[date, ...]
         Their observation dates, aligned with ``points``.
     age_sessions : int | None
@@ -133,16 +137,26 @@ def load_window(
         return LoadedWindow(status=SignalStatus.STALE_INPUT, age_sessions=age)
 
     series = context.series(instrument_id, bar_field, basis)
-    if len(series) < spec.observations:
-        return LoadedWindow(status=SignalStatus.INSUFFICIENT_HISTORY, age_sessions=age)
     window = series.iloc[-spec.observations :]
     dates = tuple(window.index)
     points = tuple(float(value) for value in window.to_numpy(dtype="float64"))
+    if len(series) < spec.observations:
+        return LoadedWindow(
+            status=SignalStatus.INSUFFICIENT_HISTORY,
+            points=points,
+            dates=dates,
+            age_sessions=age,
+        )
 
     if spec.mode is WindowMode.CONSECUTIVE_SESSIONS and not _is_consecutive(
         context, instrument, dates
     ):
-        return LoadedWindow(status=SignalStatus.NON_CONSECUTIVE_HISTORY, age_sessions=age)
+        return LoadedWindow(
+            status=SignalStatus.NON_CONSECUTIVE_HISTORY,
+            points=points,
+            dates=dates,
+            age_sessions=age,
+        )
     return LoadedWindow(status=SignalStatus.OK, points=points, dates=dates, age_sessions=age)
 
 

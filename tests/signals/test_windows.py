@@ -75,11 +75,17 @@ def test_the_same_window_twice_is_the_same_window(context: SignalContext) -> Non
 
 
 def test_a_history_shorter_than_the_window_is_named(context: SignalContext) -> None:
-    """Ten sessions stored, eleven asked for: the fund has not lived long enough."""
+    """Ten sessions stored, eleven asked for: the fund has not lived long enough.
+
+    The ten it does have come back with the refusal. "Not enough history" is a
+    verdict nobody can act on; "ten of the eleven sessions asked for" tells a
+    reader whether to wait a day or to drop the instrument.
+    """
     window = load(context, observations=11)
 
     assert window.status is SignalStatus.INSUFFICIENT_HISTORY
-    assert window.points == ()
+    assert len(window.points) == 10
+    assert window.dates[-1] == date(2026, 9, 14)
 
 
 def test_an_instrument_that_did_not_exist_is_not_a_data_problem(
@@ -242,3 +248,66 @@ def test_returns_of_a_window_are_one_shorter_than_it(context: SignalContext) -> 
 
     assert len(simple) == 4
     assert simple[0] == pytest.approx(106.0 / 105.0 - 1.0)
+
+
+# --- a refused window still says what it found -------------------------------
+
+
+def test_insufficient_history_reports_what_was_available(
+    context: SignalContext, sessions: tuple[date, ...]
+) -> None:
+    """Ten of the eleven asked for, and the dates they cover.
+
+    "Not enough history" alone cannot be acted on. Ten out of eleven means
+    waiting a day; two out of eleven means dropping the instrument for months.
+    """
+    window = load(context, observations=11)
+
+    assert window.status is SignalStatus.INSUFFICIENT_HISTORY
+    assert len(window.points) == 10
+    assert window.dates == sessions
+
+
+def test_non_consecutive_history_reports_the_window_it_tried(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., object],
+    make_context: Callable[[MarketDataReader, datetime], SignalContext],
+    evening: Callable[[date], datetime],
+    prices: Callable[..., dict[date, float]],
+    sessions: tuple[date, ...],
+    xpar: TradingCalendar,
+) -> None:
+    """The five observations it found, and the six sessions they turned out to span."""
+    market = make_market(
+        {
+            "ETF_EU": make_bars(
+                "ETF_EU",
+                xpar,
+                prices(100.0, 1.0),
+                contested={date(2026, 9, 10): [BarField.CLOSE]},
+            )
+        }
+    )
+    context = make_context(market, evening(sessions[-1]))
+
+    window = load(context, observations=5)
+
+    assert window.status is SignalStatus.NON_CONSECUTIVE_HISTORY
+    assert len(window.points) == 5
+    assert window.dates[0] == date(2026, 9, 7)
+    assert window.dates[-1] == sessions[-1]
+    assert date(2026, 9, 10) not in window.dates
+
+
+def test_the_diagnostics_reach_the_result(context: SignalContext) -> None:
+    """A signal's row carries them, which is where a reader actually looks."""
+    from quant_backtester.signals.price.returns import ReturnSignal
+
+    result = ReturnSignal(
+        signal_id="return_10d", lookback_sessions=10, price_basis=PriceBasis.RAW
+    ).compute(context, ["ETF_EU"])
+    row = result.frame.loc["ETF_EU"]
+
+    assert row["status"] is SignalStatus.INSUFFICIENT_HISTORY
+    assert row["observations_used"] == 10
+    assert row["input_end_date"] == date(2026, 9, 14)

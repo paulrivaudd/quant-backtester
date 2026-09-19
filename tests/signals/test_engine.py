@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.data.schemas import BarField
 from quant_backtester.signals.base import Signal, SignalResult, build_result_frame, result_row
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine
@@ -52,7 +53,7 @@ class WrongInstant(Signal):
         return SignalResult(
             signal_id=self.signal_id,
             as_of=context.as_of + timedelta(days=1),
-            frame=build_result_frame(rows),
+            _frame=build_result_frame(rows),
             definition=self.definition(),
         )
 
@@ -149,3 +150,127 @@ def test_the_engine_does_not_advance_time(
 
     assert now.as_of != then.as_of
     assert now.value("return_4d", "ETF_EU") != then.value("return_4d", "ETF_EU")
+
+
+# --- the engine checks the answers it is given -------------------------------
+#
+# The signals here all go through one window loader and cannot get the shape
+# wrong. A fitted model, later, will build its own frame, and a row quietly
+# missing from it would leave a strategy ranking a universe it thinks is whole.
+
+
+@dataclass(frozen=True, slots=True)
+class Malformed(Signal):
+    """A signal returning a frame broken in one chosen way."""
+
+    signal_id: str
+    breakage: str
+
+    def definition(self) -> Mapping[str, object]:
+        """Return a definition naming the breakage, so two instances differ."""
+        return {"type": "Malformed", "breakage": self.breakage}
+
+    def compute(self, context: SignalContext, instrument_ids: Sequence[str]) -> SignalResult:
+        """Return a result that breaks the contract in exactly one way."""
+        names = list(instrument_ids)
+        if self.breakage == "missing-instrument":
+            names = names[:-1]
+        elif self.breakage == "extra-instrument":
+            names = [*names, "NOT_ASKED_FOR"]
+        elif self.breakage == "reordered":
+            names = list(reversed(names))
+        elif self.breakage == "duplicate-index":
+            names = [names[0], names[0]]
+        rows = {
+            name: result_row(1.0, LoadedWindow(status=SignalStatus.OK, points=(1.0,)))
+            for name in names
+        }
+        frame = build_result_frame(rows)
+        if self.breakage == "duplicate-index":
+            frame = pd.concat([frame, frame])
+        if self.breakage == "missing-column":
+            frame = frame.drop(columns=["observations_used"])
+        if self.breakage == "invalid-status":
+            frame["status"] = "OK"
+        return SignalResult(
+            signal_id=self.signal_id,
+            as_of=context.as_of,
+            _frame=frame,
+            definition=self.definition(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("breakage", "match"),
+    [
+        ("missing-instrument", "missing"),
+        ("extra-instrument", "unasked for"),
+        ("reordered", "another order"),
+    ],
+    ids=["missing-instrument", "extra-instrument", "reordered"],
+)
+def test_a_result_about_another_universe_is_refused(
+    context: SignalContext, breakage: str, match: str
+) -> None:
+    """A strategy ranks what it was handed; the universe has to be the one asked for."""
+    with pytest.raises(ValueError, match=match):
+        SignalEngine().compute(
+            context, [Malformed(signal_id="bad", breakage=breakage)], ["ETF_EU", "IDX_US"]
+        )
+
+
+@pytest.mark.parametrize(
+    ("breakage", "match"),
+    [
+        ("duplicate-index", "more than once"),
+        ("missing-column", "missing column"),
+        ("invalid-status", "not a SignalStatus"),
+    ],
+    ids=["duplicate-index", "missing-column", "invalid-status"],
+)
+def test_a_malformed_frame_is_refused_when_it_is_built(
+    context: SignalContext, breakage: str, match: str
+) -> None:
+    """Checked by SignalResult itself, so it holds outside the engine too."""
+    with pytest.raises(ValueError, match=match):
+        Malformed(signal_id="bad", breakage=breakage).compute(context, ["ETF_EU", "IDX_US"])
+
+
+def test_one_signal_cannot_mutate_the_series_the_next_one_sees(
+    context: SignalContext,
+) -> None:
+    """The cache is shared; what it hands out is not.
+
+    A signal that normalised a series in place would change what every signal
+    computed after it reads, and a snapshot would then depend on the order its
+    signals happened to be listed in.
+    """
+
+    @dataclass(frozen=True, slots=True)
+    class Vandal(Signal):
+        signal_id: str = "vandal"
+
+        def definition(self) -> Mapping[str, object]:
+            return {"type": "Vandal"}
+
+        def compute(self, context: SignalContext, instrument_ids: Sequence[str]) -> SignalResult:
+            for instrument_id in instrument_ids:
+                series = context.series(instrument_id, BarField.CLOSE, RAW)
+                series.iloc[:] = 0.0
+            rows = {
+                instrument_id: result_row(0.0, LoadedWindow(status=SignalStatus.OK, points=(1.0,)))
+                for instrument_id in instrument_ids
+            }
+            return SignalResult(
+                signal_id=self.signal_id,
+                as_of=context.as_of,
+                _frame=build_result_frame(rows),
+                definition=self.definition(),
+            )
+
+    plain = ReturnSignal(signal_id="return_4d", lookback_sessions=4, price_basis=RAW)
+    alone = plain.compute(context, ["ETF_EU"]).value("ETF_EU")
+
+    after_the_vandal = SignalEngine().compute(context, [Vandal(), plain], ["ETF_EU"])
+
+    assert after_the_vandal.value("return_4d", "ETF_EU") == alone

@@ -1,10 +1,10 @@
 """Read access to the clean layer, with look-ahead made unrepresentable.
 
-A strategy never receives a :class:`MarketDataReader`. It receives a
-:class:`PointInTimeReader`, built by the engine for one decision instant, whose
-methods take no ``as_of`` argument at all. There is therefore no expression a
-strategy can write that reads the future - the protection is structural, not a
-rule someone has to remember.
+Nothing above this layer receives a :class:`MarketDataReader`. What is handed
+out is a :class:`PointInTimeReader`, built by the engine for one decision
+instant, whose methods take no ``as_of`` argument at all. There is therefore no
+expression anyone can write against it that reads the future - the protection is
+structural, not a rule someone has to remember.
 
 The engine builds two of them per trading day, and the split falls out of
 field-level availability::
@@ -12,8 +12,16 @@ field-level availability::
     pit_decision  = reader.at(23:00 Paris, day t)     # US and EU closes of t
     pit_execution = reader.at(09:01 Paris, day t+1)   # open of t+1 only
 
-The first goes to the strategy. The second stays inside the execution layer, so
-the strategy never holds an object able to show it its own fill price.
+The first goes to the signals layer, the second to the execution layer::
+
+    pit_decision  -> SignalContext -> SignalEngine -> SignalSnapshot -> Strategy
+    pit_execution -> Execution
+
+A strategy receives the snapshot, not the reader. Holding the reader, it could
+write its own ``history(...).tail(20)`` and get twenty observations spanning
+twenty-six sessions, which is the one mistake the signals layer exists to make
+impossible. And the execution reader never leaves that layer, so a strategy
+never holds an object able to show it its own fill price.
 
 Two conventions this module is the only place to state.
 

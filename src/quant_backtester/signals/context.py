@@ -9,6 +9,13 @@ volatility over 20 and a drawdown over 60 all read the same closes of the same
 fund; reading them once per decision rather than once per signal is the only
 optimisation this layer needs, and it lives and dies with the decision, so no
 invalidation problem can outlive it.
+
+What it hands out is a copy. A shared pandas object is a shared mutable object,
+and a signal that wrote into one - to normalise it in place, say - would change
+what every signal computed after it sees, making a snapshot depend on the order
+its signals were listed in. The copy costs microseconds on a daily series and
+removes the question; the expensive part, reading the store and adjusting for
+corporate actions, still happens once.
 """
 
 from __future__ import annotations
@@ -78,7 +85,7 @@ class SignalContext:
         -------
         pd.Series
             Indexed by observation date, oldest first, truncated at the
-            decision instant. The caller must not modify it: it is shared.
+            decision instant, and the caller's own to do as it likes with.
 
         Raises
         ------
@@ -90,12 +97,11 @@ class SignalContext:
             raise ValueError(f"TOTAL_RETURN adjusts a closing series; it has no {bar_field.value}")
         key: SeriesKey = (instrument_id, bar_field.value, basis)
         cached = self._series.get(key)
-        if cached is not None:
-            return cached
-        loaded = (
-            self.market.total_return_history(instrument_id)
-            if basis is PriceBasis.TOTAL_RETURN
-            else self.market.history(instrument_id, bar_field)
-        )
-        self._series[key] = loaded
-        return loaded
+        if cached is None:
+            cached = (
+                self.market.total_return_history(instrument_id)
+                if basis is PriceBasis.TOTAL_RETURN
+                else self.market.history(instrument_id, bar_field)
+            )
+            self._series[key] = cached
+        return cached.copy(deep=True)

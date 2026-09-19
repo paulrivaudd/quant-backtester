@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
+from types import MappingProxyType
 from typing import Final
 
 import pandas as pd
@@ -43,6 +44,29 @@ says only ``NaN`` cannot tell it.
 """
 
 
+def freeze(value: object) -> object:
+    """Return a value no caller can change, mappings frozen all the way down.
+
+    Parameters
+    ----------
+    value : object
+        A definition, or one of its parts.
+
+    Returns
+    -------
+    object
+        A read-only view of a mapping, a tuple in place of a list, and anything
+        else unchanged. A definition is what a fingerprint is taken of, so a
+        caller able to edit one could make two different signals claim to be
+        the same.
+    """
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: freeze(item) for key, item in value.items()})
+    if isinstance(value, list | tuple):
+        return tuple(freeze(item) for item in value)
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class SignalResult:
     """One signal's answer for a set of instruments, at one instant.
@@ -53,30 +77,75 @@ class SignalResult:
         Identity of the signal instance that produced it.
     as_of : datetime
         Decision instant. Every row was computed with what was knowable then.
-    frame : pd.DataFrame
-        Indexed by ``instrument_id``, with :data:`RESULT_COLUMNS`.
-        Named ``frame`` and not ``values``: on a pandas object that name means
-        the raw numpy array, and this one is the whole answer, diagnostics
-        included.
+    _frame : pd.DataFrame
+        Indexed by ``instrument_id``, with :data:`RESULT_COLUMNS` and possibly
+        more. Private, and read through :attr:`frame`: a result is handed to a
+        strategy, and a pandas frame is mutable, so the object would otherwise
+        be immutable only at its surface. The underscore is the signal that
+        constructing one hands over ownership of that frame.
     definition : Mapping[str, object]
         Every parameter that changes the number, serialisable. Two runs with
-        the same definition and the same data give the same result.
+        the same definition and the same data give the same result. Frozen at
+        construction, nested mappings included.
+
+    Raises
+    ------
+    ValueError
+        If the frame does not hold the required columns, repeats an
+        instrument, or carries anything other than a :class:`SignalStatus` in
+        its status column. Checked here rather than in the engine so that it
+        holds for every result, including one a strategy builds itself.
     """
 
     signal_id: str
     as_of: datetime
-    frame: pd.DataFrame
+    _frame: pd.DataFrame
     definition: Mapping[str, object]
+
+    def __post_init__(self) -> None:
+        """Freeze the definition and refuse a frame that breaks the contract."""
+        object.__setattr__(self, "definition", freeze(self.definition))
+        frame = self._frame
+        missing = [column for column in RESULT_COLUMNS if column not in frame.columns]
+        if missing:
+            raise ValueError(f"{self.signal_id}: result is missing column(s) {', '.join(missing)}")
+        if not frame.index.is_unique:
+            repeated = sorted(frame.index[frame.index.duplicated()].unique())
+            raise ValueError(
+                f"{self.signal_id}: result holds {', '.join(map(str, repeated))} more than once"
+            )
+        wrong = [status for status in frame["status"] if not isinstance(status, SignalStatus)]
+        if wrong:
+            raise ValueError(
+                f"{self.signal_id}: result holds a status that is not a SignalStatus: {wrong[0]!r}"
+            )
+
+    @property
+    def frame(self) -> pd.DataFrame:
+        """Return the answer, diagnostics included, as a frame of the caller's own.
+
+        Returns
+        -------
+        pd.DataFrame
+            A deep copy. A strategy may add a column to it, sort it or write
+            into it without any of that reaching the result it came from, and
+            without two strategies reading the same snapshot interfering.
+        """
+        return self._frame.copy(deep=True)
 
     def value(self, instrument_id: str) -> float:
         """Return one instrument's number, ``NaN`` when it has none."""
-        return float(self.frame.loc[instrument_id, "value"])
+        return float(self._frame.loc[instrument_id, "value"])
 
     def status(self, instrument_id: str) -> SignalStatus:
         """Return why one instrument's number is what it is."""
-        status = self.frame.loc[instrument_id, "status"]
+        status = self._frame.loc[instrument_id, "status"]
         assert isinstance(status, SignalStatus)
         return status
+
+    def instruments(self) -> tuple[str, ...]:
+        """Return the instruments this result speaks about, in order."""
+        return tuple(str(name) for name in self._frame.index)
 
     def ok(self) -> pd.DataFrame:
         """Return the rows a strategy may use, dropping the ones it may not.
@@ -84,11 +153,12 @@ class SignalResult:
         Returns
         -------
         pd.DataFrame
-            The subset whose status is ``OK``. Keeping the diagnostics: a
-            caller that wants to know how many instruments it lost, and why,
-            reads ``frame`` instead.
+            The subset whose status is ``OK``, as a frame of the caller's own.
+            Keeping the diagnostics: a caller that wants to know how many
+            instruments it lost, and why, reads :attr:`frame` instead.
         """
-        return self.frame.loc[self.frame["status"] == SignalStatus.OK]
+        usable = self._frame.loc[self._frame["status"] == SignalStatus.OK]
+        return usable.copy(deep=True)
 
 
 def empty_result_frame() -> pd.DataFrame:
@@ -315,7 +385,7 @@ class Signal(ABC):
         return SignalResult(
             signal_id=self.signal_id,
             as_of=context.as_of,
-            frame=build_result_frame(rows),
+            _frame=build_result_frame(rows),
             definition=self.definition(),
         )
 

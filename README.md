@@ -24,9 +24,11 @@ yet. Those packages exist with their contracts stated and nothing else.
 - **No look-ahead bias** — every value is keyed by the time it became available,
   field by field: on a session `t` the open is knowable at the opening auction
   and the close only at the closing one.
-- **Look-ahead made unrepresentable** — a strategy never holds a reader it can
-  ask about an arbitrary date. It receives a `PointInTimeReader` fixed at one
-  decision instant, whose methods take no `as_of` argument at all.
+- **Look-ahead made unrepresentable** — nothing above the data layer holds a
+  reader it can ask about an arbitrary date. What is handed out is a
+  `PointInTimeReader` fixed at one decision instant, whose methods take no
+  `as_of` argument at all. A strategy does not even get that: it receives a
+  `SignalSnapshot`, so it cannot write its own window either.
 - **Explicit calendars** — real holidays, half days and DST, with a declared
   coverage period and an error outside it rather than an invented session. A
   signal computed after the US close trades at the following European open, and
@@ -61,6 +63,18 @@ market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
 ```
 
 Dependencies flow one way, left to right; a lower layer never imports a higher one.
+
+```text
+MarketDataReader.at(decision)  ->  SignalContext  ->  SignalEngine
+                                                           |
+                                                     SignalSnapshot
+                                                           |
+                                                       Strategy
+MarketDataReader.at(execution) ->  Execution
+```
+
+A strategy receives the snapshot, never a reader: holding one, it could write
+its own `tail(20)` and get twenty observations spanning twenty-six sessions.
 
 ## The data layer
 

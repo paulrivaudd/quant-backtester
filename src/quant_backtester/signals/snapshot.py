@@ -28,7 +28,9 @@ class SignalSnapshot:
     as_of : datetime
         The instant every result in it was computed at.
     results : Mapping[str, SignalResult]
-        One entry per signal, in the order they were computed.
+        One entry per signal, in the order they were computed. The mapping is
+        frozen, and so is each result: a strategy cannot change what it was
+        handed, neither the set of signals nor a number inside one.
     """
 
     as_of: datetime
@@ -69,7 +71,15 @@ class SignalSnapshot:
             raise KeyError(f"No signal {signal_id!r} in this snapshot; it holds: {known}") from None
 
     def values(self, signal_id: str) -> pd.DataFrame:
-        """Return one signal's frame, diagnostics included."""
+        """Return one signal's frame, diagnostics included.
+
+        Returns
+        -------
+        pd.DataFrame
+            A frame of the caller's own. Writing into it, adding a column to
+            it or sorting it changes nothing in the snapshot, so two strategies
+            reading the same one cannot interfere.
+        """
         return self.result(signal_id).frame
 
     def value(self, signal_id: str, instrument_id: str) -> float:

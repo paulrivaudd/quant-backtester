@@ -114,6 +114,6 @@ class CrossSectionalRank(Signal):
         return SignalResult(
             signal_id=self.signal_id,
             as_of=inner.as_of,
-            frame=ordered,
+            _frame=ordered,
             definition=self.definition(),
         )

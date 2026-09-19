@@ -51,7 +51,7 @@ class Fixed(Signal):
         return SignalResult(
             signal_id=self.signal_id,
             as_of=context.as_of,
-            frame=build_result_frame(rows),
+            _frame=build_result_frame(rows),
             definition=self.definition(),
         )
 
