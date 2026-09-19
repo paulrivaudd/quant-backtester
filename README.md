@@ -12,8 +12,9 @@ derived layer and rebuilding it from the raw archive gives the same files byte
 for byte.
 
 The **signals layer has its first version**: a window loader that refuses a
-window which is not what it claims to be, and five signals built on it — return,
-momentum, moving-average trend, realised volatility and current drawdown.
+window which is not what it claims to be, six signals built on it — return,
+momentum, moving-average trend, realised volatility, current drawdown and mean
+reversion — and a cross-sectional ranking over any of them.
 
 Portfolio construction, execution, the event loop and analytics are not written
 yet. Those packages exist with their contracts stated and nothing else.
@@ -91,12 +92,18 @@ opinion on Paris prices.
 | `base.py` | the contract, the result frame and its diagnostics |
 | `engine.py` | several signals over one decision |
 | `snapshot.py` | what a strategy receives |
-| `price/`, `risk/` | the five V1 signals |
+| `price/`, `risk/` | the six signals computed from one instrument's own window |
+| `cross_sectional/` | ranking those signals across a universe |
 
 A signal never chooses its own instant, never opens a file and never repairs a
 window. Every number comes with a status, because "not listed yet", "no history
 yet", "a session is missing", "the last value is too old" and "the arithmetic
 does not apply" are five different things, and a `NaN` is none of them.
+
+That is also why a ranking excludes an instrument whose own signal is not usable
+rather than putting it last: "the worst of the universe" and "we do not know"
+must not be the same number, or a strategy selling the bottom of a ranking would
+be selling the names whose data is late.
 
 ```python
 from quant_backtester.signals import (

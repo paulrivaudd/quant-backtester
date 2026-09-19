@@ -1,6 +1,6 @@
 """Every signal, in every situation where there is no number to give.
 
-The five signals share one window loader, and the formulas above test each one's
+The signals share one window loader, and the formulas above test each one's
 arithmetic. What this file pins is that none of them slips past the contract:
 whatever the formula, a fund that did not exist, a history too short, a session
 missing, a value too old and a price that breaks the arithmetic all come back
@@ -19,6 +19,7 @@ from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.schemas import BarField
 from quant_backtester.signals.base import Signal
 from quant_backtester.signals.context import SignalContext
+from quant_backtester.signals.price.mean_reversion import MeanReversionSignal
 from quant_backtester.signals.price.momentum import MomentumSignal
 from quant_backtester.signals.price.returns import ReturnSignal
 from quant_backtester.signals.price.trend import MovingAverageTrendSignal
@@ -36,8 +37,9 @@ SIGNALS: tuple[Signal, ...] = (
     MovingAverageTrendSignal(signal_id="trend_ma5", window_sessions=5, price_basis=RAW),
     RealizedVolatilitySignal(signal_id="volatility_4d", window_returns=4, price_basis=RAW),
     CurrentDrawdownSignal(signal_id="drawdown_5d", window_sessions=5, price_basis=RAW),
+    MeanReversionSignal(signal_id="reversion_4d", lookback_sessions=4, price_basis=RAW),
 )
-"""One instance of each V1 signal, every one of them needing five prices."""
+"""One instance of each signal computed from a window, all needing five prices."""
 
 IDS = [signal.signal_id for signal in SIGNALS]
 
@@ -156,7 +158,7 @@ def test_a_later_session_changes_nothing(
     sessions: tuple[date, ...],
     xpar: TradingCalendar,
 ) -> None:
-    """The look-ahead guard, for all five at once.
+    """The look-ahead guard, for all of them at once.
 
     The second archive holds one more session at a price nothing like the
     others - and, for good measure, a split that would move every adjusted
