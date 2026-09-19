@@ -25,7 +25,14 @@ primary_source = "YAHOO"
 source_symbol = "CW8.PA"
 calendar_id = "XPAR"
 tradable = true
-first_session = 2018-01-02
+# The share class listed on 18 April 2018, the first session with a real bar
+# (volume 309, an open apart from its close). Yahoo serves 74 sessions before
+# it, from 2018-01-02 to 2018-04-17, every one of them flat at a single value
+# with no volume: net asset values published before there was a market. Stored
+# as bars they were prices nobody could have traded, and the first months of any
+# momentum or volatility computed on them were fiction. The normalizer now
+# refuses a row outside this window and names it.
+first_session = 2018-04-18
 # Accumulating (C) share class: no dividend ever reaches the holder, so an empty
 # action feed is the expected state and not a provider losing them.
 distribution_policy = "ACCUMULATING"
