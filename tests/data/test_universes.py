@@ -362,6 +362,13 @@ def test_the_committed_universes_hold_together() -> None:
     universes = UniverseRegistry.from_toml(metadata / "universes.toml", instruments)
 
     rotation = universes.get("ROTATION_2")
-    assert rotation.members_at(date(2026, 9, 17)) == ("ETF_WORLD", "SP500")
-    # The world ETF's first session is in 2018; the index reaches back to 1990.
-    assert rotation.members_at(date(2010, 1, 4)) == ("SP500",)
+    assert rotation.members_at(date(2026, 9, 17)) == ("ETF_SP500_PEA", "ETF_WORLD")
+    # Both funds are PEA-eligible, both are quoted in euros, and both can be
+    # dealt at the open a decision is filled at - which is what makes them a
+    # trading universe rather than a list of things worth reading.
+    assert all(
+        instruments.get(member).tradable and instruments.get(member).currency == "EUR"
+        for member in rotation.members_at(date(2026, 9, 17))
+    )
+    # The world ETF's first session is in 2018, and the universe starts with it.
+    assert rotation.members_at(date(2015, 1, 5)) == ()

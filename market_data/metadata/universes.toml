@@ -9,17 +9,29 @@
 # until_date means "still a member". Every window is checked against the
 # instrument's own listing window when this file is read.
 
+# A trading universe holds what a book may actually hold. Every member of one
+# is checked against the registry when a run reads it: an instrument declared
+# tradable = false, or quoted in another currency than the book, is refused
+# rather than ranked, chosen and then quietly never bought. An index, a yield
+# or a volatility gauge reaches a decision through a signal of its own instead.
+
 [[universe]]
 id = "ROTATION_2"
-name = "World ETF and the S&P 500"
+name = "Two PEA funds: world and S&P 500"
 
-# Both have been there since the ETF's first session, and neither has left.
-# The rotation in the README chooses between exactly these two.
+# Both are PEA-eligible, both are quoted in euros on Euronext Paris, and both
+# can be bought at the open the decision is filled at. The rotation in the
+# README chooses between exactly these two. It used to hold the S&P 500 index
+# itself, which has an opening print and no way to buy it: the orders were
+# never sent, and the run described a strategy nobody could have followed.
 [[universe.member]]
 instrument_id = "ETF_WORLD"
 
+# The fund listed before the ETF above, but membership starts when the universe
+# does: the rotation is only a rotation once both funds have a market.
 [[universe.member]]
-instrument_id = "SP500"
+instrument_id = "ETF_SP500_PEA"
+from_date = 2018-04-18
 
 [[universe]]
 id = "MACRO_3"
