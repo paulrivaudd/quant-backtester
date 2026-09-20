@@ -8,7 +8,7 @@ be computed, and what they refuse to touch.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import date, datetime
 
 import pandas as pd
@@ -53,7 +53,7 @@ def snapshot_of(context: SignalContext, values: dict[str, float]):
         def definition(self) -> dict[str, object]:
             return {"type": "Fixed"}
 
-        def compute(self, ctx: SignalContext, instrument_ids) -> SignalResult:
+        def compute(self, context: SignalContext, instrument_ids: Sequence[str]) -> SignalResult:
             rows = {
                 name: result_row(
                     values[name],
@@ -63,7 +63,7 @@ def snapshot_of(context: SignalContext, values: dict[str, float]):
             }
             return SignalResult(
                 signal_id="score",
-                as_of=ctx.as_of,
+                as_of=context.as_of,
                 _frame=build_result_frame(rows),
                 definition=self.definition(),
             )
