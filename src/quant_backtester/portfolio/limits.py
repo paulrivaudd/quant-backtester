@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from quant_backtester.numbers import require_finite_positive
 from quant_backtester.portfolio.targets import TargetAllocation
 
 
@@ -46,9 +47,8 @@ class PositionLimits:
     def __post_init__(self) -> None:
         """Reject a limit that does not describe a fraction of capital."""
         for name, value in (("max_weight", self.max_weight), ("max_gross", self.max_gross)):
-            if isinstance(value, bool) or not isinstance(value, float | int):
-                raise ValueError(f"{name} must be a number, got {value!r}")
-            if not 0.0 < value <= 1.0:
+            require_finite_positive(value, name)
+            if value > 1.0:
                 raise ValueError(f"{name} must be in (0, 1], got {value}")
 
     def apply(self, allocation: TargetAllocation) -> TargetAllocation:

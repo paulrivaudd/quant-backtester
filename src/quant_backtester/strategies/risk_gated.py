@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from quant_backtester.numbers import require_finite
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import SignalStatus
@@ -78,10 +79,9 @@ class RiskGatedRotation:
 
     def __post_init__(self) -> None:
         """Reject a gate that cannot be applied."""
-        if isinstance(self.maximum, bool) or not isinstance(self.maximum, float | int):
-            raise ValueError(f"maximum must be a number, got {self.maximum!r}")
-        if self.maximum != self.maximum:  # NaN
-            raise ValueError("maximum must be a number, got nan")
+        # An infinite threshold is a gate that never closes, or never opens:
+        # both are a parameter written wrong rather than a decision.
+        require_finite(self.maximum, "maximum")
         if not isinstance(self.flat_when_unknown, bool):
             raise ValueError(
                 f"flat_when_unknown must be said explicitly as a boolean, got "
