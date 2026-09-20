@@ -22,6 +22,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from quant_backtester.data.calendars import TradingCalendar
+from quant_backtester.numbers import require_finite_positive
 
 
 class DataType(Enum):
@@ -214,6 +215,15 @@ class Instrument:
     tradable : bool
         Whether the execution layer may send orders on this instrument. A
         signal-only instrument (VIX, US10Y) is never tradable.
+    quantity_step : float | None
+        Smallest number of units an order may be placed for, when the venue and
+        the broker deal in whole ones. ``1.0`` for an ETF bought through a
+        retail account: the order book takes 123 shares or 124, and a backtest
+        buying 123.472 of them has allocated capital nobody could have
+        allocated - perfectly, and slightly too profitably. ``None`` means
+        fractions are dealt, which is a statement about the venue and not a
+        default to fall back on. Forbidden on an instrument that is not
+        tradable, since nothing ever sizes an order in it.
     calendar_id : str | None
         Required for ``BAR``, forbidden for ``LEVEL``.
     publication_rule : PublicationRule | None
@@ -249,6 +259,7 @@ class Instrument:
     primary_source: str
     source_symbol: str
     tradable: bool
+    quantity_step: float | None = None
     calendar_id: str | None = None
     publication_rule: PublicationRule | None = None
     first_session: date | None = None
@@ -303,6 +314,12 @@ class Instrument:
                 f"Instrument {self.id} is a {self.data_type.value}: "
                 "only BAR series are cross-checked"
             )
+        if self.quantity_step is not None:
+            require_finite_positive(self.quantity_step, f"Instrument {self.id}: quantity_step")
+            if not self.tradable:
+                raise ValueError(
+                    f"Instrument {self.id} is not tradable: a quantity_step sizes an order"
+                )
         if self.vintage_date is not None and self.data_type != DataType.LEVEL:
             raise ValueError(
                 f"Instrument {self.id} is a {self.data_type.value}: "
@@ -593,6 +610,7 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
         primary_source=table["primary_source"],
         source_symbol=table["source_symbol"],
         tradable=table["tradable"],
+        quantity_step=table.get("quantity_step"),
         calendar_id=table.get("calendar_id"),
         distribution_policy=(
             None

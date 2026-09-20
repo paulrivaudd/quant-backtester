@@ -844,3 +844,36 @@ def test_an_accumulating_policy_loads_from_the_config(tmp_path) -> None:
     registry = InstrumentRegistry.from_toml(write_toml(tmp_path, config))
 
     assert registry.get("SP500").distribution_policy is DistributionPolicy.ACCUMULATING
+
+
+def test_a_quantity_step_is_a_positive_number_of_units() -> None:
+    """A step of zero would divide by nothing; a negative one sizes no order."""
+    with pytest.raises(ValueError, match="quantity_step"):
+        make_instrument(quantity_step=0.0)
+
+
+@pytest.mark.parametrize("step", [float("nan"), float("inf")])
+def test_a_quantity_step_that_is_not_a_number_is_refused(step: float) -> None:
+    """NaN compares false against every bound and would round every order to NaN."""
+    with pytest.raises(ValueError, match="quantity_step"):
+        make_instrument(quantity_step=step)
+
+
+def test_only_something_that_can_be_ordered_has_an_order_size() -> None:
+    """An index is never sized into an order, so a lot size on it is a mistake."""
+    with pytest.raises(ValueError, match="quantity_step"):
+        make_instrument(asset_type=AssetType.INDEX, tradable=False, quantity_step=1.0)
+
+
+def test_an_instrument_deals_in_fractions_unless_it_says_otherwise() -> None:
+    """No hidden default: a lot size is a fact about a venue, declared like the rest."""
+    assert make_instrument().quantity_step is None
+
+
+def test_a_quantity_step_loads_from_the_config(tmp_path) -> None:
+    """It moves a result, so it is committed configuration like everything else."""
+    config = SAMPLE_TOML.replace("tradable = false", "tradable = true\nquantity_step = 1.0", 1)
+
+    registry = InstrumentRegistry.from_toml(write_toml(tmp_path, config))
+
+    assert registry.get("SP500").quantity_step == 1.0

@@ -19,6 +19,13 @@ can carry, and what was cut is named. The alternative - letting cash go
 negative - is a loan the model never granted and never charges for, and it
 compounds quietly in any strategy that rebalances often.
 
+An order is placed in the units the venue deals in. Where an instrument
+declares a ``quantity_step`` - one whole share for an ETF held in a retail
+account - the quantity is cut down to a multiple of it, and what the rounding
+leaves stays in cash. Fractional quantities make a backtest allocate its
+capital perfectly, which is exactly the small, systematic optimism that turns
+into a return the account never sees.
+
 Being worth something and being tradable are two different questions, and this
 layer keeps them apart. A position whose opening auction did not print still
 has a value - the book has to be worth something for the other orders to be
@@ -28,11 +35,48 @@ for everything it holds, and told separately which of them may be dealt at.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 
 from quant_backtester.execution.costs import CostModel, Side
+from quant_backtester.numbers import (
+    require_finite_non_negative,
+    require_finite_positive,
+    require_unit_fraction,
+)
 from quant_backtester.portfolio.targets import Holdings
+
+
+def _dealable_quantity(quantity: float, step: float | None) -> float:
+    """Return the part of ``quantity`` an order may actually be placed for.
+
+    Parameters
+    ----------
+    quantity : float
+        Units wanted, always positive.
+    step : float | None
+        Smallest dealable number of units, or ``None`` when the instrument is
+        dealt in fractions.
+
+    Returns
+    -------
+    float
+        The largest multiple of ``step`` at or below ``quantity``, or
+        ``quantity`` itself when there is no step. Never more than was wanted:
+        rounding an order up would buy units with money the sizing never set
+        aside, and would do it on every line of every rebalancing.
+
+    Notes
+    -----
+    The multiple is rebuilt as ``lots * step`` rather than kept as the
+    remainder of a division, so a hundred whole shares are a hundred and not
+    99.999999999999986, and a position closed in full closes to exactly zero.
+    """
+    if step is None:
+        return quantity
+    lots = math.floor(quantity / step)
+    return lots * step
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,7 +223,9 @@ class ExecutionModel:
     Raises
     ------
     ValueError
-        If ``minimum_trade_value`` is negative.
+        If ``minimum_trade_value`` is not a finite number of zero or more. A
+        threshold of ``NaN`` compares false against every order and would
+        silently send them all.
     """
 
     costs: CostModel = field(default_factory=CostModel)
@@ -187,10 +233,7 @@ class ExecutionModel:
 
     def __post_init__(self) -> None:
         """Reject a threshold that is not a value."""
-        if self.minimum_trade_value < 0:
-            raise ValueError(
-                f"minimum_trade_value must not be negative, got {self.minimum_trade_value}"
-            )
+        require_finite_non_negative(self.minimum_trade_value, "minimum_trade_value")
 
     def rebalance(
         self,
@@ -198,6 +241,7 @@ class ExecutionModel:
         weights: Mapping[str, float],
         prices: Mapping[str, float],
         tradable: Collection[str] | None = None,
+        quantity_steps: Mapping[str, float] | None = None,
     ) -> Execution:
         """Trade towards the target weights, at the given opening prices.
 
@@ -216,6 +260,12 @@ class ExecutionModel:
             all of them. A position whose opening auction did not print is
             valued at the price given here and left alone, which is not the
             same thing as being worth nothing.
+        quantity_steps : Mapping[str, float] | None
+            Smallest dealable number of units, per instrument. An instrument
+            absent from it is dealt in fractions. The rounding is always
+            downwards, in both directions: an order is never enlarged to reach
+            a round lot, because the cash to pay for the extra units was not
+            there.
 
         Returns
         -------
@@ -228,6 +278,13 @@ class ExecutionModel:
             If a position is held and no price is given for it. The equity
             cannot be computed, and sizing every other order against a guess
             about it would be worse than stopping.
+        ValueError
+            If a target weight is not a finite fraction of ``[0, 1]``. A
+            :class:`~quant_backtester.portfolio.targets.TargetAllocation`
+            already refuses one, and this layer checks again because it is the
+            layer that would turn it into a short: a negative weight is a
+            negative target quantity, and the sale that reaches it from an
+            empty position is a borrow nobody granted.
 
         Notes
         -----
@@ -247,13 +304,18 @@ class ExecutionModel:
         and a rebalancing whose result depends on the order its names happen to
         be considered in is not one anybody can reproduce.
         """
+        for instrument_id, weight in weights.items():
+            require_unit_fraction(weight, f"the target weight of {instrument_id}")
         equity = holdings.value_at(prices)
         dealable = set(prices) if tradable is None else set(tradable) & set(prices)
         wanted = set(weights) | set(holdings.quantities)
         untradable = tuple(sorted(name for name in wanted if name not in dealable))
         quantities = dict(holdings.quantities)
         cash = holdings.cash
-        orders = self._orders(equity, weights, prices, quantities, sorted(wanted & dealable))
+        steps = dict(quantity_steps or {})
+        for instrument_id, step in steps.items():
+            require_finite_positive(step, f"the quantity step of {instrument_id}")
+        orders = self._orders(equity, weights, prices, quantities, sorted(wanted & dealable), steps)
 
         fills = [self._fill(order) for order in orders if order.side is Side.SELL]
         for fill in fills:
@@ -264,7 +326,10 @@ class ExecutionModel:
         scale = self._affordable_scale(buys, cash)
         unfunded: list[str] = []
         for order in buys:
-            afforded = replace(order, quantity=order.quantity * scale)
+            afforded = replace(
+                order,
+                quantity=_dealable_quantity(order.quantity * scale, steps.get(order.instrument_id)),
+            )
             # A trimmed order of nothing is not an order, and with no declared
             # minimum it would otherwise be sent as a fill of zero units.
             if afforded.quantity == 0.0 or afforded.notional < self.minimum_trade_value:
@@ -293,6 +358,7 @@ class ExecutionModel:
         prices: Mapping[str, float],
         quantities: Mapping[str, float],
         dealable: Sequence[str],
+        steps: Mapping[str, float],
     ) -> list[_Order]:
         """Return the order each instrument needs to reach its target weight.
 
@@ -308,12 +374,16 @@ class ExecutionModel:
             What is held before the trades.
         dealable : Sequence[str]
             The instruments that may be traded, in the order to build them in.
+        steps : Mapping[str, float]
+            Smallest dealable number of units, for the instruments that have
+            one.
 
         Returns
         -------
         list[_Order]
             One per instrument that has something to do worth doing. An order
-            below the declared minimum is not one.
+            below the declared minimum is not one, and neither is one that
+            rounds down to no units at all.
         """
         orders: list[_Order] = []
         for instrument_id in dealable:
@@ -323,10 +393,13 @@ class ExecutionModel:
             if delta == 0.0:
                 continue
             side = Side.BUY if delta > 0 else Side.SELL
+            quantity = _dealable_quantity(abs(delta), steps.get(instrument_id))
+            if quantity == 0.0:
+                continue
             order = _Order(
                 instrument_id=instrument_id,
                 side=side,
-                quantity=abs(delta),
+                quantity=quantity,
                 reference_price=reference,
                 fill_price=self.costs.fill_price(side, reference),
             )
