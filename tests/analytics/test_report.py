@@ -149,6 +149,10 @@ def test_a_real_run_reports_what_execution_took(
     chasing the few units of cash the costs leave behind - so the whole bill is
     the entry, and the report's drag is exactly the distance between the two
     books the engine kept.
+
+    The entry is also cut to what the cash can carry: a target of the whole
+    book costs a thousandth more than the book is worth, so the position ends a
+    thousandth smaller and the run never borrows.
     """
     costly = ExecutionModel(
         costs=CostModel(commission_rate=0.001, half_spread=0.002), minimum_trade_value=100.0
@@ -158,13 +162,13 @@ def test_a_real_run_reports_what_execution_took(
     report = PerformanceReport.of(result, CONFIG)
 
     assert report.costs.rebalancings == 1
-    # The order is sized on the reference price - 10 000 of it - and filled two
-    # tenths of a percent above, so the broker's thousandth lands on 10 020.
-    assert report.costs.commission == pytest.approx(10.02, rel=1e-3)
+    # The ten thousand pays for the stock and the fee together: a thousandth of
+    # what is left after the fee is 9.99, not the 10.02 a full-size order would
+    # have cost with money the book did not have.
+    assert report.costs.commission == pytest.approx(10_000.0 / 1.001 * 0.001)
     assert report.costs.market_cost == pytest.approx(20.0, rel=1e-2)
-    # And the book ends every session after the entry twenty currency units
-    # short: what it overspent, borrowed, and never charged interest on.
-    assert report.quality.sessions_on_borrowed_cash == 4
+    assert report.quality.unfunded_sessions == 1
+    assert report.quality.sessions_on_borrowed_cash == 0
     assert report.costs.market_cost > 0.0
     assert report.net.total_return < report.gross.total_return
     assert report.costs.drag == pytest.approx(report.gross.total_return - report.net.total_return)

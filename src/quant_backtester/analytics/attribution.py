@@ -137,21 +137,24 @@ class RunQuality:
     sessions_with_nothing_to_choose : int
         Sessions where the strategy had no instrument with a usable signal.
         A run full of them is not a flat strategy, it is a data hole.
+    unfunded_sessions : int
+        Sessions where a purchase was cut down, or dropped, because the book
+        did not hold the cash for it. A target of a whole book costs slightly
+        more than the book is worth, so the session a strategy goes fully
+        invested on is expected to appear here; a run where most of them do is
+        a strategy asking for more than it has, session after session.
     sessions_on_borrowed_cash : int
-        Sessions the book ended with less than no cash. An order is sized on
-        the reference price and filled at a worse one, so a target of a whole
-        book overspends it by what execution charged: the difference is
-        borrowed, and nothing in the model charges interest on it. Small on one
-        entry, and not small for a strategy that rebalances every week. Counted
-        here rather than corrected, because correcting it means changing how an
-        order is sized, which is a decision about the execution model and not
-        about a report.
+        Sessions the book ended with less than no cash. The execution model
+        does not grant a loan, so this is a guard rather than a statistic: it
+        should read zero, and a run where it does not is one whose net figures
+        rest on money that was never there.
     """
 
     sessions: int
     estimated_valuations: int
     untradable_sessions: int
     sessions_with_nothing_to_choose: int
+    unfunded_sessions: int
     sessions_on_borrowed_cash: int
 
     @classmethod
@@ -173,6 +176,7 @@ class RunQuality:
             estimated_valuations=sum(1 for r in result.records if r.priced_from_earlier),
             untradable_sessions=sum(1 for r in result.records if r.untradable),
             sessions_with_nothing_to_choose=sum(1 for r in result.records if r.considered == 0),
+            unfunded_sessions=sum(1 for r in result.records if r.unfunded),
             # A hair below zero, so that floating-point dust is not an overdraft.
             sessions_on_borrowed_cash=sum(1 for r in result.records if r.cash < -_CASH_DUST),
         )

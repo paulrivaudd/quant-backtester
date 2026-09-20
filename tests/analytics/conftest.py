@@ -40,6 +40,7 @@ def make_run(
     considered: int = 2,
     cash: Sequence[float] | None = None,
     untradable: Sequence[tuple[str, ...]] | None = None,
+    unfunded: Sequence[tuple[str, ...]] | None = None,
     priced_from_earlier: Sequence[tuple[str, ...]] | None = None,
 ) -> BacktestResult:
     """Return a run whose records say exactly what the test needs them to say.
@@ -64,7 +65,7 @@ def make_run(
         session.
     cash : Sequence[float] | None
         The uninvested part per session, zero everywhere when left out.
-    untradable, priced_from_earlier : Sequence[tuple[str, ...]] | None
+    untradable, unfunded, priced_from_earlier : Sequence[tuple[str, ...]] | None
         Per session, empty everywhere when left out.
 
     Returns
@@ -89,6 +90,7 @@ def make_run(
             commission=(commission or zeros)[position],
             market_cost=(market_cost or zeros)[position],
             untradable=(untradable or nothing)[position],
+            unfunded=(unfunded or nothing)[position],
             priced_from_earlier=(priced_from_earlier or nothing)[position],
             weights={},
         )

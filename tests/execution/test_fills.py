@@ -31,12 +31,17 @@ def test_an_instrument_absent_from_the_target_is_closed() -> None:
 
 
 def test_equity_is_measured_before_this_rebalancing_s_costs() -> None:
-    """Otherwise every order would depend on the ones computed before it."""
-    model = ExecutionModel(costs=CostModel(commission_rate=0.01))
-    execution = model.rebalance(Holdings(cash=10_000.0), {"A": 1.0}, {"A": 100.0})
+    """Otherwise every order would depend on the ones computed before it.
 
-    assert execution.fills[0].quantity == pytest.approx(100.0)
-    assert execution.holdings.cash == pytest.approx(-100.0)
+    Half the book into a name at 100 is fifty units whatever the fee, because
+    the fee is paid out of the other half rather than out of the order.
+    """
+    model = ExecutionModel(costs=CostModel(commission_rate=0.01))
+
+    execution = model.rebalance(Holdings(cash=10_000.0), {"A": 0.5}, {"A": 100.0})
+
+    assert execution.fills[0].quantity == pytest.approx(50.0)
+    assert execution.holdings.cash == pytest.approx(5_000.0 - 50.0)
 
 
 def test_the_costs_are_taken_out_of_cash_and_named_apart() -> None:
@@ -125,3 +130,120 @@ def test_nothing_to_do_is_no_order_at_all() -> None:
 def test_a_negative_threshold_is_refused() -> None:
     with pytest.raises(ValueError, match="minimum_trade_value"):
         ExecutionModel(minimum_trade_value=-1.0)
+
+
+# --- an order is never paid for with money the book does not have ------------
+#
+# A target of a whole book is sized on the equity before this rebalancing's
+# costs, and the costs still have to come from somewhere. Letting cash go
+# negative would be a loan the model never granted and never charges for, and
+# in a strategy that rebalances weekly it compounds out of sight.
+
+
+def test_a_whole_book_is_bought_with_what_the_book_has() -> None:
+    """Hand-checkable: at one percent, 10 000 buys 10 000/1.01 of stock.
+
+    Ninety-nine units and a hundredth, not a hundred: the missing unit is the
+    commission, and it comes out of the position rather than out of an
+    overdraft.
+    """
+    model = ExecutionModel(costs=CostModel(commission_rate=0.01))
+
+    execution = model.rebalance(Holdings(cash=10_000.0), {"A": 1.0}, {"A": 100.0})
+
+    assert execution.fills[0].quantity == pytest.approx(10_000.0 / 101.0)
+    assert execution.holdings.cash == pytest.approx(0.0, abs=1e-9)
+    assert execution.unfunded == ("A",)
+
+
+def test_the_spread_is_paid_out_of_the_order_too() -> None:
+    """The order is sized at the reference price and done above it."""
+    model = ExecutionModel(costs=CostModel(half_spread=0.002))
+
+    execution = model.rebalance(Holdings(cash=10_000.0), {"A": 1.0}, {"A": 100.0})
+
+    assert execution.fills[0].quantity == pytest.approx(10_000.0 / 100.2)
+    assert execution.holdings.cash == pytest.approx(0.0, abs=1e-9)
+
+
+def test_a_target_that_leaves_room_for_the_costs_is_filled_whole() -> None:
+    """Nothing is cut when nothing needs to be: no trim, and nothing named."""
+    model = ExecutionModel(costs=CostModel(commission_rate=0.01))
+
+    execution = model.rebalance(Holdings(cash=10_000.0), {"A": 0.9}, {"A": 100.0})
+
+    assert execution.fills[0].quantity == pytest.approx(90.0)
+    assert execution.unfunded == ()
+    assert execution.holdings.cash == pytest.approx(1_000.0 - 90.0)
+
+
+def test_what_is_sold_pays_for_what_is_bought() -> None:
+    """The sales are done first, or a switch could not be afforded at all.
+
+    All of the book moves from A to B. Done in name order the purchase would
+    come first and find no cash; done in the right order it finds the proceeds
+    of the sale, less what the sale cost.
+    """
+    model = ExecutionModel(costs=CostModel(commission_rate=0.01))
+    before = Holdings(cash=0.0, quantities={"A": 100.0})
+
+    execution = model.rebalance(before, {"B": 1.0}, {"A": 100.0, "B": 50.0})
+
+    quantities = dict(execution.holdings.quantities)
+    assert "A" not in quantities
+    assert quantities["B"] > 0.0
+    assert execution.holdings.cash >= 0.0
+
+
+def test_the_purchases_are_cut_by_the_same_fraction() -> None:
+    """Every purchase is cut by the same fraction.
+
+    Cutting one name to the bone to leave another whole would be a decision
+    about the strategy, and this layer does not take those.
+    """
+    model = ExecutionModel(costs=CostModel(commission_rate=0.01))
+
+    execution = model.rebalance(
+        Holdings(cash=10_000.0), {"A": 0.5, "B": 0.5}, {"A": 100.0, "B": 100.0}
+    )
+
+    first, second = execution.fills
+    assert first.quantity == pytest.approx(second.quantity)
+    assert execution.holdings.cash == pytest.approx(0.0, abs=1e-9)
+    assert execution.unfunded == ("A", "B")
+
+
+def test_a_purchase_cut_below_the_threshold_is_dropped() -> None:
+    """A trimmed order that is no longer worth sending is not sent."""
+    model = ExecutionModel(costs=CostModel(commission_rate=0.5), minimum_trade_value=9_000.0)
+
+    execution = model.rebalance(Holdings(cash=10_000.0), {"A": 1.0}, {"A": 100.0})
+
+    assert execution.fills == ()
+    assert execution.unfunded == ("A",)
+    assert execution.holdings.cash == pytest.approx(10_000.0)
+
+
+def test_a_book_with_no_cash_buys_nothing() -> None:
+    """Nothing to sell, nothing to spend: the target is simply not reachable."""
+    model = ExecutionModel(costs=CostModel(commission_rate=0.01))
+    before = Holdings(cash=0.0, quantities={"A": 100.0})
+
+    execution = model.rebalance(before, {"A": 1.0, "B": 1.0}, {"A": 100.0, "B": 50.0})
+
+    assert [fill.instrument_id for fill in execution.fills] == []
+    assert execution.unfunded == ("B",)
+
+
+def test_the_commission_floor_is_carried_through_the_trim() -> None:
+    """A floor does not shrink with the order it is charged on.
+
+    Which is why the affordable size is found by bisection and not by dividing
+    through: a fee of a flat ten has to fit inside the cash as well.
+    """
+    model = ExecutionModel(costs=CostModel(minimum_commission=10.0))
+
+    execution = model.rebalance(Holdings(cash=1_000.0), {"A": 1.0}, {"A": 100.0})
+
+    assert execution.fills[0].quantity == pytest.approx(9.9)
+    assert execution.holdings.cash == pytest.approx(0.0, abs=1e-9)

@@ -175,6 +175,7 @@ class PerformanceReport:
                 f"{'sessions an order could not be sent on':<40}{quality.untradable_sessions:>6}",
                 f"{'sessions with nothing to choose from':<40}"
                 f"{quality.sessions_with_nothing_to_choose:>6}",
+                f"{'sessions a purchase was cut down on':<40}{quality.unfunded_sessions:>6}",
                 f"{'sessions ending on borrowed cash':<40}{quality.sessions_on_borrowed_cash:>6}",
             )
         )

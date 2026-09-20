@@ -139,6 +139,11 @@ class BacktestRecord:
     untradable : tuple[str, ...]
         Instruments whose opening price was not knowable, so the order was not
         sent and the position stayed as it was.
+    unfunded : tuple[str, ...]
+        Instruments whose purchase was cut down, or dropped, for want of the
+        cash to pay for it. A target of a whole book costs a little more than
+        the book is worth, and what execution charges comes out of the
+        position rather than out of a loan the model never granted.
     priced_from_earlier : tuple[str, ...]
         Held instruments valued at an older close, because none was published
         for this session. The equity is an estimate for those, and says so.
@@ -157,6 +162,7 @@ class BacktestRecord:
     commission: float
     market_cost: float
     untradable: tuple[str, ...]
+    unfunded: tuple[str, ...]
     priced_from_earlier: tuple[str, ...]
     weights: Mapping[str, float]
 
@@ -203,6 +209,7 @@ class BacktestResult:
                 "market_cost": record.market_cost,
                 "cost": record.cost,
                 "untradable": ",".join(record.untradable),
+                "unfunded": ",".join(record.unfunded),
                 "priced_from_earlier": ",".join(record.priced_from_earlier),
             }
             for record in self.records
@@ -536,6 +543,7 @@ class BacktestEngine:
             commission=execution.commission if execution else 0.0,
             market_cost=execution.market_cost if execution else 0.0,
             untradable=execution.untradable if execution else (),
+            unfunded=execution.unfunded if execution else (),
             priced_from_earlier=estimated,
             weights=dict(allocation.weights),
         )

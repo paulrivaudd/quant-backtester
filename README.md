@@ -227,26 +227,27 @@ print(report.render())
 437 sessions, 1.71 years, 255 sessions/year, risk-free 2.00%
 
                                gross         net
-total return                  17.54%      12.02%
-annualised return              9.94%       6.88%
-annualised volatility         10.16%      10.24%
-max drawdown                  -6.14%      -6.49%
-sharpe ratio                    0.79        0.50
+total return                  17.53%      12.01%
+annualised return              9.93%       6.88%
+annualised volatility         10.15%      10.23%
+max drawdown                  -6.13%      -6.49%
+sharpe ratio                    0.78        0.50
 
-costs                       5,520.96
-  commission                3,450.61
-  spread and slippage       2,070.36
+costs                       5,516.31
+  commission                3,447.70
+  spread and slippage       2,068.61
   drag on the return           5.52%
   share of gross              31.47%
   rebalancings                    65
-  per rebalancing              84.94
-  turnover                    64.90x
-  turnover a year             38.05x
+  per rebalancing              84.87
+  turnover                    64.85x
+  turnover a year             38.02x
 
 sessions valued on an older close            0
 sessions an order could not be sent on     216
 sessions with nothing to choose from        61
-sessions ending on borrowed cash           159
+sessions a purchase was cut down on         33
+sessions ending on borrowed cash             0
 ```
 
 Five and a half points of return went to execution — **a third of everything the
@@ -258,7 +259,10 @@ report a return without one.
 
 The last block is not decoration. This run holds an index alongside a fund, and
 an index has no opening auction to deal at: on 216 of its 437 sessions the
-order was not sent and the book stayed as it was. Those three lines are the
+order was not sent and the book stayed as it was. On 33 others the purchase was
+cut down, because a target of the whole book costs slightly more than the book
+is worth and execution is not allowed to borrow the difference — the last line
+reads zero, and it is a guard rather than a statistic. Those lines are the
 caveats the figures above have to be read with, and a report that left them out
 would be describing a strategy nobody could have run.
 

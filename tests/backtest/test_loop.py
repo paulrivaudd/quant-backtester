@@ -379,3 +379,35 @@ def test_a_time_carrying_its_own_offset_is_refused() -> None:
 
     with pytest.raises(ValueError, match="naive local time"):
         Timetable(decision_time=time(23, 0, tzinfo=UTC))
+
+
+def test_a_run_never_spends_cash_it_does_not_have(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """A fully invested strategy pays its costs out of the position.
+
+    The target is a whole book and the costs have to come from somewhere. A
+    book that let its cash go negative would be borrowing at no rate, every
+    session, for the length of the run - a loan the model never granted and a
+    return nobody could have earned.
+    """
+    costly = ExecutionModel(
+        costs=CostModel(commission_rate=0.001, half_spread=0.002, slippage_rate=0.001)
+    )
+
+    result = run_over(market, calendars, sessions, AlwaysHold({"ETF_EU": 1.0}), execution=costly)
+
+    for record in result.records:
+        assert record.cash >= -1e-9, f"{record.session_date} ended on borrowed cash"
+
+
+def test_a_purchase_the_cash_could_not_carry_is_named(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """Trimmed, and said out loud: the record carries what execution cut."""
+    costly = ExecutionModel(costs=CostModel(commission_rate=0.001, half_spread=0.002))
+
+    result = run_over(market, calendars, sessions, AlwaysHold({"ETF_EU": 1.0}), execution=costly)
+
+    assert result.records[1].unfunded == ("ETF_EU",)
+    assert result.records[0].unfunded == ()

@@ -12,6 +12,13 @@ traded. Not skipped quietly: the order is refused and named, and the position
 stays where it was. Filling it at yesterday's price would put a trade in the
 record at a price nobody could have got.
 
+An order is also never paid for with money the book does not have. A target of
+a whole book is sized on the equity before this rebalancing's costs, and the
+costs still have to come from somewhere: the buys are cut down to what the cash
+can carry, and what was cut is named. The alternative - letting cash go
+negative - is a loan the model never granted and never charges for, and it
+compounds quietly in any strategy that rebalances often.
+
 Being worth something and being tradable are two different questions, and this
 layer keeps them apart. A position whose opening auction did not print still
 has a value - the book has to be worth something for the other orders to be
@@ -21,8 +28,8 @@ for everything it holds, and told separately which of them may be dealt at.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
-from dataclasses import dataclass, field
+from collections.abc import Collection, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 
 from quant_backtester.execution.costs import CostModel, Side
 from quant_backtester.portfolio.targets import Holdings
@@ -79,6 +86,36 @@ class Fill:
 
 
 @dataclass(frozen=True, slots=True)
+class _Order:
+    """An order as it is wanted, before the cash has had its say.
+
+    Attributes
+    ----------
+    instrument_id : str
+        What to trade.
+    side : Side
+        Which way.
+    quantity : float
+        Units, always positive.
+    reference_price : float
+        The opening auction the order is sized against.
+    fill_price : float
+        What it would be done at, spread and slippage included.
+    """
+
+    instrument_id: str
+    side: Side
+    quantity: float
+    reference_price: float
+    fill_price: float
+
+    @property
+    def notional(self) -> float:
+        """Return the value this order would exchange, at the fill price."""
+        return self.quantity * self.fill_price
+
+
+@dataclass(frozen=True, slots=True)
 class Execution:
     """What one rebalancing did, and what it could not do.
 
@@ -92,11 +129,17 @@ class Execution:
         Instruments that could not be dealt at this instant - no opening price,
         or one too stale to trade on. Their positions were left exactly as they
         were.
+    unfunded : tuple[str, ...]
+        Instruments whose buy was cut down, or dropped, because the book did
+        not hold the cash to pay for it. Named rather than silently trimmed: a
+        strategy that keeps asking for more than it can afford is a strategy
+        whose weights do not mean what they say.
     """
 
     holdings: Holdings
     fills: tuple[Fill, ...]
     untradable: tuple[str, ...]
+    unfunded: tuple[str, ...] = ()
 
     @property
     def commission(self) -> float:
@@ -191,6 +234,18 @@ class ExecutionModel:
         Equity is measured before any of this rebalancing's costs. Sizing on
         the equity left after them would make every order depend on the ones
         computed before it, and on the order they happened to be computed in.
+
+        The sales are done first, because they are what pays for the purchases,
+        and the purchases are then cut to the cash there actually is. A target
+        of a whole book therefore ends a little under it: the difference is
+        what execution charged, and it comes out of the position rather than
+        out of a loan nobody granted.
+
+        A purchase cut below the declared minimum is dropped, and the cash it
+        would have taken is not offered back to the others. Redistributing it
+        would size one order on whether another turned out too small to send,
+        and a rebalancing whose result depends on the order its names happen to
+        be considered in is not one anybody can reproduce.
         """
         equity = holdings.value_at(prices)
         dealable = set(prices) if tradable is None else set(tradable) & set(prices)
@@ -198,30 +253,154 @@ class ExecutionModel:
         untradable = tuple(sorted(name for name in wanted if name not in dealable))
         quantities = dict(holdings.quantities)
         cash = holdings.cash
-        fills: list[Fill] = []
+        orders = self._orders(equity, weights, prices, quantities, sorted(wanted & dealable))
 
-        for instrument_id in sorted(wanted & dealable):
+        fills = [self._fill(order) for order in orders if order.side is Side.SELL]
+        for fill in fills:
+            cash += fill.cash_flow
+            quantities[fill.instrument_id] = quantities.get(fill.instrument_id, 0.0) - fill.quantity
+
+        buys = [order for order in orders if order.side is Side.BUY]
+        scale = self._affordable_scale(buys, cash)
+        unfunded: list[str] = []
+        for order in buys:
+            afforded = replace(order, quantity=order.quantity * scale)
+            # A trimmed order of nothing is not an order, and with no declared
+            # minimum it would otherwise be sent as a fill of zero units.
+            if afforded.quantity == 0.0 or afforded.notional < self.minimum_trade_value:
+                unfunded.append(order.instrument_id)
+                continue
+            if scale < 1.0:
+                unfunded.append(order.instrument_id)
+            fill = self._fill(afforded)
+            fills.append(fill)
+            cash += fill.cash_flow
+            quantities[order.instrument_id] = (
+                quantities.get(order.instrument_id, 0.0) + fill.quantity
+            )
+
+        return Execution(
+            holdings=Holdings(cash=cash, quantities=quantities),
+            fills=tuple(sorted(fills, key=lambda fill: fill.instrument_id)),
+            untradable=untradable,
+            unfunded=tuple(sorted(unfunded)),
+        )
+
+    def _orders(
+        self,
+        equity: float,
+        weights: Mapping[str, float],
+        prices: Mapping[str, float],
+        quantities: Mapping[str, float],
+        dealable: Sequence[str],
+    ) -> list[_Order]:
+        """Return the order each instrument needs to reach its target weight.
+
+        Parameters
+        ----------
+        equity : float
+            The book's worth before this rebalancing's costs.
+        weights : Mapping[str, float]
+            Target fraction of equity per instrument.
+        prices : Mapping[str, float]
+            The reference price - the opening auction - per instrument.
+        quantities : Mapping[str, float]
+            What is held before the trades.
+        dealable : Sequence[str]
+            The instruments that may be traded, in the order to build them in.
+
+        Returns
+        -------
+        list[_Order]
+            One per instrument that has something to do worth doing. An order
+            below the declared minimum is not one.
+        """
+        orders: list[_Order] = []
+        for instrument_id in dealable:
             reference = prices[instrument_id]
             target = equity * weights.get(instrument_id, 0.0) / reference
             delta = target - quantities.get(instrument_id, 0.0)
-            side = Side.BUY if delta > 0 else Side.SELL
-            fill_price = self.costs.fill_price(side, reference)
-            if abs(delta) * fill_price < self.minimum_trade_value or delta == 0.0:
+            if delta == 0.0:
                 continue
-            fill = Fill(
+            side = Side.BUY if delta > 0 else Side.SELL
+            order = _Order(
                 instrument_id=instrument_id,
                 side=side,
                 quantity=abs(delta),
                 reference_price=reference,
-                fill_price=fill_price,
-                commission=self.costs.commission(abs(delta) * fill_price),
+                fill_price=self.costs.fill_price(side, reference),
             )
-            fills.append(fill)
-            cash += fill.cash_flow
-            quantities[instrument_id] = quantities.get(instrument_id, 0.0) + delta
+            if order.notional < self.minimum_trade_value:
+                continue
+            orders.append(order)
+        return orders
 
-        return Execution(
-            holdings=Holdings(cash=cash, quantities=quantities),
-            fills=tuple(fills),
-            untradable=untradable,
+    def _fill(self, order: _Order) -> Fill:
+        """Return the fill an order is done at, commission included."""
+        return Fill(
+            instrument_id=order.instrument_id,
+            side=order.side,
+            quantity=order.quantity,
+            reference_price=order.reference_price,
+            fill_price=order.fill_price,
+            commission=self.costs.commission(order.notional),
         )
+
+    def _cash_needed(self, buys: Sequence[_Order], scale: float) -> float:
+        """Return what buying ``scale`` of every order would take out of cash.
+
+        Notes
+        -----
+        Each notional is computed the way the fill will compute it - the
+        quantity is scaled and then priced, not priced and then scaled - so
+        that what was found affordable is what is afterwards paid, to the last
+        bit. The other order of the same two multiplications differs by an ulp,
+        and an ulp below zero is still a book that borrowed.
+        """
+        needed = 0.0
+        for order in buys:
+            notional = replace(order, quantity=order.quantity * scale).notional
+            needed += notional + self.costs.commission(notional)
+        return needed
+
+    def _affordable_scale(self, buys: Sequence[_Order], cash: float) -> float:
+        """Return the largest fraction of the purchases the cash can carry.
+
+        Parameters
+        ----------
+        buys : Sequence[_Order]
+            The purchases this rebalancing wants, at full size.
+        cash : float
+            What is left after the sales.
+
+        Returns
+        -------
+        float
+            ``1.0`` when everything fits, ``0.0`` when nothing does, and the
+            fraction in between otherwise. Every order is cut by the same
+            fraction, so the book keeps the proportions the strategy asked
+            for - cutting one name to the bone to leave another whole would be
+            a decision about the strategy, and this layer does not take those.
+
+        Notes
+        -----
+        Found by bisection rather than by formula. A commission floor does not
+        scale with the order it is charged on, so the cash a set of purchases
+        needs is piecewise linear in their size and has no closed form. It is
+        monotonic, which is all a bisection needs, and fifty halvings take the
+        answer well past the precision of the numbers it is made of.
+        """
+        if not buys:
+            return 1.0
+        if self._cash_needed(buys, 1.0) <= cash:
+            return 1.0
+        if cash <= 0.0:
+            return 0.0
+        low, high = 0.0, 1.0
+        for _ in range(50):
+            middle = (low + high) / 2.0
+            if self._cash_needed(buys, middle) <= cash:
+                low = middle
+            else:
+                high = middle
+        return low

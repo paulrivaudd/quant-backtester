@@ -129,3 +129,14 @@ def test_a_book_that_ended_on_borrowed_cash_is_counted(run: RunBuilder) -> None:
 def test_rounding_dust_is_not_an_overdraft(run: RunBuilder) -> None:
     """A cash balance of minus a billionth is a float, not a loan."""
     assert RunQuality.of(run([100.0], cash=[-1e-12])).sessions_on_borrowed_cash == 0
+
+
+def test_a_purchase_the_cash_could_not_carry_is_a_caveat(run: RunBuilder) -> None:
+    """Expected on the session a strategy goes fully invested, and telling in bulk.
+
+    One session is the entry paying for itself. A run where most sessions are
+    here is a strategy asking, day after day, for more than it holds.
+    """
+    result = run([100.0, 100.0, 100.0], unfunded=[(), ("ETF_EU",), ()])
+
+    assert RunQuality.of(result).unfunded_sessions == 1
