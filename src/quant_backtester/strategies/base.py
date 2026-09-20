@@ -24,6 +24,7 @@ import hashlib
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
+from datetime import date
 from enum import Enum
 
 from quant_backtester.backtest.context import StrategyContext
@@ -103,11 +104,16 @@ class Strategy(ABC):
             strategy that carries its configuration some other way - what is
             not returned here is not recorded, and a result nobody can
             reproduce the configuration of is not a result.
+
+        Raises
+        ------
+        ValueError
+            If a field cannot be written down as built-ins.
         """
         if not dataclasses.is_dataclass(self):
             return {}
         return {
-            field.name: _plain(getattr(self, field.name))
+            field.name: _plain(getattr(self, field.name), field.name)
             for field in dataclasses.fields(self)
             if field.repr
         }
@@ -118,13 +124,16 @@ class Strategy(ABC):
         Returns
         -------
         Mapping[str, object]
-            The name, the class it is written as, its parameters and the
-            definition of every signal it declares. Two strategies with equal
-            definitions decide the same way on the same data.
+            The name, the class it is written as - module included - its
+            parameters and the definition of every signal it declares. Two
+            strategies with equal definitions decide the same way on the same
+            data.
         """
         return {
             "strategy_id": self.strategy_id,
-            "class": type(self).__name__,
+            # Fully qualified: two classes of one name, in two modules, with
+            # the same parameters would otherwise be one experiment.
+            "class": f"{type(self).__module__}.{type(self).__qualname__}",
             "parameters": dict(self.parameters()),
             "signals": [_signal_definition(item) for item in self.required_signals()],
         }
@@ -185,14 +194,44 @@ def _signal_definition(item: Signal | SignalRequest) -> Mapping[str, object]:
     return {"signal": item.definition_json(), "instruments": None}
 
 
-def _plain(value: object) -> object:
-    """Return a value JSON can render, for the parameters of a strategy."""
+def _plain(value: object, name: str = "a parameter") -> object:
+    """Return a value JSON can render, for the parameters of a strategy.
+
+    Parameters
+    ----------
+    value : object
+        A parameter, or one of its parts.
+    name : str
+        What it is called, quoted in the message.
+
+    Returns
+    -------
+    object
+        Built-ins all the way down: scalars unchanged, mappings and sequences
+        rebuilt, an enum spelled by its value like everywhere else here.
+
+    Raises
+    ------
+    ValueError
+        If the value is of a kind this cannot render. It used to fall back to
+        ``repr``, which is the worst of both: an object whose representation
+        carries its address changes the fingerprint between two identical runs,
+        and two different objects with one representation share it. Refusing
+        says which parameter needs a serialisable form.
+    """
     if isinstance(value, str | int | float | bool | type(None)):
         return value
     if isinstance(value, Mapping):
-        return {str(key): _plain(item) for key, item in value.items()}
-    if isinstance(value, Sequence):
-        return [_plain(item) for item in value]
+        return {str(key): _plain(item, f"{name}[{key!r}]") for key, item in value.items()}
     if isinstance(value, Enum):  # spelled by its value, like everywhere else here
-        return _plain(value.value)
-    return repr(value)
+        return _plain(value.value, name)
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, Sequence):
+        return [_plain(item, name) for item in value]
+    raise ValueError(
+        f"{name} is a {type(value).__name__}, which cannot be written down: a "
+        "definition nobody can serialise is a run nobody can reproduce. Give the "
+        "strategy a parameter made of numbers, strings, enums or collections of "
+        "those, or override parameters() to say how this one is recorded."
+    )
