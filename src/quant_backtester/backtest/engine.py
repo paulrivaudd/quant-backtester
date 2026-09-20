@@ -37,6 +37,7 @@ import pandas as pd
 
 from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.backtest.market import StrategyMarketView
+from quant_backtester.backtest.schedule import DecisionSchedule, EverySession
 from quant_backtester.data.calendars import CalendarRegistry, Session
 from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus, PointInTimeReader
@@ -178,6 +179,10 @@ class BacktestRecord:
     fills : tuple[Fill, ...]
         The orders done at this session's open, with their reference price,
         their fill price and their commission.
+    decided : bool
+        Whether the strategy was asked on this session. A run that rebalances
+        monthly is not asked on the other twenty sessions, and the target
+        recorded on those is the one still standing rather than a new one.
     closes : Mapping[str, float]
         The price each held instrument was valued at, at this session's close.
         The one named in ``priced_from_earlier`` is an older close carried
@@ -208,6 +213,7 @@ class BacktestRecord:
     unfunded: tuple[str, ...]
     priced_from_earlier: tuple[str, ...]
     weights: Mapping[str, float]
+    decided: bool = True
     quantities: Mapping[str, float] = MappingProxyType({})
     fills: tuple[Fill, ...] = ()
     closes: Mapping[str, float] = MappingProxyType({})
@@ -258,6 +264,7 @@ class BacktestResult:
                 "equity": record.equity,
                 "gross_equity": record.gross_equity,
                 "cash": record.cash,
+                "decided": record.decided,
                 "target_invested": record.target_invested,
                 "actual_invested": record.actual_invested,
                 "considered": record.considered,
@@ -340,6 +347,13 @@ class BacktestEngine:
         :class:`~quant_backtester.signals.engine.SignalRequest` of its own,
         which is what keeps "a thing to read" and "a thing to buy" from being
         the same list.
+    schedule : DecisionSchedule
+        Which sessions the strategy is asked on. Every session by default. On
+        a session that is not a decision session the strategy is not called, no
+        order is sent, and the record carries the target still standing - a
+        momentum rotation rebalanced monthly and the same rotation rebalanced
+        daily are two different strategies, and the calendar of the one being
+        run is part of what a result has to record.
     limits : PositionLimits
         Applied to whatever the strategy asks for.
     execution : ExecutionModel
@@ -381,6 +395,7 @@ class BacktestEngine:
     universe: UniverseSource | Sequence[str]
     initial_cash: float
     base_currency: str
+    schedule: DecisionSchedule = field(default_factory=EverySession)
     limits: PositionLimits = field(default_factory=PositionLimits)
     execution: ExecutionModel = field(default_factory=ExecutionModel)
     timetable: Timetable = field(default_factory=Timetable)
@@ -458,6 +473,9 @@ class BacktestEngine:
         last_price: dict[str, float] = {}
         records: list[BacktestRecord] = []
 
+        deciding = self.schedule.decision_sessions([item.session_date for item in sessions])
+        standing: TargetAllocation | None = None
+
         for session in sessions:
             execution, gross_cash = self._fill(session, pending, holdings, gross_cash, last_price)
             holdings = execution.holdings if execution is not None else holdings
@@ -465,8 +483,17 @@ class BacktestEngine:
             market = self.reader.at(decision_at)
             prices, estimated = self._valuation(market, holdings, last_price)
             last_price.update(prices)
-            members = self._trading_universe(session.session_date)
-            pending = self._decide(engine, market, members, session.session_date, holdings, prices)
+            decides = session.session_date in deciding
+            if decides:
+                members = self._trading_universe(session.session_date)
+                standing = self._decide(
+                    engine, market, members, session.session_date, holdings, prices
+                )
+                pending = standing
+            else:
+                # Not a decision session: nothing is asked, so nothing is sent.
+                # What stands is the last decision, which the book already holds.
+                pending = None
             records.append(
                 self._record(
                     session=session,
@@ -476,7 +503,8 @@ class BacktestEngine:
                     gross_cash=gross_cash,
                     execution=execution,
                     estimated=estimated,
-                    allocation=pending,
+                    allocation=standing,
+                    decided=decides,
                     fills=execution.fills if execution is not None else (),
                 )
             )
@@ -773,7 +801,8 @@ class BacktestEngine:
         gross_cash: float,
         execution: Execution | None,
         estimated: tuple[str, ...],
-        allocation: TargetAllocation,
+        allocation: TargetAllocation | None,
+        decided: bool,
         fills: tuple[Fill, ...],
     ) -> BacktestRecord:
         """Assemble one session's record."""
@@ -785,18 +814,19 @@ class BacktestEngine:
             equity=equity,
             gross_equity=gross_cash + positions,
             cash=holdings.cash,
-            target_invested=allocation.invested,
+            target_invested=allocation.invested if allocation is not None else 0.0,
             # A book worth nothing is a book with nothing in it, and no
             # fraction of it is invested.
             actual_invested=positions / equity if equity != 0.0 else 0.0,
-            considered=allocation.considered,
+            considered=allocation.considered if allocation is not None else 0,
             traded_value=execution.traded_value if execution else 0.0,
             commission=execution.commission if execution else 0.0,
             market_cost=execution.market_cost if execution else 0.0,
             untradable=execution.untradable if execution else (),
             unfunded=execution.unfunded if execution else (),
             priced_from_earlier=estimated,
-            weights=dict(allocation.weights),
+            weights=dict(allocation.weights) if allocation is not None else {},
+            decided=decided,
             quantities=dict(holdings.quantities),
             fills=fills,
             closes=dict(prices),

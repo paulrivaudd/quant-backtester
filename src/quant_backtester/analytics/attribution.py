@@ -137,8 +137,11 @@ class RunQuality:
         knowable. The book stayed as it was, which is the honest outcome and
         also a difference from what the strategy asked for.
     sessions_with_nothing_to_choose : int
-        Sessions where the strategy had no instrument with a usable signal.
-        A run full of them is not a flat strategy, it is a data hole.
+        Sessions where the strategy was asked and had no instrument with a
+        usable signal. A run full of them is not a flat strategy, it is a data
+        hole. Counted among the sessions a decision was actually taken on: a
+        strategy rebalancing monthly is not asked on the other twenty, and
+        counting those would turn its own calendar into a data problem.
     unfunded_sessions : int
         Sessions where a purchase was cut down, or dropped, because the book
         did not hold the cash for it. A target of a whole book costs slightly
@@ -177,7 +180,9 @@ class RunQuality:
             sessions=len(result.records),
             estimated_valuations=sum(1 for r in result.records if r.priced_from_earlier),
             untradable_sessions=sum(1 for r in result.records if r.untradable),
-            sessions_with_nothing_to_choose=sum(1 for r in result.records if r.considered == 0),
+            sessions_with_nothing_to_choose=sum(
+                1 for r in result.records if r.decided and r.considered == 0
+            ),
             unfunded_sessions=sum(1 for r in result.records if r.unfunded),
             # A hair below zero, so that floating-point dust is not an overdraft.
             sessions_on_borrowed_cash=sum(1 for r in result.records if r.cash < -_CASH_DUST),
