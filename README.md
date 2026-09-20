@@ -97,11 +97,20 @@ its own `tail(20)` and get twenty observations spanning twenty-six sessions.
 | `corporate_actions.py` | reviewed corrections to what a provider called an event |
 | `repository.py` | the only module that knows Parquet exists |
 | `updater.py` | ingestion, and the replay that proves it reproducible |
+| `universes.py` | who was in the universe on the day, not who is in it now |
 | `reader.py` | point-in-time reads, and nothing else reaches a strategy |
 
 Sources in use: Yahoo Finance (bars and corporate actions), FRED (published
 series), the ECB reference rates, and the Euronext historical export as a second
 opinion on Paris prices.
+
+Membership is dated for the same reason prices are. A universe written as a
+list of names is a list of the names that still exist — Yahoo serves nothing
+for TWTR, SIVB or CELG — so `market_data/metadata/universes.toml` gives each
+member a window, a name that left keeps the date it left on, and the engine
+asks what the universe held on the session it is deciding on. A bound left open
+in the file is closed with the instrument's own listing dates when it is read:
+a fund launched in 2018 is not a member of anything in 2010.
 
 ## The signals layer
 

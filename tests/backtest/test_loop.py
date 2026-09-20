@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, time
 
+import pandas as pd
 import pytest
 
 from quant_backtester.backtest.engine import (
@@ -22,6 +23,7 @@ from quant_backtester.backtest.engine import (
 )
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.data.universes import Membership, Universe
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.fills import ExecutionModel
 from quant_backtester.portfolio.limits import PositionLimits
@@ -411,3 +413,101 @@ def test_a_purchase_the_cash_could_not_carry_is_named(
 
     assert result.records[1].unfunded == ("ETF_EU",)
     assert result.records[0].unfunded == ()
+
+
+# --- the universe is asked session by session --------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class HoldWhatIsOffered(Strategy):
+    """Equal weights over whatever the snapshot holds.
+
+    It exists so that a test about the universe is about the universe: the
+    strategy has no opinion of its own, so what it targets is exactly what it
+    was allowed to choose from.
+    """
+
+    signal_id: str
+
+    def decide(self, signals: SignalSnapshot) -> TargetAllocation:
+        """Spread the book over every instrument in the snapshot."""
+        names = tuple(signals.result(self.signal_id).instruments())
+        weight = 1.0 / len(names) if names else 0.0
+        return TargetAllocation(
+            as_of=signals.as_of,
+            weights={name: weight for name in names},
+            selected=names,
+            considered=len(names),
+            skipped={},
+        )
+
+
+def test_a_member_that_left_is_not_chosen_after_it_did(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    xpar: TradingCalendar,
+    calendars: CalendarRegistry,
+    prices: Callable[..., dict[date, float]],
+    sessions: tuple[date, ...],
+) -> None:
+    """The universe is asked on every session, and it answers for that session.
+
+    ETF_OTHER leaves after 10 September. The decision taken at that close still
+    holds it; the one taken the next session cannot, and the sale happens at
+    the open after that - the same gap every other order goes through.
+    """
+    market = make_market(
+        {
+            "ETF_EU": make_bars("ETF_EU", xpar, prices(100.0, 1.0)),
+            "ETF_OTHER": make_bars("ETF_OTHER", xpar, prices(200.0, 2.0)),
+        }
+    )
+    universe = Universe(
+        universe_id="LEAVER",
+        name="One fund leaves",
+        memberships=(
+            Membership("ETF_EU"),
+            Membership("ETF_OTHER", until_date=date(2026, 9, 10)),
+        ),
+    )
+    engine = BacktestEngine(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        signals=a_return(),
+        strategy=HoldWhatIsOffered(signal_id="return_2d"),
+        universe=universe,
+        initial_cash=10_000.0,
+        limits=PositionLimits(),
+        execution=ExecutionModel(),
+        timetable=PARIS,
+    )
+
+    result = engine.run(sessions[-4], sessions[-1])
+
+    decided_on_the_tenth = result.records[1]
+    decided_on_the_eleventh = result.records[2]
+    assert set(decided_on_the_tenth.weights) == {"ETF_EU", "ETF_OTHER"}
+    assert set(decided_on_the_eleventh.weights) == {"ETF_EU"}
+    assert decided_on_the_eleventh.considered == 1
+    # The target that drops it is filled at the next open, not at the close it
+    # was decided after.
+    assert result.records[-1].traded_value > 0.0
+
+
+def test_a_universe_given_as_a_list_is_still_asked_by_session(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """A plain sequence becomes a static universe, and nothing below notices."""
+    engine = engine_over(market, calendars, AlwaysHold({"ETF_EU": 1.0}))
+
+    assert engine.dated_universe.members_at(sessions[0]) == ("ETF_EU",)
+    assert engine.dated_universe.members_at(sessions[-1]) == ("ETF_EU",)
+
+
+def test_a_universe_that_repeats_an_instrument_is_refused(
+    market: MarketDataReader, calendars: CalendarRegistry
+) -> None:
+    """Twice in a universe would weight it twice in a ranking."""
+    with pytest.raises(ValueError, match="more than once"):
+        engine_over(market, calendars, AlwaysHold({"ETF_EU": 1.0}), universe=("ETF_EU", "ETF_EU"))

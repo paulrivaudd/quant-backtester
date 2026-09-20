@@ -29,7 +29,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -38,6 +38,7 @@ from quant_backtester.data.calendars import CalendarRegistry, Session
 from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus, PointInTimeReader
 from quant_backtester.data.schemas import BarField
+from quant_backtester.data.universes import StaticUniverse
 from quant_backtester.execution.fills import Execution, ExecutionModel
 from quant_backtester.portfolio.limits import PositionLimits
 from quant_backtester.portfolio.targets import Holdings, TargetAllocation
@@ -45,6 +46,22 @@ from quant_backtester.signals.base import Signal
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine
 from quant_backtester.signals.snapshot import SignalSnapshot
+
+
+@runtime_checkable
+class UniverseSource(Protocol):
+    """What the engine needs of a universe: its members on one session.
+
+    A :class:`~quant_backtester.data.universes.Universe` answers it from dated
+    memberships and a
+    :class:`~quant_backtester.data.universes.StaticUniverse` answers the same
+    thing every day. The engine asks the question once per session and never
+    learns which kind it holds.
+    """
+
+    def members_at(self, on: date) -> Sequence[str]:
+        """Return the instruments the universe held on ``on``."""
+        ...
 
 
 class Strategy(Protocol):
@@ -259,11 +276,16 @@ class BacktestEngine:
         Computed at every decision, in order.
     strategy : Strategy
         Given the snapshot, and nothing else.
-    universe : Sequence[str]
-        Instruments the signals are computed for. Fixed for the whole run: a
-        universe that changes with time needs a point-in-time universe, which
-        is a layer that does not exist yet, and pretending otherwise would put
-        survivorship back into a backtest.
+    universe : Universe | StaticUniverse | Sequence[str]
+        What the signals are computed for, asked session by session. A
+        :class:`~quant_backtester.data.universes.Universe` carries dated
+        memberships, so a run over a changing index chooses among the names
+        that were in it on the day - which is the only way a backtest avoids
+        being a study of the survivors. A plain sequence is accepted and
+        wrapped in a
+        :class:`~quant_backtester.data.universes.StaticUniverse`: honest for
+        two funds that both existed throughout, and a lie for anything with
+        entries and exits.
     limits : PositionLimits
         Applied to whatever the strategy asks for.
     execution : ExecutionModel
@@ -291,19 +313,39 @@ class BacktestEngine:
     reference_calendar_id: str
     signals: Sequence[Signal]
     strategy: Strategy
-    universe: Sequence[str]
+    universe: UniverseSource | Sequence[str]
     initial_cash: float
     limits: PositionLimits = field(default_factory=PositionLimits)
     execution: ExecutionModel = field(default_factory=ExecutionModel)
     timetable: Timetable = field(default_factory=Timetable)
 
     def __post_init__(self) -> None:
-        """Reject a configuration that cannot describe a run."""
+        """Reject a configuration that cannot describe a run, and date the universe.
+
+        A plain sequence of names becomes a
+        :class:`~quant_backtester.data.universes.StaticUniverse` here, so that
+        everything below asks one question - what was in the universe on this
+        session - and never has to know which kind it was handed.
+        """
         if self.initial_cash <= 0:
             raise ValueError(f"initial_cash must be positive, got {self.initial_cash}")
-        repeated = sorted({name for name in self.universe if list(self.universe).count(name) > 1})
-        if repeated:
-            raise ValueError(f"Universe holds {', '.join(repeated)} more than once")
+        if not isinstance(self.universe, UniverseSource):
+            object.__setattr__(self, "universe", StaticUniverse(tuple(self.universe)))
+
+    @property
+    def dated_universe(self) -> UniverseSource:
+        """Return the universe in the form the engine asks it: by session.
+
+        Returns
+        -------
+        UniverseSource
+            What ``__post_init__`` normalised, whether a plain sequence of
+            names or a universe of dated memberships was given.
+        """
+        universe = self.universe
+        if not isinstance(universe, UniverseSource):
+            raise TypeError(f"the universe was not dated: {universe!r}")
+        return universe
 
     @property
     def instruments(self) -> InstrumentRegistry:
@@ -356,7 +398,8 @@ class BacktestEngine:
             market = self.reader.at(decision_at)
             prices, estimated = self._valuation(market, holdings, last_price)
             last_price.update(prices)
-            pending = self._decide(engine, market)
+            members = self.dated_universe.members_at(session.session_date)
+            pending = self._decide(engine, market, members)
             records.append(
                 self._record(
                     session=session,
@@ -509,12 +552,14 @@ class BacktestEngine:
             estimated.append(instrument_id)
         return prices, tuple(estimated)
 
-    def _decide(self, engine: SignalEngine, market: PointInTimeReader) -> TargetAllocation:
-        """Compute the signals and ask the strategy what to hold next."""
+    def _decide(
+        self, engine: SignalEngine, market: PointInTimeReader, members: Sequence[str]
+    ) -> TargetAllocation:
+        """Compute the signals over that session's universe and decide what to hold."""
         context = SignalContext(
             market=market, instruments=self.instruments, calendars=self.calendars
         )
-        snapshot = engine.compute(context, list(self.signals), list(self.universe))
+        snapshot = engine.compute(context, list(self.signals), list(members))
         return self.limits.apply(self.strategy.decide(snapshot))
 
     def _record(

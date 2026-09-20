@@ -1,0 +1,38 @@
+# Universes: which instruments a strategy may choose from, and when.
+#
+# Membership is dated because a list of names is a list of the survivors. A
+# name that left stays in this file with the date it left on: removing it would
+# put survivorship back into every backtest run over the period it was there.
+#
+# from_date and until_date are inclusive session dates, and both are optional:
+# an absent from_date means "since the instrument was listed", an absent
+# until_date means "still a member". Every window is checked against the
+# instrument's own listing window when this file is read.
+
+[[universe]]
+id = "ROTATION_2"
+name = "World ETF and the S&P 500"
+
+# Both have been there since the ETF's first session, and neither has left.
+# The rotation in the README chooses between exactly these two.
+[[universe.member]]
+instrument_id = "ETF_WORLD"
+
+[[universe.member]]
+instrument_id = "SP500"
+
+[[universe]]
+id = "MACRO_3"
+name = "The published series"
+
+# Not tradable, and not meant to be: a strategy reads these to decide what to
+# do with the funds above. They are a universe of their own because the signal
+# engine asks every signal about one universe, and a yield is not a fund.
+[[universe.member]]
+instrument_id = "US10Y"
+
+[[universe.member]]
+instrument_id = "VIX"
+
+[[universe.member]]
+instrument_id = "ECB_EURUSD"
