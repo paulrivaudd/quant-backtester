@@ -30,7 +30,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from types import MappingProxyType
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -39,7 +39,7 @@ from quant_backtester.data.calendars import CalendarRegistry, Session
 from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus, PointInTimeReader
 from quant_backtester.data.schemas import BarField
-from quant_backtester.data.universes import StaticUniverse
+from quant_backtester.data.universes import StaticUniverse, UniverseSource
 from quant_backtester.execution.fills import Execution, ExecutionModel, Fill
 from quant_backtester.numbers import require_finite_positive
 from quant_backtester.portfolio.limits import PositionLimits
@@ -49,22 +49,6 @@ from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import require_identifier
-
-
-@runtime_checkable
-class UniverseSource(Protocol):
-    """What the engine needs of a universe: its members on one session.
-
-    A :class:`~quant_backtester.data.universes.Universe` answers it from dated
-    memberships and a
-    :class:`~quant_backtester.data.universes.StaticUniverse` answers the same
-    thing every day. The engine asks the question once per session and never
-    learns which kind it holds.
-    """
-
-    def members_at(self, on: date) -> Sequence[str]:
-        """Return the instruments the universe held on ``on``."""
-        ...
 
 
 class Strategy(Protocol):
@@ -323,9 +307,10 @@ class BacktestEngine:
         :class:`~quant_backtester.signals.engine.SignalRequest` may carry a
         universe of its own, which is how a gauge that is never traded - a
         volatility index, a yield - reaches the same snapshot as the funds it
-        gates. That universe is a fixed list: a per-signal universe that is
-        itself dated would need the request to carry a
-        :class:`UniverseSource`, and nothing has needed it yet.
+        gates. That universe may itself be dated: the engine resolves it for
+        the session being decided, like the trading one, so a basket of gauges
+        that changed over the years is not read as the list of those that
+        survived.
     strategy : Strategy
         Given the snapshot, and nothing else.
     universe : Universe | StaticUniverse | Sequence[str]
@@ -470,7 +455,7 @@ class BacktestEngine:
             prices, estimated = self._valuation(market, holdings, last_price)
             last_price.update(prices)
             members = self._trading_universe(session.session_date)
-            pending = self._decide(engine, market, members)
+            pending = self._decide(engine, market, members, session.session_date)
             records.append(
                 self._record(
                     session=session,
@@ -711,13 +696,30 @@ class BacktestEngine:
         return prices, tuple(estimated)
 
     def _decide(
-        self, engine: SignalEngine, market: PointInTimeReader, members: Sequence[str]
+        self,
+        engine: SignalEngine,
+        market: PointInTimeReader,
+        members: Sequence[str],
+        session_date: date,
     ) -> TargetAllocation:
-        """Compute the signals over that session's universe and decide what to hold."""
+        """Compute the signals over that session's universes and decide what to hold.
+
+        Notes
+        -----
+        Every universe is asked about this session, the trading one and each
+        signal's own. A request carrying a dated universe is resolved here
+        because here is the only place that knows which session is being
+        decided: a signal that chose its own date could choose one the decision
+        cannot see.
+        """
         context = SignalContext(
             market=market, instruments=self.instruments, calendars=self.calendars
         )
-        snapshot = engine.compute(context, list(self.signals), list(members))
+        requests = [
+            item.resolved(session_date) if isinstance(item, SignalRequest) else item
+            for item in self.signals
+        ]
+        snapshot = engine.compute(context, requests, list(members))
         return self.limits.apply(self.strategy.decide(snapshot))
 
     def _record(
