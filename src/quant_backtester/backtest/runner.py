@@ -122,6 +122,11 @@ class StrategyResult:
 
     Notes
     -----
+    Everything here is frozen all the way down. A record of an experiment that
+    can be edited afterwards is a record of nothing.
+
+    Notes
+    -----
     A result that recorded only its numbers would be a number nobody can
     reproduce. Everything here is what "Sharpe 1.4" has to be read with, and
     it is carried in the object rather than remembered by whoever ran it.
@@ -136,6 +141,19 @@ class StrategyResult:
     reader: MarketDataReader
     analytics_config: AnalyticsConfig
     base_currency: str
+
+    def __post_init__(self) -> None:
+        """Freeze the audit trail, all the way down.
+
+        ``frozen=True`` only stops the fields being reassigned. The definition
+        and the configuration are nested mappings, so without this a reader of
+        a result could edit what the run was made of - which is the one thing
+        a record of an experiment must not allow.
+        """
+        for field_name in ("definition", "configuration"):
+            frozen = freeze(dict(getattr(self, field_name)))
+            assert isinstance(frozen, Mapping)
+            object.__setattr__(self, field_name, frozen)
 
     @property
     def start(self) -> date:
@@ -288,6 +306,15 @@ class StrategyRunner:
         When a decision is taken, and when it is filled.
     schedule : DecisionSchedule
         Which sessions a strategy is asked on, unless a call says otherwise.
+    code_version : str | None
+        What identifies the code that produced a result - the commit of this
+        repository, normally. Recorded as given and never guessed at: a
+        fingerprint hashes a strategy's *configuration*, not its source, so
+        editing a `decide` in place leaves the fingerprint alone and only this
+        field can say the two runs were not the same code. ``None`` says
+        plainly that nobody recorded it, which is better than a library
+        shelling out to git and reporting the wrong answer from a notebook
+        outside the repository.
 
     Raises
     ------
@@ -307,6 +334,7 @@ class StrategyRunner:
     execution: ExecutionModel = field(default_factory=ExecutionModel)
     timetable: Timetable = field(default_factory=Timetable)
     schedule: DecisionSchedule = field(default_factory=EverySession)
+    code_version: str | None = None
 
     def __post_init__(self) -> None:
         """Reject a runner that could not describe the runs it produces."""
@@ -473,6 +501,7 @@ class StrategyRunner:
             "end": end.isoformat(),
             "requested_start": asked[0].isoformat(),
             "requested_end": asked[1].isoformat(),
+            "code_version": self.code_version,
             "reference_calendar": self.reference_calendar_id,
             "base_currency": self.base_currency,
             "universe": universe,

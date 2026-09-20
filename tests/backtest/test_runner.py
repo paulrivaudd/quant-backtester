@@ -159,10 +159,9 @@ def test_a_static_universe_records_its_members(runner: StrategyRunner) -> None:
         "2026-09-14",
     )
 
-    assert result.configuration["universe"] == {
-        "type": "StaticUniverse",
-        "members": ["ETF_EU"],
-    }
+    recorded = result.configuration["universe"]
+    assert recorded["type"] == "StaticUniverse"  # type: ignore[index]
+    assert list(recorded["members"]) == ["ETF_EU"]  # type: ignore[index]
 
 
 def test_two_static_universes_are_not_one_experiment(runner: StrategyRunner) -> None:
@@ -361,3 +360,55 @@ def test_the_signals_of_a_run_are_asked_for_once(runner: StrategyRunner) -> None
     # which are taken twice - before and after - to catch a strategy that moved.
     decisions = len(result.backtest.records)
     assert len(asked) < decisions
+
+
+def test_the_record_of_a_run_cannot_be_edited_afterwards(
+    runner: StrategyRunner,
+) -> None:
+    """A record of an experiment that can be rewritten is a record of nothing."""
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    with pytest.raises(TypeError):
+        result.configuration["initial_cash"] = 1.0  # type: ignore[index]
+    with pytest.raises(TypeError):
+        result.configuration["costs"]["commission_rate"] = 0.0  # type: ignore[index]
+    with pytest.raises(TypeError):
+        result.definition["parameters"]["instruments"] = ()  # type: ignore[index]
+
+
+def test_the_code_that_produced_a_result_is_recorded_when_it_is_given(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+) -> None:
+    """A fingerprint hashes a configuration, never the source that read it.
+
+    Editing a ``decide`` in place leaves the fingerprint alone, so only this
+    field can say that two runs were not the same code. It is given rather than
+    guessed at: a library shelling out to git answers wrongly from a notebook
+    outside the repository, and a wrong provenance is worse than none.
+    """
+    market = make_market({"ETF_EU": make_bars("ETF_EU", xpar, prices(100.0, 1.0))})
+    runner = StrategyRunner(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        base_currency="EUR",
+        analytics=CONFIG,
+        initial_cash=10_000.0,
+        timetable=PARIS,
+        code_version="9b15c93",
+    )
+
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    assert result.configuration["code_version"] == "9b15c93"
+
+
+def test_a_run_that_recorded_no_code_version_says_so(runner: StrategyRunner) -> None:
+    """``None`` is an honest answer; a guessed commit is not."""
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    assert result.configuration["code_version"] is None

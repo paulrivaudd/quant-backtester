@@ -255,3 +255,14 @@ def test_the_view_says_which_instant_it_answers_for(view: StrategyMarketView) ->
 
     assert view.as_of.isoformat() in printed
     assert "PointInTimeReader" not in printed
+
+
+@pytest.mark.parametrize("age", [0.5, True, "1"])
+def test_an_age_that_is_not_a_whole_number_of_sessions_is_refused(age: object) -> None:
+    """Staleness is counted in sessions; half of one is a parameter written wrong."""
+    observation = MarketObservation(
+        instrument_id="ETF_EU", value=1.0, status=ObservationStatus.OK, age_sessions=0
+    )
+
+    with pytest.raises(ValueError, match="max_age_sessions"):
+        observation.usable(age)  # type: ignore[arg-type]

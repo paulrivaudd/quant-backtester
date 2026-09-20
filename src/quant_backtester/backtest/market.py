@@ -33,13 +33,13 @@ import pandas as pd
 
 from quant_backtester.data.reader import ObservationStatus
 from quant_backtester.data.schemas import BarField
-from quant_backtester.numbers import require_finite_non_negative
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.types import (
     PriceBasis,
     SignalStatus,
     WindowMode,
     WindowSpec,
+    require_non_negative_int,
     require_positive_int,
 )
 from quant_backtester.signals.windows import load_window
@@ -110,9 +110,11 @@ class MarketObservation:
         Raises
         ------
         ValueError
-            If ``max_age_sessions`` is not a whole number of zero or more.
+            If ``max_age_sessions`` is not a whole number of zero or more. An
+            age is counted in sessions, so half of one is a parameter written
+            wrong rather than a tolerance; ``True`` would silently mean one.
         """
-        require_finite_non_negative(max_age_sessions, "max_age_sessions")
+        require_non_negative_int(max_age_sessions, "max_age_sessions")
         if self.value is None or self.age_sessions is None:
             return False
         return self.age_sessions <= max_age_sessions
