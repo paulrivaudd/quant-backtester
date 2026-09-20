@@ -7,24 +7,32 @@ one priority: results you can trust and reproduce.
 
 The **market data layer is complete and in use**: providers, calendars, a local
 Parquet store, validation, multi-source cross-checking, a revision policy and a
-point-in-time reader. It ingests five instruments end to end, and deleting the
-derived layer and rebuilding it from the raw archive gives the same files byte
-for byte.
+point-in-time reader. It ingests six instruments end to end, with dated
+universe memberships, and deleting the derived layer and rebuilding it from the
+raw archive gives the same files byte for byte.
 
 The **signals layer has its first version**: a window loader that refuses a
-window which is not what it claims to be, six signals built on it — return,
-momentum, moving-average trend, realised volatility, current drawdown and mean
-reversion — and a cross-sectional ranking over any of them.
+window which is not what it claims to be, six signals computed from a fund's
+own window — return, momentum, moving-average trend, realised volatility,
+current drawdown and mean reversion — two more for published series, a
+cross-sectional ranking over any of them, and a universe per signal so a gauge
+can reach the same decision as the funds it gates.
 
-**Portfolio, execution and the event loop have minimal versions**, which is
-enough to run a strategy over time and get a curve with costs charged against
-it. One strategy sits on top — hold the best-ranked instruments of a universe —
-and it is there to prove a boundary rather than to make money: it imports
-nothing from the data layer, and takes a `SignalSnapshot` as its only argument.
+**Portfolio, execution and the event loop run a strategy end to end**, with
+costs charged against it and the economics of the book enforced rather than
+assumed: the trading universe holds only instruments the registry says can be
+bought, all quoted in the book's own currency, weights are long-only fractions
+of capital, orders are placed in whole shares where the venue deals in them,
+and nothing is ever bought with cash the book does not hold. Two strategies sit
+on top — hold the best-ranked instruments of a universe, and the same gated by
+a gauge that is never traded — and they are there to prove a boundary as much
+as to make money: they import nothing from the data layer, and take a
+`SignalSnapshot` as their only argument.
 
-Analytics is not written yet. Performance and risk statistics do not belong in
-the engine, so the engine reports the two equity curves and the costs, and
-leaves the ratios to the layer that will own them.
+**Analytics has its first version**: equity curves, drawdowns, the usual ratios,
+the split of what execution took, and the caveats a run has to be read with.
+None of it reaches back into the market data — it reads a finished run, and a
+figure the run cannot support is reported as nothing rather than invented.
 
 ## Design goals
 
@@ -51,8 +59,14 @@ leaves the ratios to the layer that will own them.
   it cannot serve rather than returning a `NaN`, so twenty observations may span
   twenty-six sessions. A signal declares which of the two it wants, and the
   layer refuses the window rather than computing on the wrong one.
-- **Explicit transaction costs** — commission, spread and slippage will be
-  named, configurable terms; gross and net results reported side by side.
+- **Explicit transaction costs** — commission, spread and slippage are named,
+  configurable terms; gross and net results reported side by side.
+- **A book that could have existed** — an instrument is bought only if the
+  registry says it can be bought, in the currency the book is kept in, in the
+  units the venue deals in, with money the book holds, and never short. Each of
+  those is refused loudly rather than reported as a return: a backtest whose
+  orders could not have been placed is not a pessimistic backtest, it is a
+  different strategy.
 
 ## Layout
 
@@ -60,11 +74,11 @@ leaves the ratios to the layer that will own them.
 src/quant_backtester/
     data/        providers, Parquet store, trading calendars   (done)
     signals/     information -> forecast scores                (V1 done)
-    portfolio/   forecast scores -> target positions           (minimal)
-    execution/   target positions -> fills and costs           (minimal)
-    backtest/    the event loop                                (minimal)
+    portfolio/   forecast scores -> target positions           (V1 done)
+    execution/   target positions -> fills and costs           (V1 done)
+    backtest/    the event loop                                (V1 done)
     analytics/   performance and risk                          (V1 done)
-    strategies/  concrete strategies                           (one, minimal)
+    strategies/  concrete strategies                           (two)
 tests/           mirrors the package layout
 market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
 ```
@@ -87,7 +101,7 @@ its own `tail(20)` and get twenty observations spanning twenty-six sessions.
 
 | Module | Role |
 |---|---|
-| `instruments.py` | the registry: what each series is, and when it becomes public |
+| `instruments.py` | the registry: what each series is, when it becomes public, whether it can be bought and in what units |
 | `calendars.py` | sessions, real opening and closing instants in UTC |
 | `sources/` | one adapter per provider: Yahoo, FRED, ECB, Euronext |
 | `normalizer.py` | provider frames to canonical schemas, availability stamped |
@@ -184,10 +198,10 @@ snapshot = SignalEngine().compute(
             price_basis=PriceBasis.TOTAL_RETURN,
         )
     ],
-    ["ETF_WORLD", "SP500"],
+    ["ETF_WORLD", "ETF_SP500_PEA"],
 )
 
-snapshot.value("momentum_60d", "ETF_WORLD")  # 0.0260
+snapshot.value("momentum_60d", "ETF_WORLD")  # 0.0259
 snapshot.status("momentum_60d", "ETF_WORLD")  # SignalStatus.OK
 snapshot.result("momentum_60d").ok()  # the rows a strategy may use
 ```
@@ -221,14 +235,18 @@ from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.repository import MarketDataRepository
+from quant_backtester.data.universes import UniverseRegistry
 
 root = Path("market_data")
+instruments = InstrumentRegistry.from_toml(root / "metadata" / "instruments.toml")
+calendars = CalendarRegistry.from_directory(root / "metadata" / "calendars")
 reader = MarketDataReader(
     repository=MarketDataRepository(root),
-    instruments=InstrumentRegistry.from_toml(root / "metadata" / "instruments.toml"),
-    calendars=CalendarRegistry.from_directory(root / "metadata" / "calendars"),
+    instruments=instruments,
+    calendars=calendars,
     reference_calendar_id="XPAR",
 )
+universes = UniverseRegistry.from_toml(root / "metadata" / "universes.toml", instruments)
 
 # 23:00 in Paris: the US and European closes of the day are knowable.
 decision = reader.at(datetime(2026, 9, 17, 23, 0, tzinfo=ZoneInfo("Europe/Paris")))
@@ -247,8 +265,9 @@ engine = BacktestEngine(
     reference_calendar_id="XPAR",
     signals=[momentum, CrossSectionalRank(signal_id="momentum_60d_rank", source=momentum)],
     strategy=TopRankRotation(signal_id="momentum_60d_rank", top_n=1),
-    universe=["ETF_WORLD", "SP500"],
+    universe=universes.get("ROTATION_2"),  # two PEA funds, dated memberships
     initial_cash=100_000.0,
+    base_currency="EUR",
     limits=PositionLimits(max_weight=1.0, max_gross=1.0),
     execution=ExecutionModel(
         costs=CostModel(
@@ -267,44 +286,50 @@ print(report.render())
 437 sessions, 1.71 years, 255 sessions/year, risk-free 2.00%
 
                                gross         net
-total return                  17.53%      12.01%
-annualised return              9.93%       6.88%
-annualised volatility         10.15%      10.23%
-max drawdown                  -6.13%      -6.49%
-sharpe ratio                    0.78        0.50
+total return                  19.31%      16.19%
+annualised return             10.90%       9.20%
+annualised volatility         14.32%      14.39%
+max drawdown                 -21.60%     -21.65%
+sharpe ratio                    0.65        0.54
 
-costs                       5,516.31
-  commission                3,447.70
-  spread and slippage       2,068.61
-  drag on the return           5.52%
-  share of gross              31.47%
-  rebalancings                    65
-  per rebalancing              84.87
-  turnover                    64.85x
-  turnover a year             38.02x
+costs                       3,119.40
+  commission                1,949.63
+  spread and slippage       1,169.77
+  drag on the return           3.12%
+  share of gross              16.16%
+  rebalancings                    20
+  per rebalancing             155.97
+  turnover                    37.84x
+  turnover a year             22.18x
 
-sessions valued on an older close            0
-sessions an order could not be sent on     216
+sessions valued on an older close            1
+sessions an order could not be sent on       2
 sessions with nothing to choose from        61
-sessions a purchase was cut down on         33
+sessions a purchase was cut down on         11
 sessions ending on borrowed cash             0
 ```
 
-Five and a half points of return went to execution — **a third of everything the
-idea earned**, and a Sharpe ratio of 0.79 that an investor would have
-experienced as 0.50. A rotation that switches between two funds sixty-five
-times in twenty-one months is expensive, and that is the kind of fact a
-backtest without a cost model cannot show — which is why this one refuses to
-report a return without one.
+Three points of return went to execution — **a sixth of everything the idea
+earned** — and a Sharpe ratio of 0.65 that an investor would have experienced
+as 0.54. Twenty switches in twenty-one months is not a hyperactive strategy,
+and it still costs that much: the kind of fact a backtest without a cost model
+cannot show, which is why this one refuses to report a return without one.
 
-The last block is not decoration. This run holds an index alongside a fund, and
-an index has no opening auction to deal at: on 216 of its 437 sessions the
-order was not sent and the book stayed as it was. On 33 others the purchase was
-cut down, because a target of the whole book costs slightly more than the book
-is worth and execution is not allowed to borrow the difference — the last line
-reads zero, and it is a guard rather than a statistic. Those lines are the
-caveats the figures above have to be read with, and a report that left them out
-would be describing a strategy nobody could have run.
+The last block is not decoration. Sixty-one sessions had nothing to choose
+from, and they are one story: on 24 October 2025 the two providers disagreed
+on the world ETF's bar, so the reader serves that session as a hole rather than
+as a price. A sixty-session momentum needs sixty sessions in a row, and it took
+sixty-one for the hole to leave the window - during which the ranking had one
+instrument where it needs two, held what it already held, and traded nothing.
+That same session is the one valued on an older close and one of the two the
+order could not be sent on. Eleven purchases were cut down, because a target of
+the whole book costs slightly more than the book is worth and execution is not
+allowed to borrow the difference; the last line reads zero, and it is a guard
+rather than a statistic.
+
+Those lines are the caveats the figures above have to be read with. A single
+contested bar cost this strategy a quarter of its year, and a report that left
+that out would be describing a strategy nobody ran.
 
 Inside a session the order is fixed, and it is what stops a strategy buying at
 the close it just read:
@@ -327,12 +352,20 @@ momentum = MomentumSignal(
 snapshot = SignalEngine().compute(
     context,
     [momentum, CrossSectionalRank(signal_id="momentum_60d_rank", source=momentum)],
-    ["ETF_WORLD", "SP500"],
+    ["ETF_WORLD", "ETF_SP500_PEA"],
 )
 
 TopRankRotation(signal_id="momentum_60d_rank", top_n=1).decide(snapshot)
-# selected ('SP500',)  weights {'SP500': 1.0}  invested 100%  considered 2
+# selected ('ETF_SP500_PEA',)  weights {'ETF_SP500_PEA': 1.0}
+# invested 100%  considered 2
 ```
+
+Both names of that universe are funds a PEA can hold, in euros, on Euronext
+Paris. The S&P 500 index itself is in the registry and is declared
+`tradable = false`: a signal may read it, and a run that put it in a trading
+universe is stopped on the session it would have been chosen on. The earlier
+version of this example rotated into the index, and its orders were simply
+never sent — 216 sessions of a 437-session run, reported as a strategy.
 
 `decide` takes the snapshot and nothing else. A strategy holding a reader could
 write its own `tail(20)`; a strategy holding a repository could read a price
@@ -343,6 +376,14 @@ A name whose signal is not usable is never held, and the allocation says which
 of the reasons it was. A rotation meant to hold two names that can only find one
 holds it at half the capital rather than doubling a bet because a provider was
 late.
+
+An allocation is also a thing a portfolio could hold, checked where it is
+built: a weight is a finite fraction between zero and one, the selection and
+the weights describe the same book, and the count of instruments considered
+cannot be below the number chosen. A forecast model produces negative scores
+for half a universe by construction, and the keystroke that turns one into a
+weight is a short position nobody financed — so the refusal is at the boundary
+rather than in a comment.
 
 Other scripts: `generate_calendars.py` rewrites the committed calendars from
 `exchange_calendars`, `check_calendar_coverage.py` says when they need

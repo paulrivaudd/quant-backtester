@@ -15,6 +15,54 @@ calendar_id = "XNYS"
 tradable = false
 first_session = 1990-01-02
 
+# The second PEA-eligible fund, and the reason the rotation is a rotation: both
+# of these can actually be bought inside a French PEA, in euros, on the same
+# venue. The S&P 500 index below cannot be bought at all, which is why it is
+# declared tradable = false and never belongs to a trading universe.
+#
+# Yahoo serves 129 flat sessions before 18 March 2014, volume zero and an open
+# equal to its close: published net asset values from before the share class
+# had a market, exactly as for CW8. The first session with a real bar is
+# 2014-03-18.
+#
+# The series is nevertheless declared from 2018-04-18, and both halves of that
+# decision are written down here rather than left to be rediscovered:
+#
+#   1. it is the session the other fund of ROTATION_2 first had a market on,
+#      so nothing above this file can use an earlier one - a rotation needs two
+#      things to rotate between;
+#   2. Yahoo's only inconsistent bar in thirteen years sits before it. On
+#      2017-09-07 it serves open 9.22583 above high 9.20667, two tenths of a
+#      percent apart, and the validator refuses the whole series for it - as it
+#      should: a bar whose open is outside its own range is not a bar. This
+#      project has a reviewed correction for a corporate action and for a
+#      provider revision, and none yet for a malformed bar, so the honest state
+#      is a declared window and this note, not a silently repaired price.
+#
+# Extending the series backwards therefore needs that mechanism first, and is
+# a change to what every past result was computed on.
+[[instrument]]
+id = "ETF_SP500_PEA"
+name = "BNP Paribas Easy S&P 500 (PEA)"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ESE.PA"
+calendar_id = "XPAR"
+tradable = true
+# Whole shares: a retail order book takes 123 of them or 124, never 123.47.
+quantity_step = 1.0
+first_session = 2018-04-18
+# Capitalising (C) share class, like CW8: an empty dividend feed is expected.
+distribution_policy = "ACCUMULATING"
+
+  # Yahoo reports no split for ESE, so its bars are raw (checked 2026-09-20).
+  # Euronext serves about two years only: older sessions stay SINGLE_SOURCE.
+  [[instrument.check_sources]]
+  source = "EURONEXT"
+  source_symbol = "FR0011550185-XPAR"
+
 [[instrument]]
 id = "ETF_WORLD"
 name = "Amundi MSCI World (PEA)"
@@ -25,6 +73,10 @@ primary_source = "YAHOO"
 source_symbol = "CW8.PA"
 calendar_id = "XPAR"
 tradable = true
+# Whole shares, as above: the lot size is a fact about the venue and the
+# broker, and a backtest that ignores it allocates its capital more perfectly
+# than any account could.
+quantity_step = 1.0
 # The share class listed on 18 April 2018, the first session with a real bar
 # (volume 309, an open apart from its close). Yahoo serves 74 sessions before
 # it, from 2018-01-02 to 2018-04-17, every one of them flat at a single value
