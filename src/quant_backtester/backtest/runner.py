@@ -40,19 +40,29 @@ from dataclasses import dataclass, field
 from datetime import date
 
 import pandas as pd
+from matplotlib.figure import Figure
 
+from quant_backtester.analytics.comparison import (
+    BenchmarkCurrencyMismatch,
+    BenchmarkCurve,
+    BenchmarkSpec,
+    Comparison,
+    compare,
+)
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.curves import Book, drawdown_curve, equity_curve
+from quant_backtester.analytics.plots import drawdown_figure, equity_figure
 from quant_backtester.analytics.report import PerformanceReport
 from quant_backtester.backtest.engine import BacktestEngine, BacktestResult, Timetable
 from quant_backtester.backtest.schedule import DecisionSchedule, EverySession
 from quant_backtester.data.calendars import CalendarRegistry
-from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.data.reader import MarketDataReader, ObservationStatus
+from quant_backtester.data.schemas import BarField
 from quant_backtester.data.universes import StaticUniverse, UniverseRegistry, UniverseSource
 from quant_backtester.execution.fills import ExecutionModel
 from quant_backtester.numbers import require_finite_positive
 from quant_backtester.portfolio.limits import PositionLimits
-from quant_backtester.signals.types import require_identifier
+from quant_backtester.signals.types import PriceBasis, require_identifier
 from quant_backtester.strategies.base import Strategy
 
 Period = date | str
@@ -80,6 +90,17 @@ class StrategyResult:
     analytics : PerformanceReport
         Gross and net side by side, the costs between them, what each
         instrument contributed, and the caveats.
+    reader : MarketDataReader
+        The store the run read, kept so that a benchmark can be valued over the
+        same sessions afterwards. Ex-post only: a decision never sees it, and
+        every reading the comparison takes is at a decision instant inside the
+        period, so data arriving after the run changes none of its figures.
+    analytics_config : AnalyticsConfig
+        The convention every annualised figure was computed under, applied to a
+        benchmark as well so that the two sides are comparable.
+    base_currency : str
+        The currency the book was kept in, used to refuse a benchmark quoted in
+        another one.
 
     Notes
     -----
@@ -94,6 +115,9 @@ class StrategyResult:
     configuration: Mapping[str, object]
     backtest: BacktestResult
     analytics: PerformanceReport
+    reader: MarketDataReader
+    analytics_config: AnalyticsConfig
+    base_currency: str
 
     @property
     def start(self) -> date:
@@ -133,6 +157,86 @@ class StrategyResult:
     def frame(self) -> pd.DataFrame:
         """Return the run as a frame, one row per session."""
         return self.backtest.frame()
+
+    def benchmark(self, benchmark: BenchmarkSpec | str) -> BenchmarkCurve:
+        """Value something else over the same sessions.
+
+        Parameters
+        ----------
+        benchmark : BenchmarkSpec | str
+            What could have been held instead - an instrument id, or a
+            specification saying which price basis to compare on.
+
+        Returns
+        -------
+        BenchmarkCurve
+            Its worth, normalised to this run's starting value.
+
+        Raises
+        ------
+        BenchmarkCurrencyMismatch
+            If it is quoted in another currency than the book. Without an FX
+            conversion, the difference between the two curves is an exchange
+            rate with a strategy's name on it.
+        """
+        return value_benchmark(
+            self.backtest, self.reader, benchmark, base_currency=self.base_currency
+        )
+
+    def compare(self, benchmark: BenchmarkSpec | str, book: Book = Book.NET) -> Comparison:
+        """Measure this run against something else, over the days they share.
+
+        Parameters
+        ----------
+        benchmark : BenchmarkSpec | str
+            What could have been held instead.
+        book : Book
+            Which of the run's curves to compare, net by default.
+
+        Returns
+        -------
+        Comparison
+            The same statistics for both sides, over the same sessions.
+        """
+        return compare(self.equity(book), self.benchmark(benchmark), self.analytics_config)
+
+    def plot(
+        self,
+        benchmark: BenchmarkSpec | str | None = None,
+        *,
+        gross: bool = True,
+    ) -> Figure:
+        """Draw the run, and what it could have been measured against.
+
+        Parameters
+        ----------
+        benchmark : BenchmarkSpec | str | None
+            Drawn beside the strategy when given, normalised to the same
+            starting value.
+        gross : bool
+            Whether to draw the book that paid nothing behind the net one. The
+            gap between the two is what execution took, and it is usually the
+            most useful thing in the picture.
+
+        Returns
+        -------
+        Figure
+            A matplotlib figure. ``show`` is never called, so a notebook
+            displays it, a script saves it and a test inspects it.
+        """
+        other = None if benchmark is None else self.benchmark(benchmark).equity
+        return equity_figure(
+            self.equity(),
+            title=f"{self.strategy_id}  {self.start} to {self.end}",
+            gross=self.equity(Book.GROSS) if gross else None,
+            benchmark=other,
+        )
+
+    def plot_drawdown(self, book: Book = Book.NET) -> Figure:
+        """Draw the drawdown curve, measured against the running peak."""
+        return drawdown_figure(
+            self.drawdown(book), title=f"{self.strategy_id}  drawdown  {self.start} to {self.end}"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,6 +381,9 @@ class StrategyRunner:
             ),
             backtest=result,
             analytics=PerformanceReport.of(result, self.analytics),
+            reader=self.reader,
+            analytics_config=self.analytics,
+            base_currency=self.base_currency,
         )
 
     def _bounds(self, start: Period, end: Period) -> tuple[date, date]:
@@ -350,6 +457,110 @@ class StrategyRunner:
                 "risk_free_rate": self.analytics.risk_free_rate,
             },
         }
+
+
+def value_benchmark(
+    result: BacktestResult,
+    reader: MarketDataReader,
+    spec: BenchmarkSpec | str,
+    *,
+    base_currency: str | None = None,
+    book: Book = Book.NET,
+) -> BenchmarkCurve:
+    """Value a benchmark over the sessions of a finished run.
+
+    Parameters
+    ----------
+    result : BacktestResult
+        The run to compare against. Only its sessions and its starting value
+        are used.
+    reader : MarketDataReader
+        The store, read at each session's decision instant - the same instant
+        the strategy's own equity was valued at, so neither curve sees a price
+        the other could not.
+    spec : BenchmarkSpec | str
+        What could have been held instead.
+    base_currency : str | None
+        The currency the book is kept in. When given, a benchmark quoted in
+        another one is refused rather than drawn.
+    book : Book
+        Which of the run's curves the starting value is taken from.
+
+    Returns
+    -------
+    BenchmarkCurve
+        Its worth over the same sessions, normalised to the run's starting
+        value, naming the sessions it had to be marked from an earlier close
+        on.
+
+    Raises
+    ------
+    ValueError
+        If the run holds no session, if the benchmark has no usable price at
+        the first one - there is nothing to normalise to - or if it is not
+        registered.
+    BenchmarkCurrencyMismatch
+        If it is quoted in another currency than the book.
+
+    Notes
+    -----
+    It lives here rather than in ``analytics`` because it needs a reader, and
+    analytics is handed finished runs precisely so that no statistic can be
+    computed against prices the run never saw. This one reads at the run's own
+    decision instants, which is what makes the comparison fair: a benchmark
+    valued at today's revision of a price would be measuring the strategy
+    against a series that did not exist while it was running.
+
+    A session the benchmark's own venue did not hold is marked at the last
+    close that existed, and named. A European strategy measured against a US
+    index has a handful of those every year, and a curve with a flat day in it
+    should say why rather than look like a day the index did not move.
+    """
+    specification = BenchmarkSpec.of(spec)
+    if not result.records:
+        raise ValueError("a benchmark has nothing to be measured over: the run holds no session")
+    instrument = reader.instruments.get(specification.instrument_id)
+    if base_currency is not None and instrument.currency != base_currency:
+        raise BenchmarkCurrencyMismatch(
+            f"{instrument.id} is quoted in {instrument.currency} and the book is kept in "
+            f"{base_currency}; without an FX conversion the difference between the two "
+            "curves is an exchange rate"
+        )
+    prices: list[float] = []
+    stale: list[date] = []
+    last: float | None = None
+    for record in result.records:
+        market = reader.at(record.decision_at)
+        series = (
+            market.total_return_history(instrument.id)
+            if specification.price_basis is PriceBasis.TOTAL_RETURN
+            else market.history(instrument.id, BarField.CLOSE)
+        )
+        status = market.values([instrument.id], BarField.CLOSE).iloc[0]["status"]
+        value = float(series.iloc[-1]) if len(series) else float("nan")
+        if value != value:
+            if last is None:
+                raise ValueError(
+                    f"{instrument.id} has no price at {record.decision_at}, so there is "
+                    "nothing to normalise the benchmark to"
+                )
+            value = last
+        if status is not ObservationStatus.OK:
+            stale.append(record.session_date)
+        prices.append(value)
+        last = value
+    require_finite_positive(prices[0], f"the first price of {instrument.id}")
+    start = float(equity_curve(result, book).iloc[0])
+    values = pd.Series(
+        [start * price / prices[0] for price in prices],
+        index=pd.Index(
+            [record.session_date for record in result.records],
+            dtype="object",
+            name="session_date",
+        ),
+        name=specification.name,
+    )
+    return BenchmarkCurve(spec=specification, equity=values, marked_from_earlier=tuple(stale))
 
 
 def _as_date(value: Period, name: str) -> date:
