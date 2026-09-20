@@ -30,6 +30,8 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 
+from quant_backtester.backtest.context import StrategyContext
+from quant_backtester.backtest.market import StrategyMarketView
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.instruments import (
     AssetType,
@@ -49,7 +51,10 @@ from quant_backtester.data.schemas import (
     BarField,
     CheckStatus,
 )
+from quant_backtester.portfolio.targets import Holdings
+from quant_backtester.portfolio.view import PortfolioView
 from quant_backtester.signals.context import SignalContext
+from quant_backtester.signals.snapshot import SignalSnapshot
 
 
 @pytest.fixture(scope="session")
@@ -154,6 +159,7 @@ BarsBuilder = Callable[..., pd.DataFrame]
 LevelsBuilder = Callable[..., pd.DataFrame]
 MarketBuilder = Callable[..., MarketDataReader]
 ContextBuilder = Callable[[MarketDataReader, datetime], SignalContext]
+DecisionBuilder = Callable[..., StrategyContext]
 
 
 def paris(day: date, hour: int, minute: int = 0) -> datetime:
@@ -439,19 +445,22 @@ def market(
     xpar: TradingCalendar,
     xnys: TradingCalendar,
 ) -> MarketDataReader:
-    """Return a reader over three instruments, each there for a reason.
+    """Return a reader over four instruments, each there for a reason.
 
     ``ETF_EU`` rises by one a session over the ten sessions of the span, which
-    is what makes every formula checkable by hand. ``IDX_US`` reaches a month
-    further back so that a decision taken early in the span still has history
-    behind it, and lives on the calendar that is shut on 7 September.
-    ``ETF_LATE`` has four sessions, one short of what any V1 signal needs.
+    is what makes every formula checkable by hand. ``ETF_OTHER`` rises faster
+    on the same venue, which is what makes a rotation between two tradable
+    funds testable at all. ``IDX_US`` reaches a month further back so that a
+    decision taken early in the span still has history behind it, and lives on
+    the calendar that is shut on 7 September. ``ETF_LATE`` has four sessions,
+    one short of what any V1 signal needs.
     """
     us_start = date(2026, 8, 17)
     us_days = [session.session_date for session in xnys.sessions(us_start, DECISION)]
     return make_market(
         {
             "ETF_EU": make_bars("ETF_EU", xpar, rising(100.0, 1.0)),
+            "ETF_OTHER": make_bars("ETF_OTHER", xpar, rising(200.0, 3.0)),
             "IDX_US": make_bars("IDX_US", xnys, rising(5_000.0, 10.0, us_days)),
             "ETF_LATE": make_bars("ETF_LATE", xpar, rising(50.0, 1.0, SESSIONS[6:])),
         }
@@ -462,6 +471,44 @@ def market(
 def context(market: MarketDataReader, make_context: ContextBuilder) -> SignalContext:
     """Return the context of a decision taken after the close of 14 September."""
     return make_context(market, paris(DECISION, 23, 0))
+
+
+@pytest.fixture
+def make_decision(instruments: InstrumentRegistry) -> DecisionBuilder:
+    """Return a builder of the context a strategy is handed at one decision.
+
+    The engine builds one of these per session; a test about a strategy builds
+    it directly, so that what is under test is the decision and not the loop
+    around it. Everything defaults to the simplest honest thing: a book of cash
+    with no positions, and a universe of every tradable instrument the snapshot
+    speaks about.
+    """
+
+    def build(
+        context: SignalContext,
+        snapshot: SignalSnapshot,
+        universe: Sequence[str] | None = None,
+        holdings: Holdings | None = None,
+        prices: Mapping[str, float] | None = None,
+    ) -> StrategyContext:
+        if universe is None:
+            names: list[str] = []
+            for signal_id in snapshot:
+                for name in snapshot.result(signal_id).instruments():
+                    if name not in names and instruments.get(name).tradable:
+                        names.append(name)
+            universe = tuple(names)
+        book = Holdings(cash=10_000.0) if holdings is None else holdings
+        return StrategyContext(
+            as_of=snapshot.as_of,
+            signals=snapshot,
+            market=StrategyMarketView(context),
+            portfolio=PortfolioView.of(book, dict(prices or {}), snapshot.as_of),
+            universe=tuple(universe),
+            instruments=instruments,
+        )
+
+    return build
 
 
 @pytest.fixture

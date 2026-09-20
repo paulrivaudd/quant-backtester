@@ -35,6 +35,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from quant_backtester.backtest.context import StrategyContext
+from quant_backtester.backtest.market import StrategyMarketView
 from quant_backtester.data.calendars import CalendarRegistry, Session
 from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus, PointInTimeReader
@@ -44,10 +46,10 @@ from quant_backtester.execution.fills import Execution, ExecutionModel, Fill
 from quant_backtester.numbers import require_finite_positive
 from quant_backtester.portfolio.limits import PositionLimits
 from quant_backtester.portfolio.targets import Holdings, TargetAllocation
+from quant_backtester.portfolio.view import PortfolioView
 from quant_backtester.signals.base import Signal
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
-from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import require_identifier
 
 
@@ -59,9 +61,18 @@ class Strategy(Protocol):
     argument instead of reaching for it.
     """
 
-    def decide(self, signals: SignalSnapshot) -> TargetAllocation:
-        """Return what to hold, given the signals of one decision instant."""
+    def decide(self, ctx: StrategyContext) -> TargetAllocation:
+        """Return what to hold, given one decision instant."""
         ...
+
+    def required_signals(self) -> Sequence[Signal | SignalRequest]:
+        """Return the signals this strategy needs computed for each decision.
+
+        Given a body rather than left abstract: a strategy that reads only the
+        market, or one written for a test, declares nothing and should not have
+        to say so.
+        """
+        return ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -455,7 +466,7 @@ class BacktestEngine:
             prices, estimated = self._valuation(market, holdings, last_price)
             last_price.update(prices)
             members = self._trading_universe(session.session_date)
-            pending = self._decide(engine, market, members, session.session_date)
+            pending = self._decide(engine, market, members, session.session_date, holdings, prices)
             records.append(
                 self._record(
                     session=session,
@@ -701,6 +712,8 @@ class BacktestEngine:
         market: PointInTimeReader,
         members: Sequence[str],
         session_date: date,
+        holdings: Holdings,
+        prices: Mapping[str, float],
     ) -> TargetAllocation:
         """Compute the signals over that session's universes and decide what to hold.
 
@@ -717,10 +730,38 @@ class BacktestEngine:
         )
         requests = [
             item.resolved(session_date) if isinstance(item, SignalRequest) else item
-            for item in self.signals
+            for item in self._declared_signals()
         ]
         snapshot = engine.compute(context, requests, list(members))
-        return self.limits.apply(self.strategy.decide(snapshot))
+        decision = StrategyContext(
+            as_of=context.as_of,
+            signals=snapshot,
+            market=StrategyMarketView(context),
+            portfolio=PortfolioView.of(holdings, prices, context.as_of),
+            universe=tuple(members),
+            instruments=self.instruments,
+        )
+        return self.limits.apply(self.strategy.decide(decision))
+
+    def _declared_signals(self) -> Sequence[Signal | SignalRequest]:
+        """Return the signals to compute: the engine's, plus the strategy's own.
+
+        Notes
+        -----
+        A strategy declares what it reads, so that nobody can run one while
+        forgetting a signal it needs - a mistake that produces a ``KeyError``
+        deep inside a decision at best, and a different backtest at worst. The
+        engine's own list stays, because the low-level API is still the one the
+        tests of this layer use, and because a run may want a signal recorded
+        that no strategy reads.
+        """
+        declared = getattr(self.strategy, "required_signals", None)
+        # A strategy written against the protocol alone inherits its stub,
+        # which returns nothing: that is a strategy declaring no signal.
+        wanted = declared() if declared is not None else None
+        if not wanted:
+            return self.signals
+        return (*self.signals, *wanted)
 
     def _record(
         self,
