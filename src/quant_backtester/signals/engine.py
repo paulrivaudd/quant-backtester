@@ -19,7 +19,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 
-from quant_backtester.data.universes import UniverseSource
+from quant_backtester.data.universes import UniverseSource, universe_definition
 from quant_backtester.signals.base import Signal, SignalResult, freeze
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.snapshot import SignalSnapshot
@@ -82,6 +82,29 @@ class SignalRequest:
         if not isinstance(self.instruments, UniverseSource):
             return self
         return replace(self, instruments=tuple(self.instruments.members_at(on)))
+
+    def definition(self) -> dict[str, object]:
+        """Return what identifies this request, universe included.
+
+        Returns
+        -------
+        dict[str, object]
+            The signal's own definition and a description of what it is
+            computed for: ``None`` for the snapshot's universe, the names of a
+            fixed list, the id and memberships of a dated one.
+
+        Notes
+        -----
+        The request describes itself so that the layers above it - a strategy
+        recording what it ran, an experiment log - never have to reach into the
+        data layer to find out what a universe was. Two requests computing one
+        signal over two different universes are two different experiments, and
+        a definition naming only the class of the universe could not say so.
+        """
+        return {
+            "signal": self.signal.definition_json(),
+            "instruments": universe_definition(self.instruments),
+        }
 
     def names(self) -> Sequence[str] | None:
         """Return the instruments this request names, resolved.

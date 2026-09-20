@@ -70,8 +70,59 @@ def test_it_declares_its_signals_like_any_other(
 
 def test_its_parameters_are_recorded() -> None:
     """A function closing over a threshold has a parameter, and a run says which."""
-    assert world_or_cash.parameters() == {"floor": 0.0}
-    assert world_or_cash.definition()["parameters"] == {"floor": 0.0}
+    recorded = world_or_cash.parameters()
+
+    assert recorded["floor"] == 0.0
+    assert world_or_cash.definition()["parameters"]["floor"] == 0.0  # type: ignore[index]
+
+
+def test_the_decision_function_is_part_of_the_identity() -> None:
+    """Two functions deciding opposite things must not be filed as one experiment.
+
+    Same name, same parameters, same signals: before the function itself was
+    recorded, these two had the same fingerprint and a result could not say
+    which of them produced it.
+    """
+
+    def hold(ctx: StrategyContext) -> TargetAllocation:
+        return ctx.weights({"ETF_EU": 1.0})
+
+    def stand_aside(ctx: StrategyContext) -> TargetAllocation:
+        return ctx.cash()
+
+    first = FunctionalStrategy(strategy_id="same", decision=hold)
+    second = FunctionalStrategy(strategy_id="same", decision=stand_aside)
+
+    assert first.fingerprint() != second.fingerprint()
+    assert "hold" in str(first.parameters()["decision"])
+
+
+def test_mutating_the_caller_s_parameters_does_not_change_the_strategy() -> None:
+    """Frozen has to mean frozen, or a run records a configuration it did not use."""
+    given = {"threshold": 1.5}
+    strategy = FunctionalStrategy(
+        strategy_id="threshold", decision=world_or_cash.decision, parameter_values=given
+    )
+    before = strategy.fingerprint()
+
+    given["threshold"] = 3.0
+
+    assert strategy.fingerprint() == before
+    assert strategy.parameters()["threshold"] == 1.5
+
+
+def test_the_parameters_of_a_strategy_are_read_only() -> None:
+    """Including the nested ones: the definition is what a fingerprint is taken of."""
+    strategy = FunctionalStrategy(
+        strategy_id="nested",
+        decision=world_or_cash.decision,
+        parameter_values={"bounds": {"low": 0.0}},
+    )
+
+    with pytest.raises(TypeError):
+        strategy.parameter_values["bounds"] = {}  # type: ignore[index]
+    with pytest.raises(TypeError):
+        strategy.parameter_values["bounds"]["low"] = 1.0  # type: ignore[index]
 
 
 def test_two_configurations_have_two_fingerprints() -> None:

@@ -146,17 +146,20 @@ def test_strategies_import_no_network_library():
 
 
 def test_a_strategy_is_never_handed_the_reader():
-    """The façade may hold it; the API a strategy writes against must not expose it.
+    """The façade holds a reader; the API a strategy writes against must not expose it.
 
     Checked on the public surface rather than on the imports, because the
     context is built for the strategy rather than imported by it: what matters
-    is that there is no attribute to reach it through.
+    is that there is no attribute, property or method to reach it through.
     """
-    public = {name for name in dir(StrategyContext) if not name.startswith("_")}
+    surface = {
+        name
+        for owner in (StrategyContext, StrategyMarketView)
+        for name in dir(owner)
+        if not name.startswith("_")
+    }
 
-    assert "reader" not in public
-    assert "repository" not in public
-    assert not {name for name in dir(StrategyMarketView) if name == "reader"}
-    # The façade's own reader is reachable only through the signals context it
-    # was built from, which takes no instant either.
-    assert "at" not in {name for name in dir(StrategyMarketView) if not name.startswith("_")}
+    assert "reader" not in surface
+    assert "repository" not in surface
+    assert "context" not in surface
+    assert "at" not in surface

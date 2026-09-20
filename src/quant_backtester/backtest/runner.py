@@ -58,15 +58,33 @@ from quant_backtester.backtest.schedule import DecisionSchedule, EverySession
 from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus
 from quant_backtester.data.schemas import BarField
-from quant_backtester.data.universes import StaticUniverse, UniverseRegistry, UniverseSource
+from quant_backtester.data.universes import (
+    StaticUniverse,
+    UniverseRegistry,
+    UniverseSource,
+    universe_definition,
+)
 from quant_backtester.execution.fills import ExecutionModel
 from quant_backtester.numbers import require_finite_positive
 from quant_backtester.portfolio.limits import PositionLimits
+from quant_backtester.signals.base import freeze
 from quant_backtester.signals.types import PriceBasis, require_identifier
 from quant_backtester.strategies.base import Strategy
 
 Period = date | str
 """A bound of a run: a date, or an ISO string for the convenience of a notebook."""
+
+
+class StrategyMutated(RuntimeError):
+    """Raised when a strategy was not the same object at the end of its run.
+
+    A strategy is meant to hold no state between decisions: everything
+    path-dependent - what is held, what it is worth, how the market moved -
+    comes from the context. A strategy that kept a counter or rebuilt its
+    parameters as it went would be recorded under a definition that describes
+    its last decision rather than all of them, and the experiment could not be
+    reproduced from its own result.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -336,6 +354,8 @@ class StrategyRunner:
         ValueError
             If the strategy cannot be run, if the period holds no session of
             the reference calendar, or if a universe id is not declared.
+        StrategyMutated
+            If the strategy's definition changed while it was deciding.
         CalendarCoverageError
             If the period reaches outside the reference calendar's coverage.
         """
@@ -348,7 +368,7 @@ class StrategyRunner:
                 f"{first} to {last} holds no session of {self.reference_calendar_id}; "
                 "there is nothing to measure a performance over"
             )
-        resolved, universe_id = self._universe(universe)
+        resolved, described = self._universe(universe)
         cash = self.initial_cash if initial_cash is None else initial_cash
         require_finite_positive(cash, "initial_cash")
         decisions = self.schedule if schedule is None else schedule
@@ -366,16 +386,28 @@ class StrategyRunner:
             execution=self.execution,
             timetable=self.timetable,
         )
+        # Taken before the run, not after: a strategy that changed itself while
+        # deciding would otherwise be recorded in its final state, and the
+        # configuration a result carries would not be the one that produced it.
+        definition = freeze(dict(strategy.definition()))
+        fingerprint = strategy.fingerprint()
         result = engine.run(sessions[0].session_date, sessions[-1].session_date)
+        if strategy.fingerprint() != fingerprint:
+            raise StrategyMutated(
+                f"{strategy.strategy_id} is not the strategy it was at the start of the "
+                "run: its definition changed while it was deciding. A strategy holds no "
+                "state between decisions - what is path-dependent comes from the context."
+            )
+        assert isinstance(definition, Mapping)
         return StrategyResult(
             strategy_id=strategy.strategy_id,
-            definition=strategy.definition(),
-            fingerprint=strategy.fingerprint(),
+            definition=definition,
+            fingerprint=fingerprint,
             configuration=self._configuration(
                 start=sessions[0].session_date,
                 end=sessions[-1].session_date,
                 asked=(first, last),
-                universe_id=universe_id,
+                universe=described,
                 cash=cash,
                 schedule=decisions,
             ),
@@ -395,8 +427,16 @@ class StrategyRunner:
 
     def _universe(
         self, universe: str | UniverseSource | Sequence[str]
-    ) -> tuple[UniverseSource, str | None]:
-        """Return the universe to run over, and the id it was named by.
+    ) -> tuple[UniverseSource, object]:
+        """Return the universe to run over, and what identifies it in the record.
+
+        Returns
+        -------
+        tuple[UniverseSource, object]
+            The universe, and a description of it: the id of a committed one,
+            the members of a static one, the memberships of one built in code.
+            A run that recorded ``None`` for a list of names could not be
+            reproduced from its own result.
 
         Raises
         ------
@@ -410,10 +450,12 @@ class StrategyRunner:
                     f"the universe {universe!r} was named by id and this runner was "
                     "given no universe registry to look it up in"
                 )
-            return self.universes.get(universe), universe
+            resolved: UniverseSource = self.universes.get(universe)
+            return resolved, universe_definition(resolved)
         if isinstance(universe, UniverseSource):
-            return universe, getattr(universe, "universe_id", None)
-        return StaticUniverse(tuple(universe)), None
+            return universe, universe_definition(universe)
+        static = StaticUniverse(tuple(universe))
+        return static, universe_definition(static)
 
     def _configuration(
         self,
@@ -421,7 +463,7 @@ class StrategyRunner:
         start: date,
         end: date,
         asked: tuple[date, date],
-        universe_id: str | None,
+        universe: object,
         cash: float,
         schedule: DecisionSchedule,
     ) -> dict[str, object]:
@@ -433,9 +475,9 @@ class StrategyRunner:
             "requested_end": asked[1].isoformat(),
             "reference_calendar": self.reference_calendar_id,
             "base_currency": self.base_currency,
-            "universe": universe_id,
+            "universe": universe,
             "initial_cash": cash,
-            "schedule": type(schedule).__name__,
+            "schedule": schedule.definition(),
             "limits": {
                 "max_weight": self.limits.max_weight,
                 "max_gross": self.limits.max_gross,

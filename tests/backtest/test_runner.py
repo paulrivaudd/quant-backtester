@@ -16,6 +16,7 @@ import pytest
 
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.curves import Book
+from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.backtest.engine import Timetable
 from quant_backtester.backtest.runner import StrategyRunner
 from quant_backtester.backtest.schedule import EveryNSessions
@@ -24,6 +25,7 @@ from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.universes import Membership, StaticUniverse, Universe
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.fills import ExecutionModel
+from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.strategies.examples import BuyAndHold, MomentumSingleAsset
 
 PARIS = Timetable(decision_time=time(23, 0), execution_time=time(9, 1), timezone="Europe/Paris")
@@ -135,11 +137,21 @@ def test_a_dated_universe_is_asked_by_session(runner: StrategyRunner) -> None:
 
     result = runner.run(BuyAndHold(instruments=("ETF_EU",)), universe, "2026-09-09", "2026-09-14")
 
-    assert result.configuration["universe"] == "LEAVER"
+    recorded = result.configuration["universe"]
+    assert recorded["type"] == "Universe"  # type: ignore[index]
+    assert recorded["id"] == "LEAVER"  # type: ignore[index]
+    # The memberships, not the names of today: a dated universe answers a
+    # different list on every session, so only the windows identify it.
+    assert recorded["memberships"][1]["until"] == "2026-09-10"  # type: ignore[index]
 
 
-def test_a_static_universe_records_no_id(runner: StrategyRunner) -> None:
-    """A list of names is honest only for instruments that existed throughout."""
+def test_a_static_universe_records_its_members(runner: StrategyRunner) -> None:
+    """A list of names has no id, and its members are what identifies it.
+
+    Recording ``None`` made two runs over two completely different books look
+    like the same experiment - which is exactly what the configuration exists
+    to prevent.
+    """
     result = runner.run(
         BuyAndHold(instruments=("ETF_EU",)),
         StaticUniverse(("ETF_EU",)),
@@ -147,7 +159,20 @@ def test_a_static_universe_records_no_id(runner: StrategyRunner) -> None:
         "2026-09-14",
     )
 
-    assert result.configuration["universe"] is None
+    assert result.configuration["universe"] == {
+        "type": "StaticUniverse",
+        "members": ["ETF_EU"],
+    }
+
+
+def test_two_static_universes_are_not_one_experiment(runner: StrategyRunner) -> None:
+    """The point of recording the members rather than their absence."""
+    first = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
+    second = runner.run(
+        BuyAndHold(instruments=("ETF_OTHER",)), ["ETF_OTHER"], "2026-09-09", "2026-09-14"
+    )
+
+    assert first.configuration["universe"] != second.configuration["universe"]
 
 
 def test_the_result_records_what_the_numbers_depend_on(runner: StrategyRunner) -> None:
@@ -158,7 +183,7 @@ def test_the_result_records_what_the_numbers_depend_on(runner: StrategyRunner) -
     assert configuration["reference_calendar"] == "XPAR"
     assert configuration["base_currency"] == "EUR"
     assert configuration["initial_cash"] == pytest.approx(10_000.0)
-    assert configuration["schedule"] == "EverySession"
+    assert configuration["schedule"] == {"type": "EverySession", "parameters": {}}
     assert configuration["costs"]["commission_rate"] == pytest.approx(0.001)  # type: ignore[index]
     assert configuration["timetable"]["decision_time"] == "23:00:00"  # type: ignore[index]
     assert configuration["analytics"]["sessions_per_year"] == 255  # type: ignore[index]
@@ -171,7 +196,7 @@ def test_the_result_records_the_strategy_itself(runner: StrategyRunner) -> None:
         BuyAndHold(instruments=("ETF_OTHER",)), ["ETF_OTHER"], "2026-09-09", "2026-09-14"
     )
 
-    assert result.definition["parameters"]["instruments"] == ["ETF_EU"]  # type: ignore[index]
+    assert result.definition["parameters"]["instruments"] == ("ETF_EU",)  # type: ignore[index]
     assert result.fingerprint != other.fingerprint
 
 
@@ -185,8 +210,22 @@ def test_the_schedule_of_a_run_can_be_chosen_per_run(runner: StrategyRunner) -> 
         schedule=EveryNSessions(5),
     )
 
-    assert result.configuration["schedule"] == "EveryNSessions"
+    assert result.configuration["schedule"] == {
+        "type": "EveryNSessions",
+        "parameters": {"n": 5},
+    }
     assert sum(1 for record in result.backtest.records if record.decided) == 2
+
+
+def test_two_frequencies_are_two_experiments(runner: StrategyRunner) -> None:
+    """Rebalancing every five sessions and every twenty are not the same strategy."""
+    strategy = BuyAndHold(instruments=("ETF_EU",))
+    often = runner.run(strategy, ["ETF_EU"], "2026-09-01", "2026-09-14", schedule=EveryNSessions(2))
+    rarely = runner.run(
+        strategy, ["ETF_EU"], "2026-09-01", "2026-09-14", schedule=EveryNSessions(5)
+    )
+
+    assert often.configuration["schedule"] != rarely.configuration["schedule"]
 
 
 def test_the_result_hands_back_the_report_and_the_curves(runner: StrategyRunner) -> None:
@@ -268,3 +307,57 @@ def test_the_runner_produces_what_the_engine_produces(
     assert [record.equity for record in through.backtest.records] == [
         record.equity for record in directly.records
     ]
+
+
+def test_a_strategy_that_changes_while_it_decides_is_refused(
+    runner: StrategyRunner,
+) -> None:
+    """The definition recorded has to be the one that produced the numbers.
+
+    A strategy holds no state between decisions - everything path-dependent
+    comes from the context. One that kept a counter would be filed under a
+    definition describing its last decision rather than all of them, and the
+    result could not be reproduced from itself.
+    """
+    from quant_backtester.backtest.runner import StrategyMutated
+    from quant_backtester.strategies.base import Strategy
+
+    class Drifting(Strategy):
+        strategy_id = "drifting"
+
+        def __init__(self) -> None:
+            self.lookback = 1
+
+        def parameters(self) -> dict[str, object]:
+            return {"lookback": self.lookback}
+
+        def decide(self, ctx: StrategyContext) -> TargetAllocation:
+            self.lookback += 1
+            return ctx.cash()
+
+    with pytest.raises(StrategyMutated, match="not the strategy it was"):
+        runner.run(Drifting(), ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+
+def test_the_signals_of_a_run_are_asked_for_once(runner: StrategyRunner) -> None:
+    """The declaration that ran is the declaration the result records."""
+    from quant_backtester.strategies.base import Strategy
+
+    asked: list[int] = []
+
+    class Counting(Strategy):
+        strategy_id = "counting"
+
+        def required_signals(self) -> tuple[()]:
+            asked.append(1)
+            return ()
+
+        def decide(self, ctx: StrategyContext) -> TargetAllocation:
+            return ctx.cash()
+
+    result = runner.run(Counting(), ["ETF_EU"], "2026-09-01", "2026-09-14")
+
+    # Once for the run itself; the rest are the definition and the fingerprint,
+    # which are taken twice - before and after - to catch a strategy that moved.
+    decisions = len(result.backtest.records)
+    assert len(asked) < decisions

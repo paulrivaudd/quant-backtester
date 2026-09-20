@@ -20,7 +20,7 @@ session that exists; the 31st is not, and neither is a Sunday.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import date
 
 from quant_backtester.signals.types import require_positive_int
@@ -36,6 +36,10 @@ class EverySession:
     daily pays whatever the execution layer charges for the drift, which is
     exactly what the cost report is for.
     """
+
+    def definition(self) -> dict[str, object]:
+        """Return what identifies this schedule, for the record of a run."""
+        return _definition_of(self)
 
     def decision_sessions(self, sessions: Sequence[date]) -> frozenset[date]:
         """Return every session as a decision session."""
@@ -63,6 +67,18 @@ class EveryNSessions:
         """Reject a period that is not a number of sessions."""
         require_positive_int(self.n, "n")
 
+    def definition(self) -> dict[str, object]:
+        """Return what identifies this schedule, ``n`` included.
+
+        Returns
+        -------
+        dict[str, object]
+            The type and the parameters. Deciding every five sessions and
+            every twenty are different experiments, and a result recording only
+            the class name could not tell them apart.
+        """
+        return _definition_of(self)
+
     def decision_sessions(self, sessions: Sequence[date]) -> frozenset[date]:
         """Return every ``n``-th session, counted from the start of the run."""
         return frozenset(sessions[:: self.n])
@@ -78,6 +94,10 @@ class Weekly:
     holiday still has a last session, and a strategy that waited for a Friday
     would silently skip that week.
     """
+
+    def definition(self) -> dict[str, object]:
+        """Return what identifies this schedule, for the record of a run."""
+        return _definition_of(self)
 
     def decision_sessions(self, sessions: Sequence[date]) -> frozenset[date]:
         """Return the last session of each ISO week in the run."""
@@ -95,9 +115,37 @@ class Monthly:
     holidays, and no arithmetic on dates knows that.
     """
 
+    def definition(self) -> dict[str, object]:
+        """Return what identifies this schedule, for the record of a run."""
+        return _definition_of(self)
+
     def decision_sessions(self, sessions: Sequence[date]) -> frozenset[date]:
         """Return the last session of each month in the run."""
         return _last_of(sessions, lambda day: (day.year, day.month))
+
+
+def _definition_of(schedule: object) -> dict[str, object]:
+    """Return a schedule as its type and its parameters.
+
+    Parameters
+    ----------
+    schedule : object
+        Any schedule of this module; they are all frozen dataclasses.
+
+    Returns
+    -------
+    dict[str, object]
+        ``{"type": ..., "parameters": {...}}``. The parameters are what makes
+        two schedules of one type different, and a run that recorded only the
+        type could not be told from a run rebalanced four times as often.
+    """
+    return {
+        "type": type(schedule).__name__,
+        "parameters": {
+            field.name: getattr(schedule, field.name)
+            for field in fields(schedule)  # type: ignore[arg-type]
+        },
+    }
 
 
 def _last_of(sessions: Sequence[date], period: Callable[[date], object]) -> frozenset[date]:
