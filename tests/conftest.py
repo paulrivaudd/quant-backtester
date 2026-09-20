@@ -44,6 +44,7 @@ from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.schemas import (
     CHECKED_BARS_SCHEMA,
     CORPORATE_ACTIONS_SCHEMA,
+    LEVELS_SCHEMA,
     ActionType,
     BarField,
     CheckStatus,
@@ -150,6 +151,7 @@ ALL_BAR_FIELDS = ",".join(sorted(field.value for field in BarField))
 """Every field of a bar, as the cross-check spells an unconfirmed set."""
 
 BarsBuilder = Callable[..., pd.DataFrame]
+LevelsBuilder = Callable[..., pd.DataFrame]
 MarketBuilder = Callable[..., MarketDataReader]
 ContextBuilder = Callable[[MarketDataReader, datetime], SignalContext]
 
@@ -212,6 +214,39 @@ def make_bars() -> BarsBuilder:
         frame = pd.DataFrame(rows, columns=list(CHECKED_BARS_SCHEMA.names))
         for column in ("open_available_at_utc", "close_available_at_utc"):
             frame[column] = frame[column].astype("datetime64[us, UTC]")
+        return frame
+
+    return build
+
+
+@pytest.fixture
+def make_levels(instruments: InstrumentRegistry) -> LevelsBuilder:
+    """Return a builder of clean levels from ``observation_date -> value``.
+
+    A published series has no venue sessions, so its rows carry no calendar:
+    what makes a value knowable is the instrument's publication rule, and the
+    builder asks the registry for it rather than inventing an instant.
+    """
+
+    def build(instrument_id: str, values: Mapping[date, float]) -> pd.DataFrame:
+        rule = instruments.get(instrument_id).publication_rule
+        if rule is None:
+            raise ValueError(f"{instrument_id} declares no publication rule")
+        frame = pd.DataFrame(
+            [
+                {
+                    "instrument_id": instrument_id,
+                    "observation_date": observation_date,
+                    "value": value,
+                    "available_at_utc": pd.Timestamp(rule.available_at(observation_date)),
+                    "source": "FRED",
+                    "source_fetch_id": "20260916T000000Z",
+                }
+                for observation_date, value in values.items()
+            ],
+            columns=list(LEVELS_SCHEMA.names),
+        )
+        frame["available_at_utc"] = frame["available_at_utc"].astype("datetime64[us, UTC]")
         return frame
 
     return build
@@ -344,10 +379,14 @@ def make_market(
     """
 
     def build(
-        bars: Mapping[str, pd.DataFrame], actions: pd.DataFrame | None = None
+        bars: Mapping[str, pd.DataFrame],
+        actions: pd.DataFrame | None = None,
+        levels: Mapping[str, pd.DataFrame] | None = None,
     ) -> MarketDataReader:
         for instrument_id, frame in bars.items():
             repository.save_checked_bars(instrument_id, frame)
+        for instrument_id, frame in (levels or {}).items():
+            repository.save_levels(instrument_id, frame)
         if actions is not None:
             repository.save_corporate_actions(actions)
         return MarketDataReader(

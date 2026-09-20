@@ -107,14 +107,26 @@ opinion on Paris prices.
 
 | Module | Role |
 |---|---|
-| `types.py` | window modes, price bases, units, and the seven statuses |
+| `types.py` | window modes, price bases, units, and the eight statuses |
 | `context.py` | what a signal may read at one instant, and nothing else |
 | `windows.py` | a window of N sessions, or the reason it is not one |
 | `base.py` | the contract, the result frame and its diagnostics |
 | `engine.py` | several signals over one decision |
 | `snapshot.py` | what a strategy receives |
 | `price/`, `risk/` | the six signals computed from one instrument's own window |
+| `level/` | published series: a change in their own units, a z-score |
 | `cross_sectional/` | ranking those signals across a universe |
+
+A published series is not a price, and `level/` is where that is taken
+seriously. Nobody holds sessions for a macro release, so its window is counted
+in **observations available** rather than in sessions in a row - and the result
+carries the dates those observations actually covered, because twenty
+observations of a ten-year yield spanned twenty-nine days the last time anyone
+asked. Its arithmetic differs too: a yield of 4.20 that becomes 4.45 has moved
+twenty-five basis points, not six percent, and a yield that crosses zero makes
+the ratio change sign while the move itself is unremarkable. So the change is a
+difference in the series' own units, and two such series are compared by
+standardising them, never by dividing.
 
 A signal never chooses its own instant, never opens a file and never repairs a
 window. Every number comes with a status, because "not listed yet", "no history

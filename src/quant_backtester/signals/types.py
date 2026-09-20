@@ -56,6 +56,12 @@ class SignalUnit(Enum):
     ZSCORE = "ZSCORE"
     """Standard deviations from a rolling, strictly past mean."""
 
+    SERIES_UNITS = "SERIES_UNITS"
+    """Whatever the series itself is quoted in: percentage points for a yield,
+    dollars per euro for a rate, index points for a volatility index. Not
+    comparable across instruments, and not a fraction - a change of ``0.25`` on
+    a ten-year yield is twenty-five basis points, not twenty-five percent."""
+
     RANK = "RANK"
     """Position within a cross-section, normalised to ``[0, 1]``."""
 

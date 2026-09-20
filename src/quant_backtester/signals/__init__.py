@@ -27,6 +27,8 @@ from quant_backtester.signals.base import Signal, SignalResult
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.cross_sectional.rank import CrossSectionalRank
 from quant_backtester.signals.engine import SignalEngine
+from quant_backtester.signals.level.change import LevelChangeSignal
+from quant_backtester.signals.level.zscore import LevelZScoreSignal
 from quant_backtester.signals.price.mean_reversion import MeanReversionSignal
 from quant_backtester.signals.price.momentum import MomentumSignal
 from quant_backtester.signals.price.returns import ReturnSignal
@@ -45,6 +47,8 @@ from quant_backtester.signals.types import (
 __all__ = [
     "CrossSectionalRank",
     "CurrentDrawdownSignal",
+    "LevelChangeSignal",
+    "LevelZScoreSignal",
     "MeanReversionSignal",
     "MomentumSignal",
     "MovingAverageTrendSignal",
