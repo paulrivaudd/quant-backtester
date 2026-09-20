@@ -24,9 +24,11 @@ builds it, and a lower layer never imports a higher one.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from types import MappingProxyType
 
 import pandas as pd
 
@@ -36,7 +38,11 @@ from quant_backtester.numbers import require_unit_fraction
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.portfolio.view import PortfolioView
 from quant_backtester.signals.snapshot import SignalSnapshot
-from quant_backtester.signals.types import SignalStatus, require_positive_int
+from quant_backtester.signals.types import (
+    SignalStatus,
+    require_non_negative_int,
+    require_positive_int,
+)
 
 
 class UnusableSignal(LookupError):
@@ -64,7 +70,9 @@ class Selection:
         apart afterwards.
     skipped : Mapping[str, SignalStatus]
         Why each of the others was not chosen: no history yet, a session
-        missing, a value too old - or simply a worse rank.
+        missing, a value too old - or simply a worse rank. Frozen at
+        construction: it is part of the record of a decision, not a buffer to
+        edit before building one.
 
     Notes
     -----
@@ -77,6 +85,28 @@ class Selection:
     names: tuple[str, ...]
     considered: int
     skipped: Mapping[str, SignalStatus]
+
+    def __post_init__(self) -> None:
+        """Check the selection describes a choice, and freeze its diagnostics.
+
+        Raises
+        ------
+        ValueError
+            If a name appears twice, or fewer instruments were considered than
+            were chosen. Both would make the record of the decision say
+            something the decision cannot have meant.
+        """
+        names = tuple(self.names)
+        repeated = sorted(name for name, seen in Counter(names).items() if seen > 1)
+        if repeated:
+            raise ValueError(f"{', '.join(repeated)} is selected more than once")
+        require_non_negative_int(self.considered, "considered")
+        if self.considered < len(names):
+            raise ValueError(
+                f"{len(names)} instrument(s) were chosen among {self.considered} considered"
+            )
+        object.__setattr__(self, "names", names)
+        object.__setattr__(self, "skipped", MappingProxyType(dict(self.skipped)))
 
     def __iter__(self) -> Iterator[str]:
         """Iterate over the chosen instruments, so a selection reads as a list."""
@@ -147,7 +177,7 @@ class StrategyContext:
                     f"{what} answer for {instant} and the decision is taken at {self.as_of}"
                 )
         universe = tuple(self.universe)
-        repeated = sorted({name for name in universe if universe.count(name) > 1})
+        repeated = sorted(name for name, seen in Counter(universe).items() if seen > 1)
         if repeated:
             raise ValueError(f"the universe holds {', '.join(repeated)} more than once")
         object.__setattr__(self, "universe", universe)
@@ -400,10 +430,18 @@ class StrategyContext:
         Raises
         ------
         ValueError
-            If ``count`` is not positive, or is below the number of
-            instruments given - which would ask for more than the whole book.
+            If an instrument appears twice, if ``count`` is not positive, or if
+            it is below the number of instruments given - which would ask for
+            more than the whole book.
         """
         names = tuple(selected)
+        repeated = sorted(name for name, seen in Counter(names).items() if seen > 1)
+        if repeated:
+            raise ValueError(
+                f"{', '.join(repeated)} is selected more than once; the weights would "
+                "collapse into one position and the book would be half invested "
+                "without saying so"
+            )
         parts = len(names) if count is None else count
         if parts == 0:
             return self.cash(among=selected if isinstance(selected, Selection) else None)

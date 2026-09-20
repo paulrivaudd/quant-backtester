@@ -21,8 +21,10 @@ from quant_backtester.signals.base import Signal
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.types import SignalStatus
+from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
     BuyAndHold,
+    EqualWeightRebalance,
     MomentumRotation,
     MomentumSingleAsset,
     MomentumVix,
@@ -35,8 +37,42 @@ UNIVERSE = ("ETF_EU", "ETF_OTHER")
 """Two tradable Paris funds, which is what makes a rotation a rotation."""
 
 
+def snapshot_of(context: SignalContext, values: dict[str, float]):
+    """Return a snapshot holding one score per instrument."""
+    from quant_backtester.signals.base import (
+        Signal,
+        SignalResult,
+        build_result_frame,
+        result_row,
+    )
+    from quant_backtester.signals.windows import LoadedWindow
+
+    class Fixed(Signal):
+        signal_id = "score"
+
+        def definition(self) -> dict[str, object]:
+            return {"type": "Fixed"}
+
+        def compute(self, ctx: SignalContext, instrument_ids) -> SignalResult:
+            rows = {
+                name: result_row(
+                    values[name],
+                    LoadedWindow(status=SignalStatus.OK, points=(1.0,), age_sessions=0),
+                )
+                for name in instrument_ids
+            }
+            return SignalResult(
+                signal_id="score",
+                as_of=ctx.as_of,
+                _frame=build_result_frame(rows),
+                definition=self.definition(),
+            )
+
+    return SignalEngine().compute(context, [Fixed()], list(values))
+
+
 def decide_with(
-    strategy: BuyAndHold | MomentumRotation | MomentumSingleAsset | MomentumVix,
+    strategy: Strategy,
     context: SignalContext,
     make_decision: DecisionBuilder,
     universe: tuple[str, ...] = UNIVERSE,
@@ -262,3 +298,148 @@ def test_what_a_strategy_does_with_an_unreadable_gauge_is_declared() -> None:
     """A risk filter that silently becomes no filter is only noticed afterwards."""
     with pytest.raises(ValueError, match="flat_when_unknown"):
         MomentumVix(flat_when_unknown="yes")  # type: ignore[arg-type]
+
+
+def test_an_unreadable_gauge_can_be_declared_harmless(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    make_levels: Callable[..., pd.DataFrame],
+    make_context: Callable[[MarketDataReader, datetime], SignalContext],
+    make_decision: DecisionBuilder,
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+    evening: Callable[[date], datetime],
+    sessions: tuple[date, ...],
+) -> None:
+    """The other policy, taken deliberately rather than by omission.
+
+    A risk filter that silently becomes no filter the day its input is late is
+    only ever noticed afterwards, so both answers are written in the config.
+    """
+    market = gated_market(make_market, make_bars, make_levels, xpar, prices, sessions, [4.0] * 10)
+    context = make_context(market, evening(sessions[-1]))
+    # Sixty observations asked of a ten-session series: the gauge has no value.
+    strategy = MomentumVix(
+        gauge_id="RATE_US",
+        lookback_sessions=5,
+        gauge_observations=60,
+        top_n=1,
+        maximum=1.0,
+        flat_when_unknown=False,
+    )
+
+    allocation = decide_with(strategy, context, make_decision)
+
+    assert allocation.selected == ("ETF_OTHER",)
+
+
+def test_an_unreadable_gauge_stands_the_book_down_by_default(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    make_levels: Callable[..., pd.DataFrame],
+    make_context: Callable[[MarketDataReader, datetime], SignalContext],
+    make_decision: DecisionBuilder,
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+    evening: Callable[[date], datetime],
+    sessions: tuple[date, ...],
+) -> None:
+    """And the names it stood aside from are still counted."""
+    market = gated_market(make_market, make_bars, make_levels, xpar, prices, sessions, [4.0] * 10)
+    context = make_context(market, evening(sessions[-1]))
+    strategy = MomentumVix(
+        gauge_id="RATE_US",
+        lookback_sessions=5,
+        gauge_observations=60,
+        top_n=1,
+        maximum=1.0,
+        flat_when_unknown=True,
+    )
+
+    allocation = decide_with(strategy, context, make_decision)
+
+    assert allocation.selected == ()
+    assert allocation.considered == 2
+
+
+def test_buy_and_hold_lets_the_weights_drift(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """The difference with the constant-weight baseline, and it is not cosmetic.
+
+    Two funds bought at half each, one of which has doubled: buy and hold asks
+    for the book it has - two thirds and one third - while the rebalanced
+    version sells the winner to get back to half.
+    """
+    from quant_backtester.portfolio.targets import Holdings
+
+    held = make_decision(
+        context,
+        snapshot_of(context, {"ETF_EU": 0.9, "ETF_OTHER": 0.4}),
+        universe=UNIVERSE,
+        holdings=Holdings(cash=0.0, quantities={"ETF_EU": 2.0, "ETF_OTHER": 1.0}),
+        prices={"ETF_EU": 100.0, "ETF_OTHER": 100.0},
+    )
+
+    holding = BuyAndHold(instruments=UNIVERSE).decide(held)
+    rebalanced = EqualWeightRebalance(instruments=UNIVERSE).decide(held)
+
+    assert holding.weights["ETF_EU"] == pytest.approx(2 / 3)
+    assert rebalanced.weights["ETF_EU"] == pytest.approx(0.5)
+
+
+def test_buy_and_hold_buys_once_when_the_book_is_empty(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """Nothing is held on the first session of a run, so that is the purchase."""
+    allocation = decide_with(BuyAndHold(instruments=UNIVERSE), context, make_decision)
+
+    assert dict(allocation.weights) == {"ETF_EU": 0.5, "ETF_OTHER": 0.5}
+
+
+def test_a_book_cannot_name_the_same_instrument_twice() -> None:
+    """It would be given two shares of the capital under one position."""
+    for strategy in (BuyAndHold, EqualWeightRebalance):
+        with pytest.raises(ValueError, match="more than once"):
+            strategy(instruments=("ETF_EU", "ETF_EU"))
+
+
+@pytest.mark.parametrize("minimum", [float("nan"), float("inf"), True])
+def test_a_momentum_threshold_that_is_not_a_number_is_refused(minimum: object) -> None:
+    """NaN is invested whenever a number exists; an infinity is always cash."""
+    with pytest.raises(ValueError, match="minimum"):
+        MomentumSingleAsset(instrument_id="ETF_EU", minimum=minimum)  # type: ignore[arg-type]
+
+
+def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """A strategy that needed its signals wired in from outside looks the same.
+
+    It looks identical in an import list, and fails at the first decision with
+    a ``KeyError`` on a signal nobody computed. So every exported strategy
+    declares what it reads, and this is what says so.
+    """
+    import quant_backtester.strategies as package
+    from quant_backtester.strategies.base import Strategy as Contract
+
+    runnable = {
+        BuyAndHold(instruments=UNIVERSE),
+        EqualWeightRebalance(instruments=UNIVERSE),
+        MomentumSingleAsset(instrument_id="ETF_EU", lookback_sessions=5),
+        MomentumRotation(lookback_sessions=5, top_n=1),
+        MomentumVix(gauge_id="RATE_US", lookback_sessions=5, gauge_observations=5),
+    }
+    exported = {
+        name
+        for name in package.__all__
+        if isinstance(getattr(package, name), type)
+        and issubclass(getattr(package, name), Contract)
+        and getattr(package, name) is not Contract
+        and name != "FunctionalStrategy"  # a form, not a strategy of its own
+    }
+
+    assert exported == {type(strategy).__name__ for strategy in runnable}
+    for strategy in runnable:
+        # Declared, not wired: every signal a decision reads comes from here.
+        assert isinstance(strategy.required_signals(), tuple)

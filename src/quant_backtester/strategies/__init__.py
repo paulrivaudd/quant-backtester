@@ -15,6 +15,12 @@ anywhere that takes another.
 
 The context is defined beside the engine rather than here, because the engine
 builds one per session and a lower layer never imports a higher one.
+
+Every strategy exported here is runnable as it stands: it declares the signals
+it reads, so ``runner.run(strategy, universe, start, end)`` is the whole of
+what a user has to write. A rule that needed its signals wired in from outside
+would look identical in an import list and fail at the first decision, which is
+why there is no such thing here any more.
 """
 
 from __future__ import annotations
@@ -22,22 +28,20 @@ from __future__ import annotations
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
     BuyAndHold,
+    EqualWeightRebalance,
     MomentumRotation,
     MomentumSingleAsset,
     MomentumVix,
 )
 from quant_backtester.strategies.functional import FunctionalStrategy, strategy
-from quant_backtester.strategies.risk_gated import RiskGatedRotation
-from quant_backtester.strategies.rotation import TopRankRotation
 
 __all__ = [
     "BuyAndHold",
+    "EqualWeightRebalance",
     "FunctionalStrategy",
     "MomentumRotation",
     "MomentumSingleAsset",
     "MomentumVix",
-    "RiskGatedRotation",
     "Strategy",
-    "TopRankRotation",
     "strategy",
 ]

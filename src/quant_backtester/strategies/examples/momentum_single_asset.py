@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from quant_backtester.backtest.context import StrategyContext
+from quant_backtester.numbers import require_finite
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.base import Signal
 from quant_backtester.signals.engine import SignalRequest
@@ -38,8 +39,8 @@ class MomentumSingleAsset(Strategy):
     Raises
     ------
     ValueError
-        If the lookback is not a positive number of sessions, or a name is
-        empty.
+        If the lookback is not a positive number of sessions, if the threshold
+        is not a finite number, or if a name is empty.
 
     Notes
     -----
@@ -62,6 +63,10 @@ class MomentumSingleAsset(Strategy):
         require_identifier(self.instrument_id, "instrument_id")
         require_identifier(self.strategy_id, "strategy_id")
         require_positive_int(self.lookback_sessions, "lookback_sessions")
+        # A threshold of NaN compares false against every momentum, so the
+        # strategy would be invested whenever a number exists; an infinite one
+        # is always cash. Both are a parameter written wrong.
+        require_finite(self.minimum, "minimum")
 
     @property
     def signal_id(self) -> str:
