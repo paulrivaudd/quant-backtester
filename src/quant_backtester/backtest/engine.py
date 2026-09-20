@@ -29,6 +29,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
+from types import MappingProxyType
 from typing import Protocol, runtime_checkable
 from zoneinfo import ZoneInfo
 
@@ -39,13 +40,15 @@ from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus, PointInTimeReader
 from quant_backtester.data.schemas import BarField
 from quant_backtester.data.universes import StaticUniverse
-from quant_backtester.execution.fills import Execution, ExecutionModel
+from quant_backtester.execution.fills import Execution, ExecutionModel, Fill
+from quant_backtester.numbers import require_finite_positive
 from quant_backtester.portfolio.limits import PositionLimits
 from quant_backtester.portfolio.targets import Holdings, TargetAllocation
 from quant_backtester.signals.base import Signal
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.snapshot import SignalSnapshot
+from quant_backtester.signals.types import require_identifier
 
 
 @runtime_checkable
@@ -143,8 +146,15 @@ class BacktestRecord:
         price and no fee. The difference is everything execution took.
     cash : float
         The part not invested.
-    invested : float
-        Fraction of equity the target put to work.
+    target_invested : float
+        Fraction of equity the target decided at this close asks to put to
+        work. What was *reached* is ``actual_invested``: an order that could
+        not be sent, a purchase cut down for want of cash and a lot rounded
+        down all sit between the two, and a record that carried one number
+        would be read as the other.
+    actual_invested : float
+        Fraction of equity actually held in positions at this close, after
+        whatever execution managed to do at this session's open.
     considered : int
         Instruments that had a usable signal to choose among.
     traded_value : float
@@ -166,6 +176,18 @@ class BacktestRecord:
         for this session. The equity is an estimate for those, and says so.
     weights : Mapping[str, float]
         Target decided at this session's close, for the next open.
+    quantities : Mapping[str, float]
+        Units actually held after this session's open, per instrument. With
+        the fills and the closing prices, this is what lets a run answer why
+        the equity moved on a given day rather than only by how much.
+    fills : tuple[Fill, ...]
+        The orders done at this session's open, with their reference price,
+        their fill price and their commission.
+
+    Notes
+    -----
+    Both mappings are frozen at construction, so a record cannot be edited
+    into a different run after the fact.
     """
 
     session_date: date
@@ -173,7 +195,8 @@ class BacktestRecord:
     equity: float
     gross_equity: float
     cash: float
-    invested: float
+    target_invested: float
+    actual_invested: float
     considered: int
     traded_value: float
     commission: float
@@ -182,6 +205,17 @@ class BacktestRecord:
     unfunded: tuple[str, ...]
     priced_from_earlier: tuple[str, ...]
     weights: Mapping[str, float]
+    quantities: Mapping[str, float] = MappingProxyType({})
+    fills: tuple[Fill, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Freeze what was recorded, so a result stays what the run produced."""
+        object.__setattr__(self, "weights", MappingProxyType(dict(self.weights)))
+        object.__setattr__(self, "quantities", MappingProxyType(dict(self.quantities)))
+        object.__setattr__(self, "untradable", tuple(self.untradable))
+        object.__setattr__(self, "unfunded", tuple(self.unfunded))
+        object.__setattr__(self, "priced_from_earlier", tuple(self.priced_from_earlier))
+        object.__setattr__(self, "fills", tuple(self.fills))
 
     @property
     def cost(self) -> float:
@@ -219,7 +253,8 @@ class BacktestResult:
                 "equity": record.equity,
                 "gross_equity": record.gross_equity,
                 "cash": record.cash,
-                "invested": record.invested,
+                "target_invested": record.target_invested,
+                "actual_invested": record.actual_invested,
                 "considered": record.considered,
                 "traded_value": record.traded_value,
                 "commission": record.commission,
@@ -293,6 +328,12 @@ class BacktestEngine:
         :class:`~quant_backtester.data.universes.StaticUniverse`: honest for
         two funds that both existed throughout, and a lie for anything with
         entries and exits.
+        The trading universe holds what the book may actually hold, and
+        nothing else. An index, a yield or a volatility gauge reaches the same
+        decision through a
+        :class:`~quant_backtester.signals.engine.SignalRequest` of its own,
+        which is what keeps "a thing to read" and "a thing to buy" from being
+        the same list.
     limits : PositionLimits
         Applied to whatever the strategy asks for.
     execution : ExecutionModel
@@ -300,14 +341,25 @@ class BacktestEngine:
     timetable : Timetable
         When a decision is taken and when it is filled.
     initial_cash : float
-        What the run starts with, in the currency the instruments are quoted
-        in. Nothing here converts a currency.
+        What the run starts with, in ``base_currency``.
+    base_currency : str
+        The currency the book is kept in. Every tradable member of the
+        universe must be quoted in it, because nothing here converts one
+        currency into another: adding a fund quoted in euros to one quoted in
+        dollars would value the book as though the two were worth the same,
+        and the error would sit inside the equity curve rather than beside it.
+        An instrument a signal only reads - an index, a yield, an FX
+        fixing - may be quoted in anything, since it is never held.
 
     Raises
     ------
     ValueError
-        If ``initial_cash`` is not positive, or the universe repeats an
-        instrument.
+        If ``initial_cash`` is not a finite positive number, if
+        ``base_currency`` is not a name, or if the universe holds an
+        instrument the book may not actually hold: one the registry does not
+        know, one declared ``tradable = false``, or one quoted in another
+        currency. Checked session by session, since a dated universe answers a
+        different list on each of them.
 
     Notes
     -----
@@ -322,6 +374,7 @@ class BacktestEngine:
     strategy: Strategy
     universe: UniverseSource | Sequence[str]
     initial_cash: float
+    base_currency: str
     limits: PositionLimits = field(default_factory=PositionLimits)
     execution: ExecutionModel = field(default_factory=ExecutionModel)
     timetable: Timetable = field(default_factory=Timetable)
@@ -334,10 +387,11 @@ class BacktestEngine:
         everything below asks one question - what was in the universe on this
         session - and never has to know which kind it was handed.
         """
-        if self.initial_cash <= 0:
-            raise ValueError(f"initial_cash must be positive, got {self.initial_cash}")
+        require_finite_positive(self.initial_cash, "initial_cash")
+        require_identifier(self.base_currency, "base_currency")
         if not isinstance(self.universe, UniverseSource):
             object.__setattr__(self, "universe", StaticUniverse(tuple(self.universe)))
+        object.__setattr__(self, "signals", tuple(self.signals))
 
     @property
     def dated_universe(self) -> UniverseSource:
@@ -405,7 +459,7 @@ class BacktestEngine:
             market = self.reader.at(decision_at)
             prices, estimated = self._valuation(market, holdings, last_price)
             last_price.update(prices)
-            members = self.dated_universe.members_at(session.session_date)
+            members = self._trading_universe(session.session_date)
             pending = self._decide(engine, market, members)
             records.append(
                 self._record(
@@ -417,9 +471,64 @@ class BacktestEngine:
                     execution=execution,
                     estimated=estimated,
                     allocation=pending,
+                    fills=execution.fills if execution is not None else (),
                 )
             )
         return BacktestResult(records=tuple(records), initial_cash=self.initial_cash)
+
+    def _trading_universe(self, session_date: date) -> Sequence[str]:
+        """Return the instruments the book may hold on that session.
+
+        Parameters
+        ----------
+        session_date : date
+            The session being decided on.
+
+        Returns
+        -------
+        Sequence[str]
+            What the universe held that day, once every member has been
+            checked against the registry.
+
+        Raises
+        ------
+        ValueError
+            If a member is unknown to the registry, is not tradable, or is
+            quoted in another currency than the book.
+
+        Notes
+        -----
+        Loud, and at the top of the session rather than at the fill. A
+        non-tradable instrument reaching the execution layer is caught there
+        too, but by then the strategy has already ranked it, chosen it and
+        sized a position in it, and the run would report a rotation whose
+        orders are quietly never sent. The configuration is wrong, and the
+        place to say so is where it is read.
+        """
+        members = self.dated_universe.members_at(session_date)
+        for instrument_id in members:
+            instrument = self.instruments.get(instrument_id)
+            if not instrument.tradable:
+                raise ValueError(
+                    f"{instrument_id} is declared tradable = false and cannot be in the "
+                    f"trading universe on {session_date}; a signal reads it through a "
+                    "SignalRequest of its own"
+                )
+            if instrument.currency != self.base_currency:
+                raise ValueError(
+                    f"{instrument_id} is quoted in {instrument.currency} and the book is "
+                    f"kept in {self.base_currency}; nothing here converts a currency"
+                )
+        return members
+
+    def _quantity_steps(self, instrument_ids: Sequence[str]) -> dict[str, float]:
+        """Return the smallest dealable quantity of each instrument that declares one."""
+        steps: dict[str, float] = {}
+        for instrument_id in instrument_ids:
+            instrument = self.instruments.get(instrument_id)
+            if instrument.quantity_step is not None:
+                steps[instrument_id] = instrument.quantity_step
+        return steps
 
     def _fill(
         self,
@@ -456,7 +565,13 @@ class BacktestEngine:
         market = self.reader.at(self.timetable.execution_instant(session.session_date))
         wanted = sorted(set(pending.weights) | set(holdings.quantities))
         prices, tradable = self._opens(market, wanted, holdings, last_price)
-        execution = self.execution.rebalance(holdings, pending.weights, prices, tradable)
+        execution = self.execution.rebalance(
+            holdings,
+            pending.weights,
+            prices,
+            tradable,
+            quantity_steps=self._quantity_steps(wanted),
+        )
         for fill in execution.fills:
             # The same quantity, at the price on the screen and with no fee.
             signed = -1.0 if fill.side.value == "BUY" else 1.0
@@ -491,12 +606,18 @@ class BacktestEngine:
 
         Notes
         -----
-        Only a status of ``OK`` may be dealt at. A stale open is an open from
-        an earlier session, and filling an order at it would put a trade in the
-        record at a price nobody could have got that morning. But a held
-        position whose auction did not print is still worth something, and the
-        last knowable value is what the book is marked at meanwhile - being
-        untradable and being worthless are not the same thing.
+        Only a status of ``OK`` on an instrument declared ``tradable`` may be
+        dealt at. A stale open is an open from an earlier session, and filling
+        an order at it would put a trade in the record at a price nobody could
+        have got that morning. An index has an opening print and no way to buy
+        it, which is a different refusal and the one the registry declares.
+        Both are checked here even though the universe is checked first: this
+        is the last point before a trade exists, and a guard that only holds
+        when the configuration is right is not a guard.
+
+        A held position whose auction did not print is still worth something,
+        and the last knowable value is what the book is marked at meanwhile -
+        being untradable and being worthless are not the same thing.
         """
         if not instrument_ids:
             return {}, set()
@@ -508,7 +629,7 @@ class BacktestEngine:
             price = float(value)
             if price == price:  # not NaN
                 prices[instrument_id] = price
-            if status is ObservationStatus.OK:
+            if status is ObservationStatus.OK and self.instruments.get(instrument_id).tradable:
                 tradable.add(instrument_id)
         for instrument_id in sorted(set(holdings.quantities) - set(prices)):
             carried = last_price.get(instrument_id)
@@ -536,6 +657,12 @@ class BacktestEngine:
         to value the book at all would stop a run because one vendor missed a
         print. Saying which positions are estimated is what keeps the equity
         curve honest.
+
+        A ``STALE`` close is one of those, and the status is what says so: the
+        reader hands back a real number - the last close it had - and a run
+        that only looked at the number would report an estimate as a print.
+        The equity is the same either way; what changes is whether the report
+        admits how it was reached.
         """
         held = sorted(holdings.quantities)
         if not held:
@@ -543,11 +670,25 @@ class BacktestEngine:
         frame = market.values(held, BarField.CLOSE)
         prices: dict[str, float] = {}
         estimated: list[str] = []
-        for name, published in zip(frame.index, frame["value"], strict=True):
+        for name, published, status in zip(
+            frame.index, frame["value"], frame["status"], strict=True
+        ):
             instrument_id = str(name)
+            if status is ObservationStatus.NOT_LISTED:
+                raise ValueError(
+                    f"{instrument_id} is held and the registry says it was not listed at "
+                    f"{market.as_of}; a position in a delisted instrument has to be closed, "
+                    "and this model does not know at what price"
+                )
             value = float(published)
+            if status is ObservationStatus.OK:
+                prices[instrument_id] = value
+                continue
+            # STALE is a close from an earlier session: a real number, and
+            # still an estimate of what this session's close would have been.
             if value == value:  # not NaN
                 prices[instrument_id] = value
+                estimated.append(instrument_id)
                 continue
             carried = last_price.get(instrument_id)
             if carried is None:
@@ -580,16 +721,21 @@ class BacktestEngine:
         execution: Execution | None,
         estimated: tuple[str, ...],
         allocation: TargetAllocation,
+        fills: tuple[Fill, ...],
     ) -> BacktestRecord:
         """Assemble one session's record."""
         positions = sum(size * prices[name] for name, size in holdings.quantities.items())
+        equity = holdings.cash + positions
         return BacktestRecord(
             session_date=session.session_date,
             decision_at=decision_at,
-            equity=holdings.cash + positions,
+            equity=equity,
             gross_equity=gross_cash + positions,
             cash=holdings.cash,
-            invested=allocation.invested,
+            target_invested=allocation.invested,
+            # A book worth nothing is a book with nothing in it, and no
+            # fraction of it is invested.
+            actual_invested=positions / equity if equity != 0.0 else 0.0,
             considered=allocation.considered,
             traded_value=execution.traded_value if execution else 0.0,
             commission=execution.commission if execution else 0.0,
@@ -598,4 +744,6 @@ class BacktestEngine:
             unfunded=execution.unfunded if execution else (),
             priced_from_earlier=estimated,
             weights=dict(allocation.weights),
+            quantities=dict(holdings.quantities),
+            fills=fills,
         )

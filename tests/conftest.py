@@ -290,7 +290,13 @@ def calendars(xnys: TradingCalendar, xpar: TradingCalendar) -> CalendarRegistry:
 
 @pytest.fixture
 def instruments() -> InstrumentRegistry:
-    """Return one instrument per situation a window loader must tell apart."""
+    """Return one instrument per situation a window loader must tell apart.
+
+    ``ETF_US`` is the tradable one whose venue is not the reference calendar:
+    it is held, and its close is a session old whenever New York is shut while
+    Paris trades. It is also the one that is quoted in another currency and
+    the one that deals in whole shares.
+    """
     return InstrumentRegistry(
         [
             Instrument(
@@ -316,6 +322,19 @@ def instruments() -> InstrumentRegistry:
                 tradable=True,
                 calendar_id="XPAR",
                 first_session=date(2026, 1, 5),
+            ),
+            Instrument(
+                id="ETF_US",
+                name="A New York ETF, quoted in dollars",
+                asset_type=AssetType.ETF,
+                data_type=DataType.BAR,
+                currency="USD",
+                primary_source="YAHOO",
+                source_symbol="US.N",
+                tradable=True,
+                quantity_step=1.0,
+                calendar_id="XNYS",
+                first_session=date(2026, 1, 2),
             ),
             Instrument(
                 id="IDX_US",
