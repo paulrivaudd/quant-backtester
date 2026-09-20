@@ -29,9 +29,14 @@ from quant_backtester.execution.fills import ExecutionModel
 from quant_backtester.portfolio.limits import PositionLimits
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.base import Signal
+from quant_backtester.signals.cross_sectional.rank import CrossSectionalRank
+from quant_backtester.signals.engine import SignalRequest
+from quant_backtester.signals.level.change import LevelChangeSignal
 from quant_backtester.signals.price.returns import ReturnSignal
 from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import PriceBasis, SignalStatus
+from quant_backtester.strategies.risk_gated import RiskGatedRotation
+from quant_backtester.strategies.rotation import TopRankRotation
 
 PARIS = Timetable(decision_time=time(23, 0), execution_time=time(9, 1), timezone="Europe/Paris")
 
@@ -511,3 +516,69 @@ def test_a_universe_that_repeats_an_instrument_is_refused(
     """Twice in a universe would weight it twice in a ranking."""
     with pytest.raises(ValueError, match="more than once"):
         engine_over(market, calendars, AlwaysHold({"ETF_EU": 1.0}), universe=("ETF_EU", "ETF_EU"))
+
+
+def test_a_gauge_that_is_never_traded_stands_the_book_down(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    make_levels: Callable[..., pd.DataFrame],
+    xpar: TradingCalendar,
+    calendars: CalendarRegistry,
+    prices: Callable[..., dict[date, float]],
+    sessions: tuple[date, ...],
+) -> None:
+    """The first cross-asset run: two funds rotated, a rate deciding whether to.
+
+    The rate creeps up by five basis points a session until 11 September, when
+    it jumps by fifty. The decision taken after that close shuts the gate, and
+    the book is sold at the next open - the same gap every other order goes
+    through, and the reason the sale lands on the fourteenth rather than on the
+    evening the gauge moved.
+    """
+    rates = {day: 4.0 + 0.05 * index for index, day in enumerate(sessions)}
+    rates[date(2026, 9, 11)] = rates[date(2026, 9, 10)] + 0.50
+    rates[date(2026, 9, 14)] = rates[date(2026, 9, 11)] + 0.05
+    market = make_market(
+        {
+            "ETF_EU": make_bars("ETF_EU", xpar, prices(100.0, 1.0)),
+            "ETF_OTHER": make_bars("ETF_OTHER", xpar, prices(200.0, 2.0)),
+        },
+        None,
+        {"RATE_US": make_levels("RATE_US", rates)},
+    )
+    momentum = ReturnSignal(signal_id="return_2d", lookback_sessions=2, price_basis=PriceBasis.RAW)
+    engine = BacktestEngine(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        signals=[
+            momentum,
+            CrossSectionalRank(signal_id="return_rank", source=momentum),
+            SignalRequest(
+                LevelChangeSignal(signal_id="rate_change_1o", lookback_observations=1),
+                ["RATE_US"],
+            ),
+        ],
+        strategy=RiskGatedRotation(
+            rotation=TopRankRotation(signal_id="return_rank", top_n=1),
+            gate_signal_id="rate_change_1o",
+            gate_instrument_id="RATE_US",
+            maximum=0.10,
+            flat_when_unknown=True,
+        ),
+        universe=("ETF_EU", "ETF_OTHER"),
+        initial_cash=10_000.0,
+        limits=PositionLimits(),
+        execution=ExecutionModel(),
+        timetable=PARIS,
+    )
+
+    result = engine.run(sessions[-4], sessions[-1])
+
+    invested, gated, sold = result.records[1], result.records[2], result.records[3]
+    assert invested.invested == pytest.approx(1.0)
+    assert gated.invested == 0.0
+    # Not an empty universe: both funds were rankable, and the gate stood them down.
+    assert gated.considered == 2
+    assert sold.traded_value > 0.0
+    assert sold.cash == pytest.approx(sold.equity)

@@ -9,11 +9,13 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import pytest
 
+from quant_backtester.data.calendars import TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.schemas import BarField
 from quant_backtester.signals.base import Signal, SignalResult, build_result_frame, result_row
 from quant_backtester.signals.context import SignalContext
-from quant_backtester.signals.engine import SignalEngine
+from quant_backtester.signals.engine import SignalEngine, SignalRequest
+from quant_backtester.signals.level.zscore import LevelZScoreSignal
 from quant_backtester.signals.price.momentum import MomentumSignal
 from quant_backtester.signals.price.returns import ReturnSignal
 from quant_backtester.signals.risk.volatility import RealizedVolatilitySignal
@@ -21,6 +23,20 @@ from quant_backtester.signals.types import PriceBasis, SignalStatus
 from quant_backtester.signals.windows import LoadedWindow
 
 RAW = PriceBasis.RAW
+
+SESSIONS: tuple[date, ...] = (
+    date(2026, 9, 1),
+    date(2026, 9, 2),
+    date(2026, 9, 3),
+    date(2026, 9, 4),
+    date(2026, 9, 7),
+    date(2026, 9, 8),
+    date(2026, 9, 9),
+    date(2026, 9, 10),
+    date(2026, 9, 11),
+    date(2026, 9, 14),
+)
+"""The ten Paris sessions the synthetic market spans."""
 
 
 def three_signals() -> list[Signal]:
@@ -341,3 +357,67 @@ def test_a_definition_holding_a_sequence_is_still_its_own(context: SignalContext
     snapshot = SignalEngine().compute(context, [Listed()], ["ETF_EU"])
 
     assert snapshot.result("listed").definition["inputs"] == ("ETF_EU", "IDX_US")
+
+
+# --- a signal may be asked about a universe of its own -----------------------
+
+
+def test_a_signal_can_carry_its_own_universe(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    make_levels: Callable[..., pd.DataFrame],
+    make_context: Callable[..., SignalContext],
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+    evening: Callable[[date], datetime],
+) -> None:
+    """A yield and a fund in one snapshot, and neither asked about the other.
+
+    This is what a cross-asset decision needs. Asked about the fund, the level
+    signal would stop the run - a window over a fund is counted in sessions -
+    and asked about the yield, the return signal would be measuring a
+    difference of percentages as if it were a return.
+    """
+    rates = dict(zip(SESSIONS, [4.0 + 0.05 * step for step in range(len(SESSIONS))], strict=True))
+    market = make_market(
+        {"ETF_EU": make_bars("ETF_EU", xpar, prices(100.0, 1.0))},
+        None,
+        {"RATE_US": make_levels("RATE_US", rates)},
+    )
+    context = make_context(market, evening(SESSIONS[-1]))
+
+    snapshot = SignalEngine().compute(
+        context,
+        [
+            ReturnSignal(signal_id="return_4d", lookback_sessions=4, price_basis=RAW),
+            SignalRequest(
+                LevelZScoreSignal(signal_id="rate_z_5o", window_observations=5), ["RATE_US"]
+            ),
+        ],
+        ["ETF_EU"],
+    )
+
+    assert snapshot.result("return_4d").instruments() == ("ETF_EU",)
+    assert snapshot.result("rate_z_5o").instruments() == ("RATE_US",)
+    assert snapshot.status("rate_z_5o", "RATE_US") is SignalStatus.OK
+    # One instant, two universes: the property a snapshot exists for still holds.
+    assert snapshot.as_of == context.as_of
+
+
+def test_a_bare_signal_still_gets_the_snapshot_universe(context: SignalContext) -> None:
+    """The old call is the new call with the universe left unsaid."""
+    snapshot = SignalEngine().compute(context, three_signals(), ["ETF_EU", "IDX_US"])
+
+    for signal_id in snapshot:
+        assert snapshot.result(signal_id).instruments() == ("ETF_EU", "IDX_US")
+
+
+def test_a_requests_own_universe_cannot_repeat_a_name(context: SignalContext) -> None:
+    """It would be weighted twice in its own cross-section."""
+    request = SignalRequest(
+        ReturnSignal(signal_id="return_4d", lookback_sessions=4, price_basis=RAW),
+        ["ETF_EU", "ETF_EU"],
+    )
+
+    with pytest.raises(ValueError, match="return_4d asks for ETF_EU twice"):
+        SignalEngine().compute(context, [request], ["ETF_EU"])

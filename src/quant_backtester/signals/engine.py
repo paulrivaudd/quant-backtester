@@ -24,13 +24,43 @@ from quant_backtester.signals.snapshot import SignalSnapshot
 
 
 @dataclass(frozen=True, slots=True)
+class SignalRequest:
+    """One signal, and the universe it is to be computed over.
+
+    Attributes
+    ----------
+    signal : Signal
+        The signal.
+    instruments : Sequence[str] | None
+        The instruments to compute it for. ``None`` means the snapshot's own
+        universe, which is what every signal used to get.
+
+    Notes
+    -----
+    A snapshot used to be one universe asked several questions, and that is
+    wrong as soon as a decision is cross-asset: a rotation between two funds
+    filtered by a volatility index needs the index in the same snapshot as the
+    funds, and a level signal asked about a fund is a wiring mistake rather
+    than a number. So a signal may carry its own universe, and the snapshot
+    holds results that do not all speak about the same names.
+
+    What does not change is that they all speak about the same *instant*. That
+    is the property the snapshot exists for, and mixing two of them is still
+    refused.
+    """
+
+    signal: Signal
+    instruments: Sequence[str] | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class SignalEngine:
     """Computes a set of signals over a set of instruments, at one instant."""
 
     def compute(
         self,
         context: SignalContext,
-        signals: Sequence[Signal],
+        signals: Sequence[Signal | SignalRequest],
         instrument_ids: Sequence[str],
     ) -> SignalSnapshot:
         """Compute every signal and return them as one snapshot.
@@ -39,10 +69,14 @@ class SignalEngine:
         ----------
         context : SignalContext
             Environment of the decision; every signal sees the same one.
-        signals : Sequence[Signal]
-            Signals to compute, in order.
+        signals : Sequence[Signal | SignalRequest]
+            Signals to compute, in order. A bare signal is computed over
+            ``instrument_ids``; a :class:`SignalRequest` may carry a universe
+            of its own, which is what a cross-asset decision needs - a yield
+            and a fund are not the same universe, and a level signal asked
+            about a fund stops the run rather than answering.
         instrument_ids : Sequence[str]
-            Instruments to compute them for.
+            Instruments to compute them for, unless a request says otherwise.
 
         Returns
         -------
@@ -59,22 +93,32 @@ class SignalEngine:
             are configuration or implementation mistakes, and none of them is a
             data problem, so none becomes a status.
         """
+        requests = [
+            item if isinstance(item, SignalRequest) else SignalRequest(item) for item in signals
+        ]
         seen: set[str] = set()
-        for signal in signals:
-            if signal.signal_id in seen:
+        for request in requests:
+            signal_id = request.signal.signal_id
+            if signal_id in seen:
                 raise ValueError(
-                    f"Two signals share the id {signal.signal_id!r}; one would hide the other"
+                    f"Two signals share the id {signal_id!r}; one would hide the other"
                 )
-            seen.add(signal.signal_id)
-        repeated = sorted(name for name, count in Counter(instrument_ids).items() if count > 1)
-        if repeated:
-            raise ValueError(f"Instrument(s) asked for twice: {', '.join(repeated)}")
+            seen.add(signal_id)
+        _require_each_name_once(instrument_ids, "the snapshot's universe")
+        for request in requests:
+            if request.instruments is not None:
+                _require_each_name_once(
+                    request.instruments, f"the universe of {request.signal.signal_id}"
+                )
 
         results: dict[str, SignalResult] = {}
-        for signal in signals:
-            result = signal.compute(context, instrument_ids)
-            self._require_an_answer(signal, result, context, instrument_ids)
-            results[signal.signal_id] = result
+        for request in requests:
+            universe = (
+                list(instrument_ids) if request.instruments is None else list(request.instruments)
+            )
+            result = request.signal.compute(context, universe)
+            self._require_an_answer(request.signal, result, context, universe)
+            results[request.signal.signal_id] = result
         return SignalSnapshot(as_of=context.as_of, results=results)
 
     @staticmethod
@@ -149,3 +193,24 @@ class SignalEngine:
             raise ValueError(
                 f"{signal.signal_id} answered about another universe: {'; '.join(detail)}"
             )
+
+
+def _require_each_name_once(instrument_ids: Sequence[str], what: str) -> None:
+    """Raise if a universe holds an instrument twice.
+
+    Parameters
+    ----------
+    instrument_ids : Sequence[str]
+        The universe to check.
+    what : str
+        How to describe it in the message.
+
+    Raises
+    ------
+    ValueError
+        If a name appears more than once. It would be weighted twice in a
+        ranking, which is a configuration mistake rather than a view.
+    """
+    repeated = sorted(name for name, count in Counter(instrument_ids).items() if count > 1)
+    if repeated:
+        raise ValueError(f"{what} asks for {', '.join(repeated)} twice")

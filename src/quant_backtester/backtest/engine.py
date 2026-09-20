@@ -44,7 +44,7 @@ from quant_backtester.portfolio.limits import PositionLimits
 from quant_backtester.portfolio.targets import Holdings, TargetAllocation
 from quant_backtester.signals.base import Signal
 from quant_backtester.signals.context import SignalContext
-from quant_backtester.signals.engine import SignalEngine
+from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.snapshot import SignalSnapshot
 
 
@@ -272,8 +272,15 @@ class BacktestEngine:
         The calendar time is advanced on. A European strategy decides on Paris
         sessions even when it holds a US index, and the staleness of that
         index's close is counted on the same calendar.
-    signals : Sequence[Signal]
-        Computed at every decision, in order.
+    signals : Sequence[Signal | SignalRequest]
+        Computed at every decision, in order. A bare signal is computed over
+        that session's universe; a
+        :class:`~quant_backtester.signals.engine.SignalRequest` may carry a
+        universe of its own, which is how a gauge that is never traded - a
+        volatility index, a yield - reaches the same snapshot as the funds it
+        gates. That universe is a fixed list: a per-signal universe that is
+        itself dated would need the request to carry a
+        :class:`UniverseSource`, and nothing has needed it yet.
     strategy : Strategy
         Given the snapshot, and nothing else.
     universe : Universe | StaticUniverse | Sequence[str]
@@ -311,7 +318,7 @@ class BacktestEngine:
     reader: MarketDataReader
     calendars: CalendarRegistry
     reference_calendar_id: str
-    signals: Sequence[Signal]
+    signals: Sequence[Signal | SignalRequest]
     strategy: Strategy
     universe: UniverseSource | Sequence[str]
     initial_cash: float

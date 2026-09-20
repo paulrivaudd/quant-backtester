@@ -125,6 +125,7 @@ a fund launched in 2018 is not a member of anything in 2010.
 | `price/`, `risk/` | the six signals computed from one instrument's own window |
 | `level/` | published series: a change in their own units, a z-score |
 | `cross_sectional/` | ranking those signals across a universe |
+| `engine.py` | and a signal may be asked about a universe of its own |
 
 A published series is not a price, and `level/` is where that is taken
 seriously. Nobody holds sessions for a macro release, so its window is counted
@@ -136,6 +137,15 @@ twenty-five basis points, not six percent, and a yield that crosses zero makes
 the ratio change sign while the move itself is unremarkable. So the change is a
 difference in the series' own units, and two such series are compared by
 standardising them, never by dividing.
+
+A snapshot is one instant, not one universe. A `SignalRequest` carries the
+names a signal is computed for, so a rotation between two funds can be gated by
+a volatility index or a yield that reaches the same snapshot without ever being
+ranked against them — `RiskGatedRotation` is that decision, and it holds the
+rotation's choice only while the gauge stays at or below a declared threshold.
+What it does when the gauge cannot be read is declared too, because a risk
+filter that silently becomes no filter the day its input is late is only ever
+noticed afterwards.
 
 A signal never chooses its own instant, never opens a file and never repairs a
 window. Every number comes with a status, because "not listed yet", "no history
