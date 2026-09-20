@@ -23,6 +23,9 @@ SIGNALS = PACKAGE / "signals"
 STRATEGIES = PACKAGE / "strategies"
 """Source of the strategies layer."""
 
+ANALYTICS = PACKAGE / "analytics"
+"""Source of the analytics layer."""
+
 FORBIDDEN_IN_SIGNALS = (
     "quant_backtester.data.sources",
     "quant_backtester.data.updater",
@@ -103,6 +106,22 @@ def test_strategies_see_signals_and_nothing_below(path: Path):
     price nobody decided was knowable yet. So it is given neither: every import
     of the data layer is refused here, not only the ones the signals layer
     refuses.
+    """
+    reaching_down = sorted(
+        name for name in imported_modules(path) if name.startswith("quant_backtester.data")
+    )
+
+    assert not reaching_down, f"{path.name} imports {', '.join(reaching_down)}"
+
+
+@pytest.mark.parametrize("path", sorted(ANALYTICS.rglob("*.py")), ids=lambda path: path.stem)
+def test_analytics_describes_a_finished_run_and_fetches_nothing(path: Path):
+    """A report is a function of a run, not a second way into the market.
+
+    Given a reader, a statistic could quietly be computed against prices the
+    run never saw - a benchmark read at today's revision, a close the engine
+    had not been handed - and nobody reading the number would know. So the
+    layer is handed a finished result and nothing else.
     """
     reaching_down = sorted(
         name for name in imported_modules(path) if name.startswith("quant_backtester.data")

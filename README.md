@@ -63,7 +63,7 @@ src/quant_backtester/
     portfolio/   forecast scores -> target positions           (minimal)
     execution/   target positions -> fills and costs           (minimal)
     backtest/    the event loop                                (minimal)
-    analytics/   performance and risk                          (to write)
+    analytics/   performance and risk                          (V1 done)
     strategies/  concrete strategies                           (one, minimal)
 tests/           mirrors the package layout
 market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
@@ -199,6 +199,8 @@ state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
 ## A run, end to end
 
 ```python
+from quant_backtester.analytics import AnalyticsConfig, PerformanceReport
+
 engine = BacktestEngine(
     reader=reader,
     calendars=calendars,
@@ -217,22 +219,48 @@ engine = BacktestEngine(
     timetable=Timetable(),  # decide at 23:00 Paris, fill at 09:01 the next session
 )
 result = engine.run(date(2025, 1, 2), date(2026, 9, 17))
+report = PerformanceReport.of(result, AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.02))
+print(report.render())
 ```
 
 ```text
-sessions      437
-gross return  +17.54%
-net return    +12.02%
-total cost     5 521   (5.52% of starting capital)
-  commission   3 451
-  market       2 070
-turnover      69.0x initial capital over 65 rebalancings
+437 sessions, 1.71 years, 255 sessions/year, risk-free 2.00%
+
+                               gross         net
+total return                  17.54%      12.02%
+annualised return              9.94%       6.88%
+annualised volatility         10.16%      10.24%
+max drawdown                  -6.14%      -6.49%
+sharpe ratio                    0.79        0.50
+
+costs                       5,520.96
+  commission                3,450.61
+  spread and slippage       2,070.36
+  drag on the return           5.52%
+  share of gross              31.47%
+  rebalancings                    65
+  per rebalancing              84.94
+  turnover                    64.90x
+  turnover a year             38.05x
+
+sessions valued on an older close            0
+sessions an order could not be sent on     216
+sessions with nothing to choose from        61
+sessions ending on borrowed cash           159
 ```
 
-Five and a half points of return went to execution. A rotation that switches
-between two funds sixty-five times in twenty-one months is expensive, and that
-is the kind of fact a backtest without a cost model cannot show — which is why
-this one refuses to report a return without one.
+Five and a half points of return went to execution — **a third of everything the
+idea earned**, and a Sharpe ratio of 0.79 that an investor would have
+experienced as 0.50. A rotation that switches between two funds sixty-five
+times in twenty-one months is expensive, and that is the kind of fact a
+backtest without a cost model cannot show — which is why this one refuses to
+report a return without one.
+
+The last block is not decoration. This run holds an index alongside a fund, and
+an index has no opening auction to deal at: on 216 of its 437 sessions the
+order was not sent and the book stayed as it was. Those three lines are the
+caveats the figures above have to be read with, and a report that left them out
+would be describing a strategy nobody could have run.
 
 Inside a session the order is fixed, and it is what stops a strategy buying at
 the close it just read:
