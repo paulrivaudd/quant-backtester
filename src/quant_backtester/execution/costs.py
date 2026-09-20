@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from quant_backtester.numbers import require_finite_non_negative
+
 
 class Side(Enum):
     """Which way a trade goes, and therefore which way its costs point."""
@@ -50,8 +52,10 @@ class CostModel:
     Raises
     ------
     ValueError
-        If a term is negative, or a fractional term reaches 1. A cost of a
-        whole price is not a cost, it is a sign the units were confused.
+        If a term is not a finite number, is negative, or a fractional term
+        reaches 1 - on its own, or once the spread and the slippage are added
+        together, since the fill price pays both. A cost of a whole price is
+        not a cost, it is a sign the units were confused.
 
     Notes
     -----
@@ -72,16 +76,19 @@ class CostModel:
             ("slippage_rate", self.slippage_rate),
         )
         for name, value in (*fractions, ("minimum_commission", self.minimum_commission)):
-            if isinstance(value, bool) or not isinstance(value, float | int):
-                raise ValueError(f"{name} must be a number, got {value!r}")
-            if value < 0:
-                raise ValueError(f"{name} must not be negative, got {value}")
+            require_finite_non_negative(value, name)
         for name, value in fractions:
             if value >= 1.0:
                 raise ValueError(
                     f"{name} is a fraction, not a percentage: {value} means "
                     f"{value * 100:g}% of every trade"
                 )
+        drag = self.half_spread + self.slippage_rate
+        if drag >= 1.0:
+            raise ValueError(
+                f"half_spread and slippage_rate come to {drag}: a sale would be "
+                f"done at {1.0 - drag:g} times the price on the screen"
+            )
 
     def fill_price(self, side: Side, reference: float) -> float:
         """Return the price a trade is actually done at.

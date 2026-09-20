@@ -186,9 +186,14 @@ def test_what_to_do_with_an_unreadable_gauge_has_to_be_said(flat: object) -> Non
         )
 
 
-@pytest.mark.parametrize("maximum", [float("nan"), "1.0", None, True])
+@pytest.mark.parametrize("maximum", [float("nan"), float("inf"), float("-inf"), "1.0", None, True])
 def test_a_threshold_that_is_not_a_number_is_refused(maximum: object) -> None:
-    """A comparison against a string or a NaN is never true, silently."""
+    """A comparison against a string or a NaN is never true, silently.
+
+    An infinity is the same mistake with a straight face: a gate at ``+inf``
+    never closes and one at ``-inf`` never opens, and both would be read as a
+    risk filter that was simply never triggered.
+    """
     with pytest.raises(ValueError, match="maximum"):
         RiskGatedRotation(
             rotation=TopRankRotation(signal_id="rank", top_n=1),

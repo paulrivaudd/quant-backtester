@@ -86,3 +86,48 @@ def test_a_percentage_written_as_one_is_refused(overrides: dict[str, float]) -> 
     """``10`` meant as ten percent would take ten times every trade."""
     with pytest.raises(ValueError, match="fraction, not a percentage"):
         CostModel(**overrides)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"commission_rate": float("nan")},
+        {"half_spread": float("inf")},
+        {"slippage_rate": float("-inf")},
+        {"minimum_commission": float("nan")},
+    ],
+    ids=["commission", "spread", "slippage", "floor"],
+)
+def test_a_cost_that_is_not_a_finite_number_is_refused(overrides: dict[str, float]) -> None:
+    """NaN passes every ``<`` and every ``>=``, then charges NaN on every trade."""
+    with pytest.raises(ValueError, match="must be a finite number"):
+        CostModel(**overrides)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [{"commission_rate": True}, {"minimum_commission": "1.0"}],
+    ids=["boolean", "string"],
+)
+def test_a_cost_that_is_not_a_number_is_refused(overrides: dict[str, object]) -> None:
+    """``True`` is an ``int`` to Python, and would charge the whole trade."""
+    with pytest.raises(ValueError, match="must be a number"):
+        CostModel(**overrides)  # type: ignore[arg-type]
+
+
+def test_a_spread_and_a_slippage_that_together_reach_the_price_are_refused() -> None:
+    """Each is a legal fraction on its own, and the fill price pays both.
+
+    At 0.6 and 0.6 a sale would be done at minus twenty percent of the price on
+    the screen: the book would pay to sell, which is not a cost model but a
+    parameter written in the wrong units.
+    """
+    with pytest.raises(ValueError, match="come to"):
+        CostModel(half_spread=0.6, slippage_rate=0.6)
+
+
+def test_a_sale_is_never_done_at_a_price_of_zero_or_less() -> None:
+    """The guard above is what makes this true for every pair that is accepted."""
+    model = CostModel(half_spread=0.5, slippage_rate=0.49)
+
+    assert model.fill_price(Side.SELL, 100.0) > 0.0
