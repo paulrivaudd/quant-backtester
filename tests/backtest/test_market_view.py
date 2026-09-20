@@ -20,7 +20,12 @@ from quant_backtester.backtest.market import (
     UnavailableMarketData,
 )
 from quant_backtester.data.calendars import TradingCalendar
-from quant_backtester.data.reader import MarketDataReader, ObservationStatus
+from quant_backtester.data.reader import (
+    MarketDataReader,
+    ObservationStatus,
+    PointInTimeReader,
+)
+from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.schemas import BarField
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.types import PriceBasis, SignalStatus, WindowMode
@@ -214,3 +219,39 @@ def test_a_window_mode_is_declared_not_guessed(
 
     assert window.ok
     assert window.observations_used == 3
+
+
+def test_the_market_view_hands_back_no_signal_context(view: StrategyMarketView) -> None:
+    """The way around the window contract, closed.
+
+    While the context was a public field, a strategy could write
+    ``ctx.market.context.market.history(...).tail(20)`` and get twenty
+    observations spanning twenty-six sessions - the one mistake
+    :meth:`history` goes through the window loader to prevent. The reader is
+    fixed at the decision instant either way, so this was never a way of
+    reading tomorrow; it was a way of reading a window nobody checked.
+    """
+    public = {name for name in dir(view) if not name.startswith("_")}
+
+    assert "context" not in public
+    assert public == {"as_of", "history", "value", "values"}
+
+
+def test_no_public_attribute_of_the_view_leads_to_the_reader(
+    view: StrategyMarketView, context: SignalContext
+) -> None:
+    """Not just the name: nothing reachable from it is the reader or the store."""
+    forbidden = (PointInTimeReader, MarketDataReader, MarketDataRepository)
+
+    reachable = [getattr(view, name) for name in dir(view) if not name.startswith("_")]
+
+    assert not [item for item in reachable if isinstance(item, forbidden)]
+    assert not [item for item in reachable if isinstance(item, SignalContext)]
+
+
+def test_the_view_says_which_instant_it_answers_for(view: StrategyMarketView) -> None:
+    """Its representation names the decision and nothing underneath it."""
+    printed = repr(view)
+
+    assert view.as_of.isoformat() in printed
+    assert "PointInTimeReader" not in printed

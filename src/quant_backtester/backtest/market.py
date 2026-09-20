@@ -211,31 +211,49 @@ class MarketWindow:
         return self.values[-1]
 
 
-@dataclass(frozen=True, slots=True)
 class StrategyMarketView:
     """What a strategy may read of the market, at the instant it is deciding.
 
-    Attributes
+    Parameters
     ----------
     context : SignalContext
         The environment of the decision - the point-in-time reader, the
-        registry and the calendars. Held rather than exposed: every method here
-        reads through it, and none of them takes an instant.
+        registry and the calendars. Taken and then **hidden**: it is held
+        under a mangled private name, and no attribute, property or method of
+        this class hands it back.
 
     Notes
     -----
+    Hidden rather than merely undocumented, and the difference matters. While
+    it was a public field, a strategy could write::
+
+        ctx.market.context.market.history("ETF_WORLD").tail(20)
+
+    and get twenty *observations*, which may span twenty-six sessions - the one
+    mistake :meth:`history` goes through the window loader to make impossible.
+    The reader is already fixed at the decision instant, so this was never a
+    way of reading tomorrow; it was a way around the window contract, which is
+    the other half of what this façade exists for.
+
     Built from the same context the signals were computed against, so the
     values a strategy reads and the numbers its signals produced come from one
     reader, fixed at one instant. Sharing it also shares its cache: a fund's
     closes are read once per decision whether a signal or a strategy asks.
     """
 
-    context: SignalContext
+    __slots__ = ("__context",)
+
+    def __init__(self, context: SignalContext) -> None:
+        self.__context = context
+
+    def __repr__(self) -> str:
+        """Return a representation that names the instant and nothing else."""
+        return f"StrategyMarketView(as_of={self.as_of.isoformat()})"
 
     @property
     def as_of(self) -> datetime:
         """Return the decision instant this view is fixed at."""
-        return self.context.as_of
+        return self.__context.as_of
 
     def value(self, instrument_id: str, field: BarField = BarField.CLOSE) -> MarketObservation:
         """Return the latest knowable value of one series.
@@ -260,8 +278,8 @@ class StrategyMarketView:
             If the instrument is not registered. A name nobody declared is a
             configuration mistake, not an empty reading.
         """
-        self.context.instruments.get(instrument_id)
-        frame = self.context.market.values([instrument_id], field)
+        self.__context.instruments.get(instrument_id)
+        frame = self.__context.market.values([instrument_id], field)
         row = frame.iloc[0]
         value = float(row["value"])
         age = row["age_sessions"]
@@ -330,7 +348,7 @@ class StrategyMarketView:
         """
         require_positive_int(observations, "observations")
         loaded = load_window(
-            self.context,
+            self.__context,
             instrument_id,
             spec=WindowSpec(observations=observations, mode=mode),
             bar_field=field,

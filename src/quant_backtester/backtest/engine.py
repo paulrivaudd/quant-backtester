@@ -466,6 +466,10 @@ class BacktestEngine:
             raise ValueError(f"start {start} is after end {end}")
         calendar = self.calendars.get(self.reference_calendar_id)
         sessions = calendar.sessions(start, end)
+        # Asked once, and used for every decision of this run. A strategy that
+        # answered differently on the second session would be computing signals
+        # nobody recorded - the declaration and what ran must be one thing.
+        declared = self._declared_signals()
         engine = SignalEngine()
         holdings = Holdings(cash=self.initial_cash)
         gross_cash = self.initial_cash
@@ -487,7 +491,13 @@ class BacktestEngine:
             if decides:
                 members = self._trading_universe(session.session_date)
                 standing = self._decide(
-                    engine, market, members, session.session_date, holdings, prices
+                    engine,
+                    market,
+                    members,
+                    session.session_date,
+                    holdings,
+                    prices,
+                    declared,
                 )
                 pending = standing
             else:
@@ -742,8 +752,31 @@ class BacktestEngine:
         session_date: date,
         holdings: Holdings,
         prices: Mapping[str, float],
+        declared: Sequence[Signal | SignalRequest],
     ) -> TargetAllocation:
         """Compute the signals over that session's universes and decide what to hold.
+
+        Parameters
+        ----------
+        engine : SignalEngine
+            Computes the declared signals for this decision.
+        market : PointInTimeReader
+            The reader of the decision instant.
+        members : Sequence[str]
+            What the trading universe held on this session.
+        session_date : date
+            The session being decided on.
+        holdings : Holdings
+            The book, before the order this decision will produce.
+        prices : Mapping[str, float]
+            The closes the book was valued at.
+        declared : Sequence[Signal | SignalRequest]
+            The signals of the run, resolved once at its start.
+
+        Returns
+        -------
+        TargetAllocation
+            What to hold, once the portfolio limits have been applied.
 
         Notes
         -----
@@ -752,13 +785,18 @@ class BacktestEngine:
         because here is the only place that knows which session is being
         decided: a signal that chose its own date could choose one the decision
         cannot see.
+
+        The list of signals is not asked again. It was resolved once for the
+        run, so what was computed is exactly what the result records - a
+        strategy building its declaration on the fly could otherwise run on
+        signals no definition mentions.
         """
         context = SignalContext(
             market=market, instruments=self.instruments, calendars=self.calendars
         )
         requests = [
             item.resolved(session_date) if isinstance(item, SignalRequest) else item
-            for item in self._declared_signals()
+            for item in declared
         ]
         snapshot = engine.compute(context, requests, list(members))
         decision = StrategyContext(
@@ -771,8 +809,14 @@ class BacktestEngine:
         )
         return self.limits.apply(self.strategy.decide(decision))
 
-    def _declared_signals(self) -> Sequence[Signal | SignalRequest]:
+    def _declared_signals(self) -> tuple[Signal | SignalRequest, ...]:
         """Return the signals to compute: the engine's, plus the strategy's own.
+
+        Returns
+        -------
+        tuple[Signal | SignalRequest, ...]
+            A tuple, asked for once per run rather than once per session, so
+            that the declaration a result records is the declaration that ran.
 
         Notes
         -----
@@ -788,7 +832,7 @@ class BacktestEngine:
         # which returns nothing: that is a strategy declaring no signal.
         wanted = declared() if declared is not None else None
         if not wanted:
-            return self.signals
+            return tuple(self.signals)
         return (*self.signals, *wanted)
 
     def _record(

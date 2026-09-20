@@ -409,3 +409,57 @@ def _optional_date(value: object, path: Path, universe_id: str, key: str) -> dat
             f"{path}: {key} of a member of {universe_id} must be a TOML date, got {value!r}"
         )
     return value
+
+
+def universe_definition(universe: object) -> object:
+    """Return what identifies the instruments something is computed for.
+
+    Parameters
+    ----------
+    universe : object
+        ``None`` for the session's own universe, a sequence of names, or a
+        universe that answers by session.
+
+    Returns
+    -------
+    object
+        JSON-serialisable, and enough to tell two universes apart: the names
+        of a fixed list, the id of a committed universe, the memberships of
+        one built in code.
+
+    Raises
+    ------
+    ValueError
+        If the universe is of a kind this cannot describe. A definition that
+        silently dropped what it did not understand would let two different
+        experiments share a fingerprint, which is the one thing a fingerprint
+        exists to prevent.
+    """
+    if universe is None:
+        return None
+    if isinstance(universe, StaticUniverse):
+        return {"type": "StaticUniverse", "members": list(universe.members)}
+    if isinstance(universe, Universe):
+        return {
+            "type": "Universe",
+            "id": universe.universe_id,
+            "memberships": [
+                {
+                    "instrument_id": membership.instrument_id,
+                    "from": _day(membership.from_date),
+                    "until": _day(membership.until_date),
+                }
+                for membership in universe.memberships
+            ],
+        }
+    if isinstance(universe, Sequence) and not isinstance(universe, str):
+        return [str(name) for name in universe]
+    raise ValueError(
+        f"a universe of type {type(universe).__name__} cannot be described in a "
+        "definition, so a run using it could not be told apart from another"
+    )
+
+
+def _day(value: date | None) -> str | None:
+    """Return a bound of a membership as a string, or ``None`` for an open one."""
+    return None if value is None else value.isoformat()

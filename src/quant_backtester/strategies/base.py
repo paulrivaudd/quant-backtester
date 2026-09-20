@@ -165,19 +165,24 @@ class Strategy(ABC):
 
 
 def _signal_definition(item: Signal | SignalRequest) -> Mapping[str, object]:
-    """Return one declared signal's definition, its own universe included."""
-    if not isinstance(item, SignalRequest):
-        return {"signal": item.definition_json(), "instruments": None}
-    names = item.instruments
-    if names is None:
-        instruments: object = None
-    elif isinstance(names, Sequence):
-        instruments = [str(name) for name in names]
-    else:
-        # A dated universe: the names depend on the session, so the definition
-        # records that it is one rather than the list it happens to hold today.
-        instruments = {"universe": type(names).__name__}
-    return {"signal": item.signal.definition_json(), "instruments": instruments}
+    """Return one declared signal's definition, its own universe included.
+
+    Parameters
+    ----------
+    item : Signal | SignalRequest
+        A declared signal, with or without a universe of its own.
+
+    Returns
+    -------
+    Mapping[str, object]
+        The signal's definition and what it is computed for. A request
+        describes itself - including a universe that answers by session - so
+        that nothing here has to reach into the data layer to find out what a
+        strategy was run over.
+    """
+    if isinstance(item, SignalRequest):
+        return item.definition()
+    return {"signal": item.definition_json(), "instruments": None}
 
 
 def _plain(value: object) -> object:
