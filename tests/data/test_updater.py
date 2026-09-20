@@ -19,6 +19,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from quant_backtester.data.bar_corrections import BarCorrection, BarCorrections, BarDefect
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.corporate_actions import ActionCorrection, ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy
@@ -427,6 +428,7 @@ def build_updater(
     clock: Clock,
     accepted: AcceptedRevisions | None = None,
     corrections: ActionCorrections | None = None,
+    bar_corrections: BarCorrections | None = None,
     overlap_sessions: int = 5,
     normalizers: Mapping[str, Normalizer] | None = None,
 ) -> MarketDataUpdater:
@@ -445,6 +447,7 @@ def build_updater(
         else {source_id: FakeNormalizer(source_id) for source_id in sources},
         accepted_revisions=accepted or AcceptedRevisions([]),
         action_corrections=corrections or ActionCorrections([]),
+        bar_corrections=bar_corrections or BarCorrections([]),
         cross_check_policy=POLICY,
         overlap_sessions=overlap_sessions,
         clock=clock,
@@ -1829,6 +1832,7 @@ def test_a_cross_check_policy_that_moved_is_named_as_such(
         normalizers={source_id: FakeNormalizer(source_id) for source_id in sources},
         accepted_revisions=AcceptedRevisions([]),
         action_corrections=ActionCorrections([]),
+        bar_corrections=BarCorrections([]),
         cross_check_policy=CrossCheckPolicy(price_rel_tolerance=1e-3, volume_rel_tolerance=0.0),
         clock=clock,
     )
@@ -1870,3 +1874,282 @@ def test_interrupted_write_leaves_the_previous_file_intact(market_root, monkeypa
 
     assert path.read_bytes() == before
     assert [p.name for p in path.parent.iterdir()] == ["US10Y.parquet"]
+
+
+# ---------------------------------------------------------------------------
+# Reviewed bar corrections
+# ---------------------------------------------------------------------------
+
+
+def broken_bar(yahoo: FakeSource) -> None:
+    """Make the provider serve an impossible bar on the Wednesday."""
+    rows = yahoo.rows["ETF_EU"].copy()
+    wednesday = rows["date"] == WEDNESDAY
+    # Open above high: arithmetically impossible, and the validator says so.
+    rows.loc[wednesday, "open"] = rows.loc[wednesday, "high"] + 1.0
+    yahoo.rows["ETF_EU"] = rows
+
+
+def dropping_wednesday() -> BarCorrections:
+    """Return the reviewed decision to drop that bar."""
+    return BarCorrections(
+        [
+            BarCorrection(
+                instrument_id="ETF_EU",
+                source="YAHOO",
+                session_date=WEDNESDAY,
+                defect=BarDefect.OHLC_ORDER,
+                reason="Yahoo serves an open above the high; no second source for that year",
+            )
+        ]
+    )
+
+
+def test_a_broken_bar_refuses_the_whole_series_without_a_correction(
+    updater: MarketDataUpdater, yahoo: FakeSource, repository: MarketDataRepository
+) -> None:
+    """The state before the mechanism existed, and it is the right default.
+
+    One impossible row keeps four good ones out of the store, because a bar
+    whose open is outside its own range is not something to guess at.
+    """
+    broken_bar(yahoo)
+
+    report = updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert not report.valid
+    assert "OHLC_ORDER" in codes(report)
+    assert repository.load_bars("ETF_EU").empty
+
+
+def test_a_reviewed_correction_drops_the_bar_and_stores_the_rest(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    """The session becomes a hole and the four good sessions are ingested."""
+    broken_bar(yahoo)
+    updater = build_updater(
+        repository,
+        instruments,
+        calendars,
+        {"YAHOO": yahoo, "FRED": fred},
+        clock,
+        bar_corrections=dropping_wednesday(),
+    )
+
+    report = updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert report.valid
+    assert "REVIEWED_BAR_DROPPED" in codes(report)
+    assert list(repository.load_bars("ETF_EU")["session_date"]) == [
+        MONDAY,
+        TUESDAY,
+        THURSDAY,
+        FRIDAY,
+    ]
+
+
+def test_a_dropped_bar_is_a_hole_the_reader_reports_as_one(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    """Not a price carried over from Tuesday: the session has no price at all."""
+    broken_bar(yahoo)
+    updater = build_updater(
+        repository,
+        instruments,
+        calendars,
+        {"YAHOO": yahoo, "FRED": fred},
+        clock,
+        bar_corrections=dropping_wednesday(),
+    )
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    reader = MarketDataReader(
+        repository=repository,
+        instruments=instruments,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+    )
+    at_close = reader.at(datetime(2026, 3, 11, 20, 0, tzinfo=UTC))
+    row = at_close.values(["ETF_EU"]).iloc[0]
+
+    assert row["status"] is ObservationStatus.MISSING
+
+
+def test_a_rebuild_applies_the_same_corrections_as_the_live_path(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    """Otherwise clean would stop being a function of raw plus the committed config."""
+    broken_bar(yahoo)
+    updater = build_updater(
+        repository,
+        instruments,
+        calendars,
+        {"YAHOO": yahoo, "FRED": fred},
+        clock,
+        bar_corrections=dropping_wednesday(),
+    )
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    live = repository.load_bars("ETF_EU")
+
+    report = updater.rebuild_clean("ETF_EU")
+
+    assert "REVIEWED_BAR_DROPPED" in codes(report)
+    pd.testing.assert_frame_equal(repository.load_bars("ETF_EU"), live)
+
+
+def test_a_correction_the_provider_made_obsolete_stops_the_ingestion(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    """The bar is fine now, and a note from last year must not go on dropping it."""
+    updater = build_updater(
+        repository,
+        instruments,
+        calendars,
+        {"YAHOO": yahoo, "FRED": fred},
+        clock,
+        bar_corrections=dropping_wednesday(),
+    )
+
+    with pytest.raises(ValueError, match="no longer has"):
+        updater.download("ETF_EU", MONDAY, FRIDAY)
+
+
+# ---------------------------------------------------------------------------
+# Archiving a history before it disappears
+# ---------------------------------------------------------------------------
+
+
+def test_archiving_asks_for_the_whole_declared_history(
+    updater: MarketDataUpdater, yahoo: FakeSource
+) -> None:
+    """A delisted name cannot be fetched afterwards, so it is fetched in full now."""
+    updater.archive_history("ETF_EU")
+
+    asked = [call for call in yahoo.calls if call[0] == "ETF_EU"]
+    assert asked[0][1] == MONDAY
+    assert asked[0][2] == FRIDAY
+
+
+def test_a_history_with_no_beginning_cannot_be_asked_for_in_full(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    clock: Clock,
+) -> None:
+    """Without a first session there is no window to archive."""
+    registry = InstrumentRegistry(
+        [
+            Instrument(
+                id="ETF_EU",
+                name="Paris ETF",
+                asset_type=AssetType.ETF,
+                data_type=DataType.BAR,
+                currency="EUR",
+                primary_source="YAHOO",
+                source_symbol="CW8.PA",
+                tradable=True,
+                calendar_id="XPAR",
+            )
+        ]
+    )
+    updater = build_updater(repository, registry, calendars, {"YAHOO": yahoo}, clock)
+
+    with pytest.raises(ValueError, match="no first_session"):
+        updater.archive_history("ETF_EU")
+
+
+def test_coverage_says_a_full_history_is_covered(updater: MarketDataUpdater) -> None:
+    """The question the report exists to answer, in its happy case."""
+    updater.archive_history("ETF_EU")
+
+    coverage = updater.history_coverage("ETF_EU")
+
+    assert coverage.complete
+    assert coverage.stored_from == MONDAY
+    assert coverage.missing_head is None
+
+
+def test_coverage_names_the_history_nobody_fetched(updater: MarketDataUpdater) -> None:
+    """A name that was never downloaded is the one that will be lost first."""
+    coverage = updater.history_coverage("ETF_EU")
+
+    assert not coverage.complete
+    assert coverage.stored_from is None
+    assert coverage.raw_fetches == 0
+    assert coverage.missing_head == (MONDAY, coverage.declared_until)
+
+
+def test_coverage_names_the_head_a_partial_store_is_missing(
+    updater: MarketDataUpdater,
+) -> None:
+    """The half that matters: what was never fetched and may never be again."""
+    updater.download("ETF_EU", WEDNESDAY, FRIDAY)
+
+    coverage = updater.history_coverage("ETF_EU")
+
+    assert not coverage.complete
+    assert coverage.missing_head == (MONDAY, WEDNESDAY)
+    assert coverage.raw_fetches > 0
+
+
+def delisted(instruments: InstrumentRegistry, last: date) -> InstrumentRegistry:
+    """Return the registry with the Paris ETF delisted on ``last``."""
+    return InstrumentRegistry(
+        [
+            replace(instrument, last_session=last) if instrument.id == "ETF_EU" else instrument
+            for instrument in instruments.list_all()
+        ]
+    )
+
+
+def test_a_delisted_name_is_never_fetched_past_its_last_session(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    clock: Clock,
+) -> None:
+    """Asking for what came after is asking for a ticker somebody else now uses."""
+    updater = build_updater(
+        repository, delisted(instruments, WEDNESDAY), calendars, {"YAHOO": yahoo}, clock
+    )
+
+    updater.archive_history("ETF_EU")
+
+    assert [call[2] for call in yahoo.calls if call[0] == "ETF_EU"] == [WEDNESDAY]
+
+
+def test_a_delisted_name_already_stored_in_full_is_not_updated_again(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    clock: Clock,
+) -> None:
+    """There is nothing to extend, and the archive is the only source left."""
+    registry = delisted(instruments, WEDNESDAY)
+    updater = build_updater(repository, registry, calendars, {"YAHOO": yahoo}, clock)
+    updater.archive_history("ETF_EU")
+
+    with pytest.raises(ValueError, match="delisted"):
+        updater.update("ETF_EU")

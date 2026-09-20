@@ -23,24 +23,14 @@ first_session = 1990-01-02
 # Yahoo serves 129 flat sessions before 18 March 2014, volume zero and an open
 # equal to its close: published net asset values from before the share class
 # had a market, exactly as for CW8. The first session with a real bar is
-# 2014-03-18.
+# 2014-03-18, and the series is declared from it.
 #
-# The series is nevertheless declared from 2018-04-18, and both halves of that
-# decision are written down here rather than left to be rediscovered:
-#
-#   1. it is the session the other fund of ROTATION_2 first had a market on,
-#      so nothing above this file can use an earlier one - a rotation needs two
-#      things to rotate between;
-#   2. Yahoo's only inconsistent bar in thirteen years sits before it. On
-#      2017-09-07 it serves open 9.22583 above high 9.20667, two tenths of a
-#      percent apart, and the validator refuses the whole series for it - as it
-#      should: a bar whose open is outside its own range is not a bar. This
-#      project has a reviewed correction for a corporate action and for a
-#      provider revision, and none yet for a malformed bar, so the honest state
-#      is a declared window and this note, not a silently repaired price.
-#
-# Extending the series backwards therefore needs that mechanism first, and is
-# a change to what every past result was computed on.
+# Yahoo's only inconsistent bar in thirteen years - open 9.22583 above high
+# 9.20667 on 2017-09-07 - used to keep those four years out of the store: the
+# validator refuses the whole series for it, as it should. That session is now
+# dropped by a reviewed correction in bar_corrections.toml, with the reason on
+# file, and the rest of the history is ingested. The session itself is a hole,
+# not a repaired price: nothing knows the high the market really made.
 [[instrument]]
 id = "ETF_SP500_PEA"
 name = "BNP Paribas Easy S&P 500 (PEA)"
@@ -53,7 +43,7 @@ calendar_id = "XPAR"
 tradable = true
 # Whole shares: a retail order book takes 123 of them or 124, never 123.47.
 quantity_step = 1.0
-first_session = 2018-04-18
+first_session = 2014-03-18
 # Capitalising (C) share class, like CW8: an empty dividend feed is expected.
 distribution_policy = "ACCUMULATING"
 

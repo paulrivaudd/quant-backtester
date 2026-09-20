@@ -109,6 +109,7 @@ its own `tail(20)` and get twenty observations spanning twenty-six sessions.
 | `crosscheck.py` | several sources to one checked series, field by field |
 | `revisions.py` | detecting a change is not deciding to apply it |
 | `corporate_actions.py` | reviewed corrections to what a provider called an event |
+| `bar_corrections.py` | reviewed decisions to drop a bar a provider sent broken |
 | `repository.py` | the only module that knows Parquet exists |
 | `updater.py` | ingestion, and the replay that proves it reproducible |
 | `universes.py` | who was in the universe on the day, not who is in it now |
@@ -126,6 +127,24 @@ the first quarter of 2019 is 21 098.827 to a reader in January 2020 and
 `vintage_date` it is pinned to, in committed configuration, so the same code
 and the same config fetch the same numbers for ever — and the adapter refuses
 to fetch without one.
+
+A provider occasionally sends a bar that is not a bar: an open above its own
+high, a price of zero. The validator refuses the series for it, which is right,
+and refusing for ever is not - one impossible row in 2017 kept four years of
+good history out of the store. So the decision is committed like the others, in
+`bar_corrections.toml`, with the reason on file. A correction **drops** the row
+and never repairs it: nothing knows the high the market really made, and a hole
+is visible where an invented price is not. Each entry names the defect it was
+written for, so the day a provider fixes its own data the ingestion stops
+rather than going on dropping a good bar for ever.
+
+A dated universe is only half of the survivorship problem. The other half is
+that nobody can download the prices of a name once the provider stops serving
+it — so `--archive` fetches an instrument's whole declared history on purpose,
+while it can be, and `--coverage` says which names the store does not hold in
+full. A delisted instrument is never fetched past its last session, and never
+refetched once its series reaches it: what is in the archive is all there will
+ever be.
 
 Membership is dated for the same reason prices are. A universe written as a
 list of names is a list of the names that still exist — Yahoo serves nothing
@@ -224,6 +243,8 @@ instant:
 ```bash
 uv run python scripts/update_market_data.py              # extend every series
 uv run python scripts/update_market_data.py --rebuild    # replay raw/ into clean/
+uv run python scripts/update_market_data.py --archive --only ETF_WORLD
+uv run python scripts/update_market_data.py --coverage   # what the store is missing
 ```
 
 ```python
