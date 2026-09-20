@@ -110,7 +110,7 @@ its own `tail(20)` and get twenty observations spanning twenty-six sessions.
 | `revisions.py` | detecting a change is not deciding to apply it |
 | `corporate_actions.py` | reviewed corrections to what a provider called an event |
 | `bar_corrections.py` | reviewed decisions to drop a bar a provider sent broken |
-| `repository.py` | the only module that knows Parquet exists |
+| `repository.py` | the only module that knows Parquet exists, one change at a time |
 | `updater.py` | ingestion, and the replay that proves it reproducible |
 | `universes.py` | who was in the universe on the day, not who is in it now |
 | `reader.py` | point-in-time reads, and nothing else reaches a strategy |
@@ -137,6 +137,15 @@ and never repairs it: nothing knows the high the market really made, and a hole
 is visible where an invented price is not. Each entry names the defect it was
 written for, so the day a provider fixes its own data the ingestion stops
 rather than going on dropping a good bar for ever.
+
+One promotion writes the bars, each check source's bars, the verdicts computed
+from them, the revision log and the journal of applied fetches. Each write is
+atomic on its own, which is not the same thing: a run that died between two of
+them left a store whose verdicts described values that were no longer there —
+detected by the next update, and repaired by hand. Those writes are now one
+transaction, staged under `.pending/` and published together; opening the store
+finishes a commit that had been decided and discards a set of files that had
+not.
 
 A dated universe is only half of the survivorship problem. The other half is
 that nobody can download the prices of a name once the provider stops serving

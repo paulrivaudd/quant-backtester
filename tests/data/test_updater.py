@@ -2153,3 +2153,29 @@ def test_a_delisted_name_already_stored_in_full_is_not_updated_again(
 
     with pytest.raises(ValueError, match="delisted"):
         updater.update("ETF_EU")
+
+
+def test_a_promotion_interrupted_half_way_leaves_the_store_as_it_was(
+    updater: MarketDataUpdater,
+    repository: MarketDataRepository,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The series and the verdicts computed from it are one change, or none.
+
+    Before the promotion became a transaction, a run that died here left bars
+    on disk with no verdicts beside them - a clean layer the next update
+    refuses to build on, repaired by hand.
+    """
+
+    def die(*_: object, **__: object) -> None:
+        raise OSError("the disk went away")
+
+    monkeypatch.setattr(repository, "save_checked_bars", die)
+
+    with pytest.raises(OSError, match="the disk went away"):
+        updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert repository.load_bars("ETF_EU").empty
+    assert repository.load_checked_bars("ETF_EU").empty
+    # The raw response is still archived: it is evidence, not part of the change.
+    assert repository.list_raw_fetches("ETF_EU", "YAHOO")

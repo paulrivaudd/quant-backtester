@@ -1023,3 +1023,120 @@ def test_empty_series_exists_but_has_no_dates(market_root):
     assert repository.exists("SPY")
     assert repository.first_date("SPY") is None
     assert repository.last_date("SPY") is None
+
+
+# ---------------------------------------------------------------------------
+# One change to the clean layer, or none
+# ---------------------------------------------------------------------------
+
+
+def test_a_transaction_publishes_every_file_at_once(market_root):
+    """Nothing is visible while the block runs, and everything is after it."""
+    repository = MarketDataRepository(market_root)
+    target = market_root / "clean" / "bars" / "SPY.parquet"
+
+    with repository.transaction():
+        repository.save_bars("SPY", make_bars())
+        # The writer sees its own work; nothing outside the block does.
+        assert len(repository.load_bars("SPY")) == len(SESSIONS)
+        assert not target.exists()
+
+    assert target.exists()
+    assert len(repository.load_bars("SPY")) == len(SESSIONS)
+
+
+def test_a_transaction_that_raises_leaves_the_store_untouched(market_root):
+    """A half-written promotion is the failure the transaction exists for.
+
+    A series and the verdicts computed from it are one statement. Writing the
+    first and dying before the second leaves a store that looks complete and
+    describes values that are not there.
+    """
+    repository = MarketDataRepository(market_root)
+
+    with pytest.raises(RuntimeError, match="the provider went away"), repository.transaction():
+        repository.save_bars("SPY", make_bars())
+        raise RuntimeError("the provider went away")
+
+    assert repository.load_bars("SPY").empty
+    assert list((market_root / ".pending").iterdir()) == []
+
+
+def test_writes_go_back_to_being_immediate_after_a_transaction(market_root):
+    """The block is the exception, not a mode the repository stays in."""
+    repository = MarketDataRepository(market_root)
+    with repository.transaction():
+        repository.save_bars("SPY", make_bars())
+
+    repository.save_bars("OTHER", make_bars(instrument_id="OTHER"))
+
+    assert (market_root / "clean" / "bars" / "OTHER.parquet").exists()
+
+
+def test_an_interrupted_transaction_is_discarded_when_the_store_is_opened(market_root):
+    """Staged files with no manifest had decided nothing, so they are dropped."""
+    staged = market_root / ".pending" / "interrupted" / "clean" / "bars"
+    staged.mkdir(parents=True)
+    (staged / "SPY.parquet").write_bytes(b"not even parquet")
+
+    reopened = MarketDataRepository(market_root)
+
+    assert not (market_root / ".pending" / "interrupted").exists()
+    assert reopened.load_bars("SPY").empty
+
+
+def test_a_commit_interrupted_while_moving_files_is_finished_on_the_next_open(market_root):
+    """The manifest is what says the decision was taken; the moves carry it out.
+
+    Writing it is one filesystem operation, so a crash is either before it -
+    nothing happened - or after it, and then the work is finished rather than
+    thrown away.
+    """
+    repository = MarketDataRepository(market_root)
+    repository.save_bars("SPY", make_bars())
+    target = market_root / "clean" / "bars" / "SPY.parquet"
+    staging = market_root / ".pending" / "halfway"
+    staged = staging / "clean" / "bars" / "SPY.parquet"
+    staged.parent.mkdir(parents=True)
+    os.replace(target, staged)
+    (staging / "COMMIT.json").write_text(
+        json.dumps({"clean/bars/SPY.parquet": str(staged)}), encoding="utf-8"
+    )
+
+    reopened = MarketDataRepository(market_root)
+
+    assert len(reopened.load_bars("SPY")) == len(SESSIONS)
+    assert not staging.exists()
+
+
+def test_a_transaction_cannot_be_opened_inside_another(market_root):
+    """The inner commit would publish the outer one's work halfway through."""
+    repository = MarketDataRepository(market_root)
+
+    def open_another() -> None:
+        with repository.transaction():
+            pass
+
+    with repository.transaction(), pytest.raises(RuntimeError, match="already open"):
+        open_another()
+
+
+def test_two_appends_to_one_log_in_a_transaction_do_not_undo_each_other(market_root):
+    """A read-modify-write has to see what the same transaction just wrote."""
+    repository = MarketDataRepository(market_root)
+
+    with repository.transaction():
+        repository.append_revisions(make_revision(observation_date=SESSIONS[0]))
+        repository.append_revisions(make_revision(observation_date=SESSIONS[1]))
+
+    assert len(repository.load_revisions()) == 2
+
+
+def test_a_transaction_that_wrote_nothing_leaves_nothing_behind(market_root):
+    """A fetch with nothing to promote is not a reason to keep a directory."""
+    repository = MarketDataRepository(market_root)
+
+    with repository.transaction():
+        pass
+
+    assert list((market_root / ".pending").iterdir()) == []
