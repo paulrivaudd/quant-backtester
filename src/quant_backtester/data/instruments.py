@@ -46,6 +46,26 @@ class AssetType(Enum):
     VOLATILITY = "VOLATILITY"
 
 
+class VintagePolicy(Enum):
+    """How a series served by vintages is read.
+
+    A macro aggregate is restated for years, so "the series" is not one series.
+    There are exactly two honest answers to that, and which one a run uses
+    changes what it saw, so it is declared rather than inferred.
+    """
+
+    PINNED = "PINNED"
+    """One vintage, for the whole run. What the series looked like on one
+    stated day - reproducible, and not point-in-time: a decision in 2019 reads
+    numbers restated in 2020. Right for a study that says so, wrong for a
+    backtest that does not."""
+
+    AS_OF_DECISION = "AS_OF_DECISION"
+    """The latest vintage the decision could have seen. Each decision reads the
+    series as it stood that day, so a revision published afterwards is invisible
+    to it - which is what a point-in-time macro series means."""
+
+
 class DistributionPolicy(Enum):
     """What a fund does with the income of the assets it holds."""
 
@@ -234,14 +254,19 @@ class Instrument:
         collapse into the same ``NaN``.
     last_session : date | None
         Last session, for a delisted instrument. ``None`` means still listed.
-    vintage_date : date | None
-        The vintage a revised series is pinned to, for a source that serves
-        them. A macro aggregate is restated for years after the fact, so
-        "the series" is not one series: reading it today gives numbers nobody
-        had at the time, and reading it again next year gives different ones.
-        Pinning the vintage is what makes such a series reproducible and
-        point-in-time at once. ``None`` for anything not served by vintage,
-        which is every source here but ALFRED.
+    vintage_dates : tuple[date, ...]
+        The vintages of a revised series to fetch, for a source that serves
+        them. A macro aggregate is restated for years after the fact, so "the
+        series" is not one series: reading it today gives numbers nobody had at
+        the time, and reading it again next year gives different ones. Empty
+        for anything not served by vintage, which is every source here but
+        ALFRED.
+    vintage_policy : VintagePolicy | None
+        How those vintages are read - one pinned for the whole run, or the
+        latest one each decision could have seen. Required as soon as a vintage
+        is declared and forbidden otherwise, and ``PINNED`` takes exactly one
+        date: a pinned series with three vintages would not say which one it
+        was pinned to.
     check_sources : tuple[CheckSource, ...]
         Further providers whose bars are compared with the primary source's, in
         declared order. Empty for a series with a single source.
@@ -264,7 +289,8 @@ class Instrument:
     publication_rule: PublicationRule | None = None
     first_session: date | None = None
     last_session: date | None = None
-    vintage_date: date | None = None
+    vintage_dates: tuple[date, ...] = ()
+    vintage_policy: VintagePolicy | None = None
     check_sources: tuple[CheckSource, ...] = ()
     distribution_policy: DistributionPolicy | None = None
 
@@ -320,11 +346,56 @@ class Instrument:
                 raise ValueError(
                     f"Instrument {self.id} is not tradable: a quantity_step sizes an order"
                 )
-        if self.vintage_date is not None and self.data_type != DataType.LEVEL:
+        self._check_vintages()
+
+    def _check_vintages(self) -> None:
+        """Reject a vintage declaration that does not say what it reads.
+
+        Raises
+        ------
+        ValueError
+            If vintages are declared on anything but a ``LEVEL``, if they carry
+            no policy or a policy carries none, if a date repeats, or if a
+            ``PINNED`` series declares more than one: a pin is one day, and
+            three of them is an unanswered question about which.
+        """
+        vintages = tuple(self.vintage_dates)
+        if vintages and self.data_type != DataType.LEVEL:
             raise ValueError(
                 f"Instrument {self.id} is a {self.data_type.value}: "
                 "a vintage is a restatement of a published series"
             )
+        if bool(vintages) != (self.vintage_policy is not None):
+            raise ValueError(
+                f"Instrument {self.id}: vintage_dates and vintage_policy are declared "
+                "together or not at all - a vintage nobody says how to read is a number "
+                "whose date of knowledge is unstated"
+            )
+        repeated = sorted({day for day in vintages if vintages.count(day) > 1})
+        if repeated:
+            raise ValueError(
+                f"Instrument {self.id} declares the vintage(s) "
+                f"{', '.join(str(day) for day in repeated)} more than once"
+            )
+        if self.vintage_policy is VintagePolicy.PINNED and len(vintages) != 1:
+            raise ValueError(
+                f"Instrument {self.id} is pinned to {len(vintages)} vintages; a pin is one day"
+            )
+
+    @property
+    def vintage_date(self) -> date | None:
+        """Return the single vintage a pinned series is read at.
+
+        Returns
+        -------
+        date | None
+            The pinned vintage, or ``None`` for a series that is not pinned to
+            one - including a point-in-time series, which has no single vintage
+            by construction and is read per decision instead.
+        """
+        if self.vintage_policy is not VintagePolicy.PINNED:
+            return None
+        return self.vintage_dates[0]
 
     @property
     def sources(self) -> tuple[str, ...]:
@@ -459,6 +530,40 @@ def _require(table: Mapping[str, Any], keys: Sequence[str], context: str) -> Non
     for key in keys:
         if key not in table:
             raise ValueError(f"{context} is missing the required key {key!r}")
+
+
+def _as_session_dates(value: object, key: str, context: str) -> tuple[date, ...]:
+    """Return a list of vintage dates, in the order they were declared.
+
+    Parameters
+    ----------
+    value : object
+        Value parsed from TOML, or ``None`` when the key is absent.
+    key : str
+        Name of the field, for the error message.
+    context : str
+        Where the entry sits.
+
+    Returns
+    -------
+    tuple[date, ...]
+        The dates, empty when the key is absent.
+
+    Raises
+    ------
+    ValueError
+        If the value is not an array, or holds anything but bare TOML dates.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ValueError(
+            f"{context} has {key} = {value!r}; expected an array of bare dates such as "
+            "[2020-01-31, 2021-06-30]"
+        )
+    return tuple(
+        day for day in (_as_session_date(entry, key, context) for entry in value) if day is not None
+    )
 
 
 def _as_session_date(value: object, key: str, context: str) -> date | None:
@@ -620,7 +725,10 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
         publication_rule=publication_rule,
         first_session=_as_session_date(table.get("first_session"), "first_session", context),
         last_session=_as_session_date(table.get("last_session"), "last_session", context),
-        vintage_date=_as_session_date(table.get("vintage_date"), "vintage_date", context),
+        vintage_dates=_as_session_dates(table.get("vintage_dates"), "vintage_dates", context),
+        vintage_policy=(
+            None if table.get("vintage_policy") is None else VintagePolicy(table["vintage_policy"])
+        ),
         check_sources=tuple(check_sources),
     )
 

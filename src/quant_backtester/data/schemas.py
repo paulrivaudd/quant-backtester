@@ -104,6 +104,36 @@ LEVELS_SCHEMA: Final = pa.schema(
 )
 """Clean levels: one published value per observation date."""
 
+VINTAGES_SCHEMA: Final = pa.schema(
+    [
+        pa.field("instrument_id", pa.string(), nullable=False),
+        pa.field("observation_date", pa.date32(), nullable=False),
+        pa.field("vintage_date", pa.date32(), nullable=False),
+        pa.field("value", pa.float64(), nullable=False),
+        pa.field("available_at_utc", TIMESTAMP_UTC, nullable=False),
+        pa.field("source", pa.string(), nullable=False),
+        pa.field("source_fetch_id", pa.string(), nullable=False),
+    ]
+)
+"""The archive of a restated series: one value per observation *and* vintage.
+
+A level has one value per observation date. A vintage archive has as many as
+there were restatements, and the pair ``(observation_date, vintage_date)`` is
+what identifies a fact - US GDP for the first quarter of 2019 is 21 098.827 in
+the vintage of 31 January 2020 and 21 115.309 in that of 30 June 2021, and both
+are true of their day.
+
+It is a table of its own rather than a column on the levels, because the two
+obey different rules. A level may be revised by a provider and the revision
+policy governs that; a vintage cannot, by construction - the archive of what
+was known on a day does not change - so a value that moves under a pair is a
+provider rewriting history, and is refused rather than merged.
+
+``available_at_utc`` is the later of the observation's own release instant and
+the vintage's: a number restated in June 2021 was not knowable in 2019, whatever
+the observation it describes.
+"""
+
 CORPORATE_ACTIONS_SCHEMA: Final = pa.schema(
     [
         pa.field("instrument_id", pa.string(), nullable=False),

@@ -65,7 +65,12 @@ from quant_backtester.data.calendars import (
     Session,
     TradingCalendar,
 )
-from quant_backtester.data.instruments import DataType, Instrument, InstrumentRegistry
+from quant_backtester.data.instruments import (
+    DataType,
+    Instrument,
+    InstrumentRegistry,
+    VintagePolicy,
+)
 from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.schemas import (
     AVAILABILITY_COLUMN,
@@ -676,6 +681,11 @@ class PointInTimeReader:
             observation_date = stored["session_date"]
             value = stored[field.value]
             available_at = stored[AVAILABILITY_COLUMN[field]]
+        elif instrument.vintage_policy is VintagePolicy.AS_OF_DECISION:
+            stored = self._vintage_rows(instrument, start=start, end=end)
+            observation_date = stored["observation_date"]
+            value = stored["value"]
+            available_at = stored["available_at_utc"]
         else:
             stored = self._repository.load_levels(instrument.id, start=start, end=end)
             observation_date = stored["observation_date"]
@@ -691,6 +701,55 @@ class PointInTimeReader:
         rows = rows.loc[rows["available_at_utc"] <= self._as_of]
         rows = rows.loc[rows["value"].notna()]
         return rows.sort_values("observation_date", kind="stable").reset_index(drop=True)
+
+    def _vintage_rows(
+        self, instrument: Instrument, start: date | None = None, end: date | None = None
+    ) -> pd.DataFrame:
+        """Return a restated series as it stood at this decision instant.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            A published series read as of each decision.
+        start, end : date | None
+            Inclusive bounds on the observation date.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per observation date - the value of the latest vintage this
+            instant could have seen, and the instant that value became public.
+
+        Notes
+        -----
+        This is the whole point of storing an archive rather than a series. US
+        GDP for the first quarter of 2019 is 21 098.827 to a reader in January
+        2020 and 21 115.309 to one in June 2021; a backtest deciding in 2020 on
+        the second number is deciding on information that did not exist. The
+        row kept for each observation is therefore the one from the most recent
+        vintage available at ``as_of`` - and the availability filter above then
+        drops anything whose release had not happened either, so a revision
+        published this morning is invisible to a decision taken last night.
+
+        A later vintage that *dropped* an observation does not resurrect the
+        earlier value: the question asked is "what did the series say that
+        day", and the answer for each observation is its latest known telling,
+        which is what taking the maximum vintage per observation gives.
+        """
+        stored = self._repository.load_vintages(instrument.id)
+        if stored.empty:
+            return stored.rename(columns={})
+        knowable = stored.loc[stored["available_at_utc"] <= self._as_of]
+        if start is not None:
+            knowable = knowable.loc[knowable["observation_date"] >= start]
+        if end is not None:
+            knowable = knowable.loc[knowable["observation_date"] <= end]
+        if knowable.empty:
+            return knowable
+        latest = knowable.sort_values(
+            ["observation_date", "vintage_date"], kind="stable"
+        ).drop_duplicates("observation_date", keep="last")
+        return latest.reset_index(drop=True)
 
     def _observe(self, instrument_id: str, field: BarField, reference: Session) -> _Observation:
         """Return one row of :meth:`values`.
