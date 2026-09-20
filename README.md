@@ -181,7 +181,9 @@ difference in the series' own units, and two such series are compared by
 standardising them, never by dividing.
 
 A snapshot is one instant, not one universe. A `SignalRequest` carries the
-names a signal is computed for, so a rotation between two funds can be gated by
+names a signal is computed for — a list, or a dated universe the engine
+resolves for the session being decided, because a basket of gauges changes over
+the years like any other — so a rotation between two funds can be gated by
 a volatility index or a yield that reaches the same snapshot without ever being
 ranked against them — `RiskGatedRotation` is that decision, and it holds the
 rotation's choice only while the gauge stays at or below a declared threshold.

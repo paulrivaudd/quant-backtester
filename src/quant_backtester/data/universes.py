@@ -35,8 +35,28 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 from quant_backtester.data.instruments import InstrumentRegistry
+
+
+@runtime_checkable
+class UniverseSource(Protocol):
+    """What anything asking a universe a question needs of it: its members on a day.
+
+    A :class:`Universe` answers it from dated memberships and a
+    :class:`StaticUniverse` answers the same thing every day. The question is
+    asked once per session, and the caller never learns which kind it holds.
+
+    It is declared here, in the layer that owns membership, rather than in the
+    engine that walks the sessions: a signal may be computed over a dated
+    universe of its own, and ``signals`` sits below ``backtest`` and cannot
+    import from it.
+    """
+
+    def members_at(self, on: date) -> Sequence[str]:
+        """Return the instruments the universe held on ``on``."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)

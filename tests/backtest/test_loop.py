@@ -849,3 +849,69 @@ def test_what_was_asked_for_and_what_was_reached_are_two_numbers(
     assert first.target_invested == pytest.approx(1.0)
     assert first.actual_invested == 0.0
     assert result.records[1].actual_invested == pytest.approx(1.0)
+
+
+def test_a_gauge_universe_is_asked_about_the_session_being_decided(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    xpar: TradingCalendar,
+    calendars: CalendarRegistry,
+    prices: Callable[..., dict[date, float]],
+    sessions: tuple[date, ...],
+) -> None:
+    """A signal's own universe may be dated too, and the engine resolves it.
+
+    A basket of gauges changes over the years like any other list of names.
+    Asked as the names that still exist, it is the same survivorship bias the
+    trading universe was dated to remove - one layer further from the result,
+    and therefore harder to see.
+    """
+    market = make_market(
+        {
+            "ETF_EU": make_bars("ETF_EU", xpar, prices(100.0, 1.0)),
+            "ETF_OTHER": make_bars("ETF_OTHER", xpar, prices(200.0, 2.0)),
+        }
+    )
+    gauges = Universe(
+        universe_id="GAUGES",
+        name="One gauge stops being followed",
+        memberships=(
+            Membership("ETF_EU"),
+            Membership("ETF_OTHER", until_date=date(2026, 9, 10)),
+        ),
+    )
+    watched: list[tuple[str, ...]] = []
+
+    @dataclass(frozen=True, slots=True)
+    class Watching(Strategy):
+        def decide(self, signals: SignalSnapshot) -> TargetAllocation:
+            watched.append(signals.result("gauge_2d").instruments())
+            return TargetAllocation(
+                as_of=signals.as_of, weights={}, selected=(), considered=0, skipped={}
+            )
+
+    engine = BacktestEngine(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        signals=[
+            *a_return(),
+            SignalRequest(
+                ReturnSignal(signal_id="gauge_2d", lookback_sessions=2, price_basis=PriceBasis.RAW),
+                gauges,
+            ),
+        ],
+        strategy=Watching(),
+        universe=("ETF_EU",),
+        initial_cash=10_000.0,
+        base_currency="EUR",
+        limits=PositionLimits(),
+        execution=ExecutionModel(),
+        timetable=PARIS,
+    )
+
+    engine.run(sessions[-4], sessions[-1])
+
+    # 9 September and 10 September hold both; 11 and 14 hold one.
+    assert watched[0] == ("ETF_EU", "ETF_OTHER")
+    assert watched[-1] == ("ETF_EU",)

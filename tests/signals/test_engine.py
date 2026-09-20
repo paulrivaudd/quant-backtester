@@ -12,6 +12,7 @@ import pytest
 from quant_backtester.data.calendars import TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.schemas import BarField
+from quant_backtester.data.universes import Membership, StaticUniverse, Universe
 from quant_backtester.signals.base import Signal, SignalResult, build_result_frame, result_row
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
@@ -421,3 +422,53 @@ def test_a_requests_own_universe_cannot_repeat_a_name(context: SignalContext) ->
 
     with pytest.raises(ValueError, match="return_4d asks for ETF_EU twice"):
         SignalEngine().compute(context, [request], ["ETF_EU"])
+
+
+def a_return() -> ReturnSignal:
+    """Return a cheap signal, so a test about universes is about universes."""
+    return ReturnSignal(signal_id="return_4d", lookback_sessions=4, price_basis=RAW)
+
+
+def test_a_signal_may_be_asked_about_a_dated_universe() -> None:
+    """Resolved for one session, it is an ordinary list of names again.
+
+    A basket of gauges changes over the years like any other universe, and a
+    fixed list of the ones that still exist is the same survivorship bias the
+    trading universe was dated to remove.
+    """
+    universe = Universe(
+        universe_id="GAUGES",
+        name="Two gauges, one of which left",
+        memberships=(
+            Membership("ETF_EU"),
+            Membership("ETF_OTHER", until_date=date(2026, 9, 10)),
+        ),
+    )
+    request = SignalRequest(a_return(), universe)
+
+    while_both = request.resolved(date(2026, 9, 10)).names()
+    after = request.resolved(date(2026, 9, 11)).names()
+
+    assert list(while_both or []) == ["ETF_EU", "ETF_OTHER"]
+    assert list(after or []) == ["ETF_EU"]
+
+
+def test_a_dated_universe_that_reached_the_engine_unresolved_stops_the_run(
+    context: SignalContext,
+) -> None:
+    """Nothing in this layer knows which session is being decided, and it must not guess.
+
+    A signal that chose its own date could choose one the decision cannot see,
+    which is the whole failure this project is built around.
+    """
+    request = SignalRequest(a_return(), StaticUniverse(("ETF_EU",)))
+
+    with pytest.raises(TypeError, match="was not resolved"):
+        SignalEngine().compute(context, [request], ["ETF_EU"])
+
+
+def test_a_plain_list_needs_no_resolving(context: SignalContext) -> None:
+    """The ordinary case stays exactly what it was."""
+    request = SignalRequest(a_return(), ["ETF_EU"])
+
+    assert request.resolved(date(2026, 9, 11)) is request

@@ -16,8 +16,10 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date
 
+from quant_backtester.data.universes import UniverseSource
 from quant_backtester.signals.base import Signal, SignalResult, freeze
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.snapshot import SignalSnapshot
@@ -31,9 +33,14 @@ class SignalRequest:
     ----------
     signal : Signal
         The signal.
-    instruments : Sequence[str] | None
+    instruments : Sequence[str] | UniverseSource | None
         The instruments to compute it for. ``None`` means the snapshot's own
-        universe, which is what every signal used to get.
+        universe, which is what every signal used to get. A
+        :class:`~quant_backtester.data.universes.Universe` may be given
+        instead of a list, and then the names are the ones it held on the
+        session being decided: a gauge basket changes over the years like any
+        other, and a fixed list of the ones that still exist is the same
+        survivorship bias the trading universe was dated to remove.
 
     Notes
     -----
@@ -47,10 +54,57 @@ class SignalRequest:
     What does not change is that they all speak about the same *instant*. That
     is the property the snapshot exists for, and mixing two of them is still
     refused.
+
+    A dated universe is resolved by the layer that knows which session is being
+    decided, which is the backtest engine: nothing in ``signals`` chooses its
+    own date, and a request that reached :meth:`SignalEngine.compute` still
+    holding one stops the run rather than guessing at a session.
     """
 
     signal: Signal
-    instruments: Sequence[str] | None = None
+    instruments: Sequence[str] | UniverseSource | None = None
+
+    def resolved(self, on: date) -> SignalRequest:
+        """Return the same request with its universe fixed to one session.
+
+        Parameters
+        ----------
+        on : date
+            Session being decided, on the reference calendar.
+
+        Returns
+        -------
+        SignalRequest
+            This request when its universe is already a list of names, and a
+            copy holding the members of that session when it carries a dated
+            universe.
+        """
+        if not isinstance(self.instruments, UniverseSource):
+            return self
+        return replace(self, instruments=tuple(self.instruments.members_at(on)))
+
+    def names(self) -> Sequence[str] | None:
+        """Return the instruments this request names, resolved.
+
+        Returns
+        -------
+        Sequence[str] | None
+            The fixed list, or ``None`` for a request that takes the
+            snapshot's own universe.
+
+        Raises
+        ------
+        TypeError
+            If the universe is still dated. Resolving it needs a session, and
+            this layer never has one - a signal that chose its own date could
+            choose one the decision cannot see.
+        """
+        if isinstance(self.instruments, UniverseSource):
+            raise TypeError(
+                f"the universe of {self.signal.signal_id} is dated and was not resolved "
+                "for a session; only the layer that advances time can do that"
+            )
+        return self.instruments
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,16 +160,14 @@ class SignalEngine:
             seen.add(signal_id)
         _require_each_name_once(instrument_ids, "the snapshot's universe")
         for request in requests:
-            if request.instruments is not None:
-                _require_each_name_once(
-                    request.instruments, f"the universe of {request.signal.signal_id}"
-                )
+            names = request.names()
+            if names is not None:
+                _require_each_name_once(names, f"the universe of {request.signal.signal_id}")
 
         results: dict[str, SignalResult] = {}
         for request in requests:
-            universe = (
-                list(instrument_ids) if request.instruments is None else list(request.instruments)
-            )
+            names = request.names()
+            universe = list(instrument_ids) if names is None else list(names)
             result = request.signal.compute(context, universe)
             self._require_an_answer(request.signal, result, context, universe)
             results[request.signal.signal_id] = result
