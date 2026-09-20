@@ -36,8 +36,6 @@ from quant_backtester.signals.level.change import LevelChangeSignal
 from quant_backtester.signals.price.returns import ReturnSignal
 from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import PriceBasis, SignalStatus
-from quant_backtester.strategies.risk_gated import RiskGatedRotation
-from quant_backtester.strategies.rotation import TopRankRotation
 
 PARIS = Timetable(decision_time=time(23, 0), execution_time=time(9, 1), timezone="Europe/Paris")
 
@@ -61,6 +59,29 @@ class AlwaysHold(Strategy):
             considered=len(self.weights),
             skipped={},
         )
+
+
+@dataclass(frozen=True, slots=True)
+class Gated(Strategy):
+    """Hold the best-ranked fund while a gauge stays below a threshold.
+
+    Written here rather than taken from ``strategies`` because this test is
+    about the engine wiring two universes into one decision, not about a
+    particular strategy: the signals are given to the engine directly, which
+    is the low-level API this file exercises.
+    """
+
+    rank_id: str
+    gate_id: str
+    maximum: float
+
+    def decide(self, ctx: StrategyContext) -> TargetAllocation:
+        """Stand aside above the threshold, or when the gauge cannot be read."""
+        selected = ctx.top(self.rank_id, 1)
+        gauge = ctx.signal_value_or_none(self.gate_id, "RATE_US")
+        if gauge is None or gauge > self.maximum:
+            return ctx.cash(among=selected)
+        return ctx.equal_weight(selected, count=1)
 
 
 def a_return() -> Sequence[Signal]:
@@ -578,13 +599,7 @@ def test_a_gauge_that_is_never_traded_stands_the_book_down(
                 ["RATE_US"],
             ),
         ],
-        strategy=RiskGatedRotation(
-            rotation=TopRankRotation(signal_id="return_rank", top_n=1),
-            gate_signal_id="rate_change_1o",
-            gate_instrument_id="RATE_US",
-            maximum=0.10,
-            flat_when_unknown=True,
-        ),
+        strategy=Gated(rank_id="return_rank", gate_id="rate_change_1o", maximum=0.10),
         universe=("ETF_EU", "ETF_OTHER"),
         initial_cash=10_000.0,
         base_currency="EUR",

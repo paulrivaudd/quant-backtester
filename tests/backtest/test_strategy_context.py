@@ -348,6 +348,110 @@ def test_a_plain_list_of_names_is_accepted_too(decision: StrategyContext) -> Non
     assert allocation.considered == 1
 
 
+def test_a_universe_degraded_to_one_name_leaves_nothing_to_rank(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """Two deliberate things meet here, and the decision is the flat day.
+
+    A ranking of one instrument is refused upstream - it would only say the one
+    name is both the best and the worst of itself - so the top of it is empty.
+    A strategy reading a raw momentum instead would have put everything into
+    the single survivor.
+    """
+    from quant_backtester.signals.cross_sectional.rank import CrossSectionalRank
+
+    source = Fixed(
+        signal_id="score", values={"ETF_EU": 0.9, "ETF_OTHER": SignalStatus.MISSING_INPUT}
+    )
+    snapshot = SignalEngine().compute(
+        context,
+        [CrossSectionalRank(signal_id="rank", source=source)],
+        ["ETF_EU", "ETF_OTHER"],
+    )
+    decision = make_decision(context, snapshot)
+
+    allocation = decision.equal_weight(decision.top("rank", 2), count=2)
+
+    assert allocation.selected == ()
+    assert allocation.invested == 0.0
+    assert allocation.skipped["ETF_EU"] is SignalStatus.INSUFFICIENT_CROSS_SECTION
+
+
+def test_asking_for_more_names_than_are_usable_leaves_the_rest_in_cash(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """Three wanted, two usable: two thirds invested rather than a doubled bet.
+
+    Concentrating on the survivors is a decision, and a provider being late is
+    not the thing that should take it.
+    """
+    snapshot = snapshot_of(
+        context,
+        {"ETF_EU": 0.9, "ETF_OTHER": 0.4, "ETF_LATE": SignalStatus.MISSING_INPUT},
+    )
+    decision = make_decision(context, snapshot)
+
+    allocation = decision.equal_weight(decision.top("score", 3), count=3)
+
+    assert allocation.selected == ("ETF_EU", "ETF_OTHER")
+    assert allocation.invested == pytest.approx(2 / 3)
+
+
+def test_a_decision_says_why_each_name_was_left_out(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """A day holding nothing must be explainable without opening the data."""
+    snapshot = snapshot_of(
+        context,
+        {
+            "ETF_EU": 0.9,
+            "ETF_OTHER": 0.4,
+            "ETF_LATE": SignalStatus.STALE_INPUT,
+        },
+    )
+    decision = make_decision(context, snapshot)
+
+    allocation = decision.equal_weight(decision.top("score", 1), count=1)
+
+    assert allocation.selected == ("ETF_EU",)
+    assert allocation.skipped == {
+        "ETF_OTHER": SignalStatus.OK,
+        "ETF_LATE": SignalStatus.STALE_INPUT,
+    }
+
+
+def test_the_same_name_cannot_be_held_twice(decision: StrategyContext) -> None:
+    """One position, half a book, and nothing in the record saying why.
+
+    The weights collapse into a single entry while the capital is split in two,
+    so the strategy ends up half invested without having asked to be.
+    """
+    with pytest.raises(ValueError, match="selected more than once"):
+        decision.equal_weight(["ETF_EU", "ETF_EU"])
+
+
+def test_a_selection_cannot_be_edited_before_it_is_used(
+    decision: StrategyContext,
+) -> None:
+    """It carries the diagnostics of a decision, not a working buffer."""
+    selected = decision.top("score", 1)
+
+    with pytest.raises(TypeError):
+        selected.skipped["ETF_LATE"] = SignalStatus.OK  # type: ignore[index]
+
+
+def test_a_selection_that_claims_more_than_it_chose_is_refused() -> None:
+    """``considered`` is what tells two of nine from two of two."""
+    with pytest.raises(ValueError, match="considered"):
+        Selection(names=("A", "B"), considered=1, skipped={})
+
+
+def test_a_selection_cannot_name_one_instrument_twice() -> None:
+    """It would be weighted twice by anything that iterated over it."""
+    with pytest.raises(ValueError, match="more than once"):
+        Selection(names=("A", "A"), considered=2, skipped={})
+
+
 def test_a_context_answers_in_utc_like_everything_else(
     decision: StrategyContext,
 ) -> None:
