@@ -20,7 +20,24 @@ builds one per session and a lower layer never imports a higher one.
 from __future__ import annotations
 
 from quant_backtester.strategies.base import Strategy
+from quant_backtester.strategies.examples import (
+    BuyAndHold,
+    MomentumRotation,
+    MomentumSingleAsset,
+    MomentumVix,
+)
+from quant_backtester.strategies.functional import FunctionalStrategy, strategy
 from quant_backtester.strategies.risk_gated import RiskGatedRotation
 from quant_backtester.strategies.rotation import TopRankRotation
 
-__all__ = ["RiskGatedRotation", "Strategy", "TopRankRotation"]
+__all__ = [
+    "BuyAndHold",
+    "FunctionalStrategy",
+    "MomentumRotation",
+    "MomentumSingleAsset",
+    "MomentumVix",
+    "RiskGatedRotation",
+    "Strategy",
+    "TopRankRotation",
+    "strategy",
+]

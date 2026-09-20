@@ -14,6 +14,9 @@ from pathlib import Path
 
 import pytest
 
+from quant_backtester.backtest.context import StrategyContext
+from quant_backtester.backtest.market import StrategyMarketView
+
 PACKAGE = Path(__file__).resolve().parents[1] / "src" / "quant_backtester"
 """Source of the package, read rather than imported."""
 
@@ -128,3 +131,32 @@ def test_analytics_describes_a_finished_run_and_fetches_nothing(path: Path):
     )
 
     assert not reaching_down, f"{path.name} imports {', '.join(reaching_down)}"
+
+
+def test_strategies_import_no_network_library():
+    """A strategy that fetched a price would be reading today, not the decision's day.
+
+    The layer above the reader is the one a user writes in, so it is the one
+    where a stray ``yfinance`` import is most likely - and it would put the
+    prices of this morning inside a decision dated years ago.
+    """
+    network = {"urllib", "urllib.request", "requests", "httpx", "yfinance"}
+    for path in STRATEGIES.rglob("*.py"):
+        assert not imported_modules(path) & network, f"{path.name} imports a network library"
+
+
+def test_a_strategy_is_never_handed_the_reader():
+    """The façade may hold it; the API a strategy writes against must not expose it.
+
+    Checked on the public surface rather than on the imports, because the
+    context is built for the strategy rather than imported by it: what matters
+    is that there is no attribute to reach it through.
+    """
+    public = {name for name in dir(StrategyContext) if not name.startswith("_")}
+
+    assert "reader" not in public
+    assert "repository" not in public
+    assert not {name for name in dir(StrategyMarketView) if name == "reader"}
+    # The façade's own reader is reachable only through the signals context it
+    # was built from, which takes no instant either.
+    assert "at" not in {name for name in dir(StrategyMarketView) if not name.startswith("_")}
