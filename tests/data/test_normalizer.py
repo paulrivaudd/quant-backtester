@@ -27,6 +27,7 @@ from quant_backtester.data.instruments import (
 )
 from quant_backtester.data.normalizer import (
     NORMALIZERS,
+    AlfredNormalizer,
     EcbNormalizer,
     EuronextNormalizer,
     FredNormalizer,
@@ -1495,3 +1496,79 @@ def test_an_action_not_yet_effective_is_dropped_and_named(
     assert normalized.corporate_actions is not None
     assert normalized.corporate_actions.empty
     assert normalized.rejected.unpublished == (date(2026, 9, 10),)
+
+
+# --- ALFRED: the same file, with the vintage in the column name ---------------
+
+ALFRED_NORMALIZER = AlfredNormalizer()
+
+
+@pytest.fixture
+def gdp() -> Instrument:
+    """Return US GDP pinned to the vintage of 31 January 2020."""
+    return Instrument(
+        id="US_GDP",
+        name="US gross domestic product",
+        asset_type=AssetType.RATE,
+        data_type=DataType.LEVEL,
+        currency="NA",
+        primary_source="ALFRED",
+        source_symbol="GDP",
+        tradable=False,
+        publication_rule=PublicationRule(publication_time=time(8, 30), timezone="America/New_York"),
+        vintage_date=date(2020, 1, 31),
+    )
+
+
+def alfred_download(rows: list[tuple[str, str]], value_column: str = "GDP_20200131") -> RawDownload:
+    """Wrap raw ``alfredgraph.csv`` rows the way ``AlfredSource.download`` does."""
+    return RawDownload(
+        instrument_id="US_GDP",
+        source="ALFRED",
+        fetch_id=FETCH_ID,
+        retrieved_at_utc=RETRIEVED_AT,
+        frame=pd.DataFrame(rows, columns=["observation_date", value_column], dtype=str),
+        request={"series_id": "GDP", "vintage_date": "2020-01-31"},
+    )
+
+
+def test_alfred_levels_are_read_from_the_vintage_column(gdp: Instrument) -> None:
+    """The column carries the vintage, because one export can hold several."""
+    download = alfred_download([("2019-01-01", "21098.827"), ("2019-04-01", "21340.267")])
+
+    levels = levels_of(ALFRED_NORMALIZER.normalize(gdp, download))
+
+    assert levels["observation_date"].tolist() == [date(2019, 1, 1), date(2019, 4, 1)]
+    assert levels["value"].tolist() == [21098.827, 21340.267]
+    assert levels["source"].tolist() == ["ALFRED", "ALFRED"]
+
+
+def test_alfred_levels_refuse_another_vintage_than_the_one_declared(gdp: Instrument) -> None:
+    """A raw archive that does not say what it holds is not an archive.
+
+    The file is the June 2021 vintage and the instrument is pinned to January
+    2020. Read leniently - "take whichever value column is there" - the run
+    would silently use numbers from a restatement nobody declared.
+    """
+    download = alfred_download([("2019-01-01", "21115.309")], value_column="GDP_20210630")
+
+    with pytest.raises(ValueError, match="GDP_20200131"):
+        ALFRED_NORMALIZER.normalize(gdp, download)
+
+
+def test_alfred_levels_refuse_a_series_with_no_vintage(gdp: Instrument) -> None:
+    """Without one there is nothing to read the column name from."""
+    unpinned = replace(gdp, vintage_date=None)
+    download = alfred_download([("2019-01-01", "21098.827")])
+
+    with pytest.raises(ValueError, match="declares no vintage_date"):
+        ALFRED_NORMALIZER.normalize(unpinned, download)
+
+
+def test_alfred_levels_of_an_empty_vintage_are_empty(gdp: Instrument) -> None:
+    """A vintage older than the series: nothing had been published yet."""
+    download = alfred_download([])
+
+    levels = levels_of(ALFRED_NORMALIZER.normalize(gdp, download))
+
+    assert levels.empty

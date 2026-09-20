@@ -30,6 +30,7 @@ from quant_backtester.data.schemas import (
     LEVELS_SCHEMA,
     ActionType,
 )
+from quant_backtester.data.sources.alfred import vintage_column
 from quant_backtester.data.sources.base import RawDownload
 
 
@@ -958,6 +959,59 @@ class EuronextNormalizer:
         return NormalizedData(bars=bars, rejected=rejected)
 
 
+def _fred_style_observations(
+    raw: pd.DataFrame, instrument: Instrument, value_column: str, what: str
+) -> dict[date, float]:
+    """Return the observations of a St. Louis Fed graph CSV.
+
+    Parameters
+    ----------
+    raw : pd.DataFrame
+        The provider frame, every cell a string.
+    instrument : Instrument
+        Instrument the frame belongs to, quoted in the messages.
+    value_column : str
+        Column holding the values: the series id on FRED, the series id and the
+        vintage on ALFRED.
+    what : str
+        How to name the source in an error message.
+
+    Returns
+    -------
+    dict[date, float]
+        One entry per published observation. An empty field (and the ``"."``
+        of older exports) becomes an absent row rather than a ``NaN``: a
+        missing observation does not exist, it does not equal "unknown".
+
+    Raises
+    ------
+    ValueError
+        If a column is missing, a date is not ISO or appears twice, or a value
+        is neither a missing marker nor a finite number.
+    """
+    if raw.empty:
+        return {}
+    missing = sorted({FRED_DATE_COLUMN, value_column} - set(raw.columns))
+    if missing:
+        raise ValueError(f"{what} series of {instrument.id} lacks column(s): {', '.join(missing)}")
+    seen: set[date] = set()
+    observations: dict[date, float] = {}
+    for text_date, text_value in zip(
+        raw[FRED_DATE_COLUMN].astype(str), raw[value_column].astype(str), strict=True
+    ):
+        observation = _iso_date(text_date, f"{what} date of {instrument.id}")
+        if observation in seen:
+            raise ValueError(f"{what} series of {instrument.id} repeats {observation}")
+        seen.add(observation)
+        text = text_value.strip()
+        if text in FRED_MISSING_MARKERS:
+            continue
+        observations[observation] = _finite_number(
+            text, f"{what} {value_column} of {instrument.id} on {observation}"
+        )
+    return observations
+
+
 class FredNormalizer:
     """Normalise FRED frames into levels."""
 
@@ -1005,29 +1059,62 @@ class FredNormalizer:
         bourse.
         """
         rule = _require_level_call("FredNormalizer", self.source_id, instrument, download)
-        raw = download.frame
-        if raw.empty:
-            return NormalizedData(levels=_empty_frame(LEVELS_SCHEMA))
-        value_column = instrument.source_symbol
-        missing = sorted({FRED_DATE_COLUMN, value_column} - set(raw.columns))
-        if missing:
-            raise ValueError(
-                f"FRED series of {instrument.id} lacks column(s): {', '.join(missing)}"
-            )
-        seen: set[date] = set()
-        observations: dict[date, float] = {}
-        for text_date, text_value in zip(
-            raw[FRED_DATE_COLUMN].astype(str), raw[value_column].astype(str), strict=True
-        ):
-            observation = _iso_date(text_date, f"FRED date of {instrument.id}")
-            if observation in seen:
-                raise ValueError(f"FRED series of {instrument.id} repeats {observation}")
-            seen.add(observation)
-            text = text_value.strip()
-            if text in FRED_MISSING_MARKERS:
-                continue
-            what = f"FRED {value_column} of {instrument.id} on {observation}"
-            observations[observation] = _finite_number(text, what)
+        observations = _fred_style_observations(
+            download.frame, instrument, instrument.source_symbol, "FRED"
+        )
+        levels, rejected = _levels_frame(instrument, download, rule, observations, calendar)
+        return NormalizedData(levels=levels, rejected=rejected)
+
+
+class AlfredNormalizer:
+    """Normalise a pinned ALFRED vintage into levels.
+
+    The same file as FRED's with one difference that matters: the value column
+    carries the vintage, ``GDP_20200131`` rather than ``GDP``, because one
+    export can hold several of them. The vintage is read from the instrument
+    and the column is required to be that one - a file holding another vintage
+    than the instrument declares is a raw archive that does not say what it
+    holds, and the numbers below would be somebody else's.
+    """
+
+    source_id = "ALFRED"
+
+    def normalize(
+        self,
+        instrument: Instrument,
+        download: RawDownload,
+        calendar: TradingCalendar | None = None,
+    ) -> NormalizedData:
+        """Convert one vintage of a published series to canonical levels.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Instrument the download belongs to; its ``vintage_date`` names the
+            column that is read.
+        download : RawDownload
+            Provider response.
+        calendar : TradingCalendar | None
+            Unused for the values, and passed on for the publication rule.
+
+        Returns
+        -------
+        NormalizedData
+            Canonical ``levels``, sorted by observation date.
+
+        Raises
+        ------
+        ValueError
+            If the download belongs to another source or instrument, the
+            instrument is not a ``LEVEL`` or declares no vintage, the vintage
+            column is missing, a date is not ISO or appears twice, or a value
+            is neither a missing marker nor a finite number.
+        """
+        rule = _require_level_call("AlfredNormalizer", self.source_id, instrument, download)
+        if instrument.vintage_date is None:
+            raise ValueError(f"ALFRED series of {instrument.id} declares no vintage_date")
+        column = vintage_column(instrument.source_symbol, instrument.vintage_date)
+        observations = _fred_style_observations(download.frame, instrument, column, "ALFRED")
         levels, rejected = _levels_frame(instrument, download, rule, observations, calendar)
         return NormalizedData(levels=levels, rejected=rejected)
 
@@ -1114,7 +1201,13 @@ class EcbNormalizer:
 
 NORMALIZERS: Mapping[str, Normalizer] = {
     normalizer.source_id: normalizer
-    for normalizer in (YahooNormalizer(), EuronextNormalizer(), FredNormalizer(), EcbNormalizer())
+    for normalizer in (
+        YahooNormalizer(),
+        EuronextNormalizer(),
+        FredNormalizer(),
+        AlfredNormalizer(),
+        EcbNormalizer(),
+    )
 }
 """Registered normalizers, keyed by source identifier. They hold no state."""
 

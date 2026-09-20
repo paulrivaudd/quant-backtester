@@ -101,8 +101,17 @@ its own `tail(20)` and get twenty observations spanning twenty-six sessions.
 | `reader.py` | point-in-time reads, and nothing else reaches a strategy |
 
 Sources in use: Yahoo Finance (bars and corporate actions), FRED (published
-series), the ECB reference rates, and the Euronext historical export as a second
-opinion on Paris prices.
+series), ALFRED (the same series as it stood on a declared day), the ECB
+reference rates, and the Euronext historical export as a second opinion on
+Paris prices.
+
+FRED serves the latest vintage of every observation, which is harmless for a
+daily market rate and is look-ahead bias for a revised aggregate: US GDP for
+the first quarter of 2019 is 21 098.827 to a reader in January 2020 and
+21 115.309 to one in June 2021. An instrument served by ALFRED declares the
+`vintage_date` it is pinned to, in committed configuration, so the same code
+and the same config fetch the same numbers for ever — and the adapter refuses
+to fetch without one.
 
 Membership is dated for the same reason prices are. A universe written as a
 list of names is a list of the names that still exist — Yahoo serves nothing

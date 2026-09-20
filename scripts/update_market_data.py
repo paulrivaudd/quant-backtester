@@ -27,6 +27,7 @@ from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.normalizer import NORMALIZERS
 from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.revisions import AcceptedRevisions
+from quant_backtester.data.sources.alfred import AlfredSource
 from quant_backtester.data.sources.ecb import EcbSource
 from quant_backtester.data.sources.euronext import EuronextSource
 from quant_backtester.data.sources.fred import FredSource
@@ -40,10 +41,16 @@ ROOT = Path(__file__).resolve().parents[1] / "market_data"
 SOURCES = {
     "YAHOO": YahooSource,
     "FRED": FredSource,
+    "ALFRED": AlfredSource,
     "ECB": EcbSource,
     "EURONEXT": EuronextSource,
 }
-"""Adapter per source identifier, built on demand."""
+"""Adapter per source identifier, built on demand.
+
+``ALFRED`` serves a published series as it stood on a chosen day. An instrument
+declaring it also declares the ``vintage_date`` it is pinned to, and the
+adapter refuses to fetch without one: a vintage left unsaid is the restated
+series again, under another name."""
 
 
 def build_updater(root: Path) -> MarketDataUpdater:

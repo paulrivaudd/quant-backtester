@@ -11,9 +11,11 @@ the live endpoint on 2026-09-13):
 - An unknown series id is an HTTP 404 with an HTML body.
 
 FRED is a restated series, not a point-in-time one: the CSV shows the latest
-vintage of every observation. A daily market rate such as ``DGS10`` is stable in
-practice; a revised macro aggregate is not, and would need true vintages
-(ALFRED) rather than this adapter.
+vintage of every observation. A daily market rate such as ``DGS10`` is stable
+in practice, which is why the committed instruments use this adapter. A revised
+macro aggregate is not, and belongs to
+:mod:`quant_backtester.data.sources.alfred`, which fetches the archive as it
+stood on a declared day.
 """
 
 from __future__ import annotations

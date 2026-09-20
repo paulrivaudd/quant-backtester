@@ -224,6 +224,14 @@ class Instrument:
         collapse into the same ``NaN``.
     last_session : date | None
         Last session, for a delisted instrument. ``None`` means still listed.
+    vintage_date : date | None
+        The vintage a revised series is pinned to, for a source that serves
+        them. A macro aggregate is restated for years after the fact, so
+        "the series" is not one series: reading it today gives numbers nobody
+        had at the time, and reading it again next year gives different ones.
+        Pinning the vintage is what makes such a series reproducible and
+        point-in-time at once. ``None`` for anything not served by vintage,
+        which is every source here but ALFRED.
     check_sources : tuple[CheckSource, ...]
         Further providers whose bars are compared with the primary source's, in
         declared order. Empty for a series with a single source.
@@ -245,6 +253,7 @@ class Instrument:
     publication_rule: PublicationRule | None = None
     first_session: date | None = None
     last_session: date | None = None
+    vintage_date: date | None = None
     check_sources: tuple[CheckSource, ...] = ()
     distribution_policy: DistributionPolicy | None = None
 
@@ -293,6 +302,11 @@ class Instrument:
             raise ValueError(
                 f"Instrument {self.id} is a {self.data_type.value}: "
                 "only BAR series are cross-checked"
+            )
+        if self.vintage_date is not None and self.data_type != DataType.LEVEL:
+            raise ValueError(
+                f"Instrument {self.id} is a {self.data_type.value}: "
+                "a vintage is a restatement of a published series"
             )
 
     @property
@@ -588,6 +602,7 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
         publication_rule=publication_rule,
         first_session=_as_session_date(table.get("first_session"), "first_session", context),
         last_session=_as_session_date(table.get("last_session"), "last_session", context),
+        vintage_date=_as_session_date(table.get("vintage_date"), "vintage_date", context),
         check_sources=tuple(check_sources),
     )
 

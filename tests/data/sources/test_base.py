@@ -18,6 +18,7 @@ import pandas as pd
 import pytest
 
 from quant_backtester.data.normalizer import NORMALIZERS
+from quant_backtester.data.sources.alfred import AlfredSource
 from quant_backtester.data.sources.base import (
     HTTP_TIMEOUT_SECONDS,
     DataSource,
@@ -193,7 +194,13 @@ def test_raw_download_is_immutable() -> None:
         download.fetch_id = "20260913T000000Z"  # type: ignore[misc]
 
 
-ALL_SOURCES: tuple[DataSource, ...] = (YahooSource(), EuronextSource(), FredSource(), EcbSource())
+ALL_SOURCES: tuple[DataSource, ...] = (
+    YahooSource(),
+    EuronextSource(),
+    FredSource(),
+    AlfredSource(),
+    EcbSource(),
+)
 """Every adapter, typed as the protocol: pyright rejects one that breaks the contract."""
 
 
