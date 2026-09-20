@@ -76,6 +76,7 @@ def engine_over(
     execution: ExecutionModel | None = None,
     limits: PositionLimits | None = None,
     initial_cash: float = 10_000.0,
+    base_currency: str = "EUR",
 ) -> BacktestEngine:
     """Wire an engine onto the synthetic market."""
     return BacktestEngine(
@@ -86,6 +87,7 @@ def engine_over(
         strategy=strategy,
         universe=universe,
         initial_cash=initial_cash,
+        base_currency=base_currency,
         limits=limits or PositionLimits(),
         execution=execution or ExecutionModel(),
         timetable=PARIS,
@@ -244,7 +246,7 @@ def test_the_limits_are_applied_to_whatever_the_strategy_asks(
     )
 
     final = result.records[-1]
-    assert result.records[0].invested == pytest.approx(0.25)
+    assert result.records[0].target_invested == pytest.approx(0.25)
     assert final.equity == pytest.approx(walked_by_hand([107.0, 108.0, 109.0], 0.25, 10_000.0))
     assert final.cash == pytest.approx(final.equity * 0.75)
 
@@ -358,9 +360,21 @@ def test_the_signals_are_computed_at_the_decision_instant(
     [
         ({"initial_cash": 0.0}, "initial_cash"),
         ({"initial_cash": -1.0}, "initial_cash"),
+        ({"initial_cash": float("nan")}, "initial_cash"),
+        ({"initial_cash": float("inf")}, "initial_cash"),
+        ({"initial_cash": True}, "initial_cash"),
+        ({"base_currency": ""}, "base_currency"),
         ({"universe": ("ETF_EU", "ETF_EU")}, "more than once"),
     ],
-    ids=["no-capital", "negative-capital", "repeated-instrument"],
+    ids=[
+        "no-capital",
+        "negative-capital",
+        "capital-that-is-not-a-number",
+        "infinite-capital",
+        "capital-as-a-boolean",
+        "no-currency",
+        "repeated-instrument",
+    ],
 )
 def test_an_impossible_configuration_stops_the_run(
     market: MarketDataReader,
@@ -483,6 +497,7 @@ def test_a_member_that_left_is_not_chosen_after_it_did(
         strategy=HoldWhatIsOffered(signal_id="return_2d"),
         universe=universe,
         initial_cash=10_000.0,
+        base_currency="EUR",
         limits=PositionLimits(),
         execution=ExecutionModel(),
         timetable=PARIS,
@@ -568,6 +583,7 @@ def test_a_gauge_that_is_never_traded_stands_the_book_down(
         ),
         universe=("ETF_EU", "ETF_OTHER"),
         initial_cash=10_000.0,
+        base_currency="EUR",
         limits=PositionLimits(),
         execution=ExecutionModel(),
         timetable=PARIS,
@@ -576,9 +592,260 @@ def test_a_gauge_that_is_never_traded_stands_the_book_down(
     result = engine.run(sessions[-4], sessions[-1])
 
     invested, gated, sold = result.records[1], result.records[2], result.records[3]
-    assert invested.invested == pytest.approx(1.0)
-    assert gated.invested == 0.0
+    assert invested.target_invested == pytest.approx(1.0)
+    assert gated.target_invested == 0.0
     # Not an empty universe: both funds were rankable, and the gate stood them down.
     assert gated.considered == 2
     assert sold.traded_value > 0.0
     assert sold.cash == pytest.approx(sold.equity)
+
+
+def test_an_instrument_the_registry_says_is_not_tradable_cannot_be_in_the_universe(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """An index has a price and no way to buy it, and the registry says so.
+
+    The refusal is at the top of the session rather than at the fill: by the
+    time execution declines the order, the strategy has already ranked the
+    index, chosen it and sized a position in it, and the run would report a
+    rotation whose orders are quietly never sent.
+    """
+    engine = engine_over(market, calendars, AlwaysHold({}), universe=("ETF_EU", "IDX_US"))
+
+    with pytest.raises(ValueError, match="IDX_US is declared tradable = false"):
+        engine.run(sessions[-4], sessions[-1])
+
+
+def test_an_instrument_that_may_not_be_held_is_never_dealt_at_either(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """The last check before a trade exists, and it does not trust the first one.
+
+    The universe here is clean; the strategy asks for the index anyway. The
+    index prints an opening auction every morning, so only the registry can
+    say that nobody could have bought it.
+    """
+    result = run_over(market, calendars, sessions, AlwaysHold({"IDX_US": 1.0}))
+
+    filled = result.records[1]
+    assert filled.untradable == ("IDX_US",)
+    assert filled.fills == ()
+    assert filled.equity == pytest.approx(10_000.0)
+
+
+def test_a_signal_may_read_an_instrument_the_book_may_not_hold(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """Which is the whole point of a universe of its own.
+
+    The index is not tradable and not in the trading universe, and a signal is
+    still computed for it - a gauge is read, never bought.
+    """
+    momentum = ReturnSignal(signal_id="index_2d", lookback_sessions=2, price_basis=PriceBasis.RAW)
+    engine = BacktestEngine(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        signals=[*a_return(), SignalRequest(momentum, ["IDX_US"])],
+        strategy=AlwaysHold({"ETF_EU": 1.0}),
+        universe=("ETF_EU",),
+        initial_cash=10_000.0,
+        base_currency="EUR",
+        limits=PositionLimits(),
+        execution=ExecutionModel(),
+        timetable=PARIS,
+    )
+
+    result = engine.run(sessions[-4], sessions[-1])
+
+    assert result.records[-1].equity > 0.0
+    assert all(record.untradable == () for record in result.records[1:])
+
+
+def test_a_fund_quoted_in_another_currency_cannot_join_the_book(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """Nothing here converts a currency, so adding the two would be adding apples.
+
+    A euro of one fund and a dollar of another are not a euro and a euro, and
+    an equity curve that added them would carry the error inside itself rather
+    than beside it.
+    """
+    engine = engine_over(market, calendars, AlwaysHold({}), universe=("ETF_EU", "ETF_US"))
+
+    with pytest.raises(ValueError, match="ETF_US is quoted in USD"):
+        engine.run(sessions[-4], sessions[-1])
+
+
+def test_a_signal_only_instrument_may_be_quoted_in_anything(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """The currency rule is about what is held, not about what is read."""
+    dollars = ReturnSignal(signal_id="us_2d", lookback_sessions=2, price_basis=PriceBasis.RAW)
+    engine = BacktestEngine(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        signals=[*a_return(), SignalRequest(dollars, ["IDX_US"])],
+        strategy=AlwaysHold({"ETF_EU": 1.0}),
+        universe=("ETF_EU",),
+        initial_cash=10_000.0,
+        base_currency="EUR",
+        limits=PositionLimits(),
+        execution=ExecutionModel(),
+        timetable=PARIS,
+    )
+
+    assert engine.run(sessions[-4], sessions[-1]).records
+
+
+def dollar_market(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    xnys: TradingCalendar,
+    us_sessions: tuple[date, ...],
+) -> MarketDataReader:
+    """Return a reader over the one fund that trades in New York.
+
+    Its venue is shut on 7 September while Paris - the calendar the run walks -
+    is open, which is the only way a held position has a close that is real,
+    usable and a session old.
+    """
+    closes = {session: 100.0 + index for index, session in enumerate(us_sessions)}
+    return make_market({"ETF_US": make_bars("ETF_US", xnys, closes)})
+
+
+NEW_YORK_OPEN = Timetable(
+    decision_time=time(23, 0), execution_time=time(16, 0), timezone="Europe/Paris"
+)
+"""Decide after the New York close, fill just after the next New York open.
+
+16:00 in Paris is 10:00 in New York. A European timetable would fill at 09:01
+Paris, three hours before the American auction, and every order would be
+refused for a reason that has nothing to do with what is being tested.
+"""
+
+
+def dollar_engine(market: MarketDataReader, calendars: CalendarRegistry) -> BacktestEngine:
+    """Wire an engine that keeps its book in dollars and trades in New York."""
+    return BacktestEngine(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        signals=a_return(),
+        strategy=AlwaysHold({"ETF_US": 1.0}),
+        universe=("ETF_US",),
+        initial_cash=10_000.0,
+        base_currency="USD",
+        limits=PositionLimits(),
+        execution=ExecutionModel(),
+        timetable=NEW_YORK_OPEN,
+    )
+
+
+def test_a_close_from_an_earlier_session_values_the_book_and_says_so(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xnys: TradingCalendar,
+    us_sessions: tuple[date, ...],
+) -> None:
+    """A stale close is a number, and it is still not this session's price.
+
+    The reader hands back the last close it had, which is the right thing to
+    mark the book at. A run that only looked at the number would report an
+    estimate as a print, and the report would say no session was valued on an
+    older close when a position was.
+    """
+    market = dollar_market(make_market, make_bars, xnys, us_sessions)
+
+    result = dollar_engine(market, calendars).run(date(2026, 9, 2), date(2026, 9, 8))
+
+    labor_day = next(r for r in result.records if r.session_date == date(2026, 9, 7))
+    assert labor_day.priced_from_earlier == ("ETF_US",)
+    # Friday's close, carried: the position is worth something, just not a
+    # price of the day.
+    friday = next(r for r in result.records if r.session_date == date(2026, 9, 4))
+    assert labor_day.equity == pytest.approx(friday.equity)
+
+
+def test_a_close_of_the_session_itself_is_not_an_estimate(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xnys: TradingCalendar,
+    us_sessions: tuple[date, ...],
+) -> None:
+    """The other side of the same rule, so the diagnostic is not simply always on."""
+    market = dollar_market(make_market, make_bars, xnys, us_sessions)
+
+    result = dollar_engine(market, calendars).run(date(2026, 9, 2), date(2026, 9, 8))
+
+    traded = [r for r in result.records if r.session_date != date(2026, 9, 7)]
+    assert all(record.priced_from_earlier == () for record in traded)
+
+
+def test_whole_shares_are_dealt_where_the_instrument_says_so(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xnys: TradingCalendar,
+    us_sessions: tuple[date, ...],
+) -> None:
+    """The fund declares a step of one, so the book holds a whole number of them.
+
+    What the rounding leaves stays in cash. A backtest that bought 98.0392 of
+    them would have allocated its capital more perfectly than any account
+    could, on every rebalancing.
+    """
+    market = dollar_market(make_market, make_bars, xnys, us_sessions)
+
+    result = dollar_engine(market, calendars).run(date(2026, 9, 2), date(2026, 9, 8))
+
+    held = result.records[1].quantities["ETF_US"]
+    assert held == float(int(held))
+    assert result.records[1].cash > 0.0
+
+
+def test_the_record_keeps_the_fills_and_the_positions_they_produced(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """Why the P&L moved on a given day is a question about fills and positions.
+
+    Without them, a run can only be read as an equity curve with costs beside
+    it, and any attribution per instrument would have to be guessed at.
+    """
+    result = run_over(market, calendars, sessions, AlwaysHold({"ETF_EU": 1.0}))
+
+    filled = result.records[1]
+    assert [fill.instrument_id for fill in filled.fills] == ["ETF_EU"]
+    assert filled.fills[0].reference_price > 0.0
+    assert filled.quantities["ETF_EU"] == pytest.approx(10_000.0 / filled.fills[0].fill_price)
+
+
+def test_a_record_cannot_be_edited_into_a_different_run(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """A result is what the run produced, and reproducibility says it stays that."""
+    record = run_over(market, calendars, sessions, AlwaysHold({"ETF_EU": 1.0})).records[1]
+
+    with pytest.raises(TypeError):
+        record.weights["ETF_EU"] = 0.5  # type: ignore[index]
+    with pytest.raises(TypeError):
+        record.quantities["ETF_EU"] = 1.0  # type: ignore[index]
+
+
+def test_what_was_asked_for_and_what_was_reached_are_two_numbers(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """On the first session the target is everything and nothing is held yet.
+
+    Reporting the target as the exposure would say the book was fully invested
+    on a session it held nothing at all.
+    """
+    result = run_over(market, calendars, sessions, AlwaysHold({"ETF_EU": 1.0}))
+
+    first = result.records[0]
+    assert first.target_invested == pytest.approx(1.0)
+    assert first.actual_invested == 0.0
+    assert result.records[1].actual_invested == pytest.approx(1.0)

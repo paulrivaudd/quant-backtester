@@ -127,9 +127,11 @@ class RunQuality:
     sessions : int
         Sessions the run walked.
     estimated_valuations : int
-        Sessions where at least one held instrument had no price of its own
-        and was valued at an older close. The equity of those sessions is an
-        estimate, and so is every statistic computed across them.
+        Sessions where at least one held instrument had no close of its own
+        and was valued at an earlier one - either because none was published
+        for the session, or because the last one the reader had was already
+        stale. The equity of those sessions is an estimate, and so is every
+        statistic computed across them.
     untradable_sessions : int
         Sessions where an order was not sent because no opening price was
         knowable. The book stayed as it was, which is the honest outcome and

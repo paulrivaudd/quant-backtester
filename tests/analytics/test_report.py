@@ -134,6 +134,7 @@ def engine_over(
         strategy=AlwaysHold({instrument: 1.0 / len(universe) for instrument in universe}),
         universe=universe,
         initial_cash=10_000.0,
+        base_currency="EUR",
         limits=PositionLimits(),
         execution=execution,
         timetable=PARIS,
