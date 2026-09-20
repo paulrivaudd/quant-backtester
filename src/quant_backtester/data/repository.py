@@ -16,6 +16,13 @@ Layout under the market data root::
     clean/applied_fetches.parquet                     which fetches shaped the clean layer
     clean/revisions.parquet
     validation/validation_log.parquet
+    .pending/<id>/...                                 a transaction mid-flight
+
+One promotion writes several of those files, and a series whose verdicts no
+longer describe its values is worse than one that is a day out of date. So a
+set of writes is made through :meth:`MarketDataRepository.transaction`: staged
+under ``.pending/``, published together, and finished or discarded when the
+repository is next opened.
 
 ``raw/`` is written once and never touched again: one file per fetch, named by
 the fetch instant. That is what answers "what did Yahoo actually give us on
@@ -29,8 +36,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import BinaryIO
@@ -120,6 +129,23 @@ def write_parquet_atomic(frame: pd.DataFrame, path: Path, schema: pa.Schema) -> 
     _atomic_write(path, lambda handle: pq.write_table(table, handle))
 
 
+PENDING = ".pending"
+"""Directory, under the root, where a transaction stages its files.
+
+Under the root on purpose: ``os.replace`` is only atomic within one
+filesystem, and a staging area anywhere else would turn every commit into a
+copy that can fail half way.
+"""
+
+COMMIT_MANIFEST = "COMMIT.json"
+"""Written last, and the only thing that makes a staged set of files real.
+
+Its presence is the difference between a transaction that was interrupted
+before it decided anything - discarded - and one that had already decided and
+was interrupted while moving files - finished.
+"""
+
+
 class MarketDataRepository:
     """Read and write the market data tree.
 
@@ -129,12 +155,200 @@ class MarketDataRepository:
         Market data root, i.e. the directory holding ``metadata/``, ``raw/``,
         ``clean/`` and ``validation/``. Passed in rather than read from a global
         so tests can point at a temporary directory.
+
+    Notes
+    -----
+    Opening a repository finishes or discards whatever a previous run left
+    behind - see :meth:`transaction`. It is the one side effect a constructor
+    here has, and it is the price of a store that can be interrupted.
     """
 
     def __init__(self, root: Path) -> None:
         if not root.is_dir():
             raise FileNotFoundError(f"Market data root {root} does not exist")
         self.root = root
+        self._staged: dict[Path, Path] | None = None
+        self._staging: Path | None = None
+        self.recover()
+
+    # -- transactions ------------------------------------------------------
+
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        """Write several files as one change, or write none of them.
+
+        Yields
+        ------
+        None
+            Inside the block, every clean-layer write is staged rather than
+            applied, and every read sees what this transaction has written so
+            far.
+
+        Raises
+        ------
+        RuntimeError
+            If a transaction is already open. Nesting them would make the
+            inner block's commit a lie: it would publish the outer one's work
+            halfway through.
+
+        Notes
+        -----
+        One promotion writes the bars, each check source's bars, the verdicts,
+        the revision log and the journal of applied fetches. Each of those
+        writes is atomic on its own, and that is not the same thing: a run that
+        died between two of them left a clean layer whose verdicts described
+        values that were no longer there. It was *detected* - the next update
+        refuses to build on it - and detection means someone rebuilds a series
+        by hand because a laptop slept at the wrong moment.
+
+        So the set is committed together. Files are written into
+        ``.pending/<id>/``, mirroring their place in the tree; the manifest
+        naming them is written last; and only then is each file moved onto its
+        target. Recovery reads the manifest: present, the moves are finished
+        (each one is atomic, and a move already done is simply skipped);
+        absent, the whole staging directory is discarded. There is no state in
+        between, because the manifest appears in one filesystem operation.
+
+        What this does not claim is a database. A reader that opens two files
+        while the commit is moving them can still see one old and one new - the
+        window is microseconds rather than the seconds an ingestion takes, and
+        closing it entirely needs a snapshot the filesystem does not offer.
+        """
+        if self._staged is not None:
+            raise RuntimeError("a transaction is already open on this repository")
+        staging = Path(tempfile.mkdtemp(dir=self._pending_root()))
+        self._staged = {}
+        self._staging = staging
+        try:
+            yield
+        except BaseException:
+            self._staged = None
+            self._staging = None
+            shutil.rmtree(staging, ignore_errors=True)
+            raise
+        staged = self._staged
+        self._staged = None
+        self._staging = None
+        self._commit(staging, staged)
+
+    def recover(self) -> list[Path]:
+        """Finish or discard the transactions a previous run left behind.
+
+        Returns
+        -------
+        list[Path]
+            The staging directories that were dealt with, in name order.
+
+        Notes
+        -----
+        Called when a repository is opened. A staging directory holding a
+        manifest had decided to commit, so its moves are replayed; one without
+        had not, so it is removed. Replaying is safe to repeat: a file already
+        moved is no longer in the staging directory.
+        """
+        pending = self.root / PENDING
+        if not pending.is_dir():
+            return []
+        handled: list[Path] = []
+        for staging in sorted(pending.iterdir()):
+            if not staging.is_dir():
+                continue
+            handled.append(staging)
+            manifest = staging / COMMIT_MANIFEST
+            if not manifest.exists():
+                shutil.rmtree(staging, ignore_errors=True)
+                continue
+            moves = json.loads(manifest.read_text(encoding="utf-8"))
+            self._apply(
+                staging, {self.root / target: Path(source) for target, source in moves.items()}
+            )
+        return handled
+
+    def _pending_root(self) -> Path:
+        """Return the staging root, created if it is not there yet."""
+        pending = self.root / PENDING
+        pending.mkdir(parents=True, exist_ok=True)
+        return pending
+
+    def _commit(self, staging: Path, staged: Mapping[Path, Path]) -> None:
+        """Publish a transaction's files, manifest first, then the moves."""
+        if not staged:
+            shutil.rmtree(staging, ignore_errors=True)
+            return
+        manifest = {
+            str(target.relative_to(self.root)): str(source) for target, source in staged.items()
+        }
+        _atomic_write(
+            staging / COMMIT_MANIFEST,
+            lambda handle: handle.write(json.dumps(manifest, indent=2).encode("utf-8")),
+        )
+        self._apply(staging, staged)
+
+    def _apply(self, staging: Path, staged: Mapping[Path, Path]) -> None:
+        """Move every staged file onto its target, then drop the staging directory."""
+        for target, source in sorted(staged.items()):
+            if not Path(source).exists():
+                # Already moved by an earlier pass of the same commit.
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(source, target)
+        shutil.rmtree(staging, ignore_errors=True)
+
+    def _append_rows(self, frame: pd.DataFrame, path: Path, schema: pa.Schema) -> None:
+        """Append rows to a Parquet log without ever losing the existing ones.
+
+        The file is read, extended and rewritten atomically: a crash leaves
+        either the old log or the new one, never a truncated file. Inside a
+        transaction it reads what that transaction has already staged, so two
+        appends to one log do not undo each other.
+
+        Parameters
+        ----------
+        frame : pd.DataFrame
+            Rows to append.
+        path : Path
+            Log file; created by the first non-empty append.
+        schema : pa.Schema
+            Schema of the log.
+
+        Raises
+        ------
+        ValueError
+            If ``frame`` does not match ``schema``, even when it is empty.
+        """
+        missing = set(schema.names) - set(frame.columns)
+        extra = set(frame.columns) - set(schema.names)
+        if missing or extra:
+            raise ValueError(f"Column mismatch: missing={sorted(missing)}, extra={sorted(extra)}")
+        if frame.empty:
+            return
+        current = self._current(path)
+        if current.exists():
+            frame = pd.concat([pq.read_table(current).to_pandas(), frame], ignore_index=True)
+        write_parquet_atomic(frame, self._target(path), schema)
+
+    def _target(self, path: Path) -> Path:
+        """Return where a write should actually land.
+
+        Inside a transaction that is the staging copy of ``path``, recorded so
+        the commit knows where to move it; outside one it is ``path`` itself.
+        """
+        if self._staged is None or self._staging is None:
+            return path
+        staged = self._staging / path.relative_to(self.root)
+        self._staged[path] = staged
+        return staged
+
+    def _current(self, path: Path) -> Path:
+        """Return the newest version of a file, this transaction's included.
+
+        A read-modify-write - appending to a log, merging a series - has to see
+        what the same transaction wrote a moment ago, or the second write would
+        silently undo the first.
+        """
+        if self._staged is None:
+            return path
+        return self._staged.get(path, path)
 
     def _raw_path(self, instrument_id: str, source: str, fetch_id: str) -> Path:
         """Return ``raw/<source>/<instrument_id>/<fetch_id>.parquet``."""
@@ -293,7 +507,7 @@ class MarketDataRepository:
         if not (frame["session_date"].is_monotonic_increasing and frame["session_date"].is_unique):
             raise ValueError("Bars frame must be sorted by session_date, without duplicates")
         path = self.root / "clean" / "bars" / f"{instrument_id}.parquet"
-        write_parquet_atomic(frame, path, BARS_SCHEMA)
+        write_parquet_atomic(frame, self._target(path), BARS_SCHEMA)
 
     def load_bars(
         self, instrument_id: str, start: date | None = None, end: date | None = None
@@ -320,7 +534,7 @@ class MarketDataRepository:
         Cette methode ne filtre **pas** sur la disponibilite : c'est le role du
         reader. Le repository ne connait que des fichiers.
         """
-        path = self.root / "clean" / "bars" / f"{instrument_id}.parquet"
+        path = self._current(self.root / "clean" / "bars" / f"{instrument_id}.parquet")
         if not path.exists():
             # Same columns and dtypes as a loaded file, just zero rows.
             return BARS_SCHEMA.empty_table().to_pandas()
@@ -366,7 +580,7 @@ class MarketDataRepository:
         if unknown:
             raise ValueError(f"Unknown check_status value(s): {', '.join(map(str, unknown))}")
         path = self.root / "clean" / "checked_bars" / f"{instrument_id}.parquet"
-        write_parquet_atomic(frame, path, CHECKED_BARS_SCHEMA)
+        write_parquet_atomic(frame, self._target(path), CHECKED_BARS_SCHEMA)
 
     def save_check_bars(self, instrument_id: str, source_id: str, frame: pd.DataFrame) -> None:
         """Replace one check source's canonical bars for an instrument.
@@ -407,7 +621,9 @@ class MarketDataRepository:
             raise ValueError(f"Check bars frame for {source_id} holds rows of another source")
         if not (frame["session_date"].is_monotonic_increasing and frame["session_date"].is_unique):
             raise ValueError("Check bars frame must be sorted by session_date, without duplicates")
-        write_parquet_atomic(frame, self._check_bars_path(instrument_id, source_id), BARS_SCHEMA)
+        write_parquet_atomic(
+            frame, self._target(self._check_bars_path(instrument_id, source_id)), BARS_SCHEMA
+        )
 
     def load_check_bars(self, instrument_id: str, source_id: str) -> pd.DataFrame:
         """Load one check source's canonical bars for an instrument.
@@ -425,7 +641,9 @@ class MarketDataRepository:
             Its canonical bars; an empty frame with the right columns if it has
             never served any.
         """
-        return _load_or_empty(self._check_bars_path(instrument_id, source_id), BARS_SCHEMA)
+        return _load_or_empty(
+            self._current(self._check_bars_path(instrument_id, source_id)), BARS_SCHEMA
+        )
 
     def _check_bars_path(self, instrument_id: str, source_id: str) -> Path:
         """Return where one check source's bars for one instrument live."""
@@ -450,7 +668,7 @@ class MarketDataRepository:
             columns if none. Choosing which statuses to trust is the caller's
             decision, not the repository's.
         """
-        path = self.root / "clean" / "checked_bars" / f"{instrument_id}.parquet"
+        path = self._current(self.root / "clean" / "checked_bars" / f"{instrument_id}.parquet")
         frame = _load_or_empty(path, CHECKED_BARS_SCHEMA)
         # session_date holds datetime.date objects: compare with dates, not Timestamps.
         if start is not None:
@@ -489,7 +707,7 @@ class MarketDataRepository:
         if not (dates.is_monotonic_increasing and dates.is_unique):
             raise ValueError("Levels frame must be sorted by observation_date, without duplicates")
         replace_path = self.root / "clean" / "levels" / f"{instrument_id}.parquet"
-        write_parquet_atomic(frame, replace_path, LEVELS_SCHEMA)
+        write_parquet_atomic(frame, self._target(replace_path), LEVELS_SCHEMA)
 
     def load_levels(
         self, instrument_id: str, start: date | None = None, end: date | None = None
@@ -512,7 +730,7 @@ class MarketDataRepository:
         -----
         Exercice 3.9 (facile).
         """
-        path = self.root / "clean" / "levels" / f"{instrument_id}.parquet"
+        path = self._current(self.root / "clean" / "levels" / f"{instrument_id}.parquet")
         frame = _load_or_empty(path, LEVELS_SCHEMA)
         # observation_date holds datetime.date objects: compare with dates, not Timestamps.
         if start is not None:
@@ -540,7 +758,7 @@ class MarketDataRepository:
         en entier.
         """
         path = self.root / "clean" / "corporate_actions.parquet"
-        write_parquet_atomic(frame, path, CORPORATE_ACTIONS_SCHEMA)
+        write_parquet_atomic(frame, self._target(path), CORPORATE_ACTIONS_SCHEMA)
 
     def load_corporate_actions(self, instrument_id: str | None = None) -> pd.DataFrame:
         """Load corporate actions.
@@ -560,7 +778,7 @@ class MarketDataRepository:
         -----
         Exercice 3.11 (facile).
         """
-        path = self.root / "clean" / "corporate_actions.parquet"
+        path = self._current(self.root / "clean" / "corporate_actions.parquet")
         return _only_instrument(_load_or_empty(path, CORPORATE_ACTIONS_SCHEMA), instrument_id)
 
     def append_revisions(self, frame: pd.DataFrame) -> None:
@@ -582,7 +800,7 @@ class MarketDataRepository:
 
         An empty frame leaves the log untouched.
         """
-        _append_rows(frame, self.root / "clean" / "revisions.parquet", REVISIONS_SCHEMA)
+        self._append_rows(frame, self.root / "clean" / "revisions.parquet", REVISIONS_SCHEMA)
 
     def mark_fetches_applied(
         self, instrument_id: str, fetches: Sequence[tuple[str, str]], applied_at_utc: datetime
@@ -617,7 +835,7 @@ class MarketDataRepository:
                 ),
             }
         )
-        _append_rows(frame, self._applied_fetches_path, APPLIED_FETCHES_SCHEMA)
+        self._append_rows(frame, self._applied_fetches_path, APPLIED_FETCHES_SCHEMA)
 
     def load_applied_fetches(self, instrument_id: str) -> set[tuple[str, str]]:
         """Return the ``(source, fetch_id)`` pairs whose promotion completed.
@@ -632,7 +850,7 @@ class MarketDataRepository:
         set[tuple[str, str]]
             Empty when nothing was ever recorded for it.
         """
-        frame = _load_or_empty(self._applied_fetches_path, APPLIED_FETCHES_SCHEMA)
+        frame = _load_or_empty(self._current(self._applied_fetches_path), APPLIED_FETCHES_SCHEMA)
         mine = frame.loc[frame["instrument_id"] == instrument_id]
         return {
             (str(source), str(fetch))
@@ -662,7 +880,7 @@ class MarketDataRepository:
         -----
         Exercice 3.13 (facile).
         """
-        path = self.root / "clean" / "revisions.parquet"
+        path = self._current(self.root / "clean" / "revisions.parquet")
         return _only_instrument(_load_or_empty(path, REVISIONS_SCHEMA), instrument_id)
 
     def append_validation_log(
@@ -710,7 +928,7 @@ class MarketDataRepository:
         frame["checked_at_utc"] = pd.Series(
             [checked_at_utc] * len(rows), index=frame.index, dtype="datetime64[us, UTC]"
         )
-        _append_rows(
+        self._append_rows(
             frame, self.root / "validation" / "validation_log.parquet", VALIDATION_LOG_SCHEMA
         )
 
@@ -732,8 +950,8 @@ class MarketDataRepository:
         Exercice 3.15 (facile).
         """
         clean = self.root / "clean"
-        bars = clean / "bars" / f"{instrument_id}.parquet"
-        levels = clean / "levels" / f"{instrument_id}.parquet"
+        bars = self._current(clean / "bars" / f"{instrument_id}.parquet")
+        levels = self._current(clean / "levels" / f"{instrument_id}.parquet")
         return bars.exists() or levels.exists()
 
     def first_date(self, instrument_id: str) -> date | None:
@@ -792,8 +1010,8 @@ class MarketDataRepository:
         """
         clean = self.root / "clean"
         for path, column in (
-            (clean / "bars" / f"{instrument_id}.parquet", "session_date"),
-            (clean / "levels" / f"{instrument_id}.parquet", "observation_date"),
+            (self._current(clean / "bars" / f"{instrument_id}.parquet"), "session_date"),
+            (self._current(clean / "levels" / f"{instrument_id}.parquet"), "observation_date"),
         ):
             if path.exists():
                 return pq.read_table(path, columns=[column]).column(column).to_pylist()
@@ -838,34 +1056,3 @@ def _only_instrument(frame: pd.DataFrame, instrument_id: str | None) -> pd.DataF
     if instrument_id is not None:
         frame = frame.loc[frame["instrument_id"] == instrument_id]
     return frame.reset_index(drop=True)
-
-
-def _append_rows(frame: pd.DataFrame, path: Path, schema: pa.Schema) -> None:
-    """Append rows to a Parquet log without ever losing the existing ones.
-
-    The file is read, extended and rewritten atomically: a crash leaves either
-    the old log or the new one, never a truncated file.
-
-    Parameters
-    ----------
-    frame : pd.DataFrame
-        Rows to append.
-    path : Path
-        Log file; created by the first non-empty append.
-    schema : pa.Schema
-        Schema of the log.
-
-    Raises
-    ------
-    ValueError
-        If ``frame`` does not match ``schema``, even when it is empty.
-    """
-    missing = set(schema.names) - set(frame.columns)
-    extra = set(frame.columns) - set(schema.names)
-    if missing or extra:
-        raise ValueError(f"Column mismatch: missing={sorted(missing)}, extra={sorted(extra)}")
-    if frame.empty:
-        return
-    if path.exists():
-        frame = pd.concat([pq.read_table(path).to_pandas(), frame], ignore_index=True)
-    write_parquet_atomic(frame, path, schema)

@@ -1236,20 +1236,24 @@ class MarketDataUpdater:
         issues = list(extra_issues) + self._validate(instrument, frames, actions)
         report = ValidationReport(instrument_id=instrument.id, issues=issues)
         if report.valid:
-            issues = issues + self._promote(
-                instrument,
-                frames,
-                actions,
-                fetch_id=fetch_id,
-                checked_at=checked_at,
-                requested=requested,
-                log=log,
-            )
+            # One promotion, one change to the clean layer. The series, the
+            # verdicts computed from them and the journal saying which fetches
+            # produced them are the same statement, and a run interrupted
+            # between two of those writes used to leave a store whose verdicts
+            # described values that were no longer there.
+            with self._repository.transaction():
+                issues = issues + self._promote(
+                    instrument,
+                    frames,
+                    actions,
+                    fetch_id=fetch_id,
+                    checked_at=checked_at,
+                    requested=requested,
+                    log=log,
+                )
+                if log:
+                    self._repository.mark_fetches_applied(instrument.id, fetches, checked_at)
             report = ValidationReport(instrument_id=instrument.id, issues=issues)
-            # Last, and only once everything above returned: a fetch recorded
-            # here is one a replay will apply, so it must have been applied.
-            if log:
-                self._repository.mark_fetches_applied(instrument.id, fetches, checked_at)
         if log:
             self._repository.append_validation_log([report], checked_at)
         return report
