@@ -247,3 +247,87 @@ def test_the_commission_floor_is_carried_through_the_trim() -> None:
 
     assert execution.fills[0].quantity == pytest.approx(9.9)
     assert execution.holdings.cash == pytest.approx(0.0, abs=1e-9)
+
+
+@pytest.mark.parametrize("threshold", [float("nan"), float("inf"), -1.0])
+def test_a_minimum_trade_value_that_is_not_a_value_is_refused(threshold: float) -> None:
+    """A threshold of NaN compares false against every order and sends them all."""
+    with pytest.raises(ValueError):
+        ExecutionModel(minimum_trade_value=threshold)
+
+
+def test_a_negative_target_weight_never_becomes_a_short() -> None:
+    """The layer that would create the position is the layer that refuses it.
+
+    A target allocation already refuses a negative weight. This is the last
+    check before a sale from an empty book turns into borrowed stock.
+    """
+    with pytest.raises(ValueError, match="the target weight of A"):
+        FREE.rebalance(Holdings(cash=10_000.0), {"A": -0.5}, {"A": 100.0})
+
+
+def test_a_target_weight_of_nan_is_refused() -> None:
+    """It would size an order of NaN units and value the book at NaN for ever."""
+    with pytest.raises(ValueError, match="the target weight of A"):
+        FREE.rebalance(Holdings(cash=10_000.0), {"A": float("nan")}, {"A": 100.0})
+
+
+def test_an_order_is_placed_in_whole_units_where_the_venue_deals_in_them() -> None:
+    """Ten thousand at 300 is 33.33 shares, and a broker takes 33.
+
+    The remainder stays in cash rather than being bought: the fractional part
+    is the small, systematic optimism that makes a backtest allocate its
+    capital more perfectly than any account could.
+    """
+    execution = FREE.rebalance(
+        Holdings(cash=10_000.0), {"A": 1.0}, {"A": 300.0}, quantity_steps={"A": 1.0}
+    )
+
+    assert dict(execution.holdings.quantities) == {"A": 33.0}
+    assert execution.holdings.cash == pytest.approx(100.0)
+
+
+def test_a_position_is_still_closed_in_full() -> None:
+    """Rounding down a sale of a whole position leaves exactly nothing behind."""
+    before = Holdings(cash=0.0, quantities={"A": 33.0})
+
+    execution = FREE.rebalance(before, {}, {"A": 300.0}, quantity_steps={"A": 1.0})
+
+    assert dict(execution.holdings.quantities) == {}
+    assert execution.holdings.cash == pytest.approx(9_900.0)
+
+
+def test_an_order_smaller_than_one_lot_is_not_sent() -> None:
+    """Half a share is not an order, and it is not an error either."""
+    before = Holdings(cash=100.0, quantities={"A": 33.0})
+
+    execution = FREE.rebalance(before, {"A": 1.0}, {"A": 300.0}, quantity_steps={"A": 1.0})
+
+    assert execution.fills == ()
+    assert dict(execution.holdings.quantities) == {"A": 33.0}
+
+
+def test_rounding_is_always_downwards_so_the_cash_is_never_overdrawn() -> None:
+    """Rounding to the nearest lot would buy a share the sizing never paid for."""
+    execution = FREE.rebalance(
+        Holdings(cash=10_000.0), {"A": 1.0}, {"A": 199.0}, quantity_steps={"A": 1.0}
+    )
+
+    # 50.25 units wanted, 50 dealt: never 51, which would need 10,149.
+    assert dict(execution.holdings.quantities) == {"A": 50.0}
+    assert execution.holdings.cash >= 0.0
+
+
+def test_a_step_that_is_not_a_quantity_is_refused() -> None:
+    """A step of zero would divide by nothing, and a negative one has no meaning."""
+    with pytest.raises(ValueError, match="the quantity step of A"):
+        FREE.rebalance(Holdings(cash=10_000.0), {"A": 1.0}, {"A": 100.0}, quantity_steps={"A": 0.0})
+
+
+def test_an_instrument_without_a_step_is_still_dealt_in_fractions() -> None:
+    """Lot sizes are declared per instrument, not assumed for all of them."""
+    execution = FREE.rebalance(
+        Holdings(cash=10_000.0), {"A": 1.0, "B": 0.0}, {"A": 300.0}, quantity_steps={"B": 1.0}
+    )
+
+    assert dict(execution.holdings.quantities) == {"A": pytest.approx(10_000.0 / 300.0)}
