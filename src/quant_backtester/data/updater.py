@@ -62,7 +62,13 @@ from quant_backtester.data.bar_corrections import BarCorrection, BarCorrections
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.corporate_actions import ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy, cross_check_bars
-from quant_backtester.data.instruments import DataType, Instrument, InstrumentRegistry
+from quant_backtester.data.instruments import (
+    DataType,
+    Instrument,
+    InstrumentRegistry,
+    PublicationRule,
+    VintagePolicy,
+)
 from quant_backtester.data.normalizer import NormalizedData, Normalizer
 from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.revisions import (
@@ -70,7 +76,7 @@ from quant_backtester.data.revisions import (
     detect_revisions,
     merge_with_policy,
 )
-from quant_backtester.data.schemas import BARS_SCHEMA, LEVELS_SCHEMA
+from quant_backtester.data.schemas import BARS_SCHEMA, LEVELS_SCHEMA, VINTAGES_SCHEMA
 from quant_backtester.data.sources.base import (
     DataSource,
     ProviderError,
@@ -169,6 +175,37 @@ class HistoryCoverage:
         if self.stored_until is None or self.stored_until >= self.declared_until:
             return None
         return (self.stored_until, self.declared_until)
+
+
+def _vintage_availability(
+    rule: PublicationRule, calendar: TradingCalendar | None, vintage_at: datetime
+) -> Callable[[date], datetime]:
+    """Return when a row of one vintage became public.
+
+    The later of the observation's own release and the vintage's: a number
+    restated in June 2021 was not knowable in 2019, whatever quarter it
+    describes, and a vintage of a day carries observations released that
+    morning, which were not knowable the evening before.
+    """
+
+    def available_at(day: date) -> datetime:
+        return max(rule.available_at(day, calendar), vintage_at)
+
+    return available_at
+
+
+def _canonical_frame(instrument: Instrument, data: NormalizedData) -> pd.DataFrame | None:
+    """Return the frame an instrument's own kind of series is stored as.
+
+    A ``BAR`` produces bars and a ``LEVEL`` produces levels, except for a
+    published series read as of each decision, which produces a vintage archive
+    instead: the same observations, one row per vintage they were restated in.
+    """
+    if instrument.data_type is DataType.BAR:
+        return data.bars
+    if instrument.vintage_policy is VintagePolicy.AS_OF_DECISION:
+        return data.vintages
+    return data.levels
 
 
 def _corrected_bar_issue(
@@ -789,7 +826,7 @@ class MarketDataUpdater:
             data, corrected = self._normalize(instrument, source_id, download)
             issues += corrected
             frames = {}
-            frame = data.bars if instrument.data_type is DataType.BAR else data.levels
+            frame = _canonical_frame(instrument, data)
             if frame is not None:
                 frames[source_id] = frame
             report = self._ingest(
@@ -1049,7 +1086,7 @@ class MarketDataUpdater:
             data, corrected = self._normalize(instrument, source_id, download)
             issues += corrected
             issues += self._rejected_issues(instrument, source_id, data)
-            frame = data.bars if instrument.data_type is DataType.BAR else data.levels
+            frame = _canonical_frame(instrument, data)
             if frame is None:
                 issues.append(
                     _issue(
@@ -1269,6 +1306,26 @@ class MarketDataUpdater:
         for _, frame in sorted(frames.items()):
             if instrument.data_type is DataType.BAR:
                 issues += list(validate_bars(instrument, frame, self._venue_of(instrument)).issues)
+            elif instrument.vintage_policy is VintagePolicy.AS_OF_DECISION:
+                # One vintage at a time: inside one, the rules about a
+                # published series are exactly the level rules, and across
+                # them a repeated observation date is the point rather than a
+                # duplicate.
+                calendar = self._calendar_of(instrument)
+                rule = instrument.publication_rule
+                if rule is None:  # pragma: no cover - a LEVEL always has one
+                    raise ValueError(f"{instrument.id} is a LEVEL with no publication rule")
+                for vintage in sorted(set(frame["vintage_date"])):
+                    slice_ = frame.loc[frame["vintage_date"] == vintage]
+                    vintage_at = rule.available_at(vintage, calendar)
+                    issues += list(
+                        validate_levels(
+                            instrument,
+                            slice_.drop(columns=["vintage_date"]).reset_index(drop=True),
+                            calendar,
+                            available_at=_vintage_availability(rule, calendar, vintage_at),
+                        ).issues
+                    )
             else:
                 issues += list(
                     validate_levels(instrument, frame, self._calendar_of(instrument)).issues
@@ -1297,6 +1354,8 @@ class MarketDataUpdater:
                 checked_at=checked_at,
                 log=log,
             )
+        elif instrument.vintage_policy is VintagePolicy.AS_OF_DECISION:
+            issues = self._promote_vintages(instrument, frames)
         else:
             issues = self._promote_levels(
                 instrument, frames, fetch_id=fetch_id, checked_at=checked_at, log=log
@@ -1478,6 +1537,72 @@ class MarketDataUpdater:
         )
         self._repository.save_levels(instrument.id, merged)
         return issues
+
+    def _promote_vintages(
+        self, instrument: Instrument, frames: Mapping[str, pd.DataFrame]
+    ) -> list[ValidationIssue]:
+        """Add new vintage rows to the archive, and refuse a rewritten one.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            The published series.
+        frames : Mapping[str, pd.DataFrame]
+            Canonical vintage rows per source.
+
+        Returns
+        -------
+        list[ValidationIssue]
+            One error per pair whose value moved.
+
+        Notes
+        -----
+        The revision policy does not apply here, and the reason is worth
+        writing down. A level may legitimately be revised, and the policy
+        decides whether to accept the new value. A vintage cannot: the archive
+        of what was known on a given day is a fact about the past, and it does
+        not change. So a pair that arrives with a different value is a provider
+        rewriting history, and it stops the promotion instead of being merged
+        under a rule that does not fit it.
+        """
+        incoming = frames.get(instrument.primary_source)
+        if incoming is None:
+            return []
+        stored = self._repository.load_vintages(instrument.id)
+        known = {
+            (row["observation_date"], row["vintage_date"]): row["value"]
+            for row in stored.to_dict("records")
+        }
+        issues: list[ValidationIssue] = []
+        rows = []
+        for record in incoming.to_dict("records"):
+            key = (record["observation_date"], record["vintage_date"])
+            if key in known:
+                if known[key] != record["value"]:
+                    issues.append(
+                        _issue(
+                            "VINTAGE_REWRITTEN",
+                            Severity.ERROR,
+                            instrument.id,
+                            record["observation_date"],
+                            f"the vintage of {record['vintage_date']} gave "
+                            f"{known[key]} for {record['observation_date']} and now gives "
+                            f"{record['value']}; an archive of what was known on a day "
+                            "cannot change",
+                        )
+                    )
+                continue
+            rows.append(record)
+        if issues:
+            return issues
+        if not rows:
+            return []
+        merged = pd.concat([stored, pd.DataFrame(rows, columns=list(VINTAGES_SCHEMA.names))])
+        merged = merged.sort_values(
+            ["observation_date", "vintage_date"], kind="stable"
+        ).reset_index(drop=True)
+        self._repository.save_vintages(instrument.id, merged)
+        return []
 
     def _promote_actions(
         self,
@@ -1832,6 +1957,11 @@ class MarketDataUpdater:
             checked = self._repository.load_checked_bars(instrument.id)
             if not checked.empty:
                 self._repository.save_checked_bars(instrument.id, checked.iloc[0:0])
+        elif instrument.vintage_policy is VintagePolicy.AS_OF_DECISION:
+            if not self._repository.load_vintages(instrument.id).empty:
+                self._repository.save_vintages(
+                    instrument.id, VINTAGES_SCHEMA.empty_table().to_pandas()
+                )
         elif not self._repository.load_levels(instrument.id).empty:
             self._repository.save_levels(instrument.id, LEVELS_SCHEMA.empty_table().to_pandas())
         stored_all = self._repository.load_corporate_actions()

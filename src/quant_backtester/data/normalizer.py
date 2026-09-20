@@ -23,11 +23,17 @@ import pandas as pd
 import pyarrow as pa
 
 from quant_backtester.data.calendars import TradingCalendar
-from quant_backtester.data.instruments import DataType, Instrument, PublicationRule
+from quant_backtester.data.instruments import (
+    DataType,
+    Instrument,
+    PublicationRule,
+    VintagePolicy,
+)
 from quant_backtester.data.schemas import (
     BARS_SCHEMA,
     CORPORATE_ACTIONS_SCHEMA,
     LEVELS_SCHEMA,
+    VINTAGES_SCHEMA,
     ActionType,
 )
 from quant_backtester.data.sources.alfred import vintage_column
@@ -73,6 +79,10 @@ class NormalizedData:
         Rows matching :data:`~quant_backtester.data.schemas.BARS_SCHEMA`.
     levels : pd.DataFrame | None
         Rows matching :data:`~quant_backtester.data.schemas.LEVELS_SCHEMA`.
+    vintages : pd.DataFrame | None
+        Rows matching :data:`~quant_backtester.data.schemas.VINTAGES_SCHEMA`,
+        for a published series read as of each decision rather than pinned to
+        one vintage.
     corporate_actions : pd.DataFrame | None
         Rows matching
         :data:`~quant_backtester.data.schemas.CORPORATE_ACTIONS_SCHEMA`.
@@ -83,6 +93,7 @@ class NormalizedData:
 
     bars: pd.DataFrame | None = None
     levels: pd.DataFrame | None = None
+    vintages: pd.DataFrame | None = None
     corporate_actions: pd.DataFrame | None = None
     rejected: RejectedRows = RejectedRows()
 
@@ -561,6 +572,79 @@ def _levels_frame(
         "source_fetch_id": [download.fetch_id] * len(dates),
     }
     return pd.DataFrame(columns, columns=list(LEVELS_SCHEMA.names)), rejected
+
+
+def _vintages_frame(
+    instrument: Instrument,
+    download: RawDownload,
+    rule: PublicationRule,
+    by_vintage: Mapping[date, Mapping[date, float]],
+    calendar: TradingCalendar | None = None,
+) -> tuple[pd.DataFrame, RejectedRows]:
+    """Assemble a vintage archive: one row per observation and per vintage.
+
+    Parameters
+    ----------
+    instrument : Instrument
+        Instrument the rows belong to.
+    download : RawDownload
+        Download they come from, for the lineage columns.
+    rule : PublicationRule
+        When an observation, and a vintage, became public.
+    by_vintage : Mapping[date, Mapping[date, float]]
+        Published value per observation date, per vintage date.
+    calendar : TradingCalendar | None
+        Calendar the rule counts its lag on.
+
+    Returns
+    -------
+    tuple[pd.DataFrame, RejectedRows]
+        Rows of :data:`~quant_backtester.data.schemas.VINTAGES_SCHEMA`, sorted
+        by observation date then vintage date, and what was dropped.
+
+    Notes
+    -----
+    Availability is the later of two instants: the observation's own release,
+    and the vintage's. The second is what makes this a point-in-time series -
+    a number restated in June 2021 was not knowable in 2019, whatever quarter
+    it describes - and taking the later of the two rather than the vintage
+    alone keeps the first release honest as well: the vintage of a day carries
+    observations published that morning, and they were not knowable the evening
+    before.
+
+    A vintage that did not exist when the fetch ran is refused by the adapter,
+    so nothing here has to guess at one.
+    """
+    rows: list[tuple[date, date, float, datetime]] = []
+    unlisted: set[date] = set()
+    unpublished: set[date] = set()
+    for vintage in sorted(by_vintage):
+        vintage_at = rule.available_at(vintage, calendar)
+        for day in sorted(by_vintage[vintage]):
+            if not instrument.is_listed(day):
+                unlisted.add(day)
+                continue
+            available_at = max(rule.available_at(day, calendar), vintage_at)
+            if available_at > download.retrieved_at_utc:
+                unpublished.add(day)
+                continue
+            rows.append((day, vintage, by_vintage[vintage][day], available_at))
+    rejected = RejectedRows(
+        unlisted=tuple(sorted(unlisted)), unpublished=tuple(sorted(unpublished))
+    )
+    if not rows:
+        return _empty_frame(VINTAGES_SCHEMA), rejected
+    rows.sort(key=lambda row: (row[0], row[1]))
+    columns: dict[str, object] = {
+        "instrument_id": [instrument.id] * len(rows),
+        "observation_date": [row[0] for row in rows],
+        "vintage_date": [row[1] for row in rows],
+        "value": [row[2] for row in rows],
+        "available_at_utc": [row[3] for row in rows],
+        "source": [download.source] * len(rows),
+        "source_fetch_id": [download.fetch_id] * len(rows),
+    }
+    return pd.DataFrame(columns, columns=list(VINTAGES_SCHEMA.names)), rejected
 
 
 def _normalize_yahoo_bars(
@@ -1067,14 +1151,24 @@ class FredNormalizer:
 
 
 class AlfredNormalizer:
-    """Normalise a pinned ALFRED vintage into levels.
+    """Normalise ALFRED vintages, into levels or into a vintage archive.
 
-    The same file as FRED's with one difference that matters: the value column
-    carries the vintage, ``GDP_20200131`` rather than ``GDP``, because one
-    export can hold several of them. The vintage is read from the instrument
-    and the column is required to be that one - a file holding another vintage
-    than the instrument declares is a raw archive that does not say what it
-    holds, and the numbers below would be somebody else's.
+    The same file as FRED's with one difference that matters: each value column
+    carries its vintage, ``GDP_20200131`` rather than ``GDP``, because one
+    export holds several of them. The columns are required to be exactly the
+    ones the instrument declares - a raw archive that does not say what it
+    holds would give the numbers below somebody else's.
+
+    What comes out depends on how the instrument says the series is read. A
+    ``PINNED`` series becomes ordinary levels, one value per observation, as of
+    the one day it is pinned to. An ``AS_OF_DECISION`` series becomes vintage
+    rows, one per observation *and* vintage, and the reader picks the latest
+    vintage each decision could have seen.
+
+    A vintage row is available at the later of two instants: when the
+    observation itself was released, and when that vintage existed. A number
+    restated in June 2021 was not knowable in 2019, whatever quarter it
+    describes, and that is the whole reason this path exists.
     """
 
     source_id = "ALFRED"
@@ -1100,23 +1194,37 @@ class AlfredNormalizer:
         Returns
         -------
         NormalizedData
-            Canonical ``levels``, sorted by observation date.
+            Canonical ``levels`` for a pinned series, canonical ``vintages``
+            for one read as of each decision.
 
         Raises
         ------
         ValueError
             If the download belongs to another source or instrument, the
-            instrument is not a ``LEVEL`` or declares no vintage, the vintage
-            column is missing, a date is not ISO or appears twice, or a value
-            is neither a missing marker nor a finite number.
+            instrument is not a ``LEVEL`` or declares no vintage, a declared
+            vintage column is missing, a date is not ISO or appears twice, or a
+            value is neither a missing marker nor a finite number.
         """
         rule = _require_level_call("AlfredNormalizer", self.source_id, instrument, download)
-        if instrument.vintage_date is None:
-            raise ValueError(f"ALFRED series of {instrument.id} declares no vintage_date")
-        column = vintage_column(instrument.source_symbol, instrument.vintage_date)
-        observations = _fred_style_observations(download.frame, instrument, column, "ALFRED")
-        levels, rejected = _levels_frame(instrument, download, rule, observations, calendar)
-        return NormalizedData(levels=levels, rejected=rejected)
+        vintages = tuple(sorted(instrument.vintage_dates))
+        if not vintages:
+            raise ValueError(f"ALFRED series of {instrument.id} declares no vintage_dates")
+        if instrument.vintage_policy is VintagePolicy.PINNED:
+            column = vintage_column(instrument.source_symbol, vintages[0])
+            observations = _fred_style_observations(download.frame, instrument, column, "ALFRED")
+            levels, rejected = _levels_frame(instrument, download, rule, observations, calendar)
+            return NormalizedData(levels=levels, rejected=rejected)
+        by_vintage = {
+            vintage: _fred_style_observations(
+                download.frame,
+                instrument,
+                vintage_column(instrument.source_symbol, vintage),
+                "ALFRED",
+            )
+            for vintage in vintages
+        }
+        frame, rejected = _vintages_frame(instrument, download, rule, by_vintage, calendar)
+        return NormalizedData(vintages=frame, rejected=rejected)
 
 
 class EcbNormalizer:

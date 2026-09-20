@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
@@ -865,7 +865,10 @@ def _by_date(issues: list[ValidationIssue]) -> list[ValidationIssue]:
 
 
 def validate_levels(
-    instrument: Instrument, frame: pd.DataFrame, calendar: TradingCalendar | None = None
+    instrument: Instrument,
+    frame: pd.DataFrame,
+    calendar: TradingCalendar | None = None,
+    available_at: Callable[[date], datetime] | None = None,
 ) -> ValidationReport:
     """Check a canonical levels frame.
 
@@ -879,6 +882,13 @@ def validate_levels(
         Calendar the instrument's publication rule counts its lag on, needed to
         recompute the expected availability. Only a same-day release can do
         without one.
+    available_at : Callable[[date], datetime] | None
+        What the availability of an observation is expected to be. The
+        publication rule applied to the observation date, by default; a row of
+        a vintage archive passes the later of that and the vintage's own
+        release, because a number restated in June 2021 was not knowable in
+        2019. It is a parameter rather than a second copy of these rules: the
+        only thing that differs between the two is this instant.
 
     Returns
     -------
@@ -960,7 +970,9 @@ def validate_levels(
             )
             continue
         published_on = available.tz_convert(rule.timezone).date()
-        expected = pd.Timestamp(rule.available_at(day, calendar))
+        expected = pd.Timestamp(
+            rule.available_at(day, calendar) if available_at is None else available_at(day)
+        )
         if published_on < day:
             issues.append(
                 _issue(

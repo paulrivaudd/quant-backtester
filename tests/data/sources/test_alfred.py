@@ -15,7 +15,13 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from quant_backtester.data.instruments import AssetType, DataType, Instrument, PublicationRule
+from quant_backtester.data.instruments import (
+    AssetType,
+    DataType,
+    Instrument,
+    PublicationRule,
+    VintagePolicy,
+)
 from quant_backtester.data.sources.alfred import AlfredSource, vintage_column
 from quant_backtester.data.sources.base import ProviderResponseError
 
@@ -68,7 +74,8 @@ def gdp() -> Instrument:
             lag_sessions=1,
             calendar_id="XNYS",
         ),
-        vintage_date=date(2020, 1, 31),
+        vintage_dates=(date(2020, 1, 31),),
+        vintage_policy=VintagePolicy.PINNED,
     )
 
 
@@ -119,8 +126,8 @@ def test_the_request_records_which_vintage_it_holds(gdp: Instrument, source: Alf
     """A raw archive that does not say which vintage it is, is not an archive."""
     result = source.download(gdp, date(2019, 1, 1), date(2019, 12, 31))
 
-    assert result.request["vintage_date"] == "2020-01-31"
-    assert result.request["value_column"] == "GDP_20200131"
+    assert result.request["vintage_dates"] == ["2020-01-31"]
+    assert result.request["value_columns"] == ["GDP_20200131"]
     assert result.request["endpoint"] == "alfredgraph.csv"
 
 
@@ -128,9 +135,9 @@ def test_a_series_with_no_vintage_declared_is_refused(
     gdp: Instrument, source: AlfredSource, http: FakeHttp
 ) -> None:
     """A vintage left unsaid is the restated series again, under another name."""
-    unpinned = replace(gdp, vintage_date=None)
+    unpinned = replace(gdp, vintage_dates=(), vintage_policy=None)
 
-    with pytest.raises(ValueError, match="declares no vintage_date"):
+    with pytest.raises(ValueError, match="declares no vintage_dates"):
         source.download(unpinned, date(2019, 1, 1), date(2019, 12, 31))
     assert http.urls == []
 
@@ -144,9 +151,9 @@ def test_a_vintage_in_the_future_is_refused(
     next year's vintage would quietly serve today's numbers, and the day it
     stops doing that nobody would notice the run had changed.
     """
-    ahead = replace(gdp, vintage_date=date(2026, 9, 21))
+    ahead = replace(gdp, vintage_dates=(date(2026, 9, 21),))
 
-    with pytest.raises(ValueError, match="has not happened yet"):
+    with pytest.raises(ValueError, match="have not happened yet"):
         source.download(ahead, date(2019, 1, 1), date(2019, 12, 31))
     assert http.urls == []
 
@@ -198,7 +205,7 @@ def test_download_live_gdp_is_the_number_of_its_vintage(gdp: Instrument) -> None
     """
     january = AlfredSource().download(gdp, date(2019, 1, 1), date(2019, 3, 31))
     later = AlfredSource().download(
-        replace(gdp, vintage_date=date(2021, 6, 30)), date(2019, 1, 1), date(2019, 3, 31)
+        replace(gdp, vintage_dates=(date(2021, 6, 30),)), date(2019, 1, 1), date(2019, 3, 31)
     )
 
     assert january.frame["GDP_20200131"].tolist() == ["21098.827"]
@@ -215,3 +222,49 @@ def test_download_live_unknown_series_raises_http_404(gdp: Instrument) -> None:
 
     assert isinstance(raised.value.__cause__, HTTPError)
     assert raised.value.__cause__.code == 404
+
+
+def test_several_vintages_come_back_in_one_export(
+    gdp: Instrument, source: AlfredSource, http: FakeHttp
+) -> None:
+    """One request, one column per vintage - and the parameters are positional.
+
+    ALFRED reads ``id``, ``cosd`` and ``coed`` alongside ``vintage_date``, so
+    each has to be repeated as many times as the series is asked for. One
+    ``id`` with a list of vintages answers with the first of them and no
+    complaint, which is how a run reads one vintage believing it read four.
+    """
+    http.body = "observation_date,GDP_20200131,GDP_20210630\n2019-01-01,21098.827,21115.309\n"
+    point_in_time = replace(
+        gdp,
+        vintage_dates=(date(2020, 1, 31), date(2021, 6, 30)),
+        vintage_policy=VintagePolicy.AS_OF_DECISION,
+    )
+
+    result = source.download(point_in_time, date(2019, 1, 1), date(2019, 3, 31))
+
+    assert "id=GDP%2CGDP" in http.urls[0]
+    assert "cosd=2019-01-01%2C2019-01-01" in http.urls[0]
+    assert "vintage_date=2020-01-31%2C2021-06-30" in http.urls[0]
+    assert result.request["value_columns"] == ["GDP_20200131", "GDP_20210630"]
+    assert result.frame["GDP_20210630"].tolist() == ["21115.309"]
+
+
+@pytest.mark.network
+def test_download_live_serves_every_vintage_asked_for(gdp: Instrument) -> None:
+    """The quirk above, checked against the endpoint rather than assumed.
+
+    If ALFRED ever starts honouring a single ``id`` with several vintages, or
+    stops accepting the repeated form, this is what says so - and reading one
+    vintage while believing you read three is a silent look-ahead.
+    """
+    point_in_time = replace(
+        gdp,
+        vintage_dates=(date(2020, 1, 31), date(2021, 6, 30)),
+        vintage_policy=VintagePolicy.AS_OF_DECISION,
+    )
+
+    result = AlfredSource().download(point_in_time, date(2019, 1, 1), date(2019, 3, 31))
+
+    assert result.frame["GDP_20200131"].tolist() == ["21098.827"]
+    assert result.frame["GDP_20210630"].tolist() == ["21115.309"]

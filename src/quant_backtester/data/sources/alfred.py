@@ -23,17 +23,22 @@ Provider quirks, checked against the live endpoint on 2026-09-20:
   header with no rows. That is a legitimate answer - nothing was published
   yet - and it becomes an empty frame rather than an error.
 
-What this adapter does not do is choose a vintage per decision date. A run that
-wanted, for every session, the series as it stood that day would need a vintage
-dimension in storage; here one vintage is pinned, and what a backtest sees is
-the series as of that date, stated rather than assumed.
+An instrument declares the vintages it wants and how they are read: one pinned
+for the whole run, or every one of them, so that each decision can be given the
+series as it stood that day. Several vintages come back in a single export -
+``id=GDP,GDP&cosd=...,...&coed=...,...&vintage_date=2020-01-31,2021-06-30``
+answers with one column per vintage, and the parameters are positional, so the
+range has to be repeated as many times as the series is asked for. Sending the
+vintages as a single comma-separated list with one ``id`` silently serves the
+first of them, which is the kind of provider quirk that turns into a backtest
+reading one vintage while believing it read four.
 """
 
 from __future__ import annotations
 
 import io
 import urllib.parse
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import date, datetime
 
 import pandas as pd
@@ -118,51 +123,56 @@ class AlfredSource:
         ----------
         instrument : Instrument
             Instrument to fetch. ``source_symbol`` is the series id and
-            ``vintage_date`` is the day the series is read as of.
+            ``vintage_dates`` are the days the series is read as of.
         start, end : date
             Inclusive requested range, sent unchanged as ``cosd``/``coed``.
 
         Returns
         -------
         RawDownload
-            Provider response with its original ``observation_date`` and
-            ``<series id>_<vintage>`` columns, every cell kept as the string
-            ALFRED sent. The request records the vintage, so the raw archive
-            says which one it holds.
+            Provider response with its original ``observation_date`` and one
+            ``<series id>_<vintage>`` column per vintage, every cell kept as
+            the string ALFRED sent. The request records the vintages, so the
+            raw archive says which ones it holds.
 
         Raises
         ------
         ValueError
-            If the instrument declares no vintage, if the vintage is later than
-            the day of the download - a restatement that has not happened yet
-            cannot be read - if ``start`` is after ``end``, or if the body is
-            neither empty nor an ALFRED series CSV.
+            If the instrument declares no vintage, if one is later than the day
+            of the download - a restatement that has not happened yet cannot be
+            read - if ``start`` is after ``end``, or if the body is neither
+            empty nor an ALFRED series CSV.
         urllib.error.HTTPError
             If ALFRED answers with an HTTP error status, e.g. 404 for an
             unknown series id.
         """
         if start > end:
             raise ValueError(f"start {start} is after end {end}")
-        vintage = instrument.vintage_date
-        if vintage is None:
+        vintages = tuple(instrument.vintage_dates)
+        if not vintages:
             raise ValueError(
-                f"{instrument.id} is served by ALFRED and declares no vintage_date; a vintage "
+                f"{instrument.id} is served by ALFRED and declares no vintage_dates; a vintage "
                 f"left unsaid is the restated series again, under another name"
             )
         # Read the clock once, before the call: a non-UTC clock fails before any I/O.
         retrieved_at_utc = self._clock()
-        if vintage > retrieved_at_utc.date():
+        ahead = [day for day in vintages if day > retrieved_at_utc.date()]
+        if ahead:
             raise ValueError(
-                f"{instrument.id} asks for the vintage of {vintage}, which is after "
-                f"{retrieved_at_utc.date()}: that restatement has not happened yet"
+                f"{instrument.id} asks for the vintage(s) "
+                f"{', '.join(day.isoformat() for day in sorted(ahead))}, which are after "
+                f"{retrieved_at_utc.date()}: those restatements have not happened yet"
             )
-        column = vintage_column(instrument.source_symbol, vintage)
+        asked = sorted(vintages)
+        columns = [vintage_column(instrument.source_symbol, day) for day in asked]
+        # Positional parameters: one id, one cosd and one coed per vintage. One
+        # id with a list of vintages answers with the first of them only.
         query = urllib.parse.urlencode(
             {
-                "id": instrument.source_symbol,
-                "cosd": start.isoformat(),
-                "coed": end.isoformat(),
-                "vintage_date": vintage.isoformat(),
+                "id": ",".join([instrument.source_symbol] * len(asked)),
+                "cosd": ",".join([start.isoformat()] * len(asked)),
+                "coed": ",".join([end.isoformat()] * len(asked)),
+                "vintage_date": ",".join(day.isoformat() for day in asked),
             }
         )
         url = f"{ALFRED_CSV_URL}?{query}"
@@ -172,14 +182,14 @@ class AlfredSource:
             "url": url,
             "start": start.isoformat(),
             "end_inclusive": end.isoformat(),
-            "vintage_date": vintage.isoformat(),
-            "value_column": column,
+            "vintage_dates": [day.isoformat() for day in asked],
+            "value_columns": columns,
             # pandas parses the CSV, so its version explains the frame's dtypes.
             "pandas_version": pd.__version__,
         }
         fetch_id = make_fetch_id(retrieved_at_utc)
         text = self._fetch_text(url)
-        frame = self._frame_of(text, instrument, column)
+        frame = self._frame_of(text, instrument, columns)
         return RawDownload(
             instrument_id=instrument.id,
             source=self.source_id,
@@ -190,7 +200,7 @@ class AlfredSource:
         )
 
     @staticmethod
-    def _frame_of(text: str, instrument: Instrument, column: str) -> pd.DataFrame:
+    def _frame_of(text: str, instrument: Instrument, columns: Sequence[str]) -> pd.DataFrame:
         """Return the body as a frame, empty when the vintage predates the series.
 
         Notes
@@ -202,7 +212,9 @@ class AlfredSource:
         if not text.strip():
             # A vintage older than the series: nothing had been published, and
             # that is an answer rather than a failure.
-            return pd.DataFrame({ALFRED_DATE_COLUMN: [], column: []}, dtype=str)
+            empty: dict[str, list[str]] = {ALFRED_DATE_COLUMN: []}
+            empty.update({column: [] for column in columns})
+            return pd.DataFrame(empty, dtype=str)
         if not text.startswith(f"{ALFRED_DATE_COLUMN},"):
             raise ValueError(
                 f"ALFRED answer for {instrument.source_symbol} is not a series CSV: {text[:100]!r}"

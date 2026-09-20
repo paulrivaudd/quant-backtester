@@ -12,6 +12,7 @@ Layout under the market data root::
     clean/check_bars/<source>/<instrument_id>.parquet  a check source's own canonical bars
     clean/checked_bars/<instrument_id>.parquet        bars cross-checked across sources
     clean/levels/<instrument_id>.parquet
+    clean/vintages/<instrument_id>.parquet            a restated series, vintage by vintage
     clean/corporate_actions.parquet
     clean/applied_fetches.parquet                     which fetches shaped the clean layer
     clean/revisions.parquet
@@ -56,6 +57,7 @@ from quant_backtester.data.schemas import (
     LEVELS_SCHEMA,
     REVISIONS_SCHEMA,
     VALIDATION_LOG_SCHEMA,
+    VINTAGES_SCHEMA,
     CheckStatus,
 )
 from quant_backtester.data.sources.base import RawDownload
@@ -708,6 +710,54 @@ class MarketDataRepository:
             raise ValueError("Levels frame must be sorted by observation_date, without duplicates")
         replace_path = self.root / "clean" / "levels" / f"{instrument_id}.parquet"
         write_parquet_atomic(frame, self._target(replace_path), LEVELS_SCHEMA)
+
+    def save_vintages(self, instrument_id: str, frame: pd.DataFrame) -> None:
+        """Replace an instrument's vintage archive.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument concerned.
+        frame : pd.DataFrame
+            Full canonical frame, sorted by ``observation_date`` then
+            ``vintage_date``, with no pair repeated.
+
+        Raises
+        ------
+        ValueError
+            If a row belongs to another instrument, if the frame is not sorted,
+            or if one pair appears twice - two values for one observation as of
+            one day is a file that cannot say what was known.
+        """
+        for field in ("instrument_id", "observation_date", "vintage_date"):
+            if field not in frame.columns:
+                raise ValueError(f"Missing column {field!r} in vintages frame")
+        if not (frame["instrument_id"] == instrument_id).all():
+            raise ValueError(f"Vintages frame for {instrument_id} holds rows of another instrument")
+        keys = list(zip(frame["observation_date"], frame["vintage_date"], strict=True))
+        if keys != sorted(keys):
+            raise ValueError("Vintages frame must be sorted by observation_date, then vintage_date")
+        if len(set(keys)) != len(keys):
+            raise ValueError("Vintages frame holds one observation twice in the same vintage")
+        path = self.root / "clean" / "vintages" / f"{instrument_id}.parquet"
+        write_parquet_atomic(frame, self._target(path), VINTAGES_SCHEMA)
+
+    def load_vintages(self, instrument_id: str) -> pd.DataFrame:
+        """Load an instrument's vintage archive.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument concerned.
+
+        Returns
+        -------
+        pd.DataFrame
+            Every value of every stored vintage, sorted; an empty frame with
+            the right columns when the instrument has none.
+        """
+        path = self._current(self.root / "clean" / "vintages" / f"{instrument_id}.parquet")
+        return _load_or_empty(path, VINTAGES_SCHEMA)
 
     def load_levels(
         self, instrument_id: str, start: date | None = None, end: date | None = None

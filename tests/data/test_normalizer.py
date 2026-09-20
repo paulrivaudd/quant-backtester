@@ -24,6 +24,7 @@ from quant_backtester.data.instruments import (
     Instrument,
     InstrumentRegistry,
     PublicationRule,
+    VintagePolicy,
 )
 from quant_backtester.data.normalizer import (
     NORMALIZERS,
@@ -1516,7 +1517,8 @@ def gdp() -> Instrument:
         source_symbol="GDP",
         tradable=False,
         publication_rule=PublicationRule(publication_time=time(8, 30), timezone="America/New_York"),
-        vintage_date=date(2020, 1, 31),
+        vintage_dates=(date(2020, 1, 31),),
+        vintage_policy=VintagePolicy.PINNED,
     )
 
 
@@ -1558,7 +1560,7 @@ def test_alfred_levels_refuse_another_vintage_than_the_one_declared(gdp: Instrum
 
 def test_alfred_levels_refuse_a_series_with_no_vintage(gdp: Instrument) -> None:
     """Without one there is nothing to read the column name from."""
-    unpinned = replace(gdp, vintage_date=None)
+    unpinned = replace(gdp, vintage_dates=(), vintage_policy=None)
     download = alfred_download([("2019-01-01", "21098.827")])
 
     with pytest.raises(ValueError, match="declares no vintage_date"):

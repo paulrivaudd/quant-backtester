@@ -113,7 +113,7 @@ its own `tail(20)` and get twenty observations spanning twenty-six sessions.
 | `repository.py` | the only module that knows Parquet exists, one change at a time |
 | `updater.py` | ingestion, and the replay that proves it reproducible |
 | `universes.py` | who was in the universe on the day, not who is in it now |
-| `reader.py` | point-in-time reads, and nothing else reaches a strategy |
+| `reader.py` | point-in-time reads, vintage by vintage, and nothing else reaches a strategy |
 
 Sources in use: Yahoo Finance (bars and corporate actions), FRED (published
 series), ALFRED (the same series as it stood on a declared day), the ECB
@@ -124,9 +124,19 @@ FRED serves the latest vintage of every observation, which is harmless for a
 daily market rate and is look-ahead bias for a revised aggregate: US GDP for
 the first quarter of 2019 is 21 098.827 to a reader in January 2020 and
 21 115.309 to one in June 2021. An instrument served by ALFRED declares the
-`vintage_date` it is pinned to, in committed configuration, so the same code
-and the same config fetch the same numbers for ever — and the adapter refuses
-to fetch without one.
+vintages it wants and how they are read, in committed configuration, so the
+same code and the same config fetch the same numbers for ever — and the adapter
+refuses to fetch without them.
+
+There are two honest ways to read such a series, and which one a run used
+changes what it saw, so it is declared rather than inferred. `PINNED` reads one
+vintage for the whole run: reproducible, and not point-in-time — a decision in
+2019 sees numbers restated in 2020, which is fine for a study that says so.
+`AS_OF_DECISION` stores the archive, one row per observation *and* vintage, and
+each decision is given the latest vintage it could have seen. A revision
+published this morning is then invisible to a decision taken last night, and
+the same backtest re-run next year still hands the 2020 decision its 2020
+number.
 
 A provider occasionally sends a bar that is not a bar: an open above its own
 high, a price of zero. The validator refuses the series for it, which is right,
