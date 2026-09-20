@@ -221,7 +221,7 @@ names a signal is computed for — a list, or a dated universe the engine
 resolves for the session being decided, because a basket of gauges changes over
 the years like any other — so a rotation between two funds can be gated by
 a volatility index or a yield that reaches the same snapshot without ever being
-ranked against them — `RiskGatedRotation` is that decision, and it holds the
+ranked against them — `MomentumVix` is that decision, and it holds the
 rotation's choice only while the gauge stays at or below a declared threshold.
 What it does when the gauge cannot be read is declared too, because a risk
 filter that silently becomes no filter the day its input is late is only ever
@@ -485,6 +485,13 @@ aside and not trading on bad data are both defensible, they are different
 strategies, and a framework offering only `cash()` would quietly make every
 strategy choose the first.
 
+It is also what makes a baseline honest. `BuyAndHold` buys while the book is
+empty and asks for the book it has afterwards; `EqualWeightRebalance` restates
+the same target at every decision. Over this README's period they are two
+different strategies — one rebalancing against four, 80 euros of costs against
+86 — and calling the second one "buy and hold", as an earlier version of this
+project did, hides the very thing the comparison exists to measure.
+
 ## Running one
 
 ```python
@@ -511,6 +518,11 @@ result.plot(benchmark="ETF_WORLD")
 result.compare("ETF_WORLD").render()
 ```
 
+Every strategy the package exports is runnable as it stands: it declares the
+signals it reads, so those four arguments are the whole of what a user writes.
+A rule needing its signals wired in from outside would look identical in an
+import list and fail at the first decision, so there is no such thing.
+
 `start` is where the *performance* starts, not where the data does: a
 sixty-session momentum run from January reads the previous October, because the
 reader has always been allowed to look back and never forward. A bound that is
@@ -518,7 +530,13 @@ not a session moves inwards to one that is. And the result carries what the
 numbers depend on — period, universe, calendar, rebalancing schedule, starting
 cash, limits, costs, fill timetable, annualisation — beside the strategy's own
 definition and fingerprint, because a Sharpe ratio without them is not a
-result.
+result. All of it frozen: a record of an experiment that can be edited
+afterwards is a record of nothing.
+
+A fingerprint hashes a *configuration*, never the source that read it, so two
+runs of an edited `decide` share one. What tells them apart is `code_version`,
+given to the runner and recorded as given — `None` when nobody said, which is
+more useful than a commit a library guessed at from outside the repository.
 
 The rebalancing calendar is declared per run rather than inside the strategy,
 so one rule can be tested at several frequencies without being written twice:
