@@ -17,6 +17,7 @@ import pytest
 from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.data.calendars import TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.signals.base import Signal
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.types import SignalStatus
@@ -47,6 +48,11 @@ def decide_with(
     ]
     snapshot = SignalEngine().compute(context, requests, list(universe))
     return strategy.decide(make_decision(context, snapshot, universe=universe))
+
+
+def _id_of(item: Signal | SignalRequest) -> str:
+    """Return the id of a declared signal, whether or not it carries a universe."""
+    return item.signal.signal_id if isinstance(item, SignalRequest) else item.signal_id
 
 
 def test_buy_and_hold_holds_the_same_book_every_session(
@@ -148,10 +154,7 @@ def test_a_rotation_declares_the_ranking_it_reads() -> None:
     """Nobody can run it while forgetting a signal it needs."""
     declared = MomentumRotation(lookback_sessions=60, top_n=2).required_signals()
 
-    assert [item.signal_id for item in declared] == [
-        "momentum_60d",
-        "momentum_60d_rank",
-    ]
+    assert [_id_of(item) for item in declared] == ["momentum_60d", "momentum_60d_rank"]
 
 
 def gated_market(
