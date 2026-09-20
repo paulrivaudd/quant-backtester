@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from quant_backtester.analytics.attribution import CostAttribution, RunQuality
 from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.contribution import InstrumentAttribution, InstrumentPnL
 from quant_backtester.analytics.curves import (
     Book,
     drawdown_curve,
@@ -31,6 +32,8 @@ __all__ = [
     "Book",
     "CostAttribution",
     "Drawdown",
+    "InstrumentAttribution",
+    "InstrumentPnL",
     "PerformanceReport",
     "PerformanceStats",
     "RunQuality",

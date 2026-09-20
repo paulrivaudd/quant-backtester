@@ -323,6 +323,10 @@ costs                       3,119.40
   turnover                    37.84x
   turnover a year             22.18x
 
+by instrument                    net       gross        cost    held
+  ETF_SP500_PEA            15,742.11   17,260.63    1,518.52     165
+  ETF_WORLD                   446.51    2,047.40    1,600.88     210
+
 sessions valued on an older close            1
 sessions an order could not be sent on       2
 sessions with nothing to choose from        61
@@ -335,6 +339,16 @@ earned** — and a Sharpe ratio of 0.65 that an investor would have experienced
 as 0.54. Twenty switches in twenty-one months is not a hyperactive strategy,
 and it still costs that much: the kind of fact a backtest without a cost model
 cannot show, which is why this one refuses to report a return without one.
+
+The instrument block is the one that should worry its author. The world ETF
+was held for 210 of the 375 invested sessions and returned 447 euros of the
+16,189: it paid 1,601 in costs to earn 2,047 gross. Practically the whole
+result is the other leg. A rotation between two funds whose gain comes from one
+of them is not a rotation that works - it is a strategy that was right once,
+and the total return alone cannot tell the difference. The decomposition is
+exact: every instrument's share is computed from the quantities, the fills and
+the closes the run itself recorded, and what it fails to explain is reported
+rather than absorbed.
 
 The last block is not decoration. Sixty-one sessions had nothing to choose
 from, and they are one story: on 24 October 2025 the two providers disagreed

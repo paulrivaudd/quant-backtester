@@ -183,6 +183,14 @@ class BacktestRecord:
     fills : tuple[Fill, ...]
         The orders done at this session's open, with their reference price,
         their fill price and their commission.
+    closes : Mapping[str, float]
+        The price each held instrument was valued at, at this session's close.
+        The one named in ``priced_from_earlier`` is an older close carried
+        forward, and the record says which. With the quantities and the fills,
+        this is what lets a run be taken apart per instrument afterwards -
+        without it, an attribution would have to re-read the market data, and
+        analytics that re-reads the market data is analytics that can quietly
+        use a price the run never saw.
 
     Notes
     -----
@@ -207,11 +215,13 @@ class BacktestRecord:
     weights: Mapping[str, float]
     quantities: Mapping[str, float] = MappingProxyType({})
     fills: tuple[Fill, ...] = ()
+    closes: Mapping[str, float] = MappingProxyType({})
 
     def __post_init__(self) -> None:
         """Freeze what was recorded, so a result stays what the run produced."""
         object.__setattr__(self, "weights", MappingProxyType(dict(self.weights)))
         object.__setattr__(self, "quantities", MappingProxyType(dict(self.quantities)))
+        object.__setattr__(self, "closes", MappingProxyType(dict(self.closes)))
         object.__setattr__(self, "untradable", tuple(self.untradable))
         object.__setattr__(self, "unfunded", tuple(self.unfunded))
         object.__setattr__(self, "priced_from_earlier", tuple(self.priced_from_earlier))
@@ -746,4 +756,5 @@ class BacktestEngine:
             weights=dict(allocation.weights),
             quantities=dict(holdings.quantities),
             fills=fills,
+            closes=dict(prices),
         )

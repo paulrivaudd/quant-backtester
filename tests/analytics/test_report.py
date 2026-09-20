@@ -87,8 +87,8 @@ def test_the_rendered_report_prints_a_dash_where_there_is_nothing(run: RunBuilde
     assert "nan" not in rendered
 
 
-def test_the_rendered_report_holds_the_three_blocks(run: RunBuilder) -> None:
-    """Performance, costs, caveats: what a result is, and how to read it."""
+def test_the_rendered_report_holds_the_four_blocks(run: RunBuilder) -> None:
+    """Performance, costs, instruments, caveats: what a result is, and how to read it."""
     result = run(
         [100.0, 99.0, 112.0],
         gross=[100.0, 100.0, 117.0],
@@ -103,6 +103,7 @@ def test_the_rendered_report_holds_the_three_blocks(run: RunBuilder) -> None:
     assert "total return" in rendered
     assert "commission" in rendered
     assert "spread and slippage" in rendered
+    assert "by instrument" in rendered
     assert "sessions valued on an older close" in rendered
 
 
@@ -212,3 +213,29 @@ def test_a_report_of_a_run_that_did_nothing_reads_as_nothing(run: RunBuilder) ->
     assert report.costs.total == 0.0
     assert report.quality.sessions == 0
     assert "0 sessions" in rendered
+
+
+def test_the_attribution_of_a_real_run_adds_up_to_the_run(
+    market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
+) -> None:
+    """The two layers meeting: every instrument's share, against the equity itself.
+
+    The engine values the book at closes it recorded, and the attribution reads
+    those same closes rather than the store. If the two ever disagreed - a
+    price re-read, a fill left out of a record - this residual is where it
+    would show, which is why it is computed rather than assumed.
+    """
+    costly = ExecutionModel(
+        costs=CostModel(commission_rate=0.001, half_spread=0.002), minimum_trade_value=100.0
+    )
+    result = engine_over(market, calendars, costly).run(sessions[-5], sessions[-1])
+
+    report = PerformanceReport.of(result, CONFIG)
+
+    moved = result.records[-1].equity - result.records[0].equity
+    assert report.instruments.unexplained == pytest.approx(0.0, abs=1e-9)
+    assert report.instruments.total_pnl == pytest.approx(moved)
+    assert report.instruments.get("ETF_EU").sessions_held > 0
+    # What the run paid, seen from the other side: the costs of one book and
+    # the costs charged to its instruments are the same money.
+    assert report.instruments.total_cost == pytest.approx(report.costs.total)

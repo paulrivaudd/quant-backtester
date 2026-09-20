@@ -18,6 +18,7 @@ import pandas as pd
 
 from quant_backtester.analytics.attribution import CostAttribution, RunQuality
 from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.contribution import InstrumentAttribution
 from quant_backtester.analytics.curves import Book, equity_curve
 from quant_backtester.analytics.performance import PerformanceStats
 from quant_backtester.backtest.engine import BacktestResult
@@ -44,6 +45,10 @@ class PerformanceReport:
         The difference between the two, taken apart.
     quality : RunQuality
         The caveats the figures above have to be read with.
+    instruments : InstrumentAttribution
+        What each instrument contributed and what it cost. A total says whether
+        the idea worked; this says which part of it did, and a rotation whose
+        whole gain came from one leg is not the strategy its name describes.
     config : AnalyticsConfig
         The conventions every annualised figure depends on, carried along so
         that a report can be reproduced from itself.
@@ -53,6 +58,7 @@ class PerformanceReport:
     net: PerformanceStats
     costs: CostAttribution
     quality: RunQuality
+    instruments: InstrumentAttribution
     config: AnalyticsConfig
 
     @classmethod
@@ -78,6 +84,7 @@ class PerformanceReport:
             net=PerformanceStats.from_equity(equity_curve(result, Book.NET), config),
             costs=CostAttribution.of(result),
             quality=RunQuality.of(result),
+            instruments=InstrumentAttribution.of(result),
             config=config,
         )
 
@@ -116,8 +123,8 @@ class PerformanceReport:
         Returns
         -------
         str
-            Three blocks - performance, costs, caveats - with gross and net in
-            two columns wherever both exist. Percentages are printed as such,
+            Four blocks - performance, costs, instruments, caveats - with
+            gross and net in two columns wherever both exist. Percentages are printed as such,
             which is the one place in the project where a fraction is not the
             unit: a report is read by a person.
         """
@@ -145,8 +152,20 @@ class PerformanceReport:
             f"{'sharpe ratio':<24}{_number(self.gross.sharpe_ratio):>12}"
             f"{_number(self.net.sharpe_ratio):>12}"
         )
-        lines.extend(("", self._cost_block(), "", self._quality_block()))
+        lines.extend(
+            ("", self._cost_block(), "", self._instrument_block(), "", self._quality_block())
+        )
         return "\n".join(lines)
+
+    def _instrument_block(self) -> str:
+        """Return the per-instrument lines of the rendered report."""
+        header = f"{'by instrument':<24}{'net':>12}{'gross':>12}{'cost':>12}{'held':>8}"
+        rows = [
+            f"{'  ' + entry.instrument_id:<24}{entry.pnl:>12,.2f}"
+            f"{entry.gross_pnl:>12,.2f}{entry.cost:>12,.2f}{entry.sessions_held:>8}"
+            for entry in self.instruments.instruments
+        ]
+        return "\n".join([header, *rows]) if rows else f"{'by instrument':<24}nothing was held"
 
     def _cost_block(self) -> str:
         """Return the cost lines of the rendered report."""
