@@ -327,7 +327,7 @@ def _check_sessions(
     return issues
 
 
-def _check_row(instrument: Instrument, row: Mapping[str, Any]) -> list[ValidationIssue]:
+def bar_row_issues(instrument: Instrument, row: Mapping[str, Any]) -> list[ValidationIssue]:
     """Report what is wrong within one bar.
 
     Parameters
@@ -358,6 +358,11 @@ def _check_row(instrument: Instrument, row: Mapping[str, Any]) -> list[Validatio
 
     Volume is deliberately out of it: a provider leaving it empty on an index is
     ordinary, and no price is derived from it.
+
+    Public because a reviewed bar correction has to be able to ask whether the
+    defect it was written for is still in the data. Two copies of the OHLC rule
+    would drift, and the day they did, a correction would go on dropping a bar
+    the provider had already fixed.
     """
     day: date = row["session_date"]
     prices = {field: _number(row[field]) for field in BAR_PRICE_FIELDS}
@@ -615,7 +620,7 @@ def validate_bars(
     else can be checked) and ``OUTSIDE_CALENDAR_COVERAGE`` (the calendar cannot
     say whether the day was a session, so the row cannot be trusted either). One
     ``WARNING``: ``MISSING_PRICE``, a bar whose open, high, low or close is
-    absent - see :func:`_check_row`.
+    absent - see :func:`bar_row_issues`.
     Issues are sorted by date, whole-frame issues first.
     """
     missing = [column for column in REQUIRED_BAR_COLUMNS if column not in frame.columns]
@@ -637,7 +642,7 @@ def validate_bars(
     issues = _check_order(instrument, dates)
     issues += _check_sessions(instrument, dates, calendar)
     for row in rows:
-        issues += _check_row(instrument, row)
+        issues += bar_row_issues(instrument, row)
     issues += _check_gaps(instrument, dates, calendar)
     issues += _check_moves(instrument, rows)
     issues += check_stale_open(instrument, frame)

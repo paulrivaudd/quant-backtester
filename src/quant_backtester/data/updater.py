@@ -52,11 +52,13 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Final
 
 import pandas as pd
 
+from quant_backtester.data.bar_corrections import BarCorrection, BarCorrections
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.corporate_actions import ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy, cross_check_bars
@@ -114,6 +116,81 @@ def _fetched_pairs(
     return sorted(pairs)
 
 
+@dataclass(frozen=True, slots=True)
+class HistoryCoverage:
+    """How much of one instrument's declared history the store actually holds.
+
+    Attributes
+    ----------
+    instrument_id : str
+        Instrument measured.
+    declared_from : date | None
+        Its ``first_session``, or ``None`` when the registry does not say.
+    declared_until : date
+        Its ``last_session`` when it was delisted, otherwise the last
+        observation that is published today.
+    stored_from, stored_until : date | None
+        Span of the clean series, ``None`` when nothing is stored.
+    raw_fetches : int
+        Archived provider responses across every source. A name with fetches
+        and no clean series was downloaded and refused, which is not the same
+        problem as a name nobody ever fetched.
+    """
+
+    instrument_id: str
+    declared_from: date | None
+    declared_until: date
+    stored_from: date | None
+    stored_until: date | None
+    raw_fetches: int
+
+    @property
+    def complete(self) -> bool:
+        """Return whether the store covers the whole declared window."""
+        if self.stored_from is None or self.stored_until is None:
+            return False
+        starts = self.declared_from is None or self.stored_from <= self.declared_from
+        return starts and self.stored_until >= self.declared_until
+
+    @property
+    def missing_head(self) -> tuple[date, date] | None:
+        """Return the declared range before the first stored observation."""
+        if self.declared_from is None:
+            return None
+        if self.stored_from is None:
+            return (self.declared_from, self.declared_until)
+        if self.stored_from <= self.declared_from:
+            return None
+        return (self.declared_from, self.stored_from)
+
+    @property
+    def missing_tail(self) -> tuple[date, date] | None:
+        """Return the declared range after the last stored observation."""
+        if self.stored_until is None or self.stored_until >= self.declared_until:
+            return None
+        return (self.stored_until, self.declared_until)
+
+
+def _corrected_bar_issue(
+    instrument: Instrument, source_id: str, correction: BarCorrection
+) -> ValidationIssue:
+    """Report a bar a reviewed correction dropped.
+
+    A warning rather than an error: the decision was taken on purpose, and the
+    series must still be written. What it must not do is happen in silence - a
+    row removed by a config file nobody reads is indistinguishable from a
+    provider that never sent it.
+    """
+    return _issue(
+        "REVIEWED_BAR_DROPPED",
+        Severity.WARNING,
+        instrument.id,
+        correction.session_date,
+        f"{source_id}'s bar for {instrument.id} on {correction.session_date} was dropped "
+        f"by a reviewed correction ({correction.defect.value}): {correction.reason}",
+    )
+
+
 def safe_end_date(
     instrument: Instrument, calendar: TradingCalendar | None, now_utc: datetime
 ) -> date:
@@ -155,10 +232,16 @@ def safe_end_date(
     auction, which is what ``close_available_at_utc`` records, so the last
     fetchable session is the last one that has closed. A published level is
     whole at its release instant, lag included.
+
+    A delisted instrument stops at its declared ``last_session``. Asking a
+    provider for what came after is asking for rows that do not exist, or for
+    whatever it decided to serve in their place.
     """
     if now_utc.tzinfo is None:
         raise ValueError(f"now_utc must be timezone-aware, got {now_utc!r}")
     today = now_utc.astimezone(UTC).date()
+    if instrument.last_session is not None and instrument.last_session < today:
+        today = instrument.last_session
     if instrument.data_type is DataType.BAR:
         if calendar is None:
             raise ValueError(f"BAR instrument {instrument.id} has no calendar")
@@ -316,6 +399,11 @@ class MarketDataUpdater:
         declared in ``metadata/corporate_actions.toml``. Required for the same
         reason the accepted revisions are: an empty set is a state someone chose,
         not a default.
+    bar_corrections : BarCorrections
+        Reviewed decisions to drop a bar a provider sent broken, declared in
+        ``metadata/bar_corrections.toml``. Required for the same reason, and
+        applied where the raw becomes canonical, so the live path and a replay
+        of the archive reach the same series.
     cross_check_policy : CrossCheckPolicy
         Tolerances deciding when two sources agree, declared in
         ``metadata/crosscheck.toml``. Required, and passed in like the accepted
@@ -342,6 +430,7 @@ class MarketDataUpdater:
         normalizers: Mapping[str, Normalizer],
         accepted_revisions: AcceptedRevisions,
         action_corrections: ActionCorrections,
+        bar_corrections: BarCorrections,
         cross_check_policy: CrossCheckPolicy,
         overlap_sessions: int = 5,
         clock: Callable[[], datetime] = utc_now,
@@ -355,6 +444,7 @@ class MarketDataUpdater:
         self._normalizers = dict(normalizers)
         self._accepted_revisions = accepted_revisions
         self._action_corrections = action_corrections
+        self._bar_corrections = bar_corrections
         self._cross_check_policy = cross_check_policy
         self._overlap_sessions = overlap_sessions
         self._clock = clock
@@ -459,6 +549,14 @@ class MarketDataUpdater:
         self._require_consistent_clean(instrument)
         key_column = self._key_column(instrument)
         stored = self._stored_frame(instrument)
+        last = instrument.last_session
+        if last is not None and not stored.empty and max(stored[key_column]) >= last:
+            raise ValueError(
+                f"{instrument_id} was delisted on {last} and its series already reaches "
+                "it; there is nothing left to extend. A delisted name is read from the "
+                "archive - rebuild it rather than asking a provider what it serves for a "
+                "ticker that has been reused."
+            )
         end = safe_end_date(instrument, self._calendar_of(instrument), self._clock())
         if stored.empty:
             if instrument.first_session is None:
@@ -495,6 +593,93 @@ class MarketDataUpdater:
             requested=(start, end),
             extra_issues=issues,
             fetches=_fetched_pairs(downloads, actions_download),
+        )
+
+    def archive_history(self, instrument_id: str) -> ValidationReport:
+        """Fetch an instrument's whole declared history, from its first session.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument to archive.
+
+        Returns
+        -------
+        ValidationReport
+            Issues found, exactly as :meth:`download` reports them.
+
+        Raises
+        ------
+        ValueError
+            If the instrument declares no ``first_session``: a history with no
+            beginning cannot be asked for in full.
+
+        Notes
+        -----
+        This is the other half of the survivorship problem, and it is the half
+        a dated universe cannot solve. Membership dated correctly says TWTR was
+        in the index until it left; it does not give anyone its prices, and the
+        day a provider stops serving a delisted name, its history is gone for
+        good. Nobody can go back for it later - a download is only possible
+        while the name is still served.
+
+        So the archive is taken on purpose, in full, while it can be: the
+        response lands in ``raw/`` like any other, and ``clean/`` is rebuilt
+        from it for ever after. Run it for a name that may leave, and read
+        :meth:`history_coverage` to know which ones are not covered yet.
+
+        It is an ordinary fetch of a wide window, not a special path: the same
+        normalizer, the same validator, the same revision policy. What it adds
+        is the range - the instrument's own listing window - and the intent.
+        """
+        instrument = self._instruments.get(instrument_id)
+        if instrument.first_session is None:
+            raise ValueError(
+                f"{instrument_id}: no first_session declared, so there is no whole "
+                "history to ask for"
+            )
+        end = safe_end_date(instrument, self._calendar_of(instrument), self._clock())
+        return self.download(instrument_id, instrument.first_session, end)
+
+    def history_coverage(self, instrument_id: str) -> HistoryCoverage:
+        """Return how much of an instrument's declared history the store holds.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument to measure.
+
+        Returns
+        -------
+        HistoryCoverage
+            The declared window, what is stored inside it, and how many raw
+            fetches stand behind it.
+
+        Notes
+        -----
+        Measured on the clean series rather than on the raw archive, and on
+        purpose: ``clean`` is what a replay of ``raw`` produces, so a fetch the
+        validator refused is correctly counted as history the store does not
+        have. The raw count is reported beside it, because a name with archived
+        fetches and an empty clean series is a different problem from a name
+        that was never fetched at all.
+        """
+        instrument = self._instruments.get(instrument_id)
+        stored = self._stored_frame(instrument)
+        key_column = self._key_column(instrument)
+        dates = sorted(stored[key_column]) if not stored.empty else []
+        fetches = sum(
+            len(self._repository.list_raw_fetches(instrument.id, source))
+            for source in instrument.sources
+        )
+        return HistoryCoverage(
+            instrument_id=instrument.id,
+            declared_from=instrument.first_session,
+            declared_until=instrument.last_session
+            or safe_end_date(instrument, self._calendar_of(instrument), self._clock()),
+            stored_from=dates[0] if dates else None,
+            stored_until=dates[-1] if dates else None,
+            raw_fetches=fetches,
         )
 
     def update_all(self) -> dict[str, ValidationReport]:
@@ -601,7 +786,8 @@ class MarketDataUpdater:
                 skipped.append(f"{source_id}:{fetch_id}")
                 continue
             download = self._repository.load_raw(instrument.id, source_id, fetch_id)
-            data = self._normalize(instrument, source_id, download)
+            data, corrected = self._normalize(instrument, source_id, download)
+            issues += corrected
             frames = {}
             frame = data.bars if instrument.data_type is DataType.BAR else data.levels
             if frame is not None:
@@ -860,7 +1046,8 @@ class MarketDataUpdater:
         frames: dict[str, pd.DataFrame] = {}
         issues: list[ValidationIssue] = []
         for source_id, download in downloads.items():
-            data = self._normalize(instrument, source_id, download)
+            data, corrected = self._normalize(instrument, source_id, download)
+            issues += corrected
             issues += self._rejected_issues(instrument, source_id, data)
             frame = data.bars if instrument.data_type is DataType.BAR else data.levels
             if frame is None:
@@ -878,7 +1065,10 @@ class MarketDataUpdater:
             frames[source_id] = frame
         actions = None
         if actions_download is not None:
-            normalized = self._normalize(instrument, instrument.primary_source, actions_download)
+            normalized, corrected = self._normalize(
+                instrument, instrument.primary_source, actions_download
+            )
+            issues += corrected
             issues += self._rejected_issues(instrument, instrument.primary_source, normalized)
             actions = normalized.corporate_actions
         return frames, actions, issues
@@ -950,17 +1140,50 @@ class MarketDataUpdater:
 
     def _normalize(
         self, instrument: Instrument, source_id: str, download: RawDownload
-    ) -> NormalizedData:
-        """Run one source's normalizer on one response."""
+    ) -> tuple[NormalizedData, list[ValidationIssue]]:
+        """Run one source's normalizer on one response, then the reviewed corrections.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Instrument concerned.
+        source_id : str
+            Source that sent the response.
+        download : RawDownload
+            The response, exactly as it was archived.
+
+        Returns
+        -------
+        tuple[NormalizedData, list[ValidationIssue]]
+            The canonical frames, and one warning per bar a reviewed correction
+            dropped. The correction is applied here, at the one point both the
+            live path and a replay of the archive go through, so a rebuild
+            produces the series the live run produced.
+
+        Raises
+        ------
+        KeyError
+            If no normalizer is registered for the source.
+        ValueError
+            If a correction no longer matches the row it was written for.
+        """
         normalizer = self._normalizers.get(source_id)
         if normalizer is None:
             raise KeyError(
                 f"No normalizer registered for source {source_id!r}; "
                 f"known: {', '.join(sorted(self._normalizers))}"
             )
-        return normalizer.normalize(
+        data = normalizer.normalize(
             instrument.for_source(source_id), download, self._calendar_of(instrument)
         )
+        if data.bars is None:
+            return data, []
+        bars, applied = self._bar_corrections.apply(instrument, source_id, data.bars)
+        if not applied:
+            return data, []
+        return replace(data, bars=bars), [
+            _corrected_bar_issue(instrument, source_id, correction) for correction in applied
+        ]
 
     # -- promotion ---------------------------------------------------------
 

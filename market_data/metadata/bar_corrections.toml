@@ -1,0 +1,26 @@
+# Reviewed decisions to drop a bar a provider sent broken - committed
+# configuration, like everything else a result is reproduced from.
+#
+# A correction never repairs a bar. It drops the row, because repairing would
+# mean inventing the price the market really made, and a value invented in a
+# config file is worse than a hole: a hole is visible, and the reader already
+# reports it as MISSING.
+#
+# Every entry names the defect it was written for. If the provider repairs its
+# own data, the row stops showing that defect and the ingestion fails rather
+# than going on dropping a good bar for ever.
+#
+# A correction added here takes effect on the next fetch, and on the history
+# already stored at the next `--rebuild`.
+
+[[correction]]
+instrument_id = "ETF_SP500_PEA"
+source = "YAHOO"
+session_date = 2017-09-07
+defect = "OHLC_ORDER"
+reason = """Yahoo serves open 9.22583 above high 9.20667, two tenths of a \
+percent apart, on a session that traded 29 136 shares. The neighbouring \
+sessions are ordinary and the move is not: it is the only inconsistent bar in \
+thirteen years of this series. Euronext, the second source, serves about two \
+years and cannot arbitrate a session of 2017, so the true high is not \
+knowable - the session is dropped rather than guessed at. Reviewed 2026-09-20."""
