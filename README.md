@@ -18,6 +18,16 @@ current drawdown and mean reversion — two more for published series, a
 cross-sectional ranking over any of them, and a universe per signal so a gauge
 can reach the same decision as the funds it gates.
 
+**Writing a strategy is the point, and it takes about fifteen lines.** A
+strategy declares the signals it needs and answers one question - what to hold,
+at an instant it did not choose. What it is handed is a decision context: those
+signals, a market façade whose every reading carries its status and its age,
+the book as it stands, and the names it is allowed to hold. What it is not
+handed is a reader, so there is no expression it can write that reads tomorrow.
+A runner takes it from there - any period, warm-up included, with the
+configuration recorded beside the numbers - and the result draws itself against
+whatever it should be measured against.
+
 **Portfolio, execution and the event loop run a strategy end to end**, with
 costs charged against it and the economics of the book enforced rather than
 assumed: the trading universe holds only instruments the registry says can be
@@ -77,8 +87,8 @@ src/quant_backtester/
     portfolio/   forecast scores -> target positions           (V1 done)
     execution/   target positions -> fills and costs           (V1 done)
     backtest/    the event loop                                (V1 done)
-    analytics/   performance and risk                          (V1 done)
-    strategies/  concrete strategies                           (two)
+    analytics/   performance, risk, comparison, plots           (V1 done)
+    strategies/  the contract, and strategies written on it     (V1 done)
 tests/           mirrors the package layout
 market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
 ```
@@ -86,16 +96,23 @@ market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
 Dependencies flow one way, left to right; a lower layer never imports a higher one.
 
 ```text
-MarketDataReader.at(decision)  ->  SignalContext  ->  SignalEngine
-                                                           |
-                                                     SignalSnapshot
-                                                           |
-                                                       Strategy
-MarketDataReader.at(execution) ->  Execution
+MarketDataReader.at(decision) ──┬──> SignalContext ──> SignalEngine ──> SignalSnapshot ──┐
+                                │                                                        │
+                                └──> StrategyMarketView ──────────────────────────┐      │
+                                                                                  ▼      ▼
+                                          PortfolioView ──────────────────>  StrategyContext
+                                                                                     │
+                                                                                  Strategy
+                                                                                     │
+                                                                             TargetAllocation
+                                                                                     │
+MarketDataReader.at(execution) ────────────────────────────────────────────>  Execution
 ```
 
-A strategy receives the snapshot, never a reader: holding one, it could write
-its own `tail(20)` and get twenty observations spanning twenty-six sessions.
+A strategy receives that context, never a reader: holding one, it could write
+its own `tail(20)` and get twenty observations spanning twenty-six sessions, or
+read a price nobody had decided was knowable yet. Every part of the context
+answers for the same instant, and the construction refuses a set that does not.
 
 ## The data layer
 
@@ -298,6 +315,10 @@ state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
 
 ## A run, end to end
 
+The engine below is the primitive, and the sections after this one show the
+façade that a user actually writes against. It is here because everything the
+façade does is *this*, with the configuration filled in once:
+
 ```python
 from quant_backtester.analytics import AnalyticsConfig, PerformanceReport
 
@@ -305,8 +326,8 @@ engine = BacktestEngine(
     reader=reader,
     calendars=calendars,
     reference_calendar_id="XPAR",
-    signals=[momentum, CrossSectionalRank(signal_id="momentum_60d_rank", source=momentum)],
-    strategy=TopRankRotation(signal_id="momentum_60d_rank", top_n=1),
+    signals=[],  # a strategy declares its own
+    strategy=MomentumRotation(lookback_sessions=60, top_n=1),
     universe=universes.get("ROTATION_2"),  # two PEA funds, dated memberships
     initial_cash=100_000.0,
     base_currency="EUR",
@@ -396,42 +417,162 @@ close of session s    the portfolio is valued
 after that close      the signals run, and s+1's target is decided
 ```
 
-## A decision, end to end
+## Writing a strategy
+
+A strategy is a name, the signals it needs, and one decision:
 
 ```python
-momentum = MomentumSignal(
-    signal_id="momentum_60d",
-    lookback_sessions=60,
-    skip_recent_sessions=0,
-    price_basis=PriceBasis.TOTAL_RETURN,
-)
-snapshot = SignalEngine().compute(
-    context,
-    [momentum, CrossSectionalRank(signal_id="momentum_60d_rank", source=momentum)],
-    ["ETF_WORLD", "ETF_SP500_PEA"],
-)
+from quant_backtester.strategies import Strategy
 
-TopRankRotation(signal_id="momentum_60d_rank", top_n=1).decide(snapshot)
-# selected ('ETF_SP500_PEA',)  weights {'ETF_SP500_PEA': 1.0}
-# invested 100%  considered 2
+
+class MomentumVix(Strategy):
+    strategy_id = "momentum_vix"
+
+    def required_signals(self):
+        momentum = MomentumSignal(
+            signal_id="mom60", lookback_sessions=60, price_basis=PriceBasis.TOTAL_RETURN
+        )
+        return (
+            momentum,
+            CrossSectionalRank(signal_id="rank", source=momentum),
+            SignalRequest(LevelZScoreSignal(signal_id="vix_z", window_observations=60), ("VIX",)),
+        )
+
+    def decide(self, ctx):
+        gauge = ctx.signal_value_or_none("vix_z", "VIX")
+        if gauge is None or gauge > 1.5:
+            return ctx.cash()
+        return ctx.equal_weight(ctx.top("rank", 2))
 ```
 
-Both names of that universe are funds a PEA can hold, in euros, on Euronext
-Paris. The S&P 500 index itself is in the registry and is declared
-`tradable = false`: a signal may read it, and a run that put it in a trading
-universe is stopped on the session it would have been chosen on. The earlier
-version of this example rotated into the index, and its orders were simply
-never sent — 216 sessions of a 437-session run, reported as a strategy.
+Nothing in it knows that Parquet, Yahoo, corporate actions, trading calendars
+or fill prices exist. `ctx` is the decision instant, and everything in it
+answers for that instant:
 
-`decide` takes the snapshot and nothing else. A strategy holding a reader could
-write its own `tail(20)`; a strategy holding a repository could read a price
-nobody had decided was knowable yet. It holds neither, and a test reads the
-source of `strategies/` to check that no import of the data layer has appeared.
+| What it holds | For |
+|---|---|
+| `ctx.signals` | the snapshot, read through `signal_value`, `signal_status`, `top`, `bottom`, `where` |
+| `ctx.market` | the latest value of any series, and windows of it |
+| `ctx.portfolio` | the book as it stands: cash, positions, weights |
+| `ctx.universe` | the names this session's universe allows |
+
+and the decision is expressed through `ctx.weights`, `ctx.equal_weight`,
+`ctx.cash` and `ctx.hold_current`, which refuse a book nobody could hold: a
+negative weight, a sum above one, a name outside the universe, an instrument
+the registry declares untradable.
+
+`ctx.market` exists so that a rule like *stand aside above thirty* does not
+need a new signal class. It costs nothing in safety, because staleness is never
+hidden:
+
+```python
+vix = ctx.market.value("VIX")
+if not vix.usable(max_age_sessions=1):
+    return ctx.hold_current()
+if vix.value > 30:
+    return ctx.cash()
+```
+
+A reading carries its status, the day it describes and its age in sessions, and
+`require()` refuses to hand back a number that is too old rather than returning
+a stale one. A window goes through the loader every signal uses, so twenty
+observations spanning twenty-six sessions are refused here exactly as they are
+there. The rule of thumb: a *decision* belongs in a strategy, and a
+*transformation* worth reusing belongs in a signal.
+
+`hold_current()` is there for the day a signal cannot be computed. Standing
+aside and not trading on bad data are both defensible, they are different
+strategies, and a framework offering only `cash()` would quietly make every
+strategy choose the first.
+
+## Running one
+
+```python
+runner = StrategyRunner(
+    reader=reader,
+    calendars=calendars,
+    reference_calendar_id="XPAR",
+    base_currency="EUR",
+    analytics=AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.02),
+    universes=universes,
+    initial_cash=100_000.0,
+    execution=ExecutionModel(costs=CostModel(commission_rate=0.0005, minimum_commission=1.0)),
+)
+
+result = runner.run(
+    MomentumRotation(lookback_sessions=60, top_n=1),
+    universe="ROTATION_2",
+    start="2025-01-02",
+    end="2026-09-17",
+)
+
+result.report().render()
+result.plot(benchmark="ETF_WORLD")
+result.compare("ETF_WORLD").render()
+```
+
+`start` is where the *performance* starts, not where the data does: a
+sixty-session momentum run from January reads the previous October, because the
+reader has always been allowed to look back and never forward. A bound that is
+not a session moves inwards to one that is. And the result carries what the
+numbers depend on — period, universe, calendar, rebalancing schedule, starting
+cash, limits, costs, fill timetable, annualisation — beside the strategy's own
+definition and fingerprint, because a Sharpe ratio without them is not a
+result.
+
+The rebalancing calendar is declared per run rather than inside the strategy,
+so one rule can be tested at several frequencies without being written twice:
+
+```python
+runner.run(strategy, "ROTATION_2", "2025-01-02", "2026-09-17", schedule=Monthly())
+```
+
+On a session the schedule does not decide on, the strategy is not called, no
+order is sent, and the record carries the target still standing with
+`decided = False` beside it.
+
+Measured against simply holding the world ETF, the rotation of this README is
+behind:
+
+```text
+437 sessions, strategy against ETF_WORLD
+
+                            strategy     ETF_WORLD
+total return                  16.19%        20.19%
+annualised return              9.20%        11.39%
+annualised volatility         14.39%        14.69%
+max drawdown                 -21.65%       -21.66%
+sharpe ratio                    0.54          0.67
+excess return                 -4.01%
+```
+
+Four points of it are the single contested bar of 24 October 2025: the strategy
+held nothing for the sixty-one sessions its sixty-session window needed to
+clear the hole, and the benchmark kept moving. A picture makes that plateau
+obvious where a table does not, which is what `result.plot()` is for — it
+returns a figure and never calls `show`, so a notebook displays it, a script
+saves it and a test inspects it.
+
+The benchmark is read at the run's own decision instants, so adding data after
+the last session changes none of its figures; a session its venue did not hold
+is marked at the last close that existed and named; and one quoted in another
+currency is refused rather than drawn, because without an FX conversion the
+difference between the two curves is an exchange rate.
+
+## What a strategy may not do
+
+Both names of `ROTATION_2` are funds a PEA can hold, in euros, on Euronext
+Paris. The S&P 500 index itself is in the registry and is declared
+`tradable = false`: a signal may read it, `ctx.market` may read it, and
+`ctx.weights({"SP500": 1.0})` is refused — as is a run that puts it in a
+trading universe at all. An earlier version of this README rotated into the
+index, and its orders were simply never sent: 216 sessions of a 437-session
+run, reported as a strategy.
 
 A name whose signal is not usable is never held, and the allocation says which
-of the reasons it was. A rotation meant to hold two names that can only find one
-holds it at half the capital rather than doubling a bet because a provider was
-late.
+of the reasons it was. A rotation meant to hold two names that can only find
+one holds it at half the capital rather than doubling a bet because a provider
+was late.
 
 An allocation is also a thing a portfolio could hold, checked where it is
 built: a weight is a finite fraction between zero and one, the selection and
@@ -440,6 +581,12 @@ cannot be below the number chosen. A forecast model produces negative scores
 for half a universe by construction, and the keystroke that turns one into a
 weight is a short position nobody financed — so the refusal is at the boundary
 rather than in a comment.
+
+Four tests stand behind those sentences rather than the prose: a strategy that
+imports the data layer or a network library fails the build, the context hands
+back no reader, a decision taken on a store that knows what happens tomorrow is
+identical to one taken without it, and every part of a context must answer for
+the same instant or it cannot be built.
 
 Other scripts: `generate_calendars.py` rewrites the committed calendars from
 `exchange_calendars`, `check_calendar_coverage.py` says when they need
