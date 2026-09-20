@@ -15,6 +15,7 @@ from datetime import date, time
 import pandas as pd
 import pytest
 
+from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.backtest.engine import (
     BacktestEngine,
     BacktestResult,
@@ -51,10 +52,10 @@ class AlwaysHold(Strategy):
 
     weights: Mapping[str, float]
 
-    def decide(self, signals: SignalSnapshot) -> TargetAllocation:
-        """Return the fixed target, stamped at the snapshot's instant."""
+    def decide(self, ctx: StrategyContext) -> TargetAllocation:
+        """Return the fixed target, stamped at the decision instant."""
         return TargetAllocation(
-            as_of=signals.as_of,
+            as_of=ctx.as_of,
             weights=dict(self.weights),
             selected=tuple(self.weights),
             considered=len(self.weights),
@@ -316,14 +317,14 @@ def test_the_strategy_only_ever_sees_a_snapshot(
     market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
 ) -> None:
     """The boundary, checked from the inside of a real run."""
-    seen: list[object] = []
+    seen: list[StrategyContext] = []
 
     @dataclass(frozen=True, slots=True)
     class Watching(Strategy):
-        def decide(self, signals: SignalSnapshot) -> TargetAllocation:
-            seen.append(signals)
+        def decide(self, ctx: StrategyContext) -> TargetAllocation:
+            seen.append(ctx)
             return TargetAllocation(
-                as_of=signals.as_of,
+                as_of=ctx.as_of,
                 weights={},
                 selected=(),
                 considered=0,
@@ -333,7 +334,10 @@ def test_the_strategy_only_ever_sees_a_snapshot(
     run_over(market, calendars, sessions, Watching())
 
     assert seen
-    assert all(isinstance(given, SignalSnapshot) for given in seen)
+    assert all(isinstance(given, StrategyContext) for given in seen)
+    # The snapshot inside it, and nothing under it: no reader, no repository.
+    assert all(isinstance(given.signals, SignalSnapshot) for given in seen)
+    assert not hasattr(seen[0], "reader")
 
 
 def test_the_signals_are_computed_at_the_decision_instant(
@@ -344,10 +348,10 @@ def test_the_signals_are_computed_at_the_decision_instant(
 
     @dataclass(frozen=True, slots=True)
     class Watching(Strategy):
-        def decide(self, signals: SignalSnapshot) -> TargetAllocation:
-            stamps.append(signals.as_of)
+        def decide(self, ctx: StrategyContext) -> TargetAllocation:
+            stamps.append(ctx.as_of)
             return TargetAllocation(
-                as_of=signals.as_of, weights={}, selected=(), considered=0, skipped={}
+                as_of=ctx.as_of, weights={}, selected=(), considered=0, skipped={}
             )
 
     result = run_over(market, calendars, sessions, Watching())
@@ -448,12 +452,12 @@ class HoldWhatIsOffered(Strategy):
 
     signal_id: str
 
-    def decide(self, signals: SignalSnapshot) -> TargetAllocation:
+    def decide(self, ctx: StrategyContext) -> TargetAllocation:
         """Spread the book over every instrument in the snapshot."""
-        names = tuple(signals.result(self.signal_id).instruments())
+        names = tuple(ctx.signals.result(self.signal_id).instruments())
         weight = 1.0 / len(names) if names else 0.0
         return TargetAllocation(
-            as_of=signals.as_of,
+            as_of=ctx.as_of,
             weights={name: weight for name in names},
             selected=names,
             considered=len(names),
@@ -884,10 +888,10 @@ def test_a_gauge_universe_is_asked_about_the_session_being_decided(
 
     @dataclass(frozen=True, slots=True)
     class Watching(Strategy):
-        def decide(self, signals: SignalSnapshot) -> TargetAllocation:
-            watched.append(signals.result("gauge_2d").instruments())
+        def decide(self, ctx: StrategyContext) -> TargetAllocation:
+            watched.append(ctx.signals.result("gauge_2d").instruments())
             return TargetAllocation(
-                as_of=signals.as_of, weights={}, selected=(), considered=0, skipped={}
+                as_of=ctx.as_of, weights={}, selected=(), considered=0, skipped={}
             )
 
     engine = BacktestEngine(

@@ -8,12 +8,13 @@ late - it says what it does when its own input is missing.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
 import pytest
 
+from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.signals.base import Signal, SignalResult, build_result_frame, result_row
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
@@ -22,6 +23,9 @@ from quant_backtester.signals.types import SignalStatus
 from quant_backtester.signals.windows import LoadedWindow
 from quant_backtester.strategies.risk_gated import RiskGatedRotation
 from quant_backtester.strategies.rotation import TopRankRotation
+
+DecisionBuilder = Callable[..., StrategyContext]
+"""Builds the context a strategy is handed; the fixture lives in conftest."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,21 +85,25 @@ def gated(flat_when_unknown: bool = True, maximum: float = 1.0) -> RiskGatedRota
     )
 
 
-def test_a_quiet_gauge_lets_the_rotation_run(context: SignalContext) -> None:
+def test_a_quiet_gauge_lets_the_rotation_run(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
     """Below the threshold, the strategy is exactly the rotation it wraps."""
-    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "IDX_US": 0.5}, gate=0.2)
+    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "ETF_OTHER": 0.5}, gate=0.2)
 
-    allocation = gated().decide(snapshot)
+    allocation = gated().decide(make_decision(context, snapshot))
 
     assert allocation.selected == ("ETF_EU",)
     assert allocation.invested == pytest.approx(1.0)
 
 
-def test_a_gauge_above_the_threshold_stands_the_book_down(context: SignalContext) -> None:
+def test_a_gauge_above_the_threshold_stands_the_book_down(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
     """The names were rankable and the strategy chose not to hold them."""
-    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "IDX_US": 0.5}, gate=2.5)
+    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "ETF_OTHER": 0.5}, gate=2.5)
 
-    allocation = gated().decide(snapshot)
+    allocation = gated().decide(make_decision(context, snapshot))
 
     assert allocation.selected == ()
     assert allocation.invested == 0.0
@@ -103,64 +111,76 @@ def test_a_gauge_above_the_threshold_stands_the_book_down(context: SignalContext
     assert allocation.considered == 2
 
 
-def test_the_threshold_is_inclusive(context: SignalContext) -> None:
+def test_the_threshold_is_inclusive(context: SignalContext, make_decision: DecisionBuilder) -> None:
     """At the threshold the gate is open, and the docstring says so."""
-    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "IDX_US": 0.5}, gate=1.0)
+    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "ETF_OTHER": 0.5}, gate=1.0)
 
-    assert gated(maximum=1.0).decide(snapshot).selected == ("ETF_EU",)
+    assert gated(maximum=1.0).decide(make_decision(context, snapshot)).selected == ("ETF_EU",)
 
 
-def test_a_gauge_nobody_could_read_stands_the_book_down(context: SignalContext) -> None:
+def test_a_gauge_nobody_could_read_stands_the_book_down(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
     """The case a risk filter is really judged on.
 
     A filter that silently becomes no filter the day its input is late is only
     noticed afterwards, so what happens is declared in the configuration.
     """
-    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "IDX_US": 0.5}, gate=SignalStatus.STALE_INPUT)
+    snapshot = snapshot_of(
+        context, {"ETF_EU": 1.0, "ETF_OTHER": 0.5}, gate=SignalStatus.STALE_INPUT
+    )
 
-    assert gated(flat_when_unknown=True).decide(snapshot).selected == ()
+    assert gated(flat_when_unknown=True).decide(make_decision(context, snapshot)).selected == ()
 
 
-def test_a_gauge_nobody_could_read_can_also_be_ignored(context: SignalContext) -> None:
+def test_a_gauge_nobody_could_read_can_also_be_ignored(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
     """The other choice, taken deliberately rather than by omission."""
-    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "IDX_US": 0.5}, gate=SignalStatus.STALE_INPUT)
+    snapshot = snapshot_of(
+        context, {"ETF_EU": 1.0, "ETF_OTHER": 0.5}, gate=SignalStatus.STALE_INPUT
+    )
 
-    assert gated(flat_when_unknown=False).decide(snapshot).selected == ("ETF_EU",)
+    assert gated(flat_when_unknown=False).decide(make_decision(context, snapshot)).selected == (
+        "ETF_EU",
+    )
 
 
 def test_a_flat_day_with_nothing_to_choose_from_is_not_a_gated_day(
-    context: SignalContext,
+    context: SignalContext, make_decision: DecisionBuilder
 ) -> None:
     """Both are flat, and they mean opposite things about the strategy."""
     nothing_usable = snapshot_of(
         context,
-        {"ETF_EU": SignalStatus.MISSING_INPUT, "IDX_US": SignalStatus.MISSING_INPUT},
+        {"ETF_EU": SignalStatus.MISSING_INPUT, "ETF_OTHER": SignalStatus.MISSING_INPUT},
         gate=0.1,
     )
 
-    allocation = gated().decide(nothing_usable)
+    allocation = gated().decide(make_decision(context, nothing_usable))
 
     assert allocation.selected == ()
     assert allocation.considered == 0
 
 
-def test_the_gauge_must_have_been_computed(context: SignalContext) -> None:
+def test_the_gauge_must_have_been_computed(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
     """A strategy naming a signal the engine was not given is a wiring mistake."""
     snapshot = SignalEngine().compute(
         context,
-        [Fixed(signal_id="momentum_rank", values={"ETF_EU": 1.0, "IDX_US": 0.5})],
-        ["ETF_EU", "IDX_US"],
+        [Fixed(signal_id="momentum_rank", values={"ETF_EU": 1.0, "ETF_OTHER": 0.5})],
+        ["ETF_EU", "ETF_OTHER"],
     )
 
     with pytest.raises(KeyError, match="risk_gauge"):
-        gated().decide(snapshot)
+        gated().decide(make_decision(context, snapshot))
 
 
 def test_the_gauge_must_have_been_computed_for_its_instrument(
-    context: SignalContext,
+    context: SignalContext, make_decision: DecisionBuilder
 ) -> None:
     """The gauge exists, and it was not asked about the name the gate reads."""
-    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "IDX_US": 0.5}, gate=0.2)
+    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "ETF_OTHER": 0.5}, gate=0.2)
     wrong = RiskGatedRotation(
         rotation=TopRankRotation(signal_id="momentum_rank", top_n=1),
         gate_signal_id="risk_gauge",
@@ -170,7 +190,7 @@ def test_the_gauge_must_have_been_computed_for_its_instrument(
     )
 
     with pytest.raises(KeyError):
-        wrong.decide(snapshot)
+        wrong.decide(make_decision(context, snapshot))
 
 
 @pytest.mark.parametrize("flat", [None, "yes", 1])
@@ -204,11 +224,13 @@ def test_a_threshold_that_is_not_a_number_is_refused(maximum: object) -> None:
         )
 
 
-def test_the_snapshot_is_the_only_argument(context: SignalContext) -> None:
+def test_the_snapshot_is_the_only_argument(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
     """A strategy sees numbers and statuses, and nothing that produced them."""
-    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "IDX_US": 0.5}, gate=0.2)
+    snapshot = snapshot_of(context, {"ETF_EU": 1.0, "ETF_OTHER": 0.5}, gate=0.2)
 
-    allocation = gated().decide(snapshot)
+    allocation = gated().decide(make_decision(context, snapshot))
 
     assert isinstance(allocation.as_of, datetime)
     assert allocation.as_of == snapshot.as_of

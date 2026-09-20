@@ -16,6 +16,7 @@ import pytest
 
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.report import PerformanceReport
+from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.backtest.engine import (
     BacktestEngine,
     BacktestResult,
@@ -29,7 +30,6 @@ from quant_backtester.execution.fills import ExecutionModel
 from quant_backtester.portfolio.limits import PositionLimits
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.price.returns import ReturnSignal
-from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import PriceBasis
 
 RunBuilder = Callable[..., BacktestResult]
@@ -45,10 +45,10 @@ class AlwaysHold(Strategy):
 
     weights: Mapping[str, float]
 
-    def decide(self, signals: SignalSnapshot) -> TargetAllocation:
-        """Return the fixed target, stamped at the snapshot's instant."""
+    def decide(self, ctx: StrategyContext) -> TargetAllocation:
+        """Return the fixed target, stamped at the decision instant."""
         return TargetAllocation(
-            as_of=signals.as_of,
+            as_of=ctx.as_of,
             weights=dict(self.weights),
             selected=tuple(self.weights),
             considered=len(self.weights),

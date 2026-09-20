@@ -17,15 +17,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.numbers import require_finite
 from quant_backtester.portfolio.targets import TargetAllocation
-from quant_backtester.signals.snapshot import SignalSnapshot
-from quant_backtester.signals.types import SignalStatus
+from quant_backtester.signals.types import require_identifier
+from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.rotation import TopRankRotation
 
 
 @dataclass(frozen=True, slots=True)
-class RiskGatedRotation:
+class RiskGatedRotation(Strategy):
     """Hold the rotation's choice while a gauge stays at or below a threshold.
 
     Attributes
@@ -76,9 +77,13 @@ class RiskGatedRotation:
     gate_instrument_id: str
     maximum: float
     flat_when_unknown: bool
+    strategy_id: str = "risk_gated_rotation"
 
     def __post_init__(self) -> None:
         """Reject a gate that cannot be applied."""
+        require_identifier(self.gate_signal_id, "gate_signal_id")
+        require_identifier(self.gate_instrument_id, "gate_instrument_id")
+        require_identifier(self.strategy_id, "strategy_id")
         # An infinite threshold is a gate that never closes, or never opens:
         # both are a parameter written wrong rather than a decision.
         require_finite(self.maximum, "maximum")
@@ -88,13 +93,13 @@ class RiskGatedRotation:
                 f"{self.flat_when_unknown!r}"
             )
 
-    def decide(self, signals: SignalSnapshot) -> TargetAllocation:
-        """Return what to hold, given every signal of one decision instant.
+    def decide(self, ctx: StrategyContext) -> TargetAllocation:
+        """Return what to hold, given one decision instant.
 
         Parameters
         ----------
-        signals : SignalSnapshot
-            The snapshot, holding both the ranking and the gauge. They need not
+        ctx : StrategyContext
+            The decision, holding both the ranking and the gauge. They need not
             speak about the same instruments - that is what a per-signal
             universe is for - but they do speak about the same instant.
 
@@ -102,7 +107,9 @@ class RiskGatedRotation:
         -------
         TargetAllocation
             The rotation's choice, or an allocation of nothing when the gate is
-            shut.
+            shut. A gated day keeps the count of instruments the rotation had
+            to choose among, which is what tells it apart from a day with
+            nothing to choose from at all.
 
         Raises
         ------
@@ -111,20 +118,14 @@ class RiskGatedRotation:
             computed for ``gate_instrument_id``. A strategy naming something
             the engine was not given is a wiring mistake, not a flat day.
         """
-        wanted = self.rotation.decide(signals)
-        if self._gate_is_open(signals):
-            return wanted
-        return TargetAllocation(
-            as_of=wanted.as_of,
-            weights={},
-            selected=(),
-            considered=wanted.considered,
-            skipped=wanted.skipped,
-        )
+        selected = ctx.top(self.rotation.signal_id, self.rotation.top_n)
+        if not self._gate_is_open(ctx):
+            return ctx.cash(among=selected)
+        return ctx.equal_weight(selected, count=self.rotation.top_n)
 
-    def _gate_is_open(self, signals: SignalSnapshot) -> bool:
+    def _gate_is_open(self, ctx: StrategyContext) -> bool:
         """Return whether the rotation may run today."""
-        status = signals.status(self.gate_signal_id, self.gate_instrument_id)
-        if status is not SignalStatus.OK:
+        gauge = ctx.signal_value_or_none(self.gate_signal_id, self.gate_instrument_id)
+        if gauge is None:
             return not self.flat_when_unknown
-        return signals.value(self.gate_signal_id, self.gate_instrument_id) <= self.maximum
+        return gauge <= self.maximum
