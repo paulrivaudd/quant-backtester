@@ -8,8 +8,9 @@ import pytest
 
 from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.portfolio.targets import TargetAllocation
+from quant_backtester.signals.base import Signal
 from quant_backtester.signals.context import SignalContext
-from quant_backtester.signals.engine import SignalEngine
+from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.price.returns import ReturnSignal
 from quant_backtester.signals.types import PriceBasis
 from quant_backtester.strategies.functional import FunctionalStrategy, strategy
@@ -38,6 +39,11 @@ def decision_of(context: SignalContext, make_decision: DecisionBuilder) -> Strat
     return make_decision(context, snapshot, universe=("ETF_EU",))
 
 
+def _id_of(item: Signal | SignalRequest) -> str:
+    """Return the id of a declared signal, whether or not it carries a universe."""
+    return item.signal.signal_id if isinstance(item, SignalRequest) else item.signal_id
+
+
 def test_a_decorated_function_is_a_strategy() -> None:
     """The same contract, reached with less ceremony."""
     assert isinstance(world_or_cash, FunctionalStrategy)
@@ -57,7 +63,9 @@ def test_it_declares_its_signals_like_any_other(
     context: SignalContext, make_decision: DecisionBuilder
 ) -> None:
     """Nobody can run it while forgetting the signal it reads."""
-    assert [item.signal_id for item in world_or_cash.required_signals()] == ["return_2d"]
+    declared = world_or_cash.required_signals()
+
+    assert [_id_of(item) for item in declared] == ["return_2d"]
 
 
 def test_its_parameters_are_recorded() -> None:
