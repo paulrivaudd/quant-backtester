@@ -28,16 +28,18 @@ A runner takes it from there - any period, warm-up included, with the
 configuration recorded beside the numbers - and the result draws itself against
 whatever it should be measured against.
 
-**Portfolio, execution and the event loop run a strategy end to end**, with
-costs charged against it and the economics of the book enforced rather than
-assumed: the trading universe holds only instruments the registry says can be
-bought, all quoted in the book's own currency, weights are long-only fractions
-of capital, orders are placed in whole shares where the venue deals in them,
-and nothing is ever bought with cash the book does not hold. Two strategies sit
-on top — hold the best-ranked instruments of a universe, and the same gated by
-a gauge that is never traded — and they are there to prove a boundary as much
-as to make money: they import nothing from the data layer, and take a
-`SignalSnapshot` as their only argument.
+**Portfolio, execution and the event loop turn a decision into a book that could
+have existed, and keep every step of the way.** What the strategy asked for,
+what the portfolio allowed of it, the orders that produced, the fills and the
+refusals with their reasons, the positions with what they cost, and how the
+book was valued - one immutable record per session, from which every table of
+a run is built. The economics are enforced rather than assumed: the trading
+universe holds only instruments the registry says can be bought, all quoted in
+the book's own currency and checked before the first session; weights are
+long-only fractions of one book; a purchase is sized at the price it will be
+paid and rounded down to whole shares; the sales pay for the purchases; cash
+cannot go below zero; and an order is only ever filled at an opening price of
+its own session.
 
 **Analytics has its first version**: equity curves, drawdowns, the usual ratios,
 the split of what execution took, and the caveats a run has to be read with.
@@ -51,9 +53,10 @@ figure the run cannot support is reported as nothing rather than invented.
   and the close only at the closing one.
 - **Look-ahead made unrepresentable** — nothing above the data layer holds a
   reader it can ask about an arbitrary date. What is handed out is a
-  `PointInTimeReader` fixed at one decision instant, whose methods take no
-  `as_of` argument at all. A strategy does not even get that: it receives a
-  `SignalSnapshot`, so it cannot write its own window either.
+  `PointInTimeReader` fixed at one instant, whose methods take no `as_of`
+  argument at all. A strategy does not even get that: it receives a decision
+  context whose every part answers for the same instant, and no attribute of
+  it leads back to a reader.
 - **Explicit calendars** — real holidays, half days and DST, with a declared
   coverage period and an error outside it rather than an invented session. A
   signal computed after the US close trades at the following European open, and
@@ -77,6 +80,10 @@ figure the run cannot support is reported as nothing rather than invented.
   those is refused loudly rather than reported as a return: a backtest whose
   orders could not have been placed is not a pessimistic backtest, it is a
   different strategy.
+- **Target and actual are two things** — what a strategy asked for, what the
+  portfolio allowed, what was filled and what is held are four records, not
+  one number overwritten three times. A report that only kept the last would
+  describe a strategy that never met a missing price, a lot size or a limit.
 
 ## Layout
 
@@ -102,11 +109,19 @@ MarketDataReader.at(decision) ──┬──> SignalContext ──> SignalEngin
                                                                                   ▼      ▼
                                           PortfolioView ──────────────────>  StrategyContext
                                                                                      │
-                                                                                  Strategy
+                                                                          Strategy.decide()
                                                                                      │
-                                                                             TargetAllocation
+                                                              TargetAllocation  (what it asked for)
                                                                                      │
-MarketDataReader.at(execution) ────────────────────────────────────────────>  Execution
+                                                    PortfolioModel: admissible? within the limits?
+                                                                                     │
+                                                              ConstrainedTarget (what it may hold)
+                                                                                     │
+MarketDataReader.at(execution) ──> opening prices ──>  ExecutionModel: orders, fills, rejects
+                                                                                     │
+                                                                PortfolioState (what is held)
+                                                                                     │
+MarketDataReader.at(valuation) ──> closing prices ──>  value_state()  ──>  BacktestRecord
 ```
 
 A strategy receives that context, never a reader: holding one, it could write
@@ -321,26 +336,35 @@ façade does is *this*, with the configuration filled in once:
 
 ```python
 from quant_backtester.analytics import AnalyticsConfig, PerformanceReport
+from quant_backtester.provenance import git_source_state
 
 engine = BacktestEngine(
     reader=reader,
     calendars=calendars,
-    reference_calendar_id="XPAR",
-    signals=[],  # a strategy declares its own
-    strategy=MomentumRotation(lookback_sessions=60, top_n=1),
+    strategy=MomentumRotation(lookback_sessions=60, top_n=1),  # declares its own signals
     universe=universes.get("ROTATION_2"),  # two PEA funds, dated memberships
-    initial_cash=100_000.0,
-    base_currency="EUR",
-    limits=PositionLimits(max_weight=1.0, max_gross=1.0),
+    config=BacktestConfig(
+        start=date(2025, 1, 2),
+        end=date(2026, 9, 17),
+        initial_cash=100_000.0,
+        base_currency="EUR",
+        reference_calendar="XPAR",
+        schedule=EverySession(),
+        timetable=BacktestTimetable(),  # fill at 09:01, value and decide at 23:00, Paris
+    ),
     execution=ExecutionModel(
         costs=CostModel(
-            commission_rate=0.0005, minimum_commission=1.0, half_spread=0.0002, slippage_rate=0.0001
+            commission_rate=0.0005,
+            minimum_commission=1.0,
+            half_spread_rate=0.0002,
+            slippage_rate=0.0001,
         ),
         minimum_trade_value=500.0,
     ),
-    timetable=Timetable(),  # decide at 23:00 Paris, fill at 09:01 the next session
+    portfolio=PortfolioModel(PortfolioLimits(max_weight_per_instrument=1.0, max_gross=1.0)),
+    source=git_source_state(Path(".")),  # the commit, and whether the tree was clean
 )
-result = engine.run(date(2025, 1, 2), date(2026, 9, 17))
+result = engine.run()
 report = PerformanceReport.of(result, AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.02))
 print(report.render())
 ```
@@ -357,7 +381,8 @@ sharpe ratio                    0.65        0.54
 
 costs                       3,119.40
   commission                1,949.63
-  spread and slippage       1,169.77
+  spread                      779.85
+  slippage                    389.92
   drag on the return           3.12%
   share of gross              16.16%
   rebalancings                    20
@@ -369,11 +394,15 @@ by instrument                    net       gross        cost    held
   ETF_SP500_PEA            15,742.11   17,260.63    1,518.52     165
   ETF_WORLD                   446.51    2,047.40    1,600.88     210
 
-sessions valued on an older close            1
-sessions an order could not be sent on       2
-sessions with nothing to choose from        61
-sessions a purchase was cut down on         11
-sessions ending on borrowed cash             0
+sessions valued on an older price              1
+sessions without an execution price            2
+purchases cut for want of cash                11
+sessions with nothing to choose from          61
+sessions missing a line of the target          0
+average cash                              14.27%
+orders, fills, rejects                37, 37, 13
+  INSUFFICIENT_CASH                           11
+  NO_EXECUTION_PRICE                           2
 ```
 
 Three points of return went to execution — **a sixth of everything the idea
@@ -397,25 +426,78 @@ from, and they are one story: on 24 October 2025 the two providers disagreed
 on the world ETF's bar, so the reader serves that session as a hole rather than
 as a price. A sixty-session momentum needs sixty sessions in a row, and it took
 sixty-one for the hole to leave the window - during which the ranking had one
-instrument where it needs two, held what it already held, and traded nothing.
-That same session is the one valued on an older close and one of the two the
-order could not be sent on. Eleven purchases were cut down, because a target of
-the whole book costs slightly more than the book is worth and execution is not
-allowed to borrow the difference; the last line reads zero, and it is a guard
-rather than a statistic.
+instrument where it needs two, the strategy had nothing to choose from, and the
+book stood in cash: that is most of the fourteen percent of average cash. The
+same session is the one valued on an older price and one of the two on which
+an order met no opening price of its own. Eleven purchases were cut, because a
+switch pays the sale's costs out of its proceeds and the commission on top of
+the purchase, and execution lends nothing: each cut is a reject on the record,
+with the units it cost.
+
+These figures are the same, to the cent, as before the execution layer was
+rebuilt around the specification: a purchase is now sized at the price it will
+be paid rather than at the open, and in whole shares both routes land on the
+same quantity once the cash has had its say. What changed is what the record
+can say about it - the spread and the slippage apart, every refusal with its
+reason, the orders against the fills.
 
 Those lines are the caveats the figures above have to be read with. A single
 contested bar cost this strategy a quarter of its year, and a report that left
 that out would be describing a strategy nobody ran.
 
 Inside a session the order is fixed, and it is what stops a strategy buying at
-the close it just read:
+the close it just read. The three instants are declared in the run's
+`BacktestTimetable` and recorded with it:
 
 ```text
-open of session s     the target decided on s-1 is filled here
-close of session s    the portfolio is valued
-after that close      the signals run, and s+1's target is decided
+09:01 on session s   execution   the target decided on s-1 is filled at s's open
+23:00 on session s   valuation   the book is marked at s's closes
+23:00 on session s   decision    the signals run, and the target for s+1 is decided
 ```
+
+An order is filled at an opening price **of its own session** or not at all. A
+Friday decision is filled on Monday, one taken before Easter on the Tuesday
+after it, and an execution time set before the auction finds only yesterday's
+open - which the reader rightly calls the latest there is, and which is still
+not a price anyone could trade at that morning. Valuation may estimate - a
+close that did not print is marked at the last price known, and named -
+execution never does.
+
+## What a run records
+
+One immutable `BacktestRecord` per session, and every table is a view of those:
+
+| Asked of a result | What it holds |
+|---|---|
+| `result.records` | the records themselves, the source of truth - `records()` on what a runner hands back |
+| `result.frame()` | one row per session: the three instants, net and gross, target and actual invested, costs term by term |
+| `result.fills()` | every trade: market price, fill price, commission, spread, slippage |
+| `result.orders()` | every order the targets called for, with `FILLED`, `PARTIALLY_FILLED` or `REJECTED` |
+| `result.rejects()` | every refusal with its reason: no price, a stale one, below the minimum trade, not enough cash, left the universe |
+| `result.holdings()` | the quantity of every instrument and the cash, after each session |
+| `result.weights()`, `result.target_weights()` | what the book actually was, against what it was traded towards |
+| `result.costs()`, `result.equity()` | the bill per session, and the two books |
+
+A decision is kept whole: what the strategy returned - with how many
+instruments it chose among and why the others were not eligible - and what
+the portfolio allowed of it. A limit that cut a weight says which limit it was;
+an instrument the book may not hold at all is not cut to nothing, it stops the
+run. Positions carry the average price actually paid for them, costs included,
+which is what a stop or a take-profit is measured against.
+
+The run also records what it was made with - period, universe, calendar,
+schedule, timetable, limits, cost and execution models, the lot size of every
+instrument it could hold, the strategy's definition and fingerprint - and the
+state of the code: the commit and whether the tree had uncommitted changes, as
+`git_source_state` found them when the script that ran it asked. The library
+never shells out to git on its own.
+
+What this version does not model is refused rather than approximated. A split
+or a dividend on a position the book holds stops the run: the funds traded here
+accumulate and have not split, and a position halving overnight, or a dividend
+that never reached the cash, would be worse than a run that says it cannot
+continue. Execution is the next open and nothing else; the book is long-only
+and kept in one currency.
 
 ## Writing a strategy
 
@@ -501,9 +583,11 @@ runner = StrategyRunner(
     reference_calendar_id="XPAR",
     base_currency="EUR",
     analytics=AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.02),
+    execution=ExecutionModel(costs=CostModel(commission_rate=0.0005, minimum_commission=1.0)),
     universes=universes,
     initial_cash=100_000.0,
-    execution=ExecutionModel(costs=CostModel(commission_rate=0.0005, minimum_commission=1.0)),
+    source=git_source_state(Path(".")),
+    benchmark="ETF_WORLD",
 )
 
 result = runner.run(
@@ -514,9 +598,13 @@ result = runner.run(
 )
 
 result.report().render()
-result.plot(benchmark="ETF_WORLD")
-result.compare("ETF_WORLD").render()
+result.plot()  # against the declared benchmark
+result.compare().render()
+result.fills(), result.holdings(), result.rejects()
 ```
+
+The cost model is required: a runner that defaulted to free trading would
+report returns no account could have had, from a line nobody wrote.
 
 Every strategy the package exports is runnable as it stands: it declares the
 signals it reads, so those four arguments are the whole of what a user writes.
@@ -534,9 +622,10 @@ result. All of it frozen: a record of an experiment that can be edited
 afterwards is a record of nothing.
 
 A fingerprint hashes a *configuration*, never the source that read it, so two
-runs of an edited `decide` share one. What tells them apart is `code_version`,
-given to the runner and recorded as given — `None` when nobody said, which is
-more useful than a commit a library guessed at from outside the repository.
+runs of an edited `decide` share one. What tells them apart is the state of the
+code - the commit, and whether the tree had changes nobody committed - given
+to the runner and recorded as given, `UNRECORDED` when nobody said. Scripts get
+it from `git_source_state`; the library never guesses it.
 
 The rebalancing calendar is declared per run rather than inside the strategy,
 so one rule can be tested at several frequencies without being written twice:
@@ -577,6 +666,55 @@ is marked at the last close that existed and named; and one quoted in another
 currency is refused rather than drawn, because without an FX conversion the
 difference between the two curves is an exchange rate.
 
+## Four baselines, several periods
+
+`scripts/run_baselines.py` runs the four reference strategies over the whole
+history both funds share and over three regimes inside it, with the costs of
+this README - five basis points of commission with a one-euro floor, two of
+half spread, one of slippage, no order under five hundred euros - and 100,000
+euros each time. Every line is a `StrategyResult` carrying its configuration,
+its fingerprint and the state of the code; the whole table takes about forty
+minutes, most of it the signals re-reading the store.
+
+```text
+strategy            period                         net    gross   a year  sharpe   max dd     costs  trades  rejects  est.  vs world
+buy_and_hold        2018-07-16 2026-09-17      164.10%  164.18%   12.62%    0.71  -33.59%        80       1        2     1     0.44%
+equal_weight        2018-07-16 2026-09-17      182.29%  182.42%   13.54%    0.74  -33.57%       127      23      106     1    18.63%
+momentum_rotation   2018-07-16 2026-09-17      160.40%  183.22%   12.42%    0.68  -33.62%    22,824      86       65     1    -3.26%
+momentum_vix        2018-07-16 2026-09-17      124.37%  161.29%   10.39%    0.66  -23.11%    36,920     214      108     1   -39.29%
+
+buy_and_hold        2019-01-02 2021-12-31       82.30%   82.38%   22.20%    1.08  -33.61%        80       1        0     0     1.37%
+equal_weight        2019-01-02 2021-12-31       77.41%   77.50%   21.09%    1.02  -33.56%        90       6       45     0    -3.51%
+momentum_rotation   2019-01-02 2021-12-31       92.21%   97.34%   24.38%    1.14  -33.62%     5,130      24       17     0    11.29%
+momentum_vix        2019-01-02 2021-12-31       78.91%   88.94%   21.44%    1.26  -12.21%    10,025      69       39     0    -2.01%
+
+buy_and_hold        2022-01-03 2023-12-29        2.13%    2.21%    1.07%    0.01  -16.99%        80       1        0     0    -0.82%
+equal_weight        2022-01-03 2023-12-29        9.34%    9.42%    4.60%    0.24  -15.54%        83       4       30     0     6.39%
+momentum_rotation   2022-01-03 2023-12-29       -1.05%    2.61%   -0.53%   -0.08  -18.75%     3,662      26       18     0    -4.00%
+momentum_vix        2022-01-03 2023-12-29       -8.83%   -3.23%   -4.55%   -0.39  -23.31%     5,605      63       30     0   -11.78%
+
+buy_and_hold        2024-01-02 2026-09-17       53.43%   53.51%   17.13%    1.09  -21.61%        80       1        2     1    -0.19%
+equal_weight        2024-01-02 2026-09-17       49.50%   49.59%   16.01%    0.99  -22.46%        90       6       25     1    -4.13%
+momentum_rotation   2024-01-02 2026-09-17       47.99%   54.51%   15.58%    0.98  -21.62%     6,522      35       23     1    -5.63%
+momentum_vix        2024-01-02 2026-09-17       37.65%   47.78%   12.53%    0.96  -13.47%    10,124      76       34     1   -15.97%
+```
+
+Over eight years the simplest things win. Half and half, rebalanced monthly,
+beats everything; the rotation earns, gross, what the equal weight keeps net,
+and hands twenty-three points of it to 86 switches. The VIX gate does what it
+says - its worst fall is a third smaller over the whole history, and its
+Sharpe ratio is the best of 2019-2021 - and pays for it twice: 214 trades, and
+the rebounds it sits out. In 2022-2023 both rotations lose money net, the gated
+one even before costs. None of this is a verdict on momentum: two funds are
+the thinnest universe a ranking can have, and over these years the S&P 500
+fund simply outran the world one. It is what the chain was built to be able to
+say.
+
+The `rejects` column is mostly orders under the minimum trade value - the
+fraction of a rebalancing the drift between two decisions calls for - and
+`est.` counts the sessions a position was valued on an older close: the
+contested bar of 24 October 2025.
+
 ## What a strategy may not do
 
 Both names of `ROTATION_2` are funds a PEA can hold, in euros, on Euronext
@@ -606,7 +744,8 @@ back no reader, a decision taken on a store that knows what happens tomorrow is
 identical to one taken without it, and every part of a context must answer for
 the same instant or it cannot be built.
 
-Other scripts: `generate_calendars.py` rewrites the committed calendars from
+Other scripts: `run_baselines.py` runs the four baselines over several
+periods, `generate_calendars.py` rewrites the committed calendars from
 `exchange_calendars`, `check_calendar_coverage.py` says when they need
 extending, and `accept_revision.py` builds the entry that approves one detected
 correction.
