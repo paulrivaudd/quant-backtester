@@ -3,27 +3,32 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, time
 
 import pandas as pd
 import pytest
 
+from quant_backtester.backtest.config import BacktestConfig
 from quant_backtester.backtest.context import StrategyContext
-from quant_backtester.backtest.engine import BacktestEngine, Strategy, Timetable
+from quant_backtester.backtest.engine import BacktestEngine
 from quant_backtester.backtest.schedule import (
     EveryNSessions,
     EverySession,
     Monthly,
     Weekly,
 )
+from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
-from quant_backtester.execution.fills import ExecutionModel
-from quant_backtester.portfolio.limits import PositionLimits
+from quant_backtester.execution.costs import CostModel
+from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.portfolio.targets import TargetAllocation
+from quant_backtester.strategies.base import Strategy
 
-PARIS = Timetable(decision_time=time(23, 0), execution_time=time(9, 1), timezone="Europe/Paris")
+PARIS = BacktestTimetable(
+    decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)
+)
 
 SEPTEMBER = [
     date(2026, 9, 1),
@@ -93,7 +98,8 @@ class Counting(Strategy):
     """A strategy that records every session it is asked on."""
 
     weights_wanted: Mapping[str, float]
-    asked: list[date]
+    asked: list[date] = field(repr=False, compare=False)
+    strategy_id: str = "counting"
 
     def decide(self, ctx: StrategyContext) -> TargetAllocation:
         """Record the instant, and always want the same book."""
@@ -106,21 +112,25 @@ def engine_over(
     calendars: CalendarRegistry,
     strategy: Strategy,
     schedule: object,
+    start: date,
+    end: date,
 ) -> BacktestEngine:
     """Wire an engine with a decision schedule."""
     return BacktestEngine(
         reader=market,
         calendars=calendars,
-        reference_calendar_id="XPAR",
-        signals=[],
         strategy=strategy,
         universe=("ETF_EU",),
-        initial_cash=10_000.0,
-        base_currency="EUR",
-        schedule=schedule,  # type: ignore[arg-type]
-        limits=PositionLimits(),
-        execution=ExecutionModel(),
-        timetable=PARIS,
+        config=BacktestConfig(
+            start=start,
+            end=end,
+            initial_cash=10_000.0,
+            base_currency="EUR",
+            reference_calendar="XPAR",
+            schedule=schedule,  # type: ignore[arg-type]
+            timetable=PARIS,
+        ),
+        execution=ExecutionModel(costs=CostModel()),
     )
 
 
@@ -137,7 +147,7 @@ def test_a_strategy_is_not_asked_on_a_session_it_does_not_decide_on(
     asked: list[date] = []
     strategy = Counting(weights_wanted={"ETF_EU": 1.0}, asked=asked)
 
-    engine_over(market, calendars, strategy, EveryNSessions(3)).run(sessions[-6], sessions[-1])
+    engine_over(market, calendars, strategy, EveryNSessions(3), sessions[-6], sessions[-1]).run()
 
     # Asked at 23:00 Paris, which is the same date in UTC.
     assert len(asked) == 2
@@ -160,9 +170,9 @@ def test_a_session_with_no_decision_sends_no_order(
     asked: list[date] = []
     strategy = Counting(weights_wanted={"ETF_EU": 1.0}, asked=asked)
 
-    result = engine_over(market, calendars, strategy, EveryNSessions(3)).run(
-        sessions[-6], sessions[-1]
-    )
+    result = engine_over(
+        market, calendars, strategy, EveryNSessions(3), sessions[-6], sessions[-1]
+    ).run()
 
     traded = [record for record in result.records if record.traded_value > 0.0]
     assert len(traded) == 1
@@ -181,9 +191,12 @@ def test_a_session_with_no_decision_carries_the_target_still_standing(
     market = make_market({"ETF_EU": make_bars("ETF_EU", xpar, prices(100.0, 1.0))})
     strategy = Counting(weights_wanted={"ETF_EU": 1.0}, asked=[])
 
-    result = engine_over(market, calendars, strategy, EveryNSessions(3)).run(
-        sessions[-6], sessions[-1]
-    )
+    result = engine_over(
+        market, calendars, strategy, EveryNSessions(3), sessions[-6], sessions[-1]
+    ).run()
 
-    assert dict(result.records[1].weights) == {"ETF_EU": 1.0}
+    standing = result.target_weights()
+    assert standing.loc[sessions[-5], "ETF_EU"] == 1.0
+    assert result.records[1].target_invested == 1.0
     assert result.records[1].decided is False
+    assert result.records[1].decision is None

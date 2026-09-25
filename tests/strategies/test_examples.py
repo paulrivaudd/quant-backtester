@@ -17,6 +17,7 @@ import pytest
 from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.data.calendars import TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.portfolio.state import PortfolioState
 from quant_backtester.signals.base import Signal
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
@@ -363,7 +364,9 @@ def test_an_unreadable_gauge_stands_the_book_down_by_default(
 
 
 def test_buy_and_hold_lets_the_weights_drift(
-    context: SignalContext, make_decision: DecisionBuilder
+    context: SignalContext,
+    make_decision: DecisionBuilder,
+    make_book: Callable[..., PortfolioState],
 ) -> None:
     """The difference with the constant-weight baseline, and it is not cosmetic.
 
@@ -371,13 +374,11 @@ def test_buy_and_hold_lets_the_weights_drift(
     for the book it has - two thirds and one third - while the rebalanced
     version sells the winner to get back to half.
     """
-    from quant_backtester.portfolio.targets import Holdings
-
     held = make_decision(
         context,
         snapshot_of(context, {"ETF_EU": 0.9, "ETF_OTHER": 0.4}),
         universe=UNIVERSE,
-        holdings=Holdings(cash=0.0, quantities={"ETF_EU": 2.0, "ETF_OTHER": 1.0}),
+        holdings=make_book(0.0, {"ETF_EU": 2.0, "ETF_OTHER": 1.0}),
         prices={"ETF_EU": 100.0, "ETF_OTHER": 100.0},
     )
 

@@ -51,7 +51,8 @@ from quant_backtester.data.schemas import (
     BarField,
     CheckStatus,
 )
-from quant_backtester.portfolio.targets import Holdings
+from quant_backtester.portfolio.holdings import Holding
+from quant_backtester.portfolio.state import PortfolioState
 from quant_backtester.portfolio.view import PortfolioView
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.snapshot import SignalSnapshot
@@ -160,6 +161,10 @@ LevelsBuilder = Callable[..., pd.DataFrame]
 MarketBuilder = Callable[..., MarketDataReader]
 ContextBuilder = Callable[[MarketDataReader, datetime], SignalContext]
 DecisionBuilder = Callable[..., StrategyContext]
+BookBuilder = Callable[..., PortfolioState]
+
+BOOK_START = datetime(2026, 9, 1, 9, 1, tzinfo=ZoneInfo("Europe/Paris"))
+"""When a hand-built book starts to hold: the first open of the synthetic span."""
 
 
 def paris(day: date, hour: int, minute: int = 0) -> datetime:
@@ -488,7 +493,7 @@ def make_decision(instruments: InstrumentRegistry) -> DecisionBuilder:
         context: SignalContext,
         snapshot: SignalSnapshot,
         universe: Sequence[str] | None = None,
-        holdings: Holdings | None = None,
+        holdings: PortfolioState | None = None,
         prices: Mapping[str, float] | None = None,
     ) -> StrategyContext:
         if universe is None:
@@ -498,7 +503,7 @@ def make_decision(instruments: InstrumentRegistry) -> DecisionBuilder:
                     if name not in names and instruments.get(name).tradable:
                         names.append(name)
             universe = tuple(names)
-        book = Holdings(cash=10_000.0) if holdings is None else holdings
+        book = PortfolioState.opening(10_000.0, BOOK_START) if holdings is None else holdings
         return StrategyContext(
             as_of=snapshot.as_of,
             signals=snapshot,
@@ -509,6 +514,34 @@ def make_decision(instruments: InstrumentRegistry) -> DecisionBuilder:
         )
 
     return build
+
+
+def book_of(
+    cash: float,
+    quantities: Mapping[str, float] | None = None,
+    as_of: datetime = BOOK_START,
+    average_costs: Mapping[str, float] | None = None,
+) -> PortfolioState:
+    """Return a book holding ``cash`` and the given quantities.
+
+    Average costs are unknown unless given: a book written by hand has no
+    history, and inventing one would make a stop-loss test pass for the wrong
+    reason.
+    """
+    costs = average_costs or {}
+    return PortfolioState(
+        as_of=as_of,
+        cash=cash,
+        holdings={
+            name: Holding(name, size, costs.get(name)) for name, size in (quantities or {}).items()
+        },
+    )
+
+
+@pytest.fixture
+def make_book() -> BookBuilder:
+    """Return a builder of a book from its cash and its quantities."""
+    return book_of
 
 
 @pytest.fixture

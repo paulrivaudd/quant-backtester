@@ -18,13 +18,18 @@ from matplotlib.lines import Line2D
 
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.plots import drawdown_figure, equity_figure
-from quant_backtester.backtest.engine import Timetable
 from quant_backtester.backtest.runner import StrategyRunner
+from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.execution.costs import CostModel
+from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.strategies.examples import BuyAndHold
 
-PARIS = Timetable(decision_time=time(23, 0), execution_time=time(9, 1), timezone="Europe/Paris")
+PARIS = BacktestTimetable(
+    decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)
+)
+FREE = ExecutionModel(costs=CostModel())
 CONFIG = AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.0)
 
 
@@ -63,6 +68,7 @@ def result(
         reference_calendar_id="XPAR",
         base_currency="EUR",
         analytics=CONFIG,
+        execution=FREE,
         initial_cash=10_000.0,
         timetable=PARIS,
     )

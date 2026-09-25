@@ -21,8 +21,8 @@ number quietly:
   previous October, because the reader is point-in-time and has always been
   allowed to look back - what it may never do is look forward;
 - **the configuration is recorded.** A Sharpe ratio without the period, the
-  costs, the universe, the fill assumption and the rebalancing calendar is not
-  a result, so the result carries all of them.
+  costs, the universe, the fill assumption, the rebalancing calendar and the
+  state of the code is not a result, so the result carries all of them.
 
 What it is not is a second engine. It builds one, runs it, and hands back what
 it produced beside the report of it.
@@ -53,38 +53,29 @@ from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.curves import Book, drawdown_curve, equity_curve
 from quant_backtester.analytics.plots import drawdown_figure, equity_figure
 from quant_backtester.analytics.report import PerformanceReport
-from quant_backtester.backtest.engine import BacktestEngine, BacktestResult, Timetable
+from quant_backtester.backtest.config import BacktestConfig
+from quant_backtester.backtest.engine import BacktestEngine, StrategyMutated
+from quant_backtester.backtest.records import BacktestRecord
+from quant_backtester.backtest.result import BacktestResult
 from quant_backtester.backtest.schedule import DecisionSchedule, EverySession
+from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus
 from quant_backtester.data.schemas import BarField
-from quant_backtester.data.universes import (
-    StaticUniverse,
-    UniverseRegistry,
-    UniverseSource,
-    universe_definition,
-)
-from quant_backtester.execution.fills import ExecutionModel
+from quant_backtester.data.universes import StaticUniverse, UniverseRegistry, UniverseSource
+from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.numbers import require_finite_positive
-from quant_backtester.portfolio.limits import PositionLimits
+from quant_backtester.portfolio.allocation import PortfolioModel
+from quant_backtester.portfolio.limits import PortfolioLimits
+from quant_backtester.provenance import SourceState
 from quant_backtester.signals.base import freeze
 from quant_backtester.signals.types import PriceBasis, require_identifier
 from quant_backtester.strategies.base import Strategy
 
+__all__ = ["Period", "StrategyMutated", "StrategyResult", "StrategyRunner", "value_benchmark"]
+
 Period = date | str
 """A bound of a run: a date, or an ISO string for the convenience of a notebook."""
-
-
-class StrategyMutated(RuntimeError):
-    """Raised when a strategy was not the same object at the end of its run.
-
-    A strategy is meant to hold no state between decisions: everything
-    path-dependent - what is held, what it is worth, how the market moved -
-    comes from the context. A strategy that kept a counter or rebuilt its
-    parameters as it went would be recorded under a definition that describes
-    its last decision rather than all of them, and the experiment could not be
-    reproduced from its own result.
-    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,67 +84,76 @@ class StrategyResult:
 
     Attributes
     ----------
-    strategy_id : str
-        Name of the strategy that produced it.
-    definition : Mapping[str, object]
-        What the strategy was: its class, its parameters, its signals.
-    fingerprint : str
-        Hash of that definition, for telling two experiments apart.
-    configuration : Mapping[str, object]
-        Everything else the numbers depend on: the period, the universe, the
-        reference calendar, the rebalancing schedule, the starting cash, the
-        limits, the cost model and the fill timetable.
     backtest : BacktestResult
-        The run itself, session by session.
+        The run itself, session by session, with the strategy's definition and
+        fingerprint and the state of the code that produced it.
     analytics : PerformanceReport
         Gross and net side by side, the costs between them, what each
         instrument contributed, and the caveats.
+    configuration : Mapping[str, object]
+        Everything the numbers depend on: what the engine recorded - the
+        period, the universe, the calendar, the schedule, the starting cash,
+        the limits, the execution and cost models, the lot sizes, the
+        timetable - plus the bounds the caller asked for, the analytics
+        convention, the declared benchmark and the state of the code.
     reader : MarketDataReader
         The store the run read, kept so that a benchmark can be valued over the
         same sessions afterwards. Ex-post only: a decision never sees it, and
-        every reading the comparison takes is at a decision instant inside the
+        every reading the comparison takes is at a valuation instant inside the
         period, so data arriving after the run changes none of its figures.
     analytics_config : AnalyticsConfig
         The convention every annualised figure was computed under, applied to a
         benchmark as well so that the two sides are comparable.
-    base_currency : str
-        The currency the book was kept in, used to refuse a benchmark quoted in
-        another one.
+    benchmark_spec : BenchmarkSpec | None
+        What the run is measured against by default, when the runner declared
+        it.
 
     Notes
     -----
     Everything here is frozen all the way down. A record of an experiment that
-    can be edited afterwards is a record of nothing.
-
-    Notes
-    -----
-    A result that recorded only its numbers would be a number nobody can
-    reproduce. Everything here is what "Sharpe 1.4" has to be read with, and
-    it is carried in the object rather than remembered by whoever ran it.
+    can be edited afterwards is a record of nothing; one that recorded only
+    its numbers would be a number nobody can reproduce.
     """
 
-    strategy_id: str
-    definition: Mapping[str, object]
-    fingerprint: str
-    configuration: Mapping[str, object]
     backtest: BacktestResult
     analytics: PerformanceReport
+    configuration: Mapping[str, object]
     reader: MarketDataReader
     analytics_config: AnalyticsConfig
-    base_currency: str
+    benchmark_spec: BenchmarkSpec | None = None
 
     def __post_init__(self) -> None:
-        """Freeze the audit trail, all the way down.
+        """Freeze the configuration, all the way down."""
+        frozen = freeze(dict(self.configuration))
+        assert isinstance(frozen, Mapping)
+        object.__setattr__(self, "configuration", frozen)
 
-        ``frozen=True`` only stops the fields being reassigned. The definition
-        and the configuration are nested mappings, so without this a reader of
-        a result could edit what the run was made of - which is the one thing
-        a record of an experiment must not allow.
-        """
-        for field_name in ("definition", "configuration"):
-            frozen = freeze(dict(getattr(self, field_name)))
-            assert isinstance(frozen, Mapping)
-            object.__setattr__(self, field_name, frozen)
+    # -- what the run was -----------------------------------------------------
+
+    @property
+    def strategy_id(self) -> str:
+        """Return the name of the strategy that produced the run."""
+        return str(self.backtest.strategy_definition["strategy_id"])
+
+    @property
+    def definition(self) -> Mapping[str, object]:
+        """Return what the strategy was: its class, its parameters, its signals."""
+        return self.backtest.strategy_definition
+
+    @property
+    def fingerprint(self) -> str:
+        """Return the hash of the strategy's definition."""
+        return self.backtest.strategy_fingerprint
+
+    @property
+    def source(self) -> SourceState:
+        """Return the state of the code that produced the run."""
+        return self.backtest.source
+
+    @property
+    def base_currency(self) -> str:
+        """Return the currency the book was kept in."""
+        return self.backtest.config.base_currency
 
     @property
     def start(self) -> date:
@@ -165,9 +165,47 @@ class StrategyResult:
         """Return the last session of the run."""
         return self.backtest.records[-1].session_date
 
+    # -- what it did ------------------------------------------------------------
+
     def report(self) -> PerformanceReport:
         """Return the performance report of the run."""
         return self.analytics
+
+    def records(self) -> tuple[BacktestRecord, ...]:
+        """Return the records of the run: the source of truth every view is built from."""
+        return self.backtest.records
+
+    def frame(self) -> pd.DataFrame:
+        """Return the run as a frame, one row per session."""
+        return self.backtest.frame()
+
+    def fills(self) -> pd.DataFrame:
+        """Return every fill of the run, one row each."""
+        return self.backtest.fills()
+
+    def orders(self) -> pd.DataFrame:
+        """Return every order of the run, with what became of it."""
+        return self.backtest.orders()
+
+    def rejects(self) -> pd.DataFrame:
+        """Return every order refused or cut, with its reason."""
+        return self.backtest.rejects()
+
+    def holdings(self) -> pd.DataFrame:
+        """Return the units held of every instrument, and the cash, after each session."""
+        return self.backtest.holdings()
+
+    def weights(self) -> pd.DataFrame:
+        """Return what fraction of the book each instrument actually was, per session."""
+        return self.backtest.weights()
+
+    def target_weights(self) -> pd.DataFrame:
+        """Return the target standing after each session, as the portfolio accepted it."""
+        return self.backtest.target_weights()
+
+    def costs(self) -> pd.DataFrame:
+        """Return what execution took on each session, term by term."""
+        return self.backtest.costs()
 
     def equity(self, book: Book = Book.NET) -> pd.Series:  # type: ignore[type-arg]
         """Return the equity curve, net of costs by default.
@@ -177,7 +215,7 @@ class StrategyResult:
         book : Book
             ``NET`` for what an investor would have been left with, ``GROSS``
             for what the same trades would have been worth having paid the
-            reference price and no fee.
+            market price and no fee.
 
         Returns
         -------
@@ -190,18 +228,17 @@ class StrategyResult:
         """Return the drawdown curve, measured against the running peak."""
         return drawdown_curve(equity_curve(self.backtest, book))
 
-    def frame(self) -> pd.DataFrame:
-        """Return the run as a frame, one row per session."""
-        return self.backtest.frame()
+    # -- against what -----------------------------------------------------------
 
-    def benchmark(self, benchmark: BenchmarkSpec | str) -> BenchmarkCurve:
+    def benchmark(self, benchmark: BenchmarkSpec | str | None = None) -> BenchmarkCurve:
         """Value something else over the same sessions.
 
         Parameters
         ----------
-        benchmark : BenchmarkSpec | str
+        benchmark : BenchmarkSpec | str | None
             What could have been held instead - an instrument id, or a
-            specification saying which price basis to compare on.
+            specification saying which price basis to compare on. The one the
+            runner declared when left out.
 
         Returns
         -------
@@ -210,22 +247,26 @@ class StrategyResult:
 
         Raises
         ------
+        ValueError
+            If no benchmark is given and none was declared.
         BenchmarkCurrencyMismatch
             If it is quoted in another currency than the book. Without an FX
             conversion, the difference between the two curves is an exchange
             rate with a strategy's name on it.
         """
         return value_benchmark(
-            self.backtest, self.reader, benchmark, base_currency=self.base_currency
+            self.backtest, self.reader, self._benchmark(benchmark), base_currency=self.base_currency
         )
 
-    def compare(self, benchmark: BenchmarkSpec | str, book: Book = Book.NET) -> Comparison:
+    def compare(
+        self, benchmark: BenchmarkSpec | str | None = None, book: Book = Book.NET
+    ) -> Comparison:
         """Measure this run against something else, over the days they share.
 
         Parameters
         ----------
-        benchmark : BenchmarkSpec | str
-            What could have been held instead.
+        benchmark : BenchmarkSpec | str | None
+            What could have been held instead; the declared one when left out.
         book : Book
             Which of the run's curves to compare, net by default.
 
@@ -247,8 +288,8 @@ class StrategyResult:
         Parameters
         ----------
         benchmark : BenchmarkSpec | str | None
-            Drawn beside the strategy when given, normalised to the same
-            starting value.
+            Drawn beside the strategy, normalised to the same starting value -
+            the declared one when left out, and none when neither exists.
         gross : bool
             Whether to draw the book that paid nothing behind the net one. The
             gap between the two is what execution took, and it is usually the
@@ -260,7 +301,8 @@ class StrategyResult:
             A matplotlib figure. ``show`` is never called, so a notebook
             displays it, a script saves it and a test inspects it.
         """
-        other = None if benchmark is None else self.benchmark(benchmark).equity
+        wanted = benchmark if benchmark is not None else self.benchmark_spec
+        other = None if wanted is None else self.benchmark(wanted).equity
         return equity_figure(
             self.equity(),
             title=f"{self.strategy_id}  {self.start} to {self.end}",
@@ -274,6 +316,17 @@ class StrategyResult:
             self.drawdown(book), title=f"{self.strategy_id}  drawdown  {self.start} to {self.end}"
         )
 
+    def _benchmark(self, benchmark: BenchmarkSpec | str | None) -> BenchmarkSpec:
+        """Return the benchmark asked for, or the declared one."""
+        if benchmark is not None:
+            return BenchmarkSpec.of(benchmark)
+        if self.benchmark_spec is None:
+            raise ValueError(
+                "no benchmark was given and the runner declared none; name one, or declare it "
+                "on the runner so that every run records what it is measured against"
+            )
+        return self.benchmark_spec
+
 
 @dataclass(frozen=True, slots=True)
 class StrategyRunner:
@@ -282,7 +335,8 @@ class StrategyRunner:
     Attributes
     ----------
     reader : MarketDataReader
-        The store, read point in time.
+        The store, read point in time. Its reference calendar is the one the
+        runs advance on.
     calendars : CalendarRegistry
         Venue calendars, and the reference one among them.
     reference_calendar_id : str
@@ -293,34 +347,41 @@ class StrategyRunner:
         The annualisation convention and the rate the Sharpe ratio is taken
         against. Required, like everywhere else in this project: a ratio whose
         convention nobody stated is not comparable with anything.
+    execution : ExecutionModel
+        The fill assumption and the three costs. Required: a runner that
+        defaulted to free trading would report returns no account could have
+        had, from a line nobody wrote.
     universes : UniverseRegistry | None
         Where a universe named by its id is looked up. ``None`` runs only with
         a universe given as an object or a list of names.
     initial_cash : float
         What a run starts with, unless a call says otherwise.
-    limits : PositionLimits
+    limits : PortfolioLimits
         Applied to whatever a strategy asks for.
-    execution : ExecutionModel
-        The fill assumption and the three costs.
-    timetable : Timetable
-        When a decision is taken, and when it is filled.
+    timetable : BacktestTimetable
+        When, on each session, an order is filled, the book valued and a
+        target decided.
     schedule : DecisionSchedule
         Which sessions a strategy is asked on, unless a call says otherwise.
-    code_version : str | None
-        What identifies the code that produced a result - the commit of this
-        repository, normally. Recorded as given and never guessed at: a
-        fingerprint hashes a strategy's *configuration*, not its source, so
-        editing a `decide` in place leaves the fingerprint alone and only this
-        field can say the two runs were not the same code. ``None`` says
-        plainly that nobody recorded it, which is better than a library
-        shelling out to git and reporting the wrong answer from a notebook
-        outside the repository.
+    source : SourceState
+        The state of the code that produces the runs - the commit, and whether
+        the tree had uncommitted changes - as the caller established it, with
+        :func:`~quant_backtester.provenance.git_source_state` normally.
+        Recorded as given and never guessed at: a fingerprint hashes a
+        strategy's *configuration*, not its source, so editing a ``decide`` in
+        place leaves the fingerprint alone and only this field can say the two
+        runs were not the same code.
+    benchmark : BenchmarkSpec | str | None
+        What every run is measured against by default, recorded with it.
 
     Raises
     ------
     ValueError
-        If the starting cash is not a finite positive number, or an identifier
-        is empty.
+        If the starting cash is not a finite positive number, an identifier is
+        empty, the reader counts ages on another calendar, or the benchmark is
+        not in the registry.
+    BenchmarkCurrencyMismatch
+        If the declared benchmark is quoted in another currency than the book.
     """
 
     reader: MarketDataReader
@@ -328,19 +389,33 @@ class StrategyRunner:
     reference_calendar_id: str
     base_currency: str
     analytics: AnalyticsConfig
+    execution: ExecutionModel
     universes: UniverseRegistry | None = None
     initial_cash: float = 100_000.0
-    limits: PositionLimits = field(default_factory=PositionLimits)
-    execution: ExecutionModel = field(default_factory=ExecutionModel)
-    timetable: Timetable = field(default_factory=Timetable)
+    limits: PortfolioLimits = field(default_factory=PortfolioLimits)
+    timetable: BacktestTimetable = field(default_factory=BacktestTimetable)
     schedule: DecisionSchedule = field(default_factory=EverySession)
-    code_version: str | None = None
+    source: SourceState = field(default_factory=SourceState.unrecorded)
+    benchmark: BenchmarkSpec | str | None = None
 
     def __post_init__(self) -> None:
         """Reject a runner that could not describe the runs it produces."""
         require_identifier(self.reference_calendar_id, "reference_calendar_id")
         require_identifier(self.base_currency, "base_currency")
         require_finite_positive(self.initial_cash, "initial_cash")
+        if self.reader.reference_calendar_id != self.reference_calendar_id:
+            raise ValueError(
+                f"the reader counts ages on {self.reader.reference_calendar_id} and the runs "
+                f"advance on {self.reference_calendar_id}"
+            )
+        if not isinstance(self.execution, ExecutionModel):
+            raise ValueError(f"execution must be an ExecutionModel, got {self.execution!r}")
+        if self.benchmark is not None:
+            spec = BenchmarkSpec.of(self.benchmark)
+            if spec.instrument_id not in self.reader.instruments:
+                raise ValueError(f"the benchmark {spec.instrument_id!r} is not in the registry")
+            _require_same_currency(self.reader, spec, self.base_currency)
+            object.__setattr__(self, "benchmark", spec)
 
     def run(
         self,
@@ -382,6 +457,9 @@ class StrategyRunner:
         ValueError
             If the strategy cannot be run, if the period holds no session of
             the reference calendar, or if a universe id is not declared.
+        InvalidTradingUniverse
+            If the universe holds an instrument no book could hold, on any
+            session of the period.
         StrategyMutated
             If the strategy's definition changed while it was deciding.
         CalendarCoverageError
@@ -396,54 +474,46 @@ class StrategyRunner:
                 f"{first} to {last} holds no session of {self.reference_calendar_id}; "
                 "there is nothing to measure a performance over"
             )
-        resolved, described = self._universe(universe)
         cash = self.initial_cash if initial_cash is None else initial_cash
         require_finite_positive(cash, "initial_cash")
-        decisions = self.schedule if schedule is None else schedule
+        config = BacktestConfig(
+            start=sessions[0].session_date,
+            end=sessions[-1].session_date,
+            initial_cash=cash,
+            base_currency=self.base_currency,
+            reference_calendar=self.reference_calendar_id,
+            schedule=self.schedule if schedule is None else schedule,
+            timetable=self.timetable,
+        )
         engine = BacktestEngine(
             reader=self.reader,
             calendars=self.calendars,
-            reference_calendar_id=self.reference_calendar_id,
-            signals=(),
             strategy=strategy,
-            universe=resolved,
-            initial_cash=cash,
-            base_currency=self.base_currency,
-            schedule=decisions,
-            limits=self.limits,
+            universe=self._universe(universe),
+            config=config,
             execution=self.execution,
-            timetable=self.timetable,
+            portfolio=PortfolioModel(self.limits),
+            source=self.source,
         )
-        # Taken before the run, not after: a strategy that changed itself while
-        # deciding would otherwise be recorded in its final state, and the
-        # configuration a result carries would not be the one that produced it.
-        definition = freeze(dict(strategy.definition()))
-        fingerprint = strategy.fingerprint()
-        result = engine.run(sessions[0].session_date, sessions[-1].session_date)
-        if strategy.fingerprint() != fingerprint:
-            raise StrategyMutated(
-                f"{strategy.strategy_id} is not the strategy it was at the start of the "
-                "run: its definition changed while it was deciding. A strategy holds no "
-                "state between decisions - what is path-dependent comes from the context."
-            )
-        assert isinstance(definition, Mapping)
+        result = engine.run()
+        benchmark = self.benchmark if isinstance(self.benchmark, BenchmarkSpec) else None
         return StrategyResult(
-            strategy_id=strategy.strategy_id,
-            definition=definition,
-            fingerprint=fingerprint,
-            configuration=self._configuration(
-                start=sessions[0].session_date,
-                end=sessions[-1].session_date,
-                asked=(first, last),
-                universe=described,
-                cash=cash,
-                schedule=decisions,
-            ),
             backtest=result,
             analytics=PerformanceReport.of(result, self.analytics),
+            configuration={
+                **result.configuration,
+                "requested_start": first.isoformat(),
+                "requested_end": last.isoformat(),
+                "analytics": {
+                    "sessions_per_year": self.analytics.sessions_per_year,
+                    "risk_free_rate": self.analytics.risk_free_rate,
+                },
+                "benchmark": benchmark.definition() if benchmark is not None else None,
+                "source": result.source.definition(),
+            },
             reader=self.reader,
             analytics_config=self.analytics,
-            base_currency=self.base_currency,
+            benchmark_spec=benchmark,
         )
 
     def _bounds(self, start: Period, end: Period) -> tuple[date, date]:
@@ -453,18 +523,8 @@ class StrategyRunner:
             raise ValueError(f"start {first} is after end {last}")
         return first, last
 
-    def _universe(
-        self, universe: str | UniverseSource | Sequence[str]
-    ) -> tuple[UniverseSource, object]:
-        """Return the universe to run over, and what identifies it in the record.
-
-        Returns
-        -------
-        tuple[UniverseSource, object]
-            The universe, and a description of it: the id of a committed one,
-            the members of a static one, the memberships of one built in code.
-            A run that recorded ``None`` for a list of names could not be
-            reproduced from its own result.
+    def _universe(self, universe: str | UniverseSource | Sequence[str]) -> UniverseSource:
+        """Return the universe to run over.
 
         Raises
         ------
@@ -478,56 +538,10 @@ class StrategyRunner:
                     f"the universe {universe!r} was named by id and this runner was "
                     "given no universe registry to look it up in"
                 )
-            resolved: UniverseSource = self.universes.get(universe)
-            return resolved, universe_definition(resolved)
+            return self.universes.get(universe)
         if isinstance(universe, UniverseSource):
-            return universe, universe_definition(universe)
-        static = StaticUniverse(tuple(universe))
-        return static, universe_definition(static)
-
-    def _configuration(
-        self,
-        *,
-        start: date,
-        end: date,
-        asked: tuple[date, date],
-        universe: object,
-        cash: float,
-        schedule: DecisionSchedule,
-    ) -> dict[str, object]:
-        """Return everything the numbers of a run depend on."""
-        return {
-            "start": start.isoformat(),
-            "end": end.isoformat(),
-            "requested_start": asked[0].isoformat(),
-            "requested_end": asked[1].isoformat(),
-            "code_version": self.code_version,
-            "reference_calendar": self.reference_calendar_id,
-            "base_currency": self.base_currency,
-            "universe": universe,
-            "initial_cash": cash,
-            "schedule": schedule.definition(),
-            "limits": {
-                "max_weight": self.limits.max_weight,
-                "max_gross": self.limits.max_gross,
-            },
-            "costs": {
-                "commission_rate": self.execution.costs.commission_rate,
-                "minimum_commission": self.execution.costs.minimum_commission,
-                "half_spread": self.execution.costs.half_spread,
-                "slippage_rate": self.execution.costs.slippage_rate,
-                "minimum_trade_value": self.execution.minimum_trade_value,
-            },
-            "timetable": {
-                "decision_time": self.timetable.decision_time.isoformat(),
-                "execution_time": self.timetable.execution_time.isoformat(),
-                "timezone": self.timetable.timezone,
-            },
-            "analytics": {
-                "sessions_per_year": self.analytics.sessions_per_year,
-                "risk_free_rate": self.analytics.risk_free_rate,
-            },
-        }
+            return universe
+        return StaticUniverse(tuple(universe))
 
 
 def value_benchmark(
@@ -546,7 +560,7 @@ def value_benchmark(
         The run to compare against. Only its sessions and its starting value
         are used.
     reader : MarketDataReader
-        The store, read at each session's decision instant - the same instant
+        The store, read at each session's valuation instant - the same instant
         the strategy's own equity was valued at, so neither curve sees a price
         the other could not.
     spec : BenchmarkSpec | str
@@ -578,7 +592,7 @@ def value_benchmark(
     It lives here rather than in ``analytics`` because it needs a reader, and
     analytics is handed finished runs precisely so that no statistic can be
     computed against prices the run never saw. This one reads at the run's own
-    decision instants, which is what makes the comparison fair: a benchmark
+    valuation instants, which is what makes the comparison fair: a benchmark
     valued at today's revision of a price would be measuring the strategy
     against a series that did not exist while it was running.
 
@@ -591,17 +605,13 @@ def value_benchmark(
     if not result.records:
         raise ValueError("a benchmark has nothing to be measured over: the run holds no session")
     instrument = reader.instruments.get(specification.instrument_id)
-    if base_currency is not None and instrument.currency != base_currency:
-        raise BenchmarkCurrencyMismatch(
-            f"{instrument.id} is quoted in {instrument.currency} and the book is kept in "
-            f"{base_currency}; without an FX conversion the difference between the two "
-            "curves is an exchange rate"
-        )
+    if base_currency is not None:
+        _require_same_currency(reader, specification, base_currency)
     prices: list[float] = []
     stale: list[date] = []
     last: float | None = None
     for record in result.records:
-        market = reader.at(record.decision_at)
+        market = reader.at(record.valuation_time)
         series = (
             market.total_return_history(instrument.id)
             if specification.price_basis is PriceBasis.TOTAL_RETURN
@@ -612,7 +622,7 @@ def value_benchmark(
         if value != value:
             if last is None:
                 raise ValueError(
-                    f"{instrument.id} has no price at {record.decision_at}, so there is "
+                    f"{instrument.id} has no price at {record.valuation_time}, so there is "
                     "nothing to normalise the benchmark to"
                 )
             value = last
@@ -632,6 +642,19 @@ def value_benchmark(
         name=specification.name,
     )
     return BenchmarkCurve(spec=specification, equity=values, marked_from_earlier=tuple(stale))
+
+
+def _require_same_currency(
+    reader: MarketDataReader, spec: BenchmarkSpec, base_currency: str
+) -> None:
+    """Raise unless a benchmark is quoted in the currency the book is kept in."""
+    instrument = reader.instruments.get(spec.instrument_id)
+    if instrument.currency != base_currency:
+        raise BenchmarkCurrencyMismatch(
+            f"{instrument.id} is quoted in {instrument.currency} and the book is kept in "
+            f"{base_currency}; without an FX conversion the difference between the two "
+            "curves is an exchange rate"
+        )
 
 
 def _as_date(value: Period, name: str) -> date:

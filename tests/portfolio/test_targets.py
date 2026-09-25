@@ -1,4 +1,4 @@
-"""Targets and holdings: an intention, a state, and no conversion between them."""
+"""Targets: an intention, stated in fractions of a book that could exist."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from quant_backtester.portfolio.targets import Holdings, TargetAllocation
+from quant_backtester.portfolio.targets import WEIGHT_SUM_TOLERANCE, TargetAllocation
 from quant_backtester.signals.types import SignalStatus
 
 AS_OF = datetime(2026, 9, 14, 21, 0, tzinfo=UTC)
@@ -38,40 +38,6 @@ def test_an_allocation_cannot_be_edited_afterwards() -> None:
         target.weights["A"] = 1.0  # type: ignore[index]
     with pytest.raises(TypeError):
         target.skipped["C"] = SignalStatus.OK  # type: ignore[index]
-
-
-def test_holdings_are_worth_cash_plus_positions() -> None:
-    """The only arithmetic in this file, and it needs prices from outside."""
-    holdings = Holdings(cash=1_000.0, quantities={"A": 2.0, "B": 5.0})
-
-    assert holdings.value_at({"A": 100.0, "B": 20.0}) == pytest.approx(1_300.0)
-
-
-def test_a_closed_position_is_not_a_position() -> None:
-    """A quantity of zero is dropped, so a book does not grow ghosts."""
-    holdings = Holdings(cash=100.0, quantities={"A": 0.0, "B": 3.0})
-
-    assert dict(holdings.quantities) == {"B": 3.0}
-
-
-def test_valuing_a_position_without_a_price_is_refused() -> None:
-    """Pricing it at nothing would show a loss that did not happen."""
-    holdings = Holdings(cash=100.0, quantities={"A": 2.0})
-
-    with pytest.raises(KeyError):
-        holdings.value_at({"B": 10.0})
-
-
-def test_weights_are_what_each_position_represents() -> None:
-    """What the portfolio holds now, in the same units as what it wants."""
-    holdings = Holdings(cash=500.0, quantities={"A": 5.0})
-
-    assert holdings.weights_at({"A": 100.0}) == {"A": pytest.approx(0.5)}
-
-
-def test_an_empty_book_has_no_weights() -> None:
-    """And no division by a zero total."""
-    assert Holdings(cash=0.0).weights_at({}) == {}
 
 
 def test_a_short_is_not_an_allocation_this_project_can_hold() -> None:
@@ -133,19 +99,71 @@ def test_a_decision_is_stamped_with_a_timezone() -> None:
         allocation(as_of=datetime(2026, 9, 14, 21, 0))
 
 
-def test_holdings_cannot_carry_a_short_position() -> None:
-    """A negative quantity is borrowed stock, and no layer here pays a borrow fee."""
-    with pytest.raises(ValueError, match="the quantity of A"):
-        Holdings(cash=100.0, quantities={"A": -1.0})
+def test_weights_adding_up_to_more_than_the_book_are_refused() -> None:
+    """A sum above one is leverage, and nothing here finances it."""
+    with pytest.raises(ValueError, match="add up to"):
+        allocation(weights={"A": 0.6, "B": 0.5}, selected=("A", "B"), considered=2)
 
 
-@pytest.mark.parametrize("quantity", [float("nan"), float("inf")])
-def test_a_quantity_that_is_not_a_number_is_refused(quantity: float) -> None:
-    """One NaN quantity turns the whole equity curve into NaN, silently."""
-    with pytest.raises(ValueError, match="the quantity of A"):
-        Holdings(cash=100.0, quantities={"A": quantity})
+def test_a_sum_above_one_by_floating_point_dust_is_still_the_whole_book() -> None:
+    """Arithmetic lands an ulp above one; the tolerance forgives that and nothing else."""
+    target = allocation(
+        weights={"A": 0.5, "B": 0.5 + WEIGHT_SUM_TOLERANCE / 2}, selected=("A", "B"), considered=2
+    )
+
+    assert target.invested == pytest.approx(1.0)
 
 
-def test_a_book_may_end_on_negative_cash_so_that_the_guard_can_see_it() -> None:
-    """Execution never produces one; the diagnostic that counts them must still work."""
-    assert Holdings(cash=-1.0).cash == -1.0
+def test_what_is_not_allocated_is_cash() -> None:
+    """Cash needs no line of its own."""
+    target = allocation(weights={"A": 0.75}, selected=("A",), considered=1, skipped={})
+
+    assert target.cash == pytest.approx(0.25)
+
+
+def test_the_gross_is_the_sum_of_the_absolute_weights() -> None:
+    """Equal to what is invested for as long as the project is long-only."""
+    target = allocation()
+
+    assert target.gross == pytest.approx(0.75)
+    assert target.gross == target.invested
+
+
+def test_the_simple_contract_needs_only_an_instant_and_weights() -> None:
+    """A list of weights carries no ranking, so the selection is the weights in id order."""
+    target = TargetAllocation(as_of=AS_OF, weights={"B": 0.4, "A": 0.6})
+
+    assert target.selected == ("A", "B")
+    assert target.considered == 2
+    assert dict(target.skipped) == {}
+
+
+def test_a_book_of_cash_needs_no_weight_at_all() -> None:
+    """Holding nothing is a decision, and it is written as an empty target."""
+    target = TargetAllocation(as_of=AS_OF, weights={})
+
+    assert target.invested == 0.0
+    assert target.cash == 1.0
+    assert target.selected == ()
+    assert target.considered == 0
+
+
+def test_what_is_invested_does_not_depend_on_the_order_the_weights_were_written_in() -> None:
+    """An exact sum, so two identical decisions written two ways record the same number."""
+    weights = {"A": 0.1, "B": 0.2, "C": 0.3, "D": 0.4}
+    reversed_weights = dict(reversed(list(weights.items())))
+
+    forward = TargetAllocation(as_of=AS_OF, weights=weights)
+    backward = TargetAllocation(as_of=AS_OF, weights=reversed_weights)
+
+    assert forward.invested == backward.invested
+
+
+def test_the_caller_cannot_edit_an_allocation_through_the_mapping_it_passed() -> None:
+    """The weights are copied at construction; the strategy's dict stays the strategy's."""
+    weights = {"A": 0.5}
+    target = TargetAllocation(as_of=AS_OF, weights=weights)
+
+    weights["A"] = 1.0
+
+    assert target.weights["A"] == 0.5

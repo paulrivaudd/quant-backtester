@@ -32,7 +32,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from quant_backtester.backtest.engine import BacktestResult
+from quant_backtester.backtest.result import BacktestResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +73,7 @@ class InstrumentPnL:
 
     @property
     def gross_pnl(self) -> float:
-        """Return what it would have contributed at the reference price and no fee.
+        """Return what it would have contributed at the market price and no fee.
 
         Returns
         -------
@@ -140,7 +140,7 @@ class InstrumentAttribution:
                 | {fill.instrument_id for fill in record.fills}
             )
             for name in names:
-                tonight = record.quantities.get(name, 0.0) * record.closes.get(name, 0.0)
+                tonight = record.quantities.get(name, 0.0) * record.valuation_prices.get(name, 0.0)
                 last_night = previous_quantities.get(name, 0.0) * previous_closes.get(name, 0.0)
                 pnl[name] = pnl.get(name, 0.0) + tonight - last_night
             for fill in record.fills:
@@ -153,7 +153,7 @@ class InstrumentAttribution:
             for name in record.quantities:
                 held[name] = held.get(name, 0) + 1
             previous_quantities = record.quantities
-            previous_closes = record.closes
+            previous_closes = record.valuation_prices
 
         instruments = tuple(
             sorted(
@@ -172,7 +172,9 @@ class InstrumentAttribution:
                 key=lambda entry: (-entry.pnl, entry.instrument_id),
             )
         )
-        moved = result.records[-1].equity - result.records[0].equity if result.records else 0.0
+        moved = (
+            result.records[-1].net_equity - result.records[0].net_equity if result.records else 0.0
+        )
         return cls(
             instruments=instruments,
             unexplained=moved - sum(entry.pnl for entry in instruments),

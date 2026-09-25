@@ -51,7 +51,7 @@ def equity_figure(
         What the figure is of. A plot of an unnamed run over an unnamed period
         is a picture, not a result, so the caller has to give one.
     gross : pd.Series | None
-        The same trades having paid the reference price and no fee. Drawn
+        The same trades having paid the market price and no fee. Drawn
         behind the net curve when given: the gap between them is what
         execution took.
     benchmark : pd.Series | None

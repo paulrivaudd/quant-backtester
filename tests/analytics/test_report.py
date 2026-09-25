@@ -16,27 +16,28 @@ import pytest
 
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.report import PerformanceReport
+from quant_backtester.backtest.config import BacktestConfig
 from quant_backtester.backtest.context import StrategyContext
-from quant_backtester.backtest.engine import (
-    BacktestEngine,
-    BacktestResult,
-    Strategy,
-    Timetable,
-)
+from quant_backtester.backtest.engine import BacktestEngine
+from quant_backtester.backtest.result import BacktestResult
+from quant_backtester.backtest.schedule import EverySession
+from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.execution.costs import CostModel
-from quant_backtester.execution.fills import ExecutionModel
-from quant_backtester.portfolio.limits import PositionLimits
+from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.price.returns import ReturnSignal
 from quant_backtester.signals.types import PriceBasis
+from quant_backtester.strategies.base import Strategy
 
 RunBuilder = Callable[..., BacktestResult]
 
 CONFIG = AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.0, minimum_sessions=3)
 
-PARIS = Timetable(decision_time=time(23, 0), execution_time=time(9, 1), timezone="Europe/Paris")
+PARIS = BacktestTimetable(
+    decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,16 +45,11 @@ class AlwaysHold(Strategy):
     """A strategy that always wants the same book, so the run is about the costs."""
 
     weights: Mapping[str, float]
+    strategy_id: str = "always_hold"
 
     def decide(self, ctx: StrategyContext) -> TargetAllocation:
         """Return the fixed target, stamped at the decision instant."""
-        return TargetAllocation(
-            as_of=ctx.as_of,
-            weights=dict(self.weights),
-            selected=tuple(self.weights),
-            considered=len(self.weights),
-            skipped={},
-        )
+        return TargetAllocation(as_of=ctx.as_of, weights=dict(self.weights))
 
 
 def report_of(result: BacktestResult) -> PerformanceReport:
@@ -102,9 +98,11 @@ def test_the_rendered_report_holds_the_four_blocks(run: RunBuilder) -> None:
 
     assert "total return" in rendered
     assert "commission" in rendered
-    assert "spread and slippage" in rendered
+    assert "spread" in rendered
+    assert "slippage" in rendered
     assert "by instrument" in rendered
-    assert "sessions valued on an older close" in rendered
+    assert "sessions valued on an older price" in rendered
+    assert "orders, fills, rejects" in rendered
 
 
 def test_the_report_carries_the_conventions_it_was_built_with(run: RunBuilder) -> None:
@@ -122,23 +120,28 @@ def engine_over(
     market: MarketDataReader,
     calendars: CalendarRegistry,
     execution: ExecutionModel,
+    sessions: tuple[date, ...],
     universe: Sequence[str] = ("ETF_EU",),
 ) -> BacktestEngine:
-    """Wire an engine holding one instrument over the synthetic market."""
+    """Wire an engine holding one instrument over the last five synthetic sessions."""
     return BacktestEngine(
         reader=market,
         calendars=calendars,
-        reference_calendar_id="XPAR",
+        strategy=AlwaysHold({instrument: 1.0 / len(universe) for instrument in universe}),
+        universe=universe,
+        config=BacktestConfig(
+            start=sessions[-5],
+            end=sessions[-1],
+            initial_cash=10_000.0,
+            base_currency="EUR",
+            reference_calendar="XPAR",
+            schedule=EverySession(),
+            timetable=PARIS,
+        ),
+        execution=execution,
         signals=[
             ReturnSignal(signal_id="return_2d", lookback_sessions=2, price_basis=PriceBasis.RAW)
         ],
-        strategy=AlwaysHold({instrument: 1.0 / len(universe) for instrument in universe}),
-        universe=universe,
-        initial_cash=10_000.0,
-        base_currency="EUR",
-        limits=PositionLimits(),
-        execution=execution,
-        timetable=PARIS,
     )
 
 
@@ -152,26 +155,27 @@ def test_a_real_run_reports_what_execution_took(
     the entry, and the report's drag is exactly the distance between the two
     books the engine kept.
 
-    The entry is also cut to what the cash can carry: a target of the whole
-    book costs a thousandth more than the book is worth, so the position ends a
-    thousandth smaller and the run never borrows.
+    The entry is sized at the price it is paid - 107 moved by twenty basis
+    points - so the value bought is the ten thousand, and the commission on
+    top of it is what the cash cannot carry: the position is cut by the
+    commission, and the run never borrows.
     """
     costly = ExecutionModel(
-        costs=CostModel(commission_rate=0.001, half_spread=0.002), minimum_trade_value=100.0
+        costs=CostModel(commission_rate=0.001, half_spread_rate=0.002), minimum_trade_value=100.0
     )
-    result = engine_over(market, calendars, costly).run(sessions[-5], sessions[-1])
+    result = engine_over(market, calendars, costly, sessions).run()
 
     report = PerformanceReport.of(result, CONFIG)
 
     assert report.costs.rebalancings == 1
     # The ten thousand pays for the stock and the fee together: a thousandth of
-    # what is left after the fee is 9.99, not the 10.02 a full-size order would
+    # what is left after the fee is 9.99, not the 10.00 a full-size order would
     # have cost with money the book did not have.
     assert report.costs.commission == pytest.approx(10_000.0 / 1.001 * 0.001)
-    assert report.costs.market_cost == pytest.approx(20.0, rel=1e-2)
-    assert report.quality.unfunded_sessions == 1
-    assert report.quality.sessions_on_borrowed_cash == 0
-    assert report.costs.market_cost > 0.0
+    assert report.costs.spread_cost == pytest.approx(20.0, rel=1e-2)
+    assert report.costs.slippage_cost == 0.0
+    assert report.quality.insufficient_cash_adjustments == 1
+    assert all(record.cash >= 0.0 for record in result.records)
     assert report.net.total_return < report.gross.total_return
     assert report.costs.drag == pytest.approx(report.gross.total_return - report.net.total_return)
 
@@ -180,7 +184,7 @@ def test_a_free_run_has_no_drag_and_two_identical_columns(
     market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
 ) -> None:
     """With no cost model the two books are the same book, and the report says so."""
-    result = engine_over(market, calendars, ExecutionModel()).run(sessions[-5], sessions[-1])
+    result = engine_over(market, calendars, ExecutionModel(costs=CostModel()), sessions).run()
 
     report = PerformanceReport.of(result, CONFIG)
     frame = report.as_frame()
@@ -194,8 +198,8 @@ def test_the_same_run_reports_the_same_numbers_twice(
     market: MarketDataReader, calendars: CalendarRegistry, sessions: tuple[date, ...]
 ) -> None:
     """A report is a function of a finished run, and reproducible like one."""
-    costly = ExecutionModel(costs=CostModel(commission_rate=0.001, half_spread=0.002))
-    result = engine_over(market, calendars, costly).run(sessions[-5], sessions[-1])
+    costly = ExecutionModel(costs=CostModel(commission_rate=0.001, half_spread_rate=0.002))
+    result = engine_over(market, calendars, costly, sessions).run()
 
     first = PerformanceReport.of(result, CONFIG)
     second = PerformanceReport.of(result, CONFIG)
@@ -226,13 +230,13 @@ def test_the_attribution_of_a_real_run_adds_up_to_the_run(
     would show, which is why it is computed rather than assumed.
     """
     costly = ExecutionModel(
-        costs=CostModel(commission_rate=0.001, half_spread=0.002), minimum_trade_value=100.0
+        costs=CostModel(commission_rate=0.001, half_spread_rate=0.002), minimum_trade_value=100.0
     )
-    result = engine_over(market, calendars, costly).run(sessions[-5], sessions[-1])
+    result = engine_over(market, calendars, costly, sessions).run()
 
     report = PerformanceReport.of(result, CONFIG)
 
-    moved = result.records[-1].equity - result.records[0].equity
+    moved = result.records[-1].net_equity - result.records[0].net_equity
     assert report.instruments.unexplained == pytest.approx(0.0, abs=1e-9)
     assert report.instruments.total_pnl == pytest.approx(moved)
     assert report.instruments.get("ETF_EU").sessions_held > 0

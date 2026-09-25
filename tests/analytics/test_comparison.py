@@ -21,14 +21,19 @@ from quant_backtester.analytics.comparison import (
 )
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.curves import Book, equity_curve
-from quant_backtester.backtest.engine import Timetable
 from quant_backtester.backtest.runner import StrategyRunner, value_benchmark
+from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.execution.costs import CostModel
+from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.signals.types import PriceBasis
 from quant_backtester.strategies.examples import BuyAndHold
 
-PARIS = Timetable(decision_time=time(23, 0), execution_time=time(9, 1), timezone="Europe/Paris")
+PARIS = BacktestTimetable(
+    decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)
+)
+FREE = ExecutionModel(costs=CostModel())
 CONFIG = AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.0)
 
 
@@ -56,6 +61,7 @@ def runner(
         reference_calendar_id="XPAR",
         base_currency="EUR",
         analytics=CONFIG,
+        execution=FREE,
         initial_cash=10_000.0,
         timetable=PARIS,
     )
@@ -173,7 +179,7 @@ def test_data_after_the_run_changes_no_figure_of_it(
     """A comparison is ex-post and still point-in-time.
 
     The second store carries a fifty percent jump on the session after the run
-    ends. Every reading is taken at a decision instant inside the period, so
+    ends. Every reading is taken at a valuation instant inside the period, so
     neither the curve nor the statistics move.
     """
     quiet = prices(100.0, 1.0)
@@ -194,6 +200,7 @@ def test_data_after_the_run_changes_no_figure_of_it(
             reference_calendar_id="XPAR",
             base_currency="EUR",
             analytics=CONFIG,
+            execution=FREE,
             initial_cash=10_000.0,
             timetable=PARIS,
         )
@@ -233,7 +240,13 @@ def test_two_curves_sharing_no_session_cannot_be_compared(
 def test_a_benchmark_of_a_run_with_no_session_is_refused(runner: StrategyRunner) -> None:
     """There is nothing to measure it over."""
     result = a_run(runner)
-    empty = type(result.backtest)(records=(), initial_cash=10_000.0)
+    empty = type(result.backtest)(
+        records=(),
+        config=result.backtest.config,
+        configuration={},
+        strategy_definition={"strategy_id": "nothing"},
+        strategy_fingerprint="nothing",
+    )
 
     with pytest.raises(ValueError, match="no session"):
         value_benchmark(empty, runner.reader, "ETF_OTHER")

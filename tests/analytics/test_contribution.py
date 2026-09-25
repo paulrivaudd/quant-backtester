@@ -13,68 +13,122 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 
 from quant_backtester.analytics.contribution import InstrumentAttribution
-from quant_backtester.backtest.engine import BacktestRecord, BacktestResult
-from quant_backtester.execution.costs import Side
+from quant_backtester.backtest.config import BacktestConfig
+from quant_backtester.backtest.records import BacktestRecord
+from quant_backtester.backtest.result import BacktestResult
+from quant_backtester.backtest.schedule import EverySession
+from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.execution.fills import Fill
+from quant_backtester.execution.orders import Side
+from quant_backtester.portfolio.holdings import Holding
 
 START = date(2026, 1, 5)
 """First session of a hand-written run."""
 
 
-def buy(instrument_id: str, quantity: float, price: float, *, commission: float = 0.0) -> Fill:
-    """Return a purchase done at the reference price."""
+def at_open(session: date) -> datetime:
+    """Return the instant a session's orders are filled at."""
+    return datetime.combine(session, datetime.min.time(), tzinfo=UTC) + timedelta(hours=8)
+
+
+def trade(
+    side: Side,
+    instrument_id: str,
+    quantity: float,
+    price: float,
+    *,
+    fill_price: float | None = None,
+    commission: float = 0.0,
+) -> Fill:
+    """Return a trade, at the market price unless a worse fill price is given."""
+    done = price if fill_price is None else fill_price
     return Fill(
         instrument_id=instrument_id,
-        side=Side.BUY,
+        side=side,
         quantity=quantity,
-        reference_price=price,
-        fill_price=price,
+        market_price=price,
+        fill_price=done,
         commission=commission,
+        spread_cost=abs(done - price) * quantity,
+        slippage_cost=0.0,
+        executed_at=at_open(START),
     )
 
 
+def buy(instrument_id: str, quantity: float, price: float, *, commission: float = 0.0) -> Fill:
+    """Return a purchase done at the market price."""
+    return trade(Side.BUY, instrument_id, quantity, price, commission=commission)
+
+
 def sell(instrument_id: str, quantity: float, price: float, *, commission: float = 0.0) -> Fill:
-    """Return a sale done at the reference price."""
-    return Fill(
-        instrument_id=instrument_id,
-        side=Side.SELL,
-        quantity=quantity,
-        reference_price=price,
-        fill_price=price,
-        commission=commission,
+    """Return a sale done at the market price."""
+    return trade(Side.SELL, instrument_id, quantity, price, commission=commission)
+
+
+def wrapped(records: Sequence[BacktestRecord], initial_cash: float) -> BacktestResult:
+    """Wrap hand-written records in a result whose configuration covers them."""
+    first = records[0].session_date if records else START
+    last = records[-1].session_date if records else START
+    return BacktestResult(
+        records=tuple(records),
+        config=BacktestConfig(
+            start=first,
+            end=last,
+            initial_cash=initial_cash,
+            base_currency="EUR",
+            reference_calendar="XPAR",
+            schedule=EverySession(),
+            timetable=BacktestTimetable(),
+        ),
+        configuration={},
+        strategy_definition={"strategy_id": "hand_written"},
+        strategy_fingerprint="hand_written",
     )
 
 
 def run_of(
     sessions: Sequence[tuple[float, Mapping[str, float], Mapping[str, float], Sequence[Fill]]],
 ) -> BacktestResult:
-    """Build a run from ``(equity, quantities, closes, fills)`` per session."""
+    """Build a run from ``(equity, quantities, closes, fills)`` per session.
+
+    The cash is what the equity leaves once the positions are valued, and it
+    has to be zero or more: a hand-written session cannot hold more than it is
+    worth, any more than the engine's can.
+    """
     records = []
     for position, (equity, quantities, closes, fills) in enumerate(sessions):
         session_date = START + timedelta(days=position)
+        opened = at_open(session_date)
+        dated = tuple(
+            Fill(
+                instrument_id=fill.instrument_id,
+                side=fill.side,
+                quantity=fill.quantity,
+                market_price=fill.market_price,
+                fill_price=fill.fill_price,
+                commission=fill.commission,
+                spread_cost=fill.spread_cost,
+                slippage_cost=fill.slippage_cost,
+                executed_at=opened,
+            )
+            for fill in fills
+        )
+        cash = equity - sum(quantities[name] * closes[name] for name in quantities)
         records.append(
             BacktestRecord(
                 session_date=session_date,
-                decision_at=datetime.combine(session_date, datetime.min.time(), tzinfo=UTC),
-                equity=equity,
-                gross_equity=equity,
-                cash=equity - sum(quantities[name] * closes[name] for name in quantities),
+                valuation_time=opened + timedelta(hours=14),
+                cash=cash,
+                gross_cash=cash,
+                holdings={name: Holding(name, size) for name, size in quantities.items()},
+                valuation_prices=dict(closes),
                 target_invested=1.0,
-                actual_invested=1.0,
-                considered=2,
-                traded_value=sum(fill.traded_value for fill in fills),
-                commission=sum(fill.commission for fill in fills),
-                market_cost=sum(fill.market_cost for fill in fills),
-                untradable=(),
-                unfunded=(),
-                priced_from_earlier=(),
-                weights={},
-                quantities=dict(quantities),
-                fills=tuple(fills),
-                closes=dict(closes),
+                execution_time=opened if dated else None,
+                executed_decision=session_date - timedelta(days=1) if dated else None,
+                fills=dated,
             )
         )
-    return BacktestResult(records=tuple(records), initial_cash=sessions[0][0])
+    return wrapped(records, sessions[0][0])
 
 
 def one_fund_bought_and_held() -> BacktestResult:
@@ -146,7 +200,7 @@ def test_what_execution_took_is_charged_to_the_instrument_it_was_taken_on() -> N
     result = run_of(
         [
             (1_000.0, {}, {}, []),
-            (995.0, {"A": 10.0}, {"A": 100.0}, [buy("A", 10.0, 100.0, commission=5.0)]),
+            (995.0, {"A": 9.0}, {"A": 100.0}, [buy("A", 9.0, 100.0, commission=5.0)]),
         ]
     )
 
@@ -158,19 +212,12 @@ def test_what_execution_took_is_charged_to_the_instrument_it_was_taken_on() -> N
 
 def test_the_gross_figure_hands_execution_back() -> None:
     """Net says what the holder got; gross says whether the idea was worth trading."""
-    spread = Fill(
-        instrument_id="A",
-        side=Side.BUY,
-        quantity=10.0,
-        reference_price=100.0,
-        fill_price=101.0,
-        commission=5.0,
-    )
-    result = run_of([(1_000.0, {}, {}, []), (985.0, {"A": 10.0}, {"A": 100.0}, [spread])])
+    spread = trade(Side.BUY, "A", 9.0, 100.0, fill_price=101.0, commission=5.0)
+    result = run_of([(1_000.0, {}, {}, []), (986.0, {"A": 9.0}, {"A": 100.0}, [spread])])
 
     entry = InstrumentAttribution.of(result).get("A")
-    assert entry.market_cost == pytest.approx(10.0)
-    assert entry.pnl == pytest.approx(-15.0)
+    assert entry.market_cost == pytest.approx(9.0)
+    assert entry.pnl == pytest.approx(-14.0)
     assert entry.gross_pnl == pytest.approx(0.0)
 
 
@@ -231,7 +278,7 @@ def test_a_run_that_held_nothing_explains_nothing_and_says_so() -> None:
 
 def test_an_empty_run_is_not_an_error() -> None:
     """A range with no session is a run that did nothing, not a broken one."""
-    attribution = InstrumentAttribution.of(BacktestResult(records=(), initial_cash=1_000.0))
+    attribution = InstrumentAttribution.of(wrapped((), 1_000.0))
 
     assert attribution.instruments == ()
     assert attribution.total_pnl == 0.0

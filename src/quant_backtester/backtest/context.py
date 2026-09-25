@@ -24,6 +24,7 @@ builds it, and a lower layer never imports a higher one.
 
 from __future__ import annotations
 
+import math
 from collections import Counter
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
@@ -35,7 +36,7 @@ import pandas as pd
 from quant_backtester.backtest.market import StrategyMarketView
 from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.numbers import require_unit_fraction
-from quant_backtester.portfolio.targets import TargetAllocation
+from quant_backtester.portfolio.targets import WEIGHT_SUM_TOLERANCE, TargetAllocation
 from quant_backtester.portfolio.view import PortfolioView
 from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import (
@@ -396,8 +397,8 @@ class StrategyContext:
         for instrument_id, weight in weights.items():
             require_unit_fraction(weight, f"the weight of {instrument_id}")
             self._require_targetable(instrument_id)
-        total = sum(weights.values())
-        if total > 1.0:
+        total = math.fsum(weights.values())
+        if total > 1.0 + WEIGHT_SUM_TOLERANCE:
             raise ValueError(f"the target weights add up to {total}, and this book does not borrow")
         return TargetAllocation(
             as_of=self.as_of,

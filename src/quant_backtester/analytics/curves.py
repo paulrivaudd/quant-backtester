@@ -19,7 +19,7 @@ from enum import Enum
 
 import pandas as pd
 
-from quant_backtester.backtest.engine import BacktestResult
+from quant_backtester.backtest.result import BacktestResult
 
 
 class Book(Enum):
@@ -29,9 +29,9 @@ class Book(Enum):
     """What the strategy was actually worth, costs paid."""
 
     GROSS = "GROSS"
-    """What the same trades would have been worth having paid the reference
-    price and no fee. The difference between the two curves is everything
-    execution took."""
+    """What the same trades would have been worth having paid the market price
+    and no fee. The difference between the two curves is everything execution
+    took."""
 
 
 def equity_curve(result: BacktestResult, book: Book) -> pd.Series:
@@ -41,7 +41,7 @@ def equity_curve(result: BacktestResult, book: Book) -> pd.Series:
     ----------
     result : BacktestResult
         A finished run. Nothing here advances time or reads market data: the
-        equity was valued by the engine at each session's decision instant, and
+        equity was valued by the engine at each session's valuation instant, and
         this only lines the numbers up.
     book : Book
         Which book to read. Required rather than defaulted: a gross number read
@@ -65,7 +65,7 @@ def equity_curve(result: BacktestResult, book: Book) -> pd.Series:
     if not isinstance(book, Book):
         raise ValueError(f"book must be a Book, got {book!r}")
     values = [
-        record.equity if book is Book.NET else record.gross_equity for record in result.records
+        record.net_equity if book is Book.NET else record.gross_equity for record in result.records
     ]
     index = pd.Index(
         [record.session_date for record in result.records], dtype="object", name="session_date"
