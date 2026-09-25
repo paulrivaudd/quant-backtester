@@ -1107,6 +1107,57 @@ def test_a_book_asked_to_keep_what_it_holds_does_not_trade_again(
     assert held == {fills[0].quantity}
 
 
+@dataclass(frozen=True, slots=True)
+class FalseHold(Strategy):
+    """A strategy that says it keeps its book while naming another one."""
+
+    strategy_id: str = "false_hold"
+
+    def decide(self, ctx: StrategyContext) -> TargetAllocation:
+        """Claim to hold a book of all ETF_EU, whatever is held."""
+        return TargetAllocation(as_of=ctx.as_of, weights={"ETF_EU": 1.0}, hold_positions=True)
+
+
+def test_a_hold_that_does_not_describe_the_book_is_refused(
+    market: MarketDataReader, calendars: CalendarRegistry
+) -> None:
+    """Keeping a book is recorded as that book's weights, or it records a lie."""
+    with pytest.raises(ValueError, match="record the book as it is"):
+        run_over(market, calendars, FalseHold())
+
+
+def test_two_funds_bought_and_held_trade_once_even_with_no_minimum_trade(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    xpar: TradingCalendar,
+    calendars: CalendarRegistry,
+    prices: Callable[..., dict[date, float]],
+) -> None:
+    """The audit's test: buy and hold must not rely on a trade threshold to stay still.
+
+    Two funds rising at different rates, fractions allowed, no minimum trade
+    value: restating last night's weights at each open would trade every
+    morning. Keeping the positions trades once, at the entry, and never again.
+    """
+    market = leaver_market(make_market, make_bars, xpar, prices)
+
+    result = run_over(
+        market,
+        calendars,
+        BuyAndHold(instruments=("ETF_EU", "ETF_OTHER")),
+        universe=("ETF_EU", "ETF_OTHER"),
+        start=date(2026, 9, 2),
+        end=date(2026, 9, 14),
+    )
+
+    traded = [record.session_date for record in result.records if record.fills]
+    assert traded == [date(2026, 9, 3)]
+    assert all(record.rejects == () for record in result.records)
+    kept = [record for record in result.records[2:] if record.execution_time is not None]
+    assert kept and all(record.orders == () for record in kept)
+    assert all(record.decision and record.decision.holds_positions for record in kept)
+
+
 def test_whole_shares_keep_the_book_off_its_target(
     make_market: Callable[..., MarketDataReader],
     make_bars: Callable[..., pd.DataFrame],

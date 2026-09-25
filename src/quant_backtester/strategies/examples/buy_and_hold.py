@@ -42,7 +42,9 @@ class BuyAndHold(Strategy):
 
     How it knows it has already bought: the book. Nothing is held on the first
     session of a run, so the target is the purchase; from the moment a position
-    exists, the target is the book itself. If that first order could not be
+    exists, the decision is to keep the positions as they are, and no order is
+    sent - not the weights of the close restated at the next open, which would
+    trade the overnight drift every morning. If that first order could not be
     sent - no opening price, not enough cash - nothing is held, and the
     purchase is simply attempted again at the next decision.
     """
@@ -65,7 +67,7 @@ class BuyAndHold(Strategy):
             )
 
     def decide(self, ctx: StrategyContext) -> TargetAllocation:
-        """Buy while the book is empty, then ask for the book that is there."""
+        """Buy while the book is empty, then keep what is there without trading."""
         if not ctx.portfolio.quantities:
             return ctx.equal_weight(self.instruments)
-        return ctx.hold_current()
+        return ctx.hold_positions()

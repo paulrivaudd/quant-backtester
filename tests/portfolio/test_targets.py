@@ -167,3 +167,16 @@ def test_the_caller_cannot_edit_an_allocation_through_the_mapping_it_passed() ->
     weights["A"] = 1.0
 
     assert target.weights["A"] == 0.5
+
+
+def test_an_allocation_does_not_hold_its_positions_unless_it_says_so() -> None:
+    """Weights are a target to trade towards; keeping the book is a separate statement."""
+    assert TargetAllocation(as_of=AS_OF, weights={"A": 0.5}).hold_positions is False
+    assert TargetAllocation(as_of=AS_OF, weights={"A": 0.5}, hold_positions=True).hold_positions
+
+
+@pytest.mark.parametrize("flag", [1, "yes", None])
+def test_holding_is_said_as_a_boolean(flag: object) -> None:
+    """A truthy value is not a decision to hold."""
+    with pytest.raises(ValueError, match="hold_positions"):
+        TargetAllocation(as_of=AS_OF, weights={}, hold_positions=flag)  # type: ignore[arg-type]

@@ -226,3 +226,56 @@ def test_a_decision_constrains_exactly_what_was_requested() -> None:
 
     with pytest.raises(ValueError, match="does not start from what was requested"):
         PortfolioDecision(requested=requested, constrained=constrained())
+
+
+# -- keeping the book --------------------------------------------------------------------
+
+
+def test_a_book_kept_within_the_limits_is_kept(instruments: InstrumentRegistry) -> None:
+    """Nothing to cut, so nothing to trade: the hold goes through."""
+    requested = TargetAllocation(
+        as_of=AS_OF, weights={"ETF_EU": 0.4, "ETF_OTHER": 0.5}, hold_positions=True
+    )
+
+    decision = PortfolioModel().decide(
+        requested, instruments=instruments, universe=UNIVERSE, base_currency="EUR"
+    )
+
+    assert decision.holds_positions
+    assert dict(decision.accepted_weights) == {"ETF_EU": 0.4, "ETF_OTHER": 0.5}
+
+
+def test_a_limit_the_kept_book_breaches_overrules_the_hold(
+    instruments: InstrumentRegistry,
+) -> None:
+    """A position that drifted past a cap is traded down to it: policy wins over inertia."""
+    requested = TargetAllocation(
+        as_of=AS_OF, weights={"ETF_EU": 0.7, "ETF_OTHER": 0.3}, hold_positions=True
+    )
+
+    decision = PortfolioModel(PortfolioLimits(max_weight_per_instrument=0.5)).decide(
+        requested, instruments=instruments, universe=UNIVERSE, base_currency="EUR"
+    )
+
+    assert not decision.holds_positions
+    assert dict(decision.accepted_weights) == {"ETF_EU": 0.5, "ETF_OTHER": 0.3}
+    assert dict(decision.constrained.adjustments) == {
+        "ETF_EU": (LimitAdjustment.CAPPED_AT_MAX_WEIGHT,)
+    }
+
+
+def test_a_constrained_target_cannot_both_hold_and_be_cut() -> None:
+    """A cut is a trade; a hold is the absence of one."""
+    with pytest.raises(ValueError, match="cannot be kept as it is"):
+        constrained(hold_positions=True)
+
+
+def test_holding_on_a_constrained_target_is_said_as_a_boolean() -> None:
+    """Truthy is not a decision."""
+    with pytest.raises(ValueError, match="hold_positions"):
+        ConstrainedTarget(
+            as_of=AS_OF,
+            requested_weights={},
+            accepted_weights={},
+            hold_positions=1,  # type: ignore[arg-type]
+        )

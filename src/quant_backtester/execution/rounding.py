@@ -3,18 +3,26 @@
 A retail order book takes 123 shares of an ETF or 124, never 123.47. A
 backtest that buys fractions allocates its capital perfectly, and that small,
 systematic optimism turns into a return the account never sees. So wherever an
-instrument declares a ``quantity_step``, an order is a whole number of lots,
-**rounded down**:
+instrument declares a ``quantity_step``, an order is a whole number of lots.
 
-- a purchase never buys more than the target asked for, because the cash for
+**The rule, stated once.** An order's quantity is always positive - its side
+carries the direction - and it is a whole number of lots rounded **down**. Seen
+as a signed change of the position, the trade is therefore **truncated towards
+zero**, never floored: a sale of an excess of 4.5 lots sells 4, not 5. It
+follows that
+
+- a purchase never buys more than the target asks for, because the cash for
   the extra units was never set aside;
-- a sale never sells more than the target calls for, so what remains is within
-  a lot of it;
-- a target within a lot of what is held is no order at all. It is the trade
-  that is rounded, not the target position: a target recomputed every morning
-  drifts by a fraction of a share, and rounding it as a position would sell a
-  lot whenever it drifted just under one - a book asked to keep what it holds
-  would sell itself away, a commission at a time.
+- a sale never sells more than the excess over the target;
+- the position ends within one lot of its target, never above it after a
+  purchase and never below it after a sale;
+- a target within a lot of what is held is no order at all. A target
+  recomputed every morning drifts by a fraction of a share, and rounding it as
+  a *position* rather than as a trade would sell a lot whenever it drifted just
+  under one - a book asked to keep what it holds would sell itself away, a
+  commission at a time.
+
+No function here ever rounds a negative number: they refuse one.
 
 Lots are counted as integers and turned back into units at the end, so a
 hundred whole shares are a hundred and not 99.999999999999986, and a position

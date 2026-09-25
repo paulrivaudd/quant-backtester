@@ -51,6 +51,10 @@ class ConstrainedTarget:
     adjustments : Mapping[str, tuple[LimitAdjustment, ...]]
         For every instrument whose accepted weight is below its requested one,
         the limits that cut it, in the order they were applied.
+    hold_positions : bool
+        Whether the book is to be kept exactly as it is, with no order sent.
+        True only when the strategy asked to hold and no limit cut anything: a
+        limit that binds on a held book is a trade the policy requires.
 
     Raises
     ------
@@ -73,11 +77,20 @@ class ConstrainedTarget:
     adjustments: Mapping[str, tuple[LimitAdjustment, ...]] = field(
         default_factory=lambda: MappingProxyType({})
     )
+    hold_positions: bool = False
 
     def __post_init__(self) -> None:
         """Check the two sides tell one consistent story, and freeze them."""
         if not isinstance(self.as_of, datetime) or self.as_of.tzinfo is None:
             raise ValueError(f"as_of must be a timezone-aware datetime, got {self.as_of!r}")
+        if not isinstance(self.hold_positions, bool):
+            raise ValueError(
+                f"hold_positions must be said as a boolean, got {self.hold_positions!r}"
+            )
+        if self.hold_positions and self.adjustments:
+            raise ValueError(
+                "a book a limit had to cut cannot be kept as it is: the cut is a trade"
+            )
         requested = {name: self.requested_weights[name] for name in sorted(self.requested_weights)}
         accepted = {name: self.accepted_weights[name] for name in sorted(self.accepted_weights)}
         if set(requested) != set(accepted):
@@ -176,6 +189,11 @@ class PortfolioDecision:
         return self.constrained.accepted_weights
 
     @property
+    def holds_positions(self) -> bool:
+        """Return whether the book is to be kept exactly as it is, with no order."""
+        return self.constrained.hold_positions
+
+    @property
     def considered(self) -> int:
         """Return how many instruments the strategy had a usable signal for."""
         return self.requested.considered
@@ -255,5 +273,8 @@ class PortfolioModel:
                 requested_weights=requested.weights,
                 accepted_weights=accepted,
                 adjustments=adjustments,
+                # A limit that binds overrules a hold: the book is traded down
+                # to the policy, like any other target that breached it.
+                hold_positions=requested.hold_positions and not adjustments,
             ),
         )
