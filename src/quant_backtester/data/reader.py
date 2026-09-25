@@ -127,6 +127,47 @@ class _Observation:
     status: ObservationStatus
 
 
+@dataclass(frozen=True, slots=True)
+class Observation:
+    """One instrument's latest knowable value at an instant, and why it is what it is.
+
+    The typed twin of one row of :meth:`PointInTimeReader.values`, for the
+    layers that act on one value at a time - valuing a position, filling an
+    order - and must never be handed a bare float. A number without its status
+    is how a close from last Thursday ends up valuing a book on Monday without
+    anything saying so.
+
+    Attributes
+    ----------
+    instrument_id : str
+        Instrument read.
+    value : float | None
+        The number, or ``None`` for ``NOT_LISTED`` and ``MISSING`` - which have
+        none to give, and are not the same thing as zero.
+    status : ObservationStatus
+        Why the value is what it is.
+    observation_date : date | None
+        The session or observation date the value describes.
+    available_at : datetime | None
+        When it became knowable, in UTC. Never after the instant it was read at.
+    age_sessions : int | None
+        Sessions of the reference calendar between the observation and the
+        instant it was read at.
+    """
+
+    instrument_id: str
+    value: float | None
+    status: ObservationStatus
+    observation_date: date | None = None
+    available_at: datetime | None = None
+    age_sessions: int | None = None
+
+    @property
+    def is_current(self) -> bool:
+        """Return whether this is a value of the session being read, and not an older one."""
+        return self.status is ObservationStatus.OK and self.value is not None
+
+
 def _require_aware(instant: datetime, name: str) -> datetime:
     """Return ``instant`` in UTC, rejecting a naive datetime.
 
@@ -477,6 +518,56 @@ class PointInTimeReader:
             },
             columns=list(VALUES_COLUMNS),
         )
+
+    def observations(
+        self, instrument_ids: Sequence[str], field: BarField = BarField.CLOSE
+    ) -> dict[str, Observation]:
+        """Return the latest knowable value of several instruments, one object each.
+
+        Parameters
+        ----------
+        instrument_ids : Sequence[str]
+            Instruments to read.
+        field : BarField
+            Field to return for ``BAR`` instruments.
+
+        Returns
+        -------
+        dict[str, Observation]
+            Keyed by instrument, in the order asked. The same rule as
+            :meth:`values`, applied the same way: this is that frame, one row
+            at a time, for a caller that acts on each value separately.
+
+        Raises
+        ------
+        ValueError
+            If an instrument appears twice.
+        KeyError
+            If an instrument is not registered.
+        """
+        requested = list(instrument_ids)
+        duplicates = sorted({name for name in requested if requested.count(name) > 1})
+        if duplicates:
+            raise ValueError(
+                f"observations() got duplicate instrument ids: {', '.join(duplicates)}"
+            )
+        if not requested:
+            return {}
+        reference = _latest_session_opened_at(self._reference_calendar, self._as_of)
+        observed: dict[str, Observation] = {}
+        for name in requested:
+            row = self._observe(name, field, reference)
+            observed[name] = Observation(
+                instrument_id=name,
+                value=None if row.value != row.value else row.value,
+                status=row.status,
+                observation_date=row.observation_date,
+                available_at=(
+                    None if row.available_at_utc is None else row.available_at_utc.to_pydatetime()
+                ),
+                age_sessions=row.age_sessions,
+            )
+        return observed
 
     def corporate_actions(self, instrument_id: str) -> pd.DataFrame:
         """Return the corporate actions knowable at ``as_of``.
