@@ -1,14 +1,20 @@
-"""Run the reference baselines over several periods, and print what each of them did.
+"""Run the reference experiments, and print what each of them did.
 
-Run it from the repository root, once the local store is filled::
+Every figure the README cites comes out of this script, from a suite with a
+name - so a number in the documentation can always be traced back to a command
+and the code that produced it. Run it from the repository root, once the local
+store is filled::
 
-    uv run python scripts/run_baselines.py
+    uv run python scripts/run_baselines.py                      # the baselines table
+    uv run python scripts/run_baselines.py --suite readme       # the README's own runs
+    uv run python scripts/run_baselines.py --suite all --records out/
     uv run python scripts/run_baselines.py --period 2024-01-02:2026-09-17
 
-Four strategies, each testing one more piece of the chain than the last:
+The ``baselines`` suite runs four strategies, each testing one more piece of
+the chain than the last:
 
-- ``buy_and_hold`` buys the world fund once and never rebalances - execution,
-  costs, whole shares and the cash they leave;
+- ``buy_and_hold`` buys the world fund once and keeps it - execution, costs,
+  whole shares and the cash they leave;
 - ``equal_weight`` restates half and half at the end of every month - turnover,
   several orders, the sale that pays for the purchase;
 - ``momentum_rotation`` holds the fund with the better sixty-session momentum -
@@ -17,15 +23,21 @@ Four strategies, each testing one more piece of the chain than the last:
   one and a half standard deviations above its sixty-observation mean - a gauge
   that is read and never held.
 
-Every run records what it was made with - the configuration, the fingerprint
-of the strategy and the state of this checkout - so a line of the table can be
-traced back to the code and the settings that produced it. The costs are the
-same for all four and declared below, where they can be argued with.
+The ``readme`` suite runs what the README prints: the reference rotation with
+its full report and its comparison with the world fund, and buy and hold
+against the equal weight over the same period.
+
+Every run records what it was made with - the configuration, the fingerprint of
+the strategy and the state of this checkout - and ``--records`` writes each
+run's sessions, orders, fills, rejects and holdings to CSV, every float written
+so that it reads back to the same bits: two versions of the code can be
+compared run for run, not only on the totals.
 """
 
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -56,10 +68,13 @@ STORE = REPOSITORY / "market_data"
 """The committed metadata and the local data next to it."""
 
 UNIVERSE = "ROTATION_2"
-"""The two PEA funds every baseline chooses among."""
+"""The two PEA funds every experiment chooses among."""
 
 BENCHMARK = "ETF_WORLD"
 """What every run is measured against: simply holding the world fund."""
+
+INITIAL_CASH = 100_000.0
+"""What every run starts with, in euros."""
 
 EXECUTION = ExecutionModel(
     costs=CostModel(
@@ -75,7 +90,7 @@ one of slippage, and no order below five hundred euros: a retail broker on a
 liquid Paris ETF, stated rather than assumed."""
 
 ANALYTICS = AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.02)
-"""The annualisation every figure of the table is computed under."""
+"""The annualisation every figure is computed under."""
 
 PERIODS: tuple[tuple[str, str], ...] = (
     ("2018-07-16", "2026-09-17"),
@@ -86,6 +101,12 @@ PERIODS: tuple[tuple[str, str], ...] = (
 """The whole history both funds share once a sixty-session window exists, and
 three regimes inside it: a long rise with a crash in it, a fall and its
 recovery, and the recent run."""
+
+README_PERIOD: tuple[str, str] = ("2025-01-02", "2026-09-17")
+"""The period of the README's reference run."""
+
+BOTH_FUNDS = ("ETF_SP500_PEA", "ETF_WORLD")
+"""The two members of the universe, in instrument order."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,15 +120,22 @@ class Baseline:
 
 BASELINES: tuple[Baseline, ...] = (
     Baseline("buy_and_hold", BuyAndHold(instruments=("ETF_WORLD",)), EverySession()),
-    Baseline(
-        "equal_weight",
-        EqualWeightRebalance(instruments=("ETF_SP500_PEA", "ETF_WORLD")),
-        Monthly(),
-    ),
+    Baseline("equal_weight", EqualWeightRebalance(instruments=BOTH_FUNDS), Monthly()),
     Baseline("momentum_rotation", MomentumRotation(lookback_sessions=60, top_n=1), EverySession()),
     Baseline("momentum_vix", MomentumVix(top_n=1), EverySession()),
 )
 """The four baselines, from the simplest to the one that reads the most."""
+
+REFERENCE = Baseline(
+    "reference_rotation", MomentumRotation(lookback_sessions=60, top_n=1), EverySession()
+)
+"""The README's reference run: the rotation between the two funds, every session."""
+
+HOLD_AGAINST_REBALANCE: tuple[Baseline, ...] = (
+    Baseline("buy_and_hold_both", BuyAndHold(instruments=BOTH_FUNDS), EverySession()),
+    Baseline("equal_weight_daily", EqualWeightRebalance(instruments=BOTH_FUNDS), EverySession()),
+)
+"""The README's two baselines on both funds: keep what was bought, or restate it."""
 
 
 def runner() -> StrategyRunner:
@@ -127,7 +155,7 @@ def runner() -> StrategyRunner:
         analytics=ANALYTICS,
         execution=EXECUTION,
         universes=UniverseRegistry.from_toml(STORE / "metadata" / "universes.toml", instruments),
-        initial_cash=100_000.0,
+        initial_cash=INITIAL_CASH,
         source=git_source_state(REPOSITORY),
         benchmark=BENCHMARK,
     )
@@ -152,11 +180,11 @@ HEADER = (
 
 
 def row(label: str, result: StrategyResult) -> str:
-    """Return one line of the table for a finished run."""
+    """Return one line of the table for a finished run, and its rejects by reason."""
     report = result.report()
     net = report.net
     comparison = result.compare()
-    return (
+    line = (
         f"{label:<20}{f'{result.start} {result.end}':<25}"
         f"{percent(net.total_return):>9}{percent(report.gross.total_return):>9}"
         f"{percent(net.annualised_return):>9}{number(net.sharpe_ratio):>8}"
@@ -164,6 +192,64 @@ def row(label: str, result: StrategyResult) -> str:
         f"{report.costs.rebalancings:>8}{report.quality.rejects:>9}"
         f"{report.quality.estimated_valuations:>6}{percent(comparison.excess_return):>10}"
     )
+    reasons = ", ".join(
+        f"{reason} {count}" for reason, count in report.quality.rejects_by_reason.items()
+    )
+    return f"{line}\n{'':<20}rejects: {reasons}" if reasons else line
+
+
+def write_records(result: StrategyResult, directory: Path, name: str) -> None:
+    """Write one run's sessions, orders, fills, rejects and holdings to CSV.
+
+    Every float is written with seventeen significant digits, which is enough
+    for it to read back to exactly the same double: the files are for comparing
+    two versions of the code bit for bit, not for reading.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    views = {
+        "sessions": result.frame(),
+        "orders": result.orders(),
+        "fills": result.fills(),
+        "rejects": result.rejects(),
+        "holdings": result.holdings(),
+    }
+    for view, frame in views.items():
+        frame.to_csv(directory / f"{name}_{view}.csv", float_format="%.17g")
+
+
+def run_baselines(
+    runs: StrategyRunner, periods: Sequence[tuple[str, str]], records: Path | None
+) -> None:
+    """Run every baseline over every period, and print the table."""
+    print(HEADER)
+    for start, end in periods:
+        for baseline in BASELINES:
+            result = runs.run(baseline.strategy, UNIVERSE, start, end, schedule=baseline.schedule)
+            print(row(baseline.label, result), flush=True)
+            if records is not None:
+                write_records(result, records, f"baselines_{baseline.label}_{start}_{end}")
+        print()
+
+
+def run_readme(runs: StrategyRunner, records: Path | None) -> None:
+    """Run what the README prints: the reference run in full, and the two baselines."""
+    start, end = README_PERIOD
+    reference = runs.run(REFERENCE.strategy, UNIVERSE, start, end, schedule=REFERENCE.schedule)
+    print(f"== {REFERENCE.label}  {start} {end}")
+    print(reference.report().render())
+    print()
+    print(reference.compare().render())
+    print(flush=True)
+    if records is not None:
+        write_records(reference, records, f"readme_{REFERENCE.label}_{start}_{end}")
+    print(f"== buy and hold against a daily equal weight, both funds  {start} {end}")
+    print(HEADER)
+    for baseline in HOLD_AGAINST_REBALANCE:
+        result = runs.run(baseline.strategy, UNIVERSE, start, end, schedule=baseline.schedule)
+        print(row(baseline.label, result), flush=True)
+        if records is not None:
+            write_records(result, records, f"readme_{baseline.label}_{start}_{end}")
+    print()
 
 
 def parse_period(text: str) -> tuple[str, str]:
@@ -181,28 +267,43 @@ def parse_period(text: str) -> tuple[str, str]:
 
 
 def main() -> None:
-    """Run every baseline over every period, and print the table."""
-    parser = argparse.ArgumentParser(description="Run the baselines over several periods.")
+    """Run the suites asked for, and print what they did."""
+    parser = argparse.ArgumentParser(description="Run the reference experiments.")
+    parser.add_argument(
+        "--suite",
+        choices=("baselines", "readme", "all"),
+        default="baselines",
+        help="which experiments to run; the baselines table by default",
+    )
     parser.add_argument(
         "--period",
         action="append",
         metavar="START:END",
-        help="a period to run over instead of the default ones; may be repeated",
+        help="a period for the baselines instead of the default ones; may be repeated",
+    )
+    parser.add_argument(
+        "--records",
+        type=Path,
+        metavar="DIR",
+        help="write every run's sessions, orders, fills, rejects and holdings there",
     )
     arguments = parser.parse_args()
     periods = [parse_period(item) for item in arguments.period or []] or list(PERIODS)
     runs = runner()
     source = runs.source.definition()
-    print(f"source {source['source_state']} {source['git_commit']}")
-    print(f"costs  {EXECUTION.costs.definition()}")
-    print(f"minimum trade value {EXECUTION.minimum_trade_value}")
+    print(f"source    {source['source_state']} {source['git_commit']}")
+    print(f"costs     {EXECUTION.costs.definition()}")
+    print(f"minimum   {EXECUTION.minimum_trade_value} per order")
+    print(f"cash      {INITIAL_CASH:,.0f} EUR in {UNIVERSE}, measured against {BENCHMARK}")
+    print(
+        f"analytics {ANALYTICS.sessions_per_year} sessions a year, "
+        f"risk-free {ANALYTICS.risk_free_rate}"
+    )
     print()
-    print(HEADER)
-    for start, end in periods:
-        for baseline in BASELINES:
-            result = runs.run(baseline.strategy, UNIVERSE, start, end, schedule=baseline.schedule)
-            print(row(baseline.label, result), flush=True)
-        print()
+    if arguments.suite in ("readme", "all"):
+        run_readme(runs, arguments.records)
+    if arguments.suite in ("baselines", "all"):
+        run_baselines(runs, periods, arguments.records)
 
 
 if __name__ == "__main__":
