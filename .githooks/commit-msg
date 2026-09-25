@@ -1,0 +1,16 @@
+#!/bin/sh
+# Refuse a commit message that credits Claude.
+#
+# The history of this repository is its owner's: no Co-Authored-By trailer
+# naming Claude, and no "Generated with Claude Code" footer. The rule lived in a
+# note for a while and was broken anyway; a hook is a rule that cannot be
+# forgotten. Rewriting the commits that already carry one is not the fix - a
+# commit a result was recorded against must keep existing.
+#
+# Enabled once per clone:  git config core.hooksPath .githooks
+if grep -Eiq '^[[:space:]]*co-authored-by:.*(claude|anthropic)|generated with.*claude' "$1"; then
+    echo "commit-msg: this repository does not credit Claude in its history;" >&2
+    echo "remove the Co-Authored-By / 'Generated with Claude Code' line and commit again." >&2
+    exit 1
+fi
+exit 0
