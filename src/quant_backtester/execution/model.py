@@ -216,6 +216,7 @@ class ExecutionModel:
         instruments: InstrumentRegistry,
         base_currency: str,
         universe: Collection[str],
+        hold: bool = False,
     ) -> Execution:
         """Trade the book towards the target weights, at one execution instant.
 
@@ -247,6 +248,10 @@ class ExecutionModel:
         universe : Collection[str]
             The trading universe on the execution session. A purchase outside
             it is refused; a sale never is.
+        hold : bool
+            Whether the decision was to keep every position as it is. No order
+            is built, whatever the target weights and the overnight moves say:
+            they only record what the book was worth when it was decided.
 
         Returns
         -------
@@ -284,13 +289,17 @@ class ExecutionModel:
           The rejection says which way and how much when that is knowable - a
           position to close is a sale of all of it - and leaves both unknown
           otherwise, rather than guessing;
+        - every order is a positive whole number of lots, rounded down, so
+          that as a signed change of the position the trade is truncated
+          towards zero (:mod:`quant_backtester.execution.rounding` states the
+          rule once);
         - a purchase is sized at the price it will be paid: the whole lots
-          between what is held and ``w * equity / fill_price``, rounded down,
-          so that the value spent is at most the value targeted. It is refused
-          outside the universe of the execution session;
+          between what is held and ``w * equity / fill_price``, so that the
+          value spent is at most the value targeted. It is refused outside the
+          universe of the execution session;
         - a sale sells the whole lots of the excess over
-          ``w * equity / market_price``, rounded down too: it never sells more
-          than the target calls for, and a position to close is sold in full;
+          ``w * equity / market_price``: it never sells more than the target
+          calls for, and a position to close is sold in full;
         - an order worth less than the minimum trade value is rejected with
           ``BELOW_MINIMUM_TRADE``;
         - a target within a lot of what is held is no order at all: at this
@@ -303,6 +312,8 @@ class ExecutionModel:
         """
         self._require_target(target)
         equity = self._equity(state, quotes, last_known, at, session)
+        if hold:
+            return Execution(at=at, state=state, equity=equity)
         sells, buys, rejects = self._plan(
             state,
             target,

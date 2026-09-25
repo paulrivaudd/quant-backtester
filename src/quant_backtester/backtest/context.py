@@ -27,7 +27,7 @@ from __future__ import annotations
 import math
 from collections import Counter
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from types import MappingProxyType
 
@@ -479,8 +479,8 @@ class StrategyContext:
             skipped=self._reasons(among, ()),
         )
 
-    def hold_current(self, among: Selection | None = None) -> TargetAllocation:
-        """Return the allocation that asks for the book already held.
+    def hold_positions(self, among: Selection | None = None) -> TargetAllocation:
+        """Return the decision to keep every position exactly as it is.
 
         Parameters
         ----------
@@ -490,15 +490,17 @@ class StrategyContext:
         Returns
         -------
         TargetAllocation
-            The current weights, as a target.
+            The book's own weights at this decision, marked as a hold: no order
+            is sent for it at the next open, however far the prices move
+            overnight. A risk limit the book breaches still trades it down.
 
         Raises
         ------
         ValueError
             If the book holds an instrument this session's universe does not,
             or one the registry says is not tradable. Both mean the book can no
-            longer be expressed as a target, and a strategy asking to hold it
-            has to say what it wants instead.
+            longer be kept as a decision, and a strategy asking to keep it has
+            to say what it wants instead.
 
         Notes
         -----
@@ -508,14 +510,16 @@ class StrategyContext:
         data - and a framework that offered only ``cash()`` would quietly make
         every strategy choose the first.
 
-        The weights returned are the ones the book actually has at this close,
-        so the order they produce is the rebalancing back to itself: nothing,
-        up to the drift since the last one.
+        Nor is it the same as asking for the weights the book has. Those are
+        the weights of this close, and at the next open the prices have moved:
+        two funds drift apart overnight, and a target restated in weights
+        trades the drift every morning - a "hold" that only a minimum trade
+        value keeps still. This one sends nothing.
         """
         held = dict(self.portfolio.weights)
         for instrument_id in held:
             self._require_targetable(instrument_id)
-        return self.weights(held, among=among)
+        return replace(self.weights(held, among=among), hold_positions=True)
 
     def _require_targetable(self, instrument_id: str) -> None:
         """Raise unless the book may actually hold this instrument."""

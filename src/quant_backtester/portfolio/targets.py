@@ -61,6 +61,13 @@ class TargetAllocation:
         Why each instrument of the universe was not eligible. Not listed yet,
         no history yet, a session missing, a value too old: a strategy that
         holds nothing today should be able to say which of those it was.
+    hold_positions : bool
+        Whether the decision is to keep every position exactly as it is and
+        send no order. The weights are then the book's own, as it was valued
+        at the decision - recorded as the target the decision stands for, and
+        checked to be exactly that by the engine. A risk limit still overrules
+        it: a held book that breaches a limit is traded down to the limit, like
+        any other target.
 
     Raises
     ------
@@ -82,6 +89,12 @@ class TargetAllocation:
     all. The same goes for a sum above one, which is leverage: nothing here
     finances it either.
 
+    Keeping a book and restating its weights are not the same decision. The
+    weights of the close are not the weights of the next open - two funds move
+    apart overnight - so a target of "the weights I have" trades the drift
+    every morning, and only a minimum trade value would hide it. A target that
+    holds its positions sends no order at all.
+
     How much of the book a *risk limit* lets through is a different question,
     and it belongs to :class:`~quant_backtester.portfolio.limits.PortfolioLimits`:
     what this class refuses is an allocation that is not a fraction of a book
@@ -96,11 +109,16 @@ class TargetAllocation:
     selected: tuple[str, ...] = ()
     considered: int = 0
     skipped: Mapping[str, SignalStatus] = field(default_factory=lambda: MappingProxyType({}))
+    hold_positions: bool = False
 
     def __post_init__(self) -> None:
         """Check the decision is one a portfolio could hold, then freeze it."""
         if not isinstance(self.as_of, datetime) or self.as_of.tzinfo is None:
             raise ValueError(f"as_of must be a timezone-aware datetime, got {self.as_of!r}")
+        if not isinstance(self.hold_positions, bool):
+            raise ValueError(
+                f"hold_positions must be said as a boolean, got {self.hold_positions!r}"
+            )
         weights = dict(self.weights)
         for name, weight in weights.items():
             require_identifier(name, "an instrument of weights")

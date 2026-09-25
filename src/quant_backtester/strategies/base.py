@@ -89,7 +89,7 @@ class Strategy(ABC):
         -------
         TargetAllocation
             Built through the context's helpers - ``ctx.weights``,
-            ``ctx.equal_weight``, ``ctx.cash``, ``ctx.hold_current`` - which
+            ``ctx.equal_weight``, ``ctx.cash``, ``ctx.hold_positions`` - which
             check that the decision is one this book could actually hold.
         """
 

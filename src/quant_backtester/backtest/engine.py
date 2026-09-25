@@ -423,7 +423,9 @@ class BacktestEngine:
         their status: only an opening price of this session is ever traded
         on. The universe passed on is this session's, so a name that left it
         between the decision and the open is not bought - and may always be
-        sold.
+        sold. A decision to keep the positions is carried out too, as an
+        execution with nothing to do: the record says the decision was acted
+        on, and that acting on it sent no order.
         """
         market = self.reader.at(at)
         wanted = sorted(set(decision.accepted_weights) | set(state.holdings))
@@ -438,6 +440,7 @@ class BacktestEngine:
             instruments=self.instruments,
             base_currency=self.config.base_currency,
             universe=self._members(session_date),
+            hold=decision.holds_positions,
         )
 
     def _value(
@@ -518,6 +521,11 @@ class BacktestEngine:
         if requested.as_of != context.as_of:
             raise ValueError(
                 f"the strategy answered for {requested.as_of} and was asked at {context.as_of}"
+            )
+        if requested.hold_positions and dict(requested.weights) != dict(ctx.portfolio.weights):
+            raise ValueError(
+                "a decision to keep the positions must record the book as it is: it asked "
+                f"for {dict(requested.weights)} and the book was {dict(ctx.portfolio.weights)}"
             )
         return self.portfolio.decide(
             requested,

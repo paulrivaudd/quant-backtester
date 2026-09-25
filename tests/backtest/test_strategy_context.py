@@ -278,10 +278,63 @@ def test_holding_the_current_book_is_not_the_same_as_going_to_cash(
         prices={"ETF_EU": 100.0},
     )
 
-    allocation = held.hold_current()
+    allocation = held.hold_positions()
 
     assert dict(allocation.weights) == {"ETF_EU": pytest.approx(0.5)}
     assert allocation.invested == pytest.approx(0.5)
+    assert allocation.hold_positions
+
+
+def test_keeping_the_book_records_its_weights_and_asks_for_no_order(
+    context: SignalContext,
+    make_decision: DecisionBuilder,
+    make_book: Callable[..., PortfolioState],
+) -> None:
+    """The weights are the book's own at this decision; the flag is what stops the orders."""
+    snapshot = snapshot_of(context, {"ETF_EU": 0.9, "ETF_OTHER": 0.4})
+    held = make_decision(
+        context,
+        snapshot,
+        holdings=make_book(0.0, {"ETF_EU": 2.0, "ETF_OTHER": 1.0}),
+        prices={"ETF_EU": 100.0, "ETF_OTHER": 100.0},
+    )
+
+    allocation = held.hold_positions()
+
+    assert allocation.hold_positions
+    assert dict(allocation.weights) == dict(held.portfolio.weights)
+    assert not held.weights({"ETF_EU": 0.5}).hold_positions
+
+
+def test_a_book_holding_a_name_outside_the_universe_cannot_simply_be_kept(
+    context: SignalContext,
+    make_decision: DecisionBuilder,
+    make_book: Callable[..., PortfolioState],
+) -> None:
+    """A name that left the universe has to be decided about, not carried on by default."""
+    snapshot = snapshot_of(context, {"ETF_EU": 0.9, "ETF_OTHER": 0.4})
+    held = make_decision(
+        context,
+        snapshot,
+        universe=("ETF_EU",),
+        holdings=make_book(0.0, {"ETF_EU": 2.0, "ETF_OTHER": 1.0}),
+        prices={"ETF_EU": 100.0, "ETF_OTHER": 100.0},
+    )
+
+    with pytest.raises(ValueError, match="ETF_OTHER is not in this session's universe"):
+        held.hold_positions()
+
+
+def test_keeping_a_book_of_cash_is_keeping_nothing(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """No position, no order: a hold of cash is a valid decision."""
+    snapshot = snapshot_of(context, {"ETF_EU": 0.9, "ETF_OTHER": 0.4})
+
+    allocation = make_decision(context, snapshot).hold_positions()
+
+    assert allocation.hold_positions
+    assert dict(allocation.weights) == {}
 
 
 def test_a_negative_weight_is_refused(decision: StrategyContext) -> None:

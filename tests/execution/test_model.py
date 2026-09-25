@@ -103,6 +103,7 @@ def trade(
     *,
     last_known: Mapping[str, float] | None = None,
     universe: Collection[str] = EVERYTHING,
+    hold: bool = False,
 ) -> Execution:
     """Rebalance at ``AT``; a bare number is an opening price of the session itself."""
     quotes = {
@@ -119,6 +120,7 @@ def trade(
         instruments=REGISTRY,
         base_currency="EUR",
         universe=universe,
+        hold=hold,
     )
 
 
@@ -276,6 +278,44 @@ def test_a_position_ends_within_a_lot_of_its_target_from_either_side() -> None:
     assert from_above.state.quantity("W") == 4.0
     for execution in (from_below, from_above):
         assert abs(execution.state.quantity("W") - 3.7) < 1.0
+
+
+def test_the_trade_is_truncated_towards_zero_and_never_floored() -> None:
+    """An excess of 4.5 lots sells 4: floored as a signed trade it would sell 5."""
+    execution = trade(FREE, book(0.0, W=5.0), {"W": 0.05}, {"W": 100.0})
+
+    assert execution.fills[0].side is Side.SELL
+    assert execution.fills[0].quantity == 4.0
+    assert execution.state.quantity("W") == 1.0
+
+
+def test_the_rounding_rule_holds_on_any_book_and_any_target(rng_seed: int) -> None:
+    """The invariants of the rule, on two thousand books drawn at random.
+
+    Free trading, so the cash never binds and what is checked is the rounding
+    alone: whole lots, a purchase never beyond what is wanted, a sale never
+    beyond the excess, and a position that ends within one lot of its target.
+    """
+    import random
+
+    draw = random.Random(rng_seed)
+    for _ in range(2_000):
+        price = draw.uniform(5.0, 800.0)
+        held = float(draw.randint(0, 300))
+        cash = draw.uniform(0.0, 50_000.0)
+        equity = cash + held * price
+        weight = draw.uniform(0.0, 1.0)
+        wanted = equity * weight / price
+
+        execution = trade(FREE, book(cash, W=held), {"W": weight}, {"W": price})
+
+        after = execution.state.quantity("W")
+        assert after == float(int(after)), "a position is a whole number of lots"
+        if after > held:
+            assert after <= wanted + 1e-9, "a purchase never buys beyond the target"
+        if after < held:
+            assert after >= wanted - 1e-9, "a sale never sells beyond the excess"
+        assert abs(after - wanted) < 1.0, "the position ends within one lot of its target"
 
 
 def test_rounding_never_sells_more_than_is_held() -> None:
@@ -721,3 +761,29 @@ def test_a_reject_is_never_a_fill() -> None:
     assert execution.traded_value == 0.0
     assert execution.total_cost == 0.0
     assert all(isinstance(reject, ExecutionReject) for reject in execution.rejects)
+
+
+def test_a_book_kept_as_it_is_sends_nothing_however_the_prices_moved() -> None:
+    """The weights of last night's close against this morning's open would call for a trade.
+
+    Two hundred of A, dealt in fractions, and a thousand in cash, recorded at
+    the close as a weight of about 0.95; the open is ten percent higher, so
+    the same weight now means 0.87 unit fewer, and restating it sells them.
+    Keeping the book sends no order and refuses nothing.
+    """
+    state = book(1_000.0, A=200.0)
+    last_nights = {"A": 200.0 * 100.0 / (1_000.0 + 200.0 * 100.0)}
+
+    kept = trade(FREE, state, last_nights, {"A": 110.0}, hold=True)
+    restated = trade(FREE, state, last_nights, {"A": 110.0})
+
+    assert kept.orders == () and kept.fills == () and kept.rejects == ()
+    assert kept.state is state
+    assert kept.equity == pytest.approx(1_000.0 + 200.0 * 110.0)
+    assert [order.side for order in restated.orders] == [Side.SELL]
+
+
+def test_keeping_a_book_still_needs_it_valued() -> None:
+    """A position with no price ever is no easier to keep than to trade."""
+    with pytest.raises(UnvaluablePosition):
+        trade(FREE, book(0.0, W=5.0), {"W": 1.0}, {"W": missing()}, hold=True)
