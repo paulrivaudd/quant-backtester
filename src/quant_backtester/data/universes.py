@@ -228,7 +228,9 @@ class StaticUniverse:
     Attributes
     ----------
     members : tuple[str, ...]
-        The instruments, in declared order.
+        The instruments, sorted whatever order they were given in: the same
+        names written in two orders are the same universe, and a run - or the
+        record of one - must not be able to tell them apart.
 
     Raises
     ------
@@ -246,13 +248,14 @@ class StaticUniverse:
     members: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        """Reject a universe that holds an instrument twice."""
+        """Reject a universe that holds an instrument twice, and sort it."""
         repeated = sorted({name for name in self.members if self.members.count(name) > 1})
         if repeated:
             raise ValueError(f"Universe holds {', '.join(repeated)} more than once")
+        object.__setattr__(self, "members", tuple(sorted(self.members)))
 
     def members_at(self, on: date) -> tuple[str, ...]:
-        """Return the members, whatever the date."""
+        """Return the members, sorted, whatever the date."""
         return self.members
 
     def instruments(self) -> tuple[str, ...]:

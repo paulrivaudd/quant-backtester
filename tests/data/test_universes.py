@@ -24,6 +24,7 @@ from quant_backtester.data.universes import (
     StaticUniverse,
     Universe,
     UniverseRegistry,
+    universe_definition,
 )
 
 
@@ -315,6 +316,16 @@ def test_a_static_universe_refuses_a_repeated_name() -> None:
     """Twice in a universe would weight it twice in a ranking."""
     with pytest.raises(ValueError, match="more than once"):
         StaticUniverse(("ETF_EU", "ETF_EU"))
+
+
+def test_a_static_universe_does_not_remember_the_order_it_was_written_in() -> None:
+    """The same names in two orders are the same universe, and record the same definition."""
+    forward = StaticUniverse(("ETF_EU", "ETF_OTHER"))
+    backward = StaticUniverse(("ETF_OTHER", "ETF_EU"))
+
+    assert forward == backward
+    assert backward.members_at(date(2026, 9, 1)) == ("ETF_EU", "ETF_OTHER")
+    assert universe_definition(forward) == universe_definition(backward)
 
 
 def test_an_open_bound_is_closed_with_the_listing_window(

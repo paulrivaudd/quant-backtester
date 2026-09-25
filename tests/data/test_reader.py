@@ -659,6 +659,71 @@ def test_values_follows_the_requested_field(reader: MarketDataReader, stocked: N
     assert frame.loc["ETF_EU", "status"] is ObservationStatus.OK
 
 
+# -- observations: the same rule, one typed object per instrument ------------------
+
+
+def test_observations_say_what_values_says_one_instrument_at_a_time(
+    reader: MarketDataReader, stocked: None
+) -> None:
+    """The typed twin of the frame: same value, date, instant, age and status."""
+    pit = reader.at(paris(WEDNESDAY, 23, 0))
+    frame = pit.values(["ETF_EU", "IDX_US"])
+
+    observed = pit.observations(["ETF_EU", "IDX_US"])
+
+    assert list(observed) == ["ETF_EU", "IDX_US"]
+    for name, observation in observed.items():
+        assert observation.instrument_id == name
+        assert observation.value == frame.loc[name, "value"]
+        assert observation.observation_date == frame.loc[name, "observation_date"]
+        assert observation.age_sessions == frame.loc[name, "age_sessions"]
+        assert observation.status is frame.loc[name, "status"]
+        assert observation.available_at == frame.loc[name, "available_at_utc"].to_pydatetime()
+        assert observation.is_current
+
+
+def test_an_observation_that_has_no_number_carries_none_rather_than_nan(
+    reader: MarketDataReader, repository: MarketDataRepository, xpar: TradingCalendar
+) -> None:
+    """A hole and an instrument that does not exist yet have no value, and say so plainly."""
+    repository.save_checked_bars("ETF_EU", checked_bars("ETF_EU", xpar, [(MONDAY, 100.0)]))
+
+    observed = reader.at(paris(TUESDAY, 23, 0)).observations(["ETF_LATE", "ETF_EU"])
+
+    assert observed["ETF_LATE"].status is ObservationStatus.NOT_LISTED
+    assert observed["ETF_LATE"].value is None
+    assert observed["ETF_EU"].status is ObservationStatus.MISSING
+    assert observed["ETF_EU"].value is None
+    assert observed["ETF_EU"].available_at is None
+    assert not observed["ETF_EU"].is_current
+
+
+def test_an_observation_follows_the_requested_field(
+    reader: MarketDataReader, stocked: None
+) -> None:
+    """The open at 09:01 is the day's open, with the instant it became knowable."""
+    observed = reader.at(paris(WEDNESDAY, 9, 1)).observations(["ETF_EU"], BarField.OPEN)
+
+    opening = observed["ETF_EU"]
+    assert opening.value == 101.5
+    assert opening.observation_date == WEDNESDAY
+    assert opening.available_at is not None
+    assert opening.available_at <= paris(WEDNESDAY, 9, 1)
+
+
+def test_observations_of_nothing_is_nothing(reader: MarketDataReader) -> None:
+    """No instrument asked, no instrument answered."""
+    assert reader.at(paris(TUESDAY, 23, 0)).observations([]) == {}
+
+
+def test_observations_refuse_a_duplicate_instrument(
+    reader: MarketDataReader, stocked: None
+) -> None:
+    """One observation for two universe members would be read twice."""
+    with pytest.raises(ValueError, match="duplicate"):
+        reader.at(paris(TUESDAY, 23, 0)).observations(["ETF_EU", "ETF_EU"])
+
+
 # ---------------------------------------------------------------------------
 # Exercice 8.4 - corporate actions
 # ---------------------------------------------------------------------------
