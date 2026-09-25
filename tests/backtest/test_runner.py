@@ -17,18 +17,21 @@ import pytest
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.curves import Book
 from quant_backtester.backtest.context import StrategyContext
-from quant_backtester.backtest.engine import Timetable
 from quant_backtester.backtest.runner import StrategyRunner
 from quant_backtester.backtest.schedule import EveryNSessions
+from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.universes import Membership, StaticUniverse, Universe
 from quant_backtester.execution.costs import CostModel
-from quant_backtester.execution.fills import ExecutionModel
+from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.portfolio.targets import TargetAllocation
+from quant_backtester.provenance import SourceState, SourceStatus
 from quant_backtester.strategies.examples import BuyAndHold, MomentumSingleAsset
 
-PARIS = Timetable(decision_time=time(23, 0), execution_time=time(9, 1), timezone="Europe/Paris")
+PARIS = BacktestTimetable(
+    decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)
+)
 CONFIG = AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.0)
 
 
@@ -183,9 +186,18 @@ def test_the_result_records_what_the_numbers_depend_on(runner: StrategyRunner) -
     assert configuration["base_currency"] == "EUR"
     assert configuration["initial_cash"] == pytest.approx(10_000.0)
     assert configuration["schedule"] == {"type": "EverySession", "parameters": {}}
-    assert configuration["costs"]["commission_rate"] == pytest.approx(0.001)  # type: ignore[index]
+    costs = configuration["execution"]["costs"]  # type: ignore[index]
+    assert costs["commission_rate"] == pytest.approx(0.001)  # type: ignore[index]
     assert configuration["timetable"]["decision_time"] == "23:00:00"  # type: ignore[index]
+    assert configuration["timetable"]["execution"] == {  # type: ignore[index]
+        "field": "open",
+        "session_offset": 1,
+    }
     assert configuration["analytics"]["sessions_per_year"] == 255  # type: ignore[index]
+    assert configuration["portfolio"]["limits"]["long_only"] is True  # type: ignore[index]
+    assert configuration["quantity_steps"] == {"ETF_EU": None}
+    assert configuration["requested_start"] == "2026-09-09"
+    assert configuration["benchmark"] is None
 
 
 def test_the_result_records_the_strategy_itself(runner: StrategyRunner) -> None:
@@ -284,28 +296,32 @@ def test_the_runner_produces_what_the_engine_produces(
     session included on one side only - every result taken through it would be
     quietly incomparable with the low-level ones the tests of the engine use.
     """
+    from quant_backtester.backtest.config import BacktestConfig
     from quant_backtester.backtest.engine import BacktestEngine
+    from quant_backtester.backtest.schedule import EverySession
 
     strategy = MomentumSingleAsset(instrument_id="ETF_EU", lookback_sessions=5)
     engine = BacktestEngine(
         reader=runner.reader,
         calendars=calendars,
-        reference_calendar_id="XPAR",
-        signals=(),
         strategy=strategy,
         universe=("ETF_EU",),
-        initial_cash=10_000.0,
-        base_currency="EUR",
+        config=BacktestConfig(
+            start=date(2026, 9, 9),
+            end=date(2026, 9, 14),
+            initial_cash=10_000.0,
+            base_currency="EUR",
+            reference_calendar="XPAR",
+            schedule=EverySession(),
+            timetable=PARIS,
+        ),
         execution=runner.execution,
-        timetable=PARIS,
     )
 
-    directly = engine.run(date(2026, 9, 9), date(2026, 9, 14))
+    directly = engine.run()
     through = runner.run(strategy, ["ETF_EU"], "2026-09-09", "2026-09-14")
 
-    assert [record.equity for record in through.backtest.records] == [
-        record.equity for record in directly.records
-    ]
+    assert through.backtest.records == directly.records
 
 
 def test_a_strategy_that_changes_while_it_decides_is_refused(
@@ -334,7 +350,7 @@ def test_a_strategy_that_changes_while_it_decides_is_refused(
             self.lookback += 1
             return ctx.cash()
 
-    with pytest.raises(StrategyMutated, match="not the strategy it was"):
+    with pytest.raises(StrategyMutated, match="not the one it was"):
         runner.run(Drifting(), ["ETF_EU"], "2026-09-09", "2026-09-14")
 
 
@@ -371,7 +387,7 @@ def test_the_record_of_a_run_cannot_be_edited_afterwards(
     with pytest.raises(TypeError):
         result.configuration["initial_cash"] = 1.0  # type: ignore[index]
     with pytest.raises(TypeError):
-        result.configuration["costs"]["commission_rate"] = 0.0  # type: ignore[index]
+        result.configuration["execution"]["costs"]["commission_rate"] = 0.0  # type: ignore[index]
     with pytest.raises(TypeError):
         result.definition["parameters"]["instruments"] = ()  # type: ignore[index]
 
@@ -390,6 +406,7 @@ def test_the_code_that_produced_a_result_is_recorded_when_it_is_given(
     guessed at: a library shelling out to git answers wrongly from a notebook
     outside the repository, and a wrong provenance is worse than none.
     """
+    commit = "9b15c93" + "0" * 33
     market = make_market({"ETF_EU": make_bars("ETF_EU", xpar, prices(100.0, 1.0))})
     runner = StrategyRunner(
         reader=market,
@@ -397,18 +414,128 @@ def test_the_code_that_produced_a_result_is_recorded_when_it_is_given(
         reference_calendar_id="XPAR",
         base_currency="EUR",
         analytics=CONFIG,
+        execution=ExecutionModel(costs=CostModel()),
         initial_cash=10_000.0,
         timetable=PARIS,
-        code_version="9b15c93",
+        source=SourceState(SourceStatus.DIRTY, commit),
     )
 
     result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
 
-    assert result.configuration["code_version"] == "9b15c93"
+    assert result.configuration["source"] == {
+        "git_commit": commit,
+        "dirty": True,
+        "source_state": "DIRTY",
+    }
+    assert result.source.git_commit == commit
+    assert result.backtest.code_version == commit
 
 
 def test_a_run_that_recorded_no_code_version_says_so(runner: StrategyRunner) -> None:
-    """``None`` is an honest answer; a guessed commit is not."""
+    """Nobody said, and the record says that rather than guessing."""
     result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
 
-    assert result.configuration["code_version"] is None
+    assert result.configuration["source"] == {
+        "git_commit": None,
+        "dirty": None,
+        "source_state": "UNRECORDED",
+    }
+
+
+def test_a_runner_without_a_cost_model_cannot_be_built(
+    runner: StrategyRunner,
+) -> None:
+    """Free trading by default would be a return no account could have had."""
+    with pytest.raises(ValueError, match="ExecutionModel"):
+        StrategyRunner(
+            reader=runner.reader,
+            calendars=runner.calendars,
+            reference_calendar_id="XPAR",
+            base_currency="EUR",
+            analytics=CONFIG,
+            execution=None,  # type: ignore[arg-type]
+        )
+
+
+def test_a_runner_reading_ages_on_another_calendar_is_refused(runner: StrategyRunner) -> None:
+    """The reader and the runs must count sessions on the same calendar."""
+    with pytest.raises(ValueError, match="counts ages on XPAR"):
+        StrategyRunner(
+            reader=runner.reader,
+            calendars=runner.calendars,
+            reference_calendar_id="XNYS",
+            base_currency="EUR",
+            analytics=CONFIG,
+            execution=runner.execution,
+        )
+
+
+def with_benchmark(runner: StrategyRunner, benchmark: str) -> StrategyRunner:
+    """Return the same runner with a benchmark declared."""
+    return StrategyRunner(
+        reader=runner.reader,
+        calendars=runner.calendars,
+        reference_calendar_id="XPAR",
+        base_currency="EUR",
+        analytics=CONFIG,
+        execution=runner.execution,
+        initial_cash=10_000.0,
+        timetable=PARIS,
+        benchmark=benchmark,
+    )
+
+
+def test_a_declared_benchmark_is_recorded_and_used_by_default(runner: StrategyRunner) -> None:
+    """What a run is measured against is part of what it was, not an afterthought."""
+    declared = with_benchmark(runner, "ETF_OTHER")
+
+    strategy = BuyAndHold(instruments=("ETF_EU",))
+    result = declared.run(strategy, ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    assert result.configuration["benchmark"] == {
+        "instrument_id": "ETF_OTHER",
+        "price_basis": "TOTAL_RETURN",
+        "label": None,
+    }
+    assert result.compare().label == "ETF_OTHER"
+    assert result.benchmark().spec.instrument_id == "ETF_OTHER"
+
+
+def test_comparing_with_nothing_declared_and_nothing_given_is_refused(
+    runner: StrategyRunner,
+) -> None:
+    """There is no default yardstick; one is named or declared."""
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    with pytest.raises(ValueError, match="no benchmark"):
+        result.compare()
+
+
+def test_a_benchmark_in_another_currency_is_refused_when_declared(runner: StrategyRunner) -> None:
+    """Refused where it is written down, not on the first comparison weeks later."""
+    from quant_backtester.analytics.comparison import BenchmarkCurrencyMismatch
+
+    with pytest.raises(BenchmarkCurrencyMismatch):
+        with_benchmark(runner, "IDX_US")
+
+
+def test_a_benchmark_the_registry_does_not_know_is_refused(runner: StrategyRunner) -> None:
+    """A typo in a benchmark id is caught before any run."""
+    with pytest.raises(ValueError, match="not in the registry"):
+        with_benchmark(runner, "NOPE")
+
+
+def test_the_result_hands_back_every_view_of_the_run(runner: StrategyRunner) -> None:
+    """Records, fills, orders, rejects, holdings, weights and costs, all from one source."""
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    assert result.records() is result.backtest.records
+    assert list(result.fills()["instrument_id"]) == ["ETF_EU"]
+    # A whole book costs a commission more than the book: the purchase is cut
+    # to what the cash can carry, and the cut is on the record.
+    assert list(result.orders()["status"]) == ["PARTIALLY_FILLED"]
+    assert list(result.rejects()["reason"]) == ["INSUFFICIENT_CASH"]
+    assert list(result.holdings().columns) == ["ETF_EU", "cash"]
+    assert list(result.weights().columns) == ["ETF_EU"]
+    assert list(result.target_weights().columns) == ["ETF_EU"]
+    assert result.costs()["total_cost"].sum() == pytest.approx(result.backtest.total_cost)

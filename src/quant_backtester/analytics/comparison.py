@@ -11,8 +11,9 @@ run, from the same period, and nothing in it reaches a decision.
 This module holds what a comparison *is* and computes nothing from the market.
 Valuing a benchmark needs prices, and prices need a reader, so that step lives
 in the runner - the one module allowed to hold both. It reads at each session's
-decision instant, so a comparison sees exactly what the strategy could have
-seen, and data arriving after the run changes none of its figures.
+valuation instant, the one the strategy's own book was valued at, so a
+comparison sees exactly what the run could have seen, and data arriving after
+the run changes none of its figures.
 
 One rule is refused rather than approximated, and the refusal is declared here:
 a benchmark quoted in another currency than the book is not comparable with it.
@@ -79,6 +80,14 @@ class BenchmarkSpec:
     def of(cls, benchmark: BenchmarkSpec | str) -> BenchmarkSpec:
         """Return a specification, building one from a bare instrument id."""
         return benchmark if isinstance(benchmark, BenchmarkSpec) else cls(instrument_id=benchmark)
+
+    def definition(self) -> dict[str, object]:
+        """Return the benchmark as it is recorded with a run."""
+        return {
+            "instrument_id": self.instrument_id,
+            "price_basis": self.price_basis.value,
+            "label": self.label,
+        }
 
 
 @dataclass(frozen=True, slots=True)

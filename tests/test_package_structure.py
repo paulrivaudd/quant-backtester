@@ -163,3 +163,46 @@ def test_a_strategy_is_never_handed_the_reader():
     assert "repository" not in surface
     assert "context" not in surface
     assert "at" not in surface
+
+
+LAYER_RANK = {layer: rank for rank, layer in enumerate(LAYERS)}
+"""Each layer's place in the one direction dependencies flow in."""
+
+COMPOSITION_FACADES = {PACKAGE / "backtest" / "runner.py"}
+"""Modules allowed to reach upwards, because composing the layers is their whole job.
+
+The runner builds an engine, runs a strategy and hands back the report of it:
+it imports the analytics that describe a run and the strategy contract that
+produces one, and says so in its own docstring. Nothing else may.
+"""
+
+
+def _layer_of(module: str) -> str | None:
+    """Return the layer a dotted module name belongs to, if it is one of ours."""
+    parts = module.split(".")
+    if len(parts) < 2 or parts[0] != "quant_backtester":
+        return None
+    return parts[1] if parts[1] in LAYER_RANK else None
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted(path for layer in LAYERS for path in (PACKAGE / layer).rglob("*.py")),
+    ids=lambda path: f"{path.parent.name}.{path.stem}",
+)
+def test_a_lower_layer_never_imports_a_higher_one(path: Path) -> None:
+    """``data -> signals -> portfolio -> execution -> backtest -> analytics -> strategies``.
+
+    A layer that needs something from above takes it as an argument. Checked on
+    every module rather than trusted, because an upward import looks harmless in
+    a diff and quietly turns the layering into a knot.
+    """
+    if path in COMPOSITION_FACADES:
+        return
+    own = path.relative_to(PACKAGE).parts[0]
+    upwards = sorted(
+        module
+        for module in imported_modules(path)
+        if (layer := _layer_of(module)) is not None and LAYER_RANK[layer] > LAYER_RANK[own]
+    )
+    assert not upwards, f"{path.relative_to(PACKAGE)} imports {', '.join(upwards)}"

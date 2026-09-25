@@ -21,7 +21,7 @@ from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.contribution import InstrumentAttribution
 from quant_backtester.analytics.curves import Book, equity_curve
 from quant_backtester.analytics.performance import PerformanceStats
-from quant_backtester.backtest.engine import BacktestResult
+from quant_backtester.backtest.result import BacktestResult
 
 _NOT_AVAILABLE = "-"
 """What a figure the run does not support is printed as.
@@ -38,7 +38,7 @@ class PerformanceReport:
     Attributes
     ----------
     gross : PerformanceStats
-        The book that paid the reference price and no fee.
+        The book that made the same trades at the market price and paid no fee.
     net : PerformanceStats
         The book that paid what execution charged.
     costs : CostAttribution
@@ -174,7 +174,8 @@ class PerformanceReport:
             (
                 f"costs{'':<19}{costs.total:>12,.2f}",
                 f"{'  commission':<24}{costs.commission:>12,.2f}",
-                f"{'  spread and slippage':<24}{costs.market_cost:>12,.2f}",
+                f"{'  spread':<24}{costs.spread_cost:>12,.2f}",
+                f"{'  slippage':<24}{costs.slippage_cost:>12,.2f}",
                 f"{'  drag on the return':<24}{_percent(costs.drag):>12}",
                 f"{'  share of gross':<24}{_percent(costs.cost_share_of_gross):>12}",
                 f"{'  rebalancings':<24}{costs.rebalancings:>12}",
@@ -188,16 +189,23 @@ class PerformanceReport:
     def _quality_block(self) -> str:
         """Return the caveat lines of the rendered report."""
         quality = self.quality
-        return "\n".join(
-            (
-                f"{'sessions valued on an older close':<40}{quality.estimated_valuations:>6}",
-                f"{'sessions an order could not be sent on':<40}{quality.untradable_sessions:>6}",
-                f"{'sessions with nothing to choose from':<40}"
-                f"{quality.sessions_with_nothing_to_choose:>6}",
-                f"{'sessions a purchase was cut down on':<40}{quality.unfunded_sessions:>6}",
-                f"{'sessions ending on borrowed cash':<40}{quality.sessions_on_borrowed_cash:>6}",
-            )
+        lines = [
+            f"{'sessions valued on an older price':<40}{quality.estimated_valuations:>8}",
+            f"{'sessions without an execution price':<40}"
+            f"{quality.sessions_without_execution_price:>8}",
+            f"{'purchases cut for want of cash':<40}{quality.insufficient_cash_adjustments:>8}",
+            f"{'sessions with nothing to choose from':<40}"
+            f"{quality.sessions_with_nothing_to_choose:>8}",
+            f"{'sessions missing a line of the target':<40}"
+            f"{quality.sessions_partially_invested:>8}",
+            f"{'average cash':<40}{_percent(quality.average_cash_share):>8}",
+            f"{'orders, fills, rejects':<32}"
+            f"{f'{quality.orders}, {quality.fills}, {quality.rejects}':>16}",
+        ]
+        lines.extend(
+            f"{'  ' + reason:<40}{count:>8}" for reason, count in quality.rejects_by_reason.items()
         )
+        return "\n".join(lines)
 
 
 def _percent(value: float | None) -> str:

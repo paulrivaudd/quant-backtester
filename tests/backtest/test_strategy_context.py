@@ -21,7 +21,7 @@ from quant_backtester.backtest.context import (
     UnusableSignal,
 )
 from quant_backtester.backtest.market import StrategyMarketView
-from quant_backtester.portfolio.targets import Holdings
+from quant_backtester.portfolio.state import PortfolioState
 from quant_backtester.signals.base import Signal, SignalResult, build_result_frame, result_row
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine
@@ -265,14 +265,16 @@ def test_cash_holds_nothing_and_says_what_it_stood_aside_from(
 
 
 def test_holding_the_current_book_is_not_the_same_as_going_to_cash(
-    context: SignalContext, make_decision: DecisionBuilder
+    context: SignalContext,
+    make_decision: DecisionBuilder,
+    make_book: Callable[..., PortfolioState],
 ) -> None:
     """The two honest answers to a day whose data cannot be trusted."""
     snapshot = snapshot_of(context, {"ETF_EU": 0.9, "ETF_OTHER": 0.4})
     held = make_decision(
         context,
         snapshot,
-        holdings=Holdings(cash=500.0, quantities={"ETF_EU": 5.0}),
+        holdings=make_book(500.0, {"ETF_EU": 5.0}),
         prices={"ETF_EU": 100.0},
     )
 

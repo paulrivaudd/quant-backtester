@@ -19,8 +19,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from types import MappingProxyType
 
-from quant_backtester.numbers import require_finite
-from quant_backtester.portfolio.targets import Holdings
+from quant_backtester.numbers import require_finite, require_finite_positive
+from quant_backtester.portfolio.state import PortfolioState
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +43,11 @@ class PortfolioView:
     weights : Mapping[str, float]
         Fraction of equity each position represents, at those same closes.
         Empty for a book worth nothing, which has no fractions to speak of.
+    average_costs : Mapping[str, float]
+        Mean price paid per unit, costs included, for every position whose
+        history the run knows. What a stop, a take-profit or a plain "am I up
+        on this" is measured against - and only ever what was actually paid,
+        never a price the strategy wished it had got.
 
     Raises
     ------
@@ -57,6 +62,7 @@ class PortfolioView:
     equity: float
     quantities: Mapping[str, float] = MappingProxyType({})
     weights: Mapping[str, float] = MappingProxyType({})
+    average_costs: Mapping[str, float] = MappingProxyType({})
 
     def __post_init__(self) -> None:
         """Check the view describes a book, and freeze it."""
@@ -68,17 +74,22 @@ class PortfolioView:
             require_finite(size, f"the quantity of {name}")
         for name, weight in self.weights.items():
             require_finite(weight, f"the weight of {name}")
+        for name, cost in self.average_costs.items():
+            require_finite_positive(cost, f"the average cost of {name}")
         object.__setattr__(self, "quantities", MappingProxyType(dict(self.quantities)))
         object.__setattr__(self, "weights", MappingProxyType(dict(self.weights)))
+        object.__setattr__(self, "average_costs", MappingProxyType(dict(self.average_costs)))
 
     @classmethod
-    def of(cls, holdings: Holdings, prices: Mapping[str, float], as_of: datetime) -> PortfolioView:
+    def of(
+        cls, state: PortfolioState, prices: Mapping[str, float], as_of: datetime
+    ) -> PortfolioView:
         """Build the view of a book at the prices it was valued at.
 
         Parameters
         ----------
-        holdings : Holdings
-            Cash and quantities held at the decision instant.
+        state : PortfolioState
+            Cash and positions held at the decision instant.
         prices : Mapping[str, float]
             One price per held instrument - the closes the run marked the book
             at, stale ones included. The view is what the run believes it is
@@ -98,10 +109,15 @@ class PortfolioView:
         """
         return cls(
             as_of=as_of,
-            cash=holdings.cash,
-            equity=holdings.value_at(prices),
-            quantities=dict(holdings.quantities),
-            weights=holdings.weights_at(prices),
+            cash=state.cash,
+            equity=state.value_at(prices),
+            quantities=dict(state.quantities),
+            weights=state.weights_at(prices),
+            average_costs={
+                name: holding.average_cost
+                for name, holding in state.holdings.items()
+                if holding.average_cost is not None
+            },
         )
 
     def weight(self, instrument_id: str) -> float:
@@ -128,6 +144,23 @@ class PortfolioView:
     def holds(self, instrument_id: str) -> bool:
         """Return whether the book has a position in one instrument."""
         return instrument_id in self.quantities
+
+    def average_cost(self, instrument_id: str) -> float | None:
+        """Return the mean price paid per unit held, or ``None`` when it is not known.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument to look up.
+
+        Returns
+        -------
+        float | None
+            ``None`` for an instrument not held, and for a position whose
+            history the run does not know. Never zero: a cost nobody knows is
+            not a cost of nothing, and a stop measured against zero never fires.
+        """
+        return self.average_costs.get(instrument_id)
 
     @property
     def invested(self) -> float:

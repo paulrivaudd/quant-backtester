@@ -1,57 +1,73 @@
 """The event loop: the only place in the project that advances time.
 
-One session at a time, and the order inside a session is the whole point::
+One session at a time, and three instants inside each, in this order::
 
-    open of session s      the allocation decided on s-1 is filled here
-    close of session s     the portfolio is valued
-    after that close       the signals are computed and s+1's target is decided
+    execution   the decision of the previous session is filled at this open
+    valuation   the book is marked at this session's closes
+    decision    the signals run, and the next target is decided on that book
 
 A decision is therefore never filled at a price that produced it. That gap -
 decide after the close, trade at the next open - is modelled rather than
 assumed away, which is what stops a backtest from buying at the very close it
-just read.
+just read. The instants are declared in the run's
+:class:`~quant_backtester.backtest.timetable.BacktestTimetable`, and each
+reading of the market is taken at its own: the reader built for the execution
+cannot see the close the decision will read, and the one built for the decision
+cannot see tomorrow's open.
 
-Nothing above this module sees the reader. The engine builds two of them per
-session, one for the decision and one for the fill, and hands the strategy only
-what the signals made of the first. It builds them from the same
-:class:`~quant_backtester.data.reader.MarketDataReader`, so a run reads exactly
-what was knowable at each instant and nothing else.
+A decision goes through every layer on its way to the book, and each step is
+kept in the record of the session::
+
+    Strategy.decide()         what the strategy wants          TargetAllocation
+    PortfolioModel.decide()   what the book may hold of it     ConstrainedTarget
+    ExecutionModel            what could be done at the open   orders, fills, rejects
+    PortfolioState            what is held afterwards          holdings, cash
+    value_state()             what that is worth               valuation, estimates
+
+Nothing above this module sees the reader. The strategy is handed a context
+built from the decision instant's reader, and the execution layer is handed the
+opening prices of its own instant, each with its status.
 
 Gross and net are reported side by side, as the project requires. They are the
-same trades: the gross book pays the reference price and no commission, the net
-book pays the spread, the slippage and the fee. Re-running the strategy without
+same trades: the gross book pays the market price and no fee, the net book pays
+the spread, the slippage and the commission. Re-running the strategy without
 costs would let the two books hold different things and stop them being
 comparable at all.
+
+What this version does not model is stated rather than approximated: a corporate
+action on a position the book holds - a split, a dividend - stops the run. The
+funds it trades today are accumulating and have not split, and a position that
+silently halved overnight, or a dividend that never reached the cash, would be
+worse than a run that refuses to continue.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import date, datetime, time
-from types import MappingProxyType
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime
 from typing import Protocol
-from zoneinfo import ZoneInfo
 
-import pandas as pd
-
+from quant_backtester.backtest.config import BacktestConfig
 from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.backtest.market import StrategyMarketView
-from quant_backtester.backtest.schedule import DecisionSchedule, EverySession
-from quant_backtester.data.calendars import CalendarRegistry, Session
+from quant_backtester.backtest.records import BacktestRecord
+from quant_backtester.backtest.result import BacktestResult
+from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.instruments import InstrumentRegistry
-from quant_backtester.data.reader import MarketDataReader, ObservationStatus, PointInTimeReader
+from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.schemas import BarField
-from quant_backtester.data.universes import StaticUniverse, UniverseSource
-from quant_backtester.execution.fills import Execution, ExecutionModel, Fill
-from quant_backtester.numbers import require_finite_positive
-from quant_backtester.portfolio.limits import PositionLimits
-from quant_backtester.portfolio.targets import Holdings, TargetAllocation
+from quant_backtester.data.universes import StaticUniverse, UniverseSource, universe_definition
+from quant_backtester.execution.model import Execution, ExecutionModel
+from quant_backtester.portfolio.allocation import PortfolioDecision, PortfolioModel
+from quant_backtester.portfolio.constraints import check_trading_universe
+from quant_backtester.portfolio.state import PortfolioState, ValuationResult, value_state
+from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.portfolio.view import PortfolioView
-from quant_backtester.signals.base import Signal
+from quant_backtester.provenance import SourceState
+from quant_backtester.signals.base import Signal, freeze
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
-from quant_backtester.signals.types import require_identifier
 
 
 class Strategy(Protocol):
@@ -67,363 +83,127 @@ class Strategy(Protocol):
         ...
 
     def required_signals(self) -> Sequence[Signal | SignalRequest]:
-        """Return the signals this strategy needs computed for each decision.
+        """Return the signals this strategy needs computed for each decision."""
+        ...
 
-        Given a body rather than left abstract: a strategy that reads only the
-        market, or one written for a test, declares nothing and should not have
-        to say so.
-        """
-        return ()
+    def definition(self) -> Mapping[str, object]:
+        """Return everything that identifies this strategy, serialisable."""
+        ...
+
+    def fingerprint(self) -> str:
+        """Return a stable hash of the definition."""
+        ...
 
 
-@dataclass(frozen=True, slots=True)
-class Timetable:
-    """When a decision is taken, and when it is filled.
+class StrategyMutated(RuntimeError):
+    """Raised when a strategy was not the same object at the end of its run.
 
-    Attributes
-    ----------
-    decision_time : time
-        Local time, on the decision session, at which the signals are computed.
-        Late enough that the closes the strategy reads are published: 23:00 in
-        Paris is after New York's, which is the case the project is built for.
-    execution_time : time
-        Local time, on the next session, at which the order is filled. Just
-        after the opening auction, since that is the price it is filled at.
-    timezone : str
-        IANA zone both times are expressed in. The reference calendar's own
-        zone, normally, so that a run is stated in the hours its decisions are
-        actually taken in.
-
-    Raises
-    ------
-    ValueError
-        If either time carries a fixed offset. A wall-clock time plus a zone
-        survives a DST switch; a time with an offset baked in does not, and the
-        decision would move by an hour twice a year.
+    A strategy is meant to hold no state between decisions: everything
+    path-dependent - what is held, what it is worth, how the market moved -
+    comes from the context. A strategy that kept a counter or rebuilt its
+    parameters as it went would be recorded under a definition that describes
+    its last decision rather than all of them, and the experiment could not be
+    reproduced from its own result.
     """
 
-    decision_time: time = time(23, 0)
-    execution_time: time = time(9, 1)
-    timezone: str = "Europe/Paris"
 
-    def __post_init__(self) -> None:
-        """Reject a time that carries its own offset."""
-        for name, value in (
-            ("decision_time", self.decision_time),
-            ("execution_time", self.execution_time),
-        ):
-            if value.tzinfo is not None:
-                raise ValueError(f"{name} must be a naive local time, got {value!r}")
-        ZoneInfo(self.timezone)
+class UnsupportedCorporateAction(RuntimeError):
+    """Raised when a held position goes through a corporate action this version does not book.
 
-    def decision_instant(self, session_date: date) -> datetime:
-        """Return the UTC-aware instant a decision is taken on that session."""
-        return datetime.combine(session_date, self.decision_time, tzinfo=ZoneInfo(self.timezone))
-
-    def execution_instant(self, session_date: date) -> datetime:
-        """Return the UTC-aware instant an order is filled on that session."""
-        return datetime.combine(session_date, self.execution_time, tzinfo=ZoneInfo(self.timezone))
-
-
-@dataclass(frozen=True, slots=True)
-class BacktestRecord:
-    """What happened on one session.
-
-    Attributes
-    ----------
-    session_date : date
-        The session of the reference calendar this record is about.
-    decision_at : datetime
-        When the portfolio was valued and the next target decided.
-    equity : float
-        Total worth after costs, at this session's close.
-    gross_equity : float
-        What the same trades would have been worth having paid the reference
-        price and no fee. The difference is everything execution took.
-    cash : float
-        The part not invested.
-    target_invested : float
-        Fraction of equity the target decided at this close asks to put to
-        work. What was *reached* is ``actual_invested``: an order that could
-        not be sent, a purchase cut down for want of cash and a lot rounded
-        down all sit between the two, and a record that carried one number
-        would be read as the other.
-    actual_invested : float
-        Fraction of equity actually held in positions at this close, after
-        whatever execution managed to do at this session's open.
-    considered : int
-        Instruments that had a usable signal to choose among.
-    traded_value : float
-        Value exchanged at this session's open, both directions counted.
-    commission : float
-        Paid to the broker at this session's open.
-    market_cost : float
-        Paid to the market at this session's open: spread and slippage.
-    untradable : tuple[str, ...]
-        Instruments whose opening price was not knowable, so the order was not
-        sent and the position stayed as it was.
-    unfunded : tuple[str, ...]
-        Instruments whose purchase was cut down, or dropped, for want of the
-        cash to pay for it. A target of a whole book costs a little more than
-        the book is worth, and what execution charges comes out of the
-        position rather than out of a loan the model never granted.
-    priced_from_earlier : tuple[str, ...]
-        Held instruments valued at an older close, because none was published
-        for this session. The equity is an estimate for those, and says so.
-    weights : Mapping[str, float]
-        Target decided at this session's close, for the next open.
-    quantities : Mapping[str, float]
-        Units actually held after this session's open, per instrument. With
-        the fills and the closing prices, this is what lets a run answer why
-        the equity moved on a given day rather than only by how much.
-    fills : tuple[Fill, ...]
-        The orders done at this session's open, with their reference price,
-        their fill price and their commission.
-    decided : bool
-        Whether the strategy was asked on this session. A run that rebalances
-        monthly is not asked on the other twenty sessions, and the target
-        recorded on those is the one still standing rather than a new one.
-    closes : Mapping[str, float]
-        The price each held instrument was valued at, at this session's close.
-        The one named in ``priced_from_earlier`` is an older close carried
-        forward, and the record says which. With the quantities and the fills,
-        this is what lets a run be taken apart per instrument afterwards -
-        without it, an attribution would have to re-read the market data, and
-        analytics that re-reads the market data is analytics that can quietly
-        use a price the run never saw.
-
-    Notes
-    -----
-    Both mappings are frozen at construction, so a record cannot be edited
-    into a different run after the fact.
+    A split multiplies the shares and divides the price overnight; a dividend
+    moves value from the price into the cash. Holding the quantity still would
+    show the first as a collapse and the second as a loss, and neither ever
+    happened - so the run stops, and says which action on which day, rather
+    than report either.
     """
-
-    session_date: date
-    decision_at: datetime
-    equity: float
-    gross_equity: float
-    cash: float
-    target_invested: float
-    actual_invested: float
-    considered: int
-    traded_value: float
-    commission: float
-    market_cost: float
-    untradable: tuple[str, ...]
-    unfunded: tuple[str, ...]
-    priced_from_earlier: tuple[str, ...]
-    weights: Mapping[str, float]
-    decided: bool = True
-    quantities: Mapping[str, float] = MappingProxyType({})
-    fills: tuple[Fill, ...] = ()
-    closes: Mapping[str, float] = MappingProxyType({})
-
-    def __post_init__(self) -> None:
-        """Freeze what was recorded, so a result stays what the run produced."""
-        object.__setattr__(self, "weights", MappingProxyType(dict(self.weights)))
-        object.__setattr__(self, "quantities", MappingProxyType(dict(self.quantities)))
-        object.__setattr__(self, "closes", MappingProxyType(dict(self.closes)))
-        object.__setattr__(self, "untradable", tuple(self.untradable))
-        object.__setattr__(self, "unfunded", tuple(self.unfunded))
-        object.__setattr__(self, "priced_from_earlier", tuple(self.priced_from_earlier))
-        object.__setattr__(self, "fills", tuple(self.fills))
-
-    @property
-    def cost(self) -> float:
-        """Return everything this session's rebalancing cost."""
-        return self.commission + self.market_cost
-
-
-@dataclass(frozen=True, slots=True)
-class BacktestResult:
-    """Every session of a run, and what it cost to get there.
-
-    Attributes
-    ----------
-    records : tuple[BacktestRecord, ...]
-        One per session of the reference calendar inside the range.
-    initial_cash : float
-        What the run started with.
-    """
-
-    records: tuple[BacktestRecord, ...]
-    initial_cash: float
-
-    def frame(self) -> pd.DataFrame:
-        """Return the run as a frame, indexed by session date.
-
-        Returns
-        -------
-        pd.DataFrame
-            One row per session, gross and net side by side, with the costs and
-            the diagnostics that explain them.
-        """
-        rows = [
-            {
-                "decision_at": record.decision_at,
-                "equity": record.equity,
-                "gross_equity": record.gross_equity,
-                "cash": record.cash,
-                "decided": record.decided,
-                "target_invested": record.target_invested,
-                "actual_invested": record.actual_invested,
-                "considered": record.considered,
-                "traded_value": record.traded_value,
-                "commission": record.commission,
-                "market_cost": record.market_cost,
-                "cost": record.cost,
-                "untradable": ",".join(record.untradable),
-                "unfunded": ",".join(record.unfunded),
-                "priced_from_earlier": ",".join(record.priced_from_earlier),
-            }
-            for record in self.records
-        ]
-        index = pd.Index(
-            [record.session_date for record in self.records],
-            dtype="object",
-            name="session_date",
-        )
-        return pd.DataFrame(rows, index=index)
-
-    @property
-    def total_cost(self) -> float:
-        """Return everything execution took over the whole run."""
-        return sum(record.cost for record in self.records)
-
-    @property
-    def net_return(self) -> float:
-        """Return the run's return after costs, as a fraction."""
-        return self._return(self.records[-1].equity) if self.records else 0.0
-
-    @property
-    def gross_return(self) -> float:
-        """Return what the same trades would have returned having paid nothing."""
-        return self._return(self.records[-1].gross_equity) if self.records else 0.0
-
-    def _return(self, final: float) -> float:
-        """Return the growth from the starting cash to ``final``."""
-        return final / self.initial_cash - 1.0
 
 
 @dataclass(frozen=True, slots=True)
 class BacktestEngine:
-    """Walks the reference calendar, deciding at each close and filling at each open.
+    """Walks the reference calendar: filling at each open, valuing and deciding at each close.
 
     Attributes
     ----------
     reader : MarketDataReader
         The store, read point in time. The engine is the only holder of it.
+        Its reference calendar must be the run's: ages are counted on the
+        calendar time advances on.
     calendars : CalendarRegistry
         Venue calendars, for the signals and for the reference timeline.
-    reference_calendar_id : str
-        The calendar time is advanced on. A European strategy decides on Paris
-        sessions even when it holds a US index, and the staleness of that
-        index's close is counted on the same calendar.
-    signals : Sequence[Signal | SignalRequest]
-        Computed at every decision, in order. A bare signal is computed over
-        that session's universe; a
-        :class:`~quant_backtester.signals.engine.SignalRequest` may carry a
-        universe of its own, which is how a gauge that is never traded - a
-        volatility index, a yield - reaches the same snapshot as the funds it
-        gates. That universe may itself be dated: the engine resolves it for
-        the session being decided, like the trading one, so a basket of gauges
-        that changed over the years is not read as the list of those that
-        survived.
     strategy : Strategy
-        Given the snapshot, and nothing else.
-    universe : Universe | StaticUniverse | Sequence[str]
-        What the signals are computed for, asked session by session. A
+        Given a decision context, and nothing else.
+    universe : UniverseSource | Sequence[str]
+        What the book may hold, asked session by session. A
         :class:`~quant_backtester.data.universes.Universe` carries dated
         memberships, so a run over a changing index chooses among the names
-        that were in it on the day - which is the only way a backtest avoids
-        being a study of the survivors. A plain sequence is accepted and
-        wrapped in a
+        that were in it on the day - the only way a backtest avoids being a
+        study of the survivors. A plain sequence is accepted and wrapped in a
         :class:`~quant_backtester.data.universes.StaticUniverse`: honest for
         two funds that both existed throughout, and a lie for anything with
-        entries and exits.
-        The trading universe holds what the book may actually hold, and
-        nothing else. An index, a yield or a volatility gauge reaches the same
+        entries and exits. An index, a yield or a volatility gauge reaches a
         decision through a
         :class:`~quant_backtester.signals.engine.SignalRequest` of its own,
-        which is what keeps "a thing to read" and "a thing to buy" from being
-        the same list.
-    schedule : DecisionSchedule
-        Which sessions the strategy is asked on. Every session by default. On
-        a session that is not a decision session the strategy is not called, no
-        order is sent, and the record carries the target still standing - a
-        momentum rotation rebalanced monthly and the same rotation rebalanced
-        daily are two different strategies, and the calendar of the one being
-        run is part of what a result has to record.
-    limits : PositionLimits
-        Applied to whatever the strategy asks for.
+        which keeps "a thing to read" and "a thing to buy" from being the same
+        list.
+    config : BacktestConfig
+        The period, the cash, the currency, the calendar, the schedule and the
+        timetable.
     execution : ExecutionModel
-        The fill price assumption and the three costs.
-    timetable : Timetable
-        When a decision is taken and when it is filled.
-    initial_cash : float
-        What the run starts with, in ``base_currency``.
-    base_currency : str
-        The currency the book is kept in. Every tradable member of the
-        universe must be quoted in it, because nothing here converts one
-        currency into another: adding a fund quoted in euros to one quoted in
-        dollars would value the book as though the two were worth the same,
-        and the error would sit inside the equity curve rather than beside it.
-        An instrument a signal only reads - an index, a yield, an FX
-        fixing - may be quoted in anything, since it is never held.
+        The fill assumption and the three costs. Required, like the costs
+        inside it: no return is reported without a cost model attached.
+    portfolio : PortfolioModel
+        The limits a decision is held to. None beyond the project's
+        invariants by default.
+    signals : Sequence[Signal | SignalRequest]
+        Signals computed at every decision besides the strategy's own - for a
+        run that wants a number recorded that no strategy reads.
+    source : SourceState
+        The state of the code, as the caller knows it. Recorded as given.
 
     Raises
     ------
     ValueError
-        If ``initial_cash`` is not a finite positive number, if
-        ``base_currency`` is not a name, or if the universe holds an
-        instrument the book may not actually hold: one the registry does not
-        know, one declared ``tradable = false``, or one quoted in another
-        currency. Checked session by session, since a dated universe answers a
-        different list on each of them.
-
-    Notes
-    -----
-    Every one of these is a declared parameter with no hidden default that
-    matters: a result follows from committed code plus this configuration.
+        If the reader counts ages on another calendar than the run advances
+        on, the universe is given as a bare id - resolving one is the runner's
+        job - or a component is not of the kind expected.
     """
 
     reader: MarketDataReader
     calendars: CalendarRegistry
-    reference_calendar_id: str
-    signals: Sequence[Signal | SignalRequest]
     strategy: Strategy
     universe: UniverseSource | Sequence[str]
-    initial_cash: float
-    base_currency: str
-    schedule: DecisionSchedule = field(default_factory=EverySession)
-    limits: PositionLimits = field(default_factory=PositionLimits)
-    execution: ExecutionModel = field(default_factory=ExecutionModel)
-    timetable: Timetable = field(default_factory=Timetable)
+    config: BacktestConfig
+    execution: ExecutionModel
+    portfolio: PortfolioModel = field(default_factory=PortfolioModel)
+    signals: Sequence[Signal | SignalRequest] = ()
+    source: SourceState = field(default_factory=SourceState.unrecorded)
 
     def __post_init__(self) -> None:
-        """Reject a configuration that cannot describe a run, and date the universe.
-
-        A plain sequence of names becomes a
-        :class:`~quant_backtester.data.universes.StaticUniverse` here, so that
-        everything below asks one question - what was in the universe on this
-        session - and never has to know which kind it was handed.
-        """
-        require_finite_positive(self.initial_cash, "initial_cash")
-        require_identifier(self.base_currency, "base_currency")
+        """Reject a configuration that cannot describe a run, and date the universe."""
+        if self.reader.reference_calendar_id != self.config.reference_calendar:
+            raise ValueError(
+                f"the reader counts ages on {self.reader.reference_calendar_id} and the run "
+                f"advances on {self.config.reference_calendar}; a value one session old on "
+                "one calendar is fresh on the other"
+            )
+        if not isinstance(self.execution, ExecutionModel):
+            raise ValueError(f"execution must be an ExecutionModel, got {self.execution!r}")
+        if not isinstance(self.portfolio, PortfolioModel):
+            raise ValueError(f"portfolio must be a PortfolioModel, got {self.portfolio!r}")
+        if not isinstance(self.source, SourceState):
+            raise ValueError(f"source must be a SourceState, got {self.source!r}")
+        if isinstance(self.universe, str):
+            raise ValueError(
+                f"the universe {self.universe!r} is an id; the engine takes the universe "
+                "itself, and the runner is what looks an id up"
+            )
         if not isinstance(self.universe, UniverseSource):
             object.__setattr__(self, "universe", StaticUniverse(tuple(self.universe)))
         object.__setattr__(self, "signals", tuple(self.signals))
 
     @property
     def dated_universe(self) -> UniverseSource:
-        """Return the universe in the form the engine asks it: by session.
-
-        Returns
-        -------
-        UniverseSource
-            What ``__post_init__`` normalised, whether a plain sequence of
-            names or a universe of dated memberships was given.
-        """
+        """Return the universe in the form the engine asks it: by session."""
         universe = self.universe
         if not isinstance(universe, UniverseSource):
             raise TypeError(f"the universe was not dated: {universe!r}")
@@ -434,444 +214,377 @@ class BacktestEngine:
         """Return the registry the reader resolves against."""
         return self.reader.instruments
 
-    def run(self, start: date, end: date) -> BacktestResult:
-        """Walk the sessions in ``[start, end]`` and return what happened.
-
-        Parameters
-        ----------
-        start, end : date
-            Inclusive bounds on the reference calendar's sessions.
+    def run(self) -> BacktestResult:
+        """Walk the sessions of the configured period and return what happened.
 
         Returns
         -------
         BacktestResult
-            One record per session, gross and net side by side.
+            One record per session, and everything the run was made with.
 
         Raises
         ------
         ValueError
-            If ``start`` is after ``end``.
+            If the period holds no session of the reference calendar.
+        InvalidTradingUniverse
+            If the trading universe holds, on any session of the period, an
+            instrument no book could hold - checked before the first session
+            is walked, not on the day that instrument first comes up.
         CalendarCoverageError
-            If the range reaches outside the reference calendar's coverage.
+            If the period reaches outside the reference calendar's coverage.
             Loud on purpose: inventing sessions past the end of a holiday list
             is how a backtest ends up trading on Christmas.
+        StrategyMutated
+            If the strategy's definition changed while it was deciding.
+        UnsupportedCorporateAction
+            If a held position goes through a split or a dividend.
 
         Notes
         -----
         The target decided on the last session is never filled, since no
-        session follows it inside the range. It is still recorded, because what
-        a strategy wanted on its last day is part of what the run says.
+        session follows it inside the period. It is still recorded, because
+        what a strategy wanted on its last day is part of what the run says.
         """
-        if start > end:
-            raise ValueError(f"start {start} is after end {end}")
-        calendar = self.calendars.get(self.reference_calendar_id)
-        sessions = calendar.sessions(start, end)
+        config = self.config
+        timetable = config.timetable
+        calendar = self.calendars.get(config.reference_calendar)
+        sessions = [session.session_date for session in calendar.sessions(config.start, config.end)]
+        if not sessions:
+            raise ValueError(
+                f"{config.start} to {config.end} holds no session of {config.reference_calendar}"
+            )
+        self._check_universe(sessions)
         # Asked once, and used for every decision of this run. A strategy that
         # answered differently on the second session would be computing signals
         # nobody recorded - the declaration and what ran must be one thing.
         declared = self._declared_signals()
-        engine = SignalEngine()
-        holdings = Holdings(cash=self.initial_cash)
-        gross_cash = self.initial_cash
-        pending: TargetAllocation | None = None
-        last_price: dict[str, float] = {}
+        # Taken before the run, not after: a strategy that changed itself while
+        # deciding would otherwise be recorded in its final state.
+        definition = self._strategy_definition()
+        fingerprint = self.strategy.fingerprint()
+        configuration = self._configuration(sessions)
+        deciding = config.schedule.decision_sessions(sessions)
+        signal_engine = SignalEngine()
+
+        state = PortfolioState.opening(
+            config.initial_cash, timetable.execution_instant(sessions[0])
+        )
+        gross_cash = config.initial_cash
+        last_known: dict[str, float] = {}
+        pending: PortfolioDecision | None = None
+        pending_from: date | None = None
+        standing = 0.0
+        previous: date | None = None
         records: list[BacktestRecord] = []
 
-        deciding = self.schedule.decision_sessions([item.session_date for item in sessions])
-        standing: TargetAllocation | None = None
-
-        for session in sessions:
-            execution, gross_cash = self._fill(session, pending, holdings, gross_cash, last_price)
-            holdings = execution.holdings if execution is not None else holdings
-            decision_at = self.timetable.decision_instant(session.session_date)
-            market = self.reader.at(decision_at)
-            prices, estimated = self._valuation(market, holdings, last_price)
-            last_price.update(prices)
-            decides = session.session_date in deciding
-            if decides:
-                members = self._trading_universe(session.session_date)
-                standing = self._decide(
-                    engine,
-                    market,
-                    members,
-                    session.session_date,
-                    holdings,
-                    prices,
-                    declared,
+        for session_date in sessions:
+            execution_at = timetable.execution_instant(session_date)
+            self._require_no_corporate_action(state, previous, session_date, execution_at)
+            execution: Execution | None = None
+            if pending is not None:
+                execution = self._execute(state, pending, session_date, execution_at, last_known)
+                state = execution.state
+                for fill in execution.fills:
+                    # The same trade, at the price on the screen and with no fee,
+                    # booked in the same order as the net book books it.
+                    gross_cash = gross_cash + fill.gross_cash_flow
+                    last_known[fill.instrument_id] = fill.market_price
+            valuation_at = timetable.valuation_instant(session_date)
+            valuation = self._value(state, valuation_at, last_known)
+            last_known.update(valuation.prices)
+            decision: PortfolioDecision | None = None
+            decision_at: datetime | None = None
+            if session_date in deciding:
+                decision_at = timetable.decision_instant(session_date)
+                decision = self._decide(
+                    signal_engine, session_date, decision_at, state, valuation, declared
                 )
-                pending = standing
-            else:
-                # Not a decision session: nothing is asked, so nothing is sent.
-                # What stands is the last decision, which the book already holds.
-                pending = None
+                standing = decision.constrained.invested
             records.append(
-                self._record(
-                    session=session,
-                    decision_at=decision_at,
-                    holdings=holdings,
-                    prices=prices,
+                BacktestRecord(
+                    session_date=session_date,
+                    valuation_time=valuation_at,
+                    cash=state.cash,
                     gross_cash=gross_cash,
-                    execution=execution,
-                    estimated=estimated,
-                    allocation=standing,
-                    decided=decides,
+                    holdings=state.holdings,
+                    valuation_prices=valuation.prices,
+                    target_invested=standing,
+                    estimated_valuation_instruments=valuation.estimated_instruments,
+                    execution_time=execution.at if execution is not None else None,
+                    executed_decision=pending_from if execution is not None else None,
+                    orders=execution.orders if execution is not None else (),
                     fills=execution.fills if execution is not None else (),
+                    rejects=execution.rejects if execution is not None else (),
+                    decision_time=decision_at,
+                    decision=decision,
                 )
             )
-        return BacktestResult(records=tuple(records), initial_cash=self.initial_cash)
+            # Not a decision session: nothing is asked, so nothing is sent at the
+            # next open. What stands is the last decision, which the book holds.
+            pending = decision
+            pending_from = session_date if decision is not None else None
+            previous = session_date
 
-    def _trading_universe(self, session_date: date) -> Sequence[str]:
-        """Return the instruments the book may hold on that session.
-
-        Parameters
-        ----------
-        session_date : date
-            The session being decided on.
-
-        Returns
-        -------
-        Sequence[str]
-            What the universe held that day, once every member has been
-            checked against the registry.
-
-        Raises
-        ------
-        ValueError
-            If a member is unknown to the registry, is not tradable, or is
-            quoted in another currency than the book.
-
-        Notes
-        -----
-        Loud, and at the top of the session rather than at the fill. A
-        non-tradable instrument reaching the execution layer is caught there
-        too, but by then the strategy has already ranked it, chosen it and
-        sized a position in it, and the run would report a rotation whose
-        orders are quietly never sent. The configuration is wrong, and the
-        place to say so is where it is read.
-        """
-        members = self.dated_universe.members_at(session_date)
-        for instrument_id in members:
-            instrument = self.instruments.get(instrument_id)
-            if not instrument.tradable:
-                raise ValueError(
-                    f"{instrument_id} is declared tradable = false and cannot be in the "
-                    f"trading universe on {session_date}; a signal reads it through a "
-                    "SignalRequest of its own"
-                )
-            if instrument.currency != self.base_currency:
-                raise ValueError(
-                    f"{instrument_id} is quoted in {instrument.currency} and the book is "
-                    f"kept in {self.base_currency}; nothing here converts a currency"
-                )
-        return members
-
-    def _quantity_steps(self, instrument_ids: Sequence[str]) -> dict[str, float]:
-        """Return the smallest dealable quantity of each instrument that declares one."""
-        steps: dict[str, float] = {}
-        for instrument_id in instrument_ids:
-            instrument = self.instruments.get(instrument_id)
-            if instrument.quantity_step is not None:
-                steps[instrument_id] = instrument.quantity_step
-        return steps
-
-    def _fill(
-        self,
-        session: Session,
-        pending: TargetAllocation | None,
-        holdings: Holdings,
-        gross_cash: float,
-        last_price: Mapping[str, float],
-    ) -> tuple[Execution | None, float]:
-        """Fill the previous session's target at this session's opening auction.
-
-        Parameters
-        ----------
-        session : Session
-            The session whose open the order is filled at.
-        pending : TargetAllocation | None
-            What was decided at the previous close; ``None`` on the first
-            session of a run, which has no decision behind it.
-        holdings : Holdings
-            What is held before the fill.
-        gross_cash : float
-            The cash of the book that pays no costs.
-        last_price : Mapping[str, float]
-            The last price each instrument was valued at, used when an opening
-            auction did not print.
-
-        Returns
-        -------
-        tuple[Execution | None, float]
-            What was traded, and the gross book's cash after the same trades.
-        """
-        if pending is None:
-            return None, gross_cash
-        market = self.reader.at(self.timetable.execution_instant(session.session_date))
-        wanted = sorted(set(pending.weights) | set(holdings.quantities))
-        prices, tradable = self._opens(market, wanted, holdings, last_price)
-        execution = self.execution.rebalance(
-            holdings,
-            pending.weights,
-            prices,
-            tradable,
-            quantity_steps=self._quantity_steps(wanted),
+        if self.strategy.fingerprint() != fingerprint:
+            raise StrategyMutated(
+                "the strategy is not the one it was at the start of the run: its definition "
+                "changed while it was deciding. A strategy holds no state between decisions - "
+                "what is path-dependent comes from the context."
+            )
+        return BacktestResult(
+            records=tuple(records),
+            config=config,
+            configuration=configuration,
+            strategy_definition=definition,
+            strategy_fingerprint=fingerprint,
+            source=self.source,
         )
-        for fill in execution.fills:
-            # The same quantity, at the price on the screen and with no fee.
-            signed = -1.0 if fill.side.value == "BUY" else 1.0
-            gross_cash += signed * fill.quantity * fill.reference_price
-        return execution, gross_cash
 
-    def _opens(
-        self,
-        market: PointInTimeReader,
-        instrument_ids: Sequence[str],
-        holdings: Holdings,
-        last_price: Mapping[str, float],
-    ) -> tuple[dict[str, float], set[str]]:
-        """Return a price for everything, and the subset that may be dealt at.
+    def _members(self, session_date: date) -> tuple[str, ...]:
+        """Return the trading universe on one session, in instrument order.
+
+        Sorted whatever the universe was declared in: two runs over the same
+        names written in two orders are the same experiment, and a ranking
+        that breaks ties in the order it is asked must not be able to tell
+        them apart.
+        """
+        return tuple(sorted(self.dated_universe.members_at(session_date)))
+
+    def _check_universe(self, sessions: Sequence[date]) -> None:
+        """Raise unless every member the universe will ever have in the run could be held.
+
+        Notes
+        -----
+        Every session is asked, before the first one is walked, and each
+        member is checked on the first session it appears on - so the error
+        names the day, and a run whose configuration is wrong in its last year
+        fails in its first second rather than after seven years of sessions.
+        """
+        seen: set[str] = set()
+        for session_date in sessions:
+            new = set(self.dated_universe.members_at(session_date)) - seen
+            if new:
+                check_trading_universe(
+                    new,
+                    instruments=self.instruments,
+                    base_currency=self.config.base_currency,
+                    on=session_date,
+                )
+                seen |= new
+
+    def _require_no_corporate_action(
+        self, state: PortfolioState, previous: date | None, session_date: date, at: datetime
+    ) -> None:
+        """Raise if a held position goes ex on a corporate action since the last session.
 
         Parameters
         ----------
-        market : PointInTimeReader
-            The reader of the execution instant.
-        instrument_ids : Sequence[str]
-            Everything held or wanted.
-        holdings : Holdings
-            What is held, so that every position can be valued.
-        last_price : Mapping[str, float]
-            The last price each instrument was valued at, used when an opening
-            auction did not print.
-
-        Returns
-        -------
-        tuple[dict[str, float], set[str]]
-            Prices for valuing, and the instruments actually tradable.
-
-        Notes
-        -----
-        Only a status of ``OK`` on an instrument declared ``tradable`` may be
-        dealt at. A stale open is an open from an earlier session, and filling
-        an order at it would put a trade in the record at a price nobody could
-        have got that morning. An index has an opening print and no way to buy
-        it, which is a different refusal and the one the registry declares.
-        Both are checked here even though the universe is checked first: this
-        is the last point before a trade exists, and a guard that only holds
-        when the configuration is right is not a guard.
-
-        A held position whose auction did not print is still worth something,
-        and the last knowable value is what the book is marked at meanwhile -
-        being untradable and being worthless are not the same thing.
+        state : PortfolioState
+            The book before this session's fills.
+        previous : date | None
+            The previous session of the run; ``None`` on the first, when
+            nothing is held yet.
+        session_date : date
+            The session about to be walked.
+        at : datetime
+            Its execution instant: an action is knowable at the open of its
+            ex-date, which is the first price it affects.
         """
-        if not instrument_ids:
-            return {}, set()
-        frame = market.values(list(instrument_ids), BarField.OPEN)
-        prices: dict[str, float] = {}
-        tradable: set[str] = set()
-        for name, value, status in zip(frame.index, frame["value"], frame["status"], strict=True):
-            instrument_id = str(name)
-            price = float(value)
-            if price == price:  # not NaN
-                prices[instrument_id] = price
-            if status is ObservationStatus.OK and self.instruments.get(instrument_id).tradable:
-                tradable.add(instrument_id)
-        for instrument_id in sorted(set(holdings.quantities) - set(prices)):
-            carried = last_price.get(instrument_id)
-            if carried is None:
-                raise ValueError(
-                    f"{instrument_id} is held and has never had a knowable price; "
-                    f"the book cannot be valued at {market.as_of}"
-                )
-            prices[instrument_id] = carried
-        return prices, tradable
+        if previous is None or not state.holdings:
+            return
+        market = self.reader.at(at)
+        for instrument_id in state.holdings:
+            actions = market.corporate_actions(instrument_id)
+            for action_type, ex_date, value in zip(
+                actions["action_type"], actions["ex_date"], actions["value"], strict=True
+            ):
+                if previous < ex_date <= session_date:
+                    raise UnsupportedCorporateAction(
+                        f"{instrument_id} is held and goes ex on a {action_type} of {value} on "
+                        f"{ex_date}. This version does not book a corporate action on a "
+                        "position - a split would read as a collapse of the price and a "
+                        "dividend would never reach the cash - so the run stops rather than "
+                        "report either."
+                    )
 
-    def _valuation(
+    def _execute(
         self,
-        market: PointInTimeReader,
-        holdings: Holdings,
-        last_price: Mapping[str, float],
-    ) -> tuple[dict[str, float], tuple[str, ...]]:
-        """Return a price for every held instrument, and which ones are estimates.
+        state: PortfolioState,
+        decision: PortfolioDecision,
+        session_date: date,
+        at: datetime,
+        last_known: Mapping[str, float],
+    ) -> Execution:
+        """Fill the previous decision at this session's opening auction.
 
         Notes
         -----
-        A held position whose close was not published for this session is
-        valued at the last one that was, and named. Marking it at nothing would
-        show a loss that did not happen and give it back the next day; refusing
-        to value the book at all would stop a run because one vendor missed a
-        print. Saying which positions are estimated is what keeps the equity
-        curve honest.
-
-        A ``STALE`` close is one of those, and the status is what says so: the
-        reader hands back a real number - the last close it had - and a run
-        that only looked at the number would report an estimate as a print.
-        The equity is the same either way; what changes is whether the report
-        admits how it was reached.
+        The prices are read at the execution instant and nowhere else, with
+        their status: only an opening price of this session is ever traded
+        on. The universe passed on is this session's, so a name that left it
+        between the decision and the open is not bought - and may always be
+        sold.
         """
-        held = sorted(holdings.quantities)
-        if not held:
-            return {}, ()
-        frame = market.values(held, BarField.CLOSE)
-        prices: dict[str, float] = {}
-        estimated: list[str] = []
-        for name, published, status in zip(
-            frame.index, frame["value"], frame["status"], strict=True
-        ):
-            instrument_id = str(name)
-            if status is ObservationStatus.NOT_LISTED:
-                raise ValueError(
-                    f"{instrument_id} is held and the registry says it was not listed at "
-                    f"{market.as_of}; a position in a delisted instrument has to be closed, "
-                    "and this model does not know at what price"
-                )
-            value = float(published)
-            if status is ObservationStatus.OK:
-                prices[instrument_id] = value
-                continue
-            # STALE is a close from an earlier session: a real number, and
-            # still an estimate of what this session's close would have been.
-            if value == value:  # not NaN
-                prices[instrument_id] = value
-                estimated.append(instrument_id)
-                continue
-            carried = last_price.get(instrument_id)
-            if carried is None:
-                raise ValueError(
-                    f"{instrument_id} is held and has never had a knowable price; "
-                    f"the run cannot value the book at {market.as_of}"
-                )
-            prices[instrument_id] = carried
-            estimated.append(instrument_id)
-        return prices, tuple(estimated)
+        market = self.reader.at(at)
+        wanted = sorted(set(decision.accepted_weights) | set(state.holdings))
+        quotes = market.observations(wanted, self.config.timetable.execution.field)
+        return self.execution.rebalance(
+            state,
+            decision.accepted_weights,
+            at=at,
+            session=session_date,
+            quotes=quotes,
+            last_known=last_known,
+            instruments=self.instruments,
+            base_currency=self.config.base_currency,
+            universe=self._members(session_date),
+        )
+
+    def _value(
+        self, state: PortfolioState, at: datetime, last_known: Mapping[str, float]
+    ) -> ValuationResult:
+        """Mark the book at the closing prices knowable at the valuation instant."""
+        held = sorted(state.holdings)
+        observations = self.reader.at(at).observations(held, BarField.CLOSE) if held else {}
+        return value_state(state, observations, last_known, at)
 
     def _decide(
         self,
         engine: SignalEngine,
-        market: PointInTimeReader,
-        members: Sequence[str],
         session_date: date,
-        holdings: Holdings,
-        prices: Mapping[str, float],
+        at: datetime,
+        state: PortfolioState,
+        valuation: ValuationResult,
         declared: Sequence[Signal | SignalRequest],
-    ) -> TargetAllocation:
-        """Compute the signals over that session's universes and decide what to hold.
+    ) -> PortfolioDecision:
+        """Compute the signals, ask the strategy, and hold its answer to the portfolio's rules.
 
         Parameters
         ----------
         engine : SignalEngine
             Computes the declared signals for this decision.
-        market : PointInTimeReader
-            The reader of the decision instant.
-        members : Sequence[str]
-            What the trading universe held on this session.
         session_date : date
             The session being decided on.
-        holdings : Holdings
+        at : datetime
+            The decision instant.
+        state : PortfolioState
             The book, before the order this decision will produce.
-        prices : Mapping[str, float]
-            The closes the book was valued at.
+        valuation : ValuationResult
+            What it was just valued at.
         declared : Sequence[Signal | SignalRequest]
             The signals of the run, resolved once at its start.
 
         Returns
         -------
-        TargetAllocation
-            What to hold, once the portfolio limits have been applied.
+        PortfolioDecision
+            What the strategy asked for and what the book may hold of it.
+
+        Raises
+        ------
+        TypeError
+            If the strategy answers with something other than an allocation.
+        ValueError
+            If the allocation answers for another instant than the decision.
+        InadmissibleTarget
+            If it names an instrument the book may not hold.
 
         Notes
         -----
         Every universe is asked about this session, the trading one and each
-        signal's own. A request carrying a dated universe is resolved here
-        because here is the only place that knows which session is being
-        decided: a signal that chose its own date could choose one the decision
-        cannot see.
-
-        The list of signals is not asked again. It was resolved once for the
-        run, so what was computed is exactly what the result records - a
-        strategy building its declaration on the fly could otherwise run on
-        signals no definition mentions.
+        signal's own, and every list of names is put in instrument order
+        before anything is computed on it. A request carrying a dated universe
+        is resolved here because here is the only place that knows which
+        session is being decided.
         """
+        members = self._members(session_date)
         context = SignalContext(
-            market=market, instruments=self.instruments, calendars=self.calendars
+            market=self.reader.at(at), instruments=self.instruments, calendars=self.calendars
         )
-        requests = [
-            item.resolved(session_date) if isinstance(item, SignalRequest) else item
-            for item in declared
-        ]
+        requests = [_canonical(item, session_date) for item in declared]
         snapshot = engine.compute(context, requests, list(members))
-        decision = StrategyContext(
+        ctx = StrategyContext(
             as_of=context.as_of,
             signals=snapshot,
             market=StrategyMarketView(context),
-            portfolio=PortfolioView.of(holdings, prices, context.as_of),
-            universe=tuple(members),
+            portfolio=PortfolioView.of(state, valuation.prices, context.as_of),
+            universe=members,
             instruments=self.instruments,
         )
-        return self.limits.apply(self.strategy.decide(decision))
+        requested = self.strategy.decide(ctx)
+        if not isinstance(requested, TargetAllocation):
+            raise TypeError(
+                f"the strategy returned {requested!r}; a decision is a TargetAllocation"
+            )
+        if requested.as_of != context.as_of:
+            raise ValueError(
+                f"the strategy answered for {requested.as_of} and was asked at {context.as_of}"
+            )
+        return self.portfolio.decide(
+            requested,
+            instruments=self.instruments,
+            universe=members,
+            base_currency=self.config.base_currency,
+        )
 
     def _declared_signals(self) -> tuple[Signal | SignalRequest, ...]:
         """Return the signals to compute: the engine's, plus the strategy's own.
-
-        Returns
-        -------
-        tuple[Signal | SignalRequest, ...]
-            A tuple, asked for once per run rather than once per session, so
-            that the declaration a result records is the declaration that ran.
 
         Notes
         -----
         A strategy declares what it reads, so that nobody can run one while
         forgetting a signal it needs - a mistake that produces a ``KeyError``
-        deep inside a decision at best, and a different backtest at worst. The
-        engine's own list stays, because the low-level API is still the one the
-        tests of this layer use, and because a run may want a signal recorded
-        that no strategy reads.
+        deep inside a decision at best, and a different backtest at worst.
         """
-        declared = getattr(self.strategy, "required_signals", None)
-        # A strategy written against the protocol alone inherits its stub,
-        # which returns nothing: that is a strategy declaring no signal.
-        wanted = declared() if declared is not None else None
-        if not wanted:
-            return tuple(self.signals)
-        return (*self.signals, *wanted)
+        return (*self.signals, *self.strategy.required_signals())
 
-    def _record(
-        self,
-        *,
-        session: Session,
-        decision_at: datetime,
-        holdings: Holdings,
-        prices: Mapping[str, float],
-        gross_cash: float,
-        execution: Execution | None,
-        estimated: tuple[str, ...],
-        allocation: TargetAllocation | None,
-        decided: bool,
-        fills: tuple[Fill, ...],
-    ) -> BacktestRecord:
-        """Assemble one session's record."""
-        positions = sum(size * prices[name] for name, size in holdings.quantities.items())
-        equity = holdings.cash + positions
-        return BacktestRecord(
-            session_date=session.session_date,
-            decision_at=decision_at,
-            equity=equity,
-            gross_equity=gross_cash + positions,
-            cash=holdings.cash,
-            target_invested=allocation.invested if allocation is not None else 0.0,
-            # A book worth nothing is a book with nothing in it, and no
-            # fraction of it is invested.
-            actual_invested=positions / equity if equity != 0.0 else 0.0,
-            considered=allocation.considered if allocation is not None else 0,
-            traded_value=execution.traded_value if execution else 0.0,
-            commission=execution.commission if execution else 0.0,
-            market_cost=execution.market_cost if execution else 0.0,
-            untradable=execution.untradable if execution else (),
-            unfunded=execution.unfunded if execution else (),
-            priced_from_earlier=estimated,
-            weights=dict(allocation.weights) if allocation is not None else {},
-            decided=decided,
-            quantities=dict(holdings.quantities),
-            fills=fills,
-            closes=dict(prices),
+    def _strategy_definition(self) -> Mapping[str, object]:
+        """Return the strategy's definition, frozen, or refuse a strategy that has none."""
+        definition = self.strategy.definition()
+        if not isinstance(definition, Mapping):
+            raise TypeError(
+                f"the strategy's definition is {definition!r}; a run records what it ran, and "
+                "a strategy that cannot say what it is cannot be recorded"
+            )
+        frozen = freeze(dict(definition))
+        assert isinstance(frozen, Mapping)
+        return frozen
+
+    def _configuration(self, sessions: Sequence[date]) -> dict[str, object]:
+        """Return everything the numbers of a run depend on, apart from the strategy.
+
+        Notes
+        -----
+        The lot size of every instrument the book could hold during the run is
+        recorded beside the rest: it is read from the registry, and a registry
+        edited afterwards would otherwise change what a result says it was run
+        with.
+        """
+        members = sorted(
+            {name for session in sessions for name in self.dated_universe.members_at(session)}
         )
+        return {
+            **self.config.definition(),
+            "universe": universe_definition(self.dated_universe),
+            "signals": [_signal_definition(item) for item in self.signals],
+            "portfolio": self.portfolio.definition(),
+            "execution": self.execution.definition(),
+            "quantity_steps": {name: self.instruments.get(name).quantity_step for name in members},
+        }
+
+
+def _canonical(item: Signal | SignalRequest, session_date: date) -> Signal | SignalRequest:
+    """Return a declared signal resolved for one session, its names in instrument order."""
+    if not isinstance(item, SignalRequest):
+        return item
+    resolved = item.resolved(session_date)
+    names = resolved.names()
+    if names is None:
+        return resolved
+    return replace(resolved, instruments=tuple(sorted(names)))
+
+
+def _signal_definition(item: Signal | SignalRequest) -> Mapping[str, object]:
+    """Return one engine-level signal's definition, its own universe included."""
+    if isinstance(item, SignalRequest):
+        return item.definition()
+    return {"signal": item.definition_json(), "instruments": None}

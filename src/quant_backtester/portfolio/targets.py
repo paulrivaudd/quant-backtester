@@ -1,29 +1,37 @@
-"""What a decision asks for, and what is actually held.
+"""What a decision asks for, stated in fractions of capital.
 
-Two small records, and the line between them is the whole point of this layer.
-A target is an intention expressed in fractions of capital; holdings are
-quantities that exist. Turning one into the other needs a price, and a price
-belongs to an instant - which is why nothing here converts them, and why the
-conversion happens at the execution instant rather than at the decision one.
+A target is an intention. What is actually held is a different object - see
+:mod:`quant_backtester.portfolio.state` - and the line between them is the
+whole point of this layer: turning one into the other needs a price, and a
+price belongs to an instant, which is why nothing here converts them and why
+the conversion happens at the execution instant rather than at the decision
+one.
 """
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from types import MappingProxyType
+from typing import Final
 
-from quant_backtester.numbers import (
-    require_finite,
-    require_finite_non_negative,
-    require_unit_fraction,
-)
+from quant_backtester.numbers import require_unit_fraction
 from quant_backtester.signals.types import (
     SignalStatus,
     require_identifier,
     require_non_negative_int,
 )
+
+WEIGHT_SUM_TOLERANCE: Final[float] = 1e-9
+"""How far above one a sum of weights may be and still mean "the whole book".
+
+Floating-point dust, not a margin: ``0.7 + 0.2 + 0.1`` is ``0.9999999999999999``
+and other sums land an ulp above one. A tolerance of a billionth of the book is
+a thousand times larger than that dust and a million times smaller than any
+weight a strategy means, so it forgives arithmetic and nothing else.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,13 +45,18 @@ class TargetAllocation:
         it was read from, so an allocation cannot be mistaken for another day's.
     weights : Mapping[str, float]
         Fraction of capital per instrument. It may sum to less than one: what
-        is not allocated is not invested.
+        is not allocated is cash, and cash needs no line of its own.
     selected : tuple[str, ...]
-        The instruments held, best first.
+        The instruments held, best first. Left empty, it is the instruments
+        of ``weights`` in id order - a list of weights carries no ranking, and
+        inventing one from the order a mapping was written in would make two
+        identical decisions record differently.
     considered : int
         How many instruments had a usable signal to be chosen among. A
         selection of two out of nine and a selection of two out of two are not
-        the same decision, and only this number tells them apart.
+        the same decision, and only this number tells them apart. Left at
+        zero with a non-empty selection - which could not otherwise be true -
+        it is the size of the selection.
     skipped : Mapping[str, SignalStatus]
         Why each instrument of the universe was not eligible. Not listed yet,
         no history yet, a session missing, a value too old: a strategy that
@@ -53,10 +66,10 @@ class TargetAllocation:
     ------
     ValueError
         If the decision is not one a portfolio could hold: a weight that is
-        not a finite fraction of ``[0, 1]``, a selection that does not match
-        the weights, a count of instruments considered below the number
-        chosen, a reason that is not a :class:`SignalStatus`, or a naive
-        ``as_of``.
+        not a finite fraction of ``[0, 1]``, weights adding up to more than
+        the whole book, a selection that does not match the weights, a count
+        of instruments considered below the number chosen, a reason that is
+        not a :class:`SignalStatus`, or a naive ``as_of``.
 
     Notes
     -----
@@ -66,20 +79,23 @@ class TargetAllocation:
     negative for half the universe by construction, so the mistake is one
     keystroke away. The refusal is here rather than in the portfolio limits
     because an allocation that cannot be held should not be constructible at
-    all.
+    all. The same goes for a sum above one, which is leverage: nothing here
+    finances it either.
 
-    How *much* of the book may be put to work is a different question, and it
-    belongs to :class:`~quant_backtester.portfolio.limits.PositionLimits`: a
-    strategy may express an intention that adds to more than one, and the
-    limits scale it down to what is allowed. What this class refuses is a
-    weight that is not a fraction at all.
+    How much of the book a *risk limit* lets through is a different question,
+    and it belongs to :class:`~quant_backtester.portfolio.limits.PortfolioLimits`:
+    what this class refuses is an allocation that is not a fraction of a book
+    at all, and what the limits do is cut a legitimate one down to policy.
+
+    Every sum here is ``math.fsum``, which is exact and therefore does not
+    depend on the order the weights were written in.
     """
 
     as_of: datetime
     weights: Mapping[str, float]
-    selected: tuple[str, ...]
-    considered: int
-    skipped: Mapping[str, SignalStatus]
+    selected: tuple[str, ...] = ()
+    considered: int = 0
+    skipped: Mapping[str, SignalStatus] = field(default_factory=lambda: MappingProxyType({}))
 
     def __post_init__(self) -> None:
         """Check the decision is one a portfolio could hold, then freeze it."""
@@ -89,7 +105,13 @@ class TargetAllocation:
         for name, weight in weights.items():
             require_identifier(name, "an instrument of weights")
             require_unit_fraction(weight, f"the weight of {name}")
-        selected = tuple(self.selected)
+        total = math.fsum(weights.values())
+        if total > 1.0 + WEIGHT_SUM_TOLERANCE:
+            raise ValueError(
+                f"the weights add up to {total}: more than the whole book is leverage, "
+                "and nothing here finances it"
+            )
+        selected = tuple(self.selected) if self.selected else tuple(sorted(weights))
         for name in selected:
             require_identifier(name, "a selected instrument")
         if len(set(selected)) != len(selected):
@@ -100,9 +122,10 @@ class TargetAllocation:
                 "describe two different books"
             )
         require_non_negative_int(self.considered, "considered")
-        if self.considered < len(selected):
+        considered = self.considered if self.considered or not selected else len(selected)
+        if considered < len(selected):
             raise ValueError(
-                f"{len(selected)} instrument(s) were selected among {self.considered} considered"
+                f"{len(selected)} instrument(s) were selected among {considered} considered"
             )
         skipped = dict(self.skipped)
         for name, status in skipped.items():
@@ -114,88 +137,28 @@ class TargetAllocation:
             raise ValueError(f"{', '.join(both)} is both selected and skipped")
         object.__setattr__(self, "weights", MappingProxyType(weights))
         object.__setattr__(self, "selected", selected)
+        object.__setattr__(self, "considered", considered)
         object.__setattr__(self, "skipped", MappingProxyType(skipped))
 
     @property
     def invested(self) -> float:
         """Return the fraction of capital this allocation puts to work."""
-        return sum(self.weights.values())
+        return math.fsum(self.weights.values())
 
-
-@dataclass(frozen=True, slots=True)
-class Holdings:
-    """Cash and quantities actually held, between two decisions.
-
-    Attributes
-    ----------
-    cash : float
-        Currency units not invested. Negative would be borrowing, which
-        nothing here does yet.
-    quantities : Mapping[str, float]
-        Units held per instrument, never negative. Fractional unless the
-        instrument declares a ``quantity_step``, which the execution layer
-        rounds to: a retail broker deals whole ETF shares, and a backtest that
-        buys 123.472 of them reports an allocation nobody could have placed.
-
-    Raises
-    ------
-    ValueError
-        If the cash is not a finite number, or a quantity is not a finite
-        number of zero or more. A negative quantity is a short position, and
-        nothing here borrows a security, pays a borrow fee or answers a margin
-        call - so it is refused where it would be created rather than
-        discovered in a return that was never available.
-
-    Notes
-    -----
-    Cash may be negative, because the guard that counts a book ending on
-    borrowed money has to be able to see one. Nothing in the execution layer
-    produces it: the purchases are cut to what the cash can carry.
-
-    Holdings are a state, and a state has no opinion. What they are worth
-    depends on prices, and prices depend on an instant: :meth:`value_at` asks
-    for both rather than remembering either.
-    """
-
-    cash: float
-    quantities: Mapping[str, float] = MappingProxyType({})
-
-    def __post_init__(self) -> None:
-        """Check the state can be held, freeze it, and drop the closed positions."""
-        require_finite(self.cash, "cash")
-        held: dict[str, float] = {}
-        for name, size in self.quantities.items():
-            require_identifier(name, "a held instrument")
-            require_finite_non_negative(size, f"the quantity of {name}")
-            if size != 0.0:
-                held[name] = size
-        object.__setattr__(self, "quantities", MappingProxyType(held))
-
-    def value_at(self, prices: Mapping[str, float]) -> float:
-        """Return the total worth of these holdings at the given prices.
-
-        Parameters
-        ----------
-        prices : Mapping[str, float]
-            One price per held instrument.
+    @property
+    def gross(self) -> float:
+        """Return the gross exposure, the sum of the absolute weights.
 
         Returns
         -------
         float
-            Cash plus the market value of every position.
-
-        Raises
-        ------
-        KeyError
-            If an instrument is held and no price is given for it. Valuing a
-            position at nothing because its price is missing would show a loss
-            that did not happen, then show it back the next day.
+            ``sum |w|``. Equal to :attr:`invested` for as long as the project
+            is long-only, and the definition that stays right the day it is not:
+            a long and a short of the same size are a gross of two, not zero.
         """
-        return self.cash + sum(size * prices[name] for name, size in self.quantities.items())
+        return math.fsum(abs(weight) for weight in self.weights.values())
 
-    def weights_at(self, prices: Mapping[str, float]) -> dict[str, float]:
-        """Return the fraction of total worth each position represents."""
-        total = self.value_at(prices)
-        if total == 0.0:
-            return {}
-        return {name: size * prices[name] / total for name, size in self.quantities.items()}
+    @property
+    def cash(self) -> float:
+        """Return the fraction of capital this allocation leaves in cash."""
+        return max(0.0, 1.0 - self.invested)
