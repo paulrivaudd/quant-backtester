@@ -22,7 +22,7 @@ from quant_backtester.data.instruments import (
 from quant_backtester.data.reader import Observation, ObservationStatus
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.fills import ExecutionReject, ExecutionRejectReason, OrderStatus
-from quant_backtester.execution.model import Execution, ExecutionModel
+from quant_backtester.execution.model import Execution, ExecutionModel, Sizing
 from quant_backtester.execution.orders import Side
 from quant_backtester.portfolio.holdings import Holding
 from quant_backtester.portfolio.state import PortfolioState, UnvaluablePosition
@@ -106,6 +106,7 @@ def trade(
     hold: bool = False,
     keep: Collection[str] = (),
     cash_shares: Mapping[str, float] | None = None,
+    decision_closes: Mapping[str, float] | None = None,
 ) -> Execution:
     """Rebalance at ``AT``; a bare number is an opening price of the session itself."""
     quotes = {
@@ -125,6 +126,7 @@ def trade(
         hold=hold,
         keep=keep,
         cash_shares=cash_shares,
+        decision_closes=decision_closes,
     )
 
 
@@ -858,3 +860,46 @@ def test_two_cash_shares_each_pay_their_own_commission() -> None:
     assert done.state.quantity("A") == pytest.approx(40.0)
     assert done.state.quantity("B") == pytest.approx(40.0)
     assert done.state.cash == pytest.approx(0.0)
+
+
+AT_DECISION = ExecutionModel(costs=CostModel(), sizing=Sizing.AT_DECISION)
+
+
+def test_quantities_fixed_at_the_decision_are_cut_to_the_cash_after_a_gap_up() -> None:
+    """C04: 100 fixed at the close of 100; the open prints 120; 10 000 buys 83.33 of them."""
+    done = trade(
+        AT_DECISION, book(10_000.0), {"A": 1.0}, {"A": 120.0}, decision_closes={"A": 100.0}
+    )
+
+    assert done.orders[0].quantity == pytest.approx(100.0)
+    assert done.state.quantity("A") == pytest.approx(10_000.0 / 120.0)
+    assert reasons(done) == {"A": ExecutionRejectReason.INSUFFICIENT_CASH}
+
+
+def test_quantities_fixed_at_the_decision_leave_cash_after_a_gap_down() -> None:
+    """The notional model would buy 125 at 80; an order fixed overnight buys its 100."""
+    fixed = trade(
+        AT_DECISION, book(10_000.0), {"A": 1.0}, {"A": 80.0}, decision_closes={"A": 100.0}
+    )
+    notional = trade(FREE, book(10_000.0), {"A": 1.0}, {"A": 80.0})
+
+    assert fixed.state.quantity("A") == pytest.approx(100.0)
+    assert fixed.state.cash == pytest.approx(2_000.0)
+    assert notional.state.quantity("A") == pytest.approx(125.0)
+
+
+def test_a_line_without_a_decision_close_is_refused_not_sized_on_the_open() -> None:
+    done = trade(AT_DECISION, book(10_000.0), {"A": 1.0}, {"A": 100.0}, decision_closes={})
+
+    assert reasons(done) == {"A": ExecutionRejectReason.NO_DECISION_PRICE}
+    assert done.fills == ()
+
+
+def test_the_sizing_is_named_where_the_run_records_it() -> None:
+    assert FREE.definition()["fill_model"] == "OPEN_AUCTION_NOTIONAL"
+    assert AT_DECISION.definition()["fill_model"] == "DECISION_CLOSE_QUANTITIES"
+
+
+def test_decision_sizing_without_the_decision_closes_is_a_wiring_mistake() -> None:
+    with pytest.raises(ValueError, match="decision's closes"):
+        trade(AT_DECISION, book(10_000.0), {"A": 1.0}, {"A": 100.0})

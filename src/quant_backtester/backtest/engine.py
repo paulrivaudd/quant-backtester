@@ -58,7 +58,7 @@ from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.schemas import BarField
 from quant_backtester.data.universes import StaticUniverse, UniverseSource, universe_definition
-from quant_backtester.execution.model import Execution, ExecutionModel
+from quant_backtester.execution.model import Execution, ExecutionModel, Sizing
 from quant_backtester.portfolio.allocation import PortfolioDecision, PortfolioModel
 from quant_backtester.portfolio.constraints import check_trading_universe
 from quant_backtester.portfolio.state import PortfolioState, ValuationResult, value_state
@@ -453,6 +453,16 @@ class BacktestEngine:
         market = self.reader.at(at)
         wanted = sorted(set(decision.accepted_weights) | set(state.holdings))
         quotes = market.observations(wanted, self.config.timetable.execution.field)
+        decision_closes: dict[str, float] | None = None
+        if self.execution.sizing is Sizing.AT_DECISION:
+            # Read at the decision instant, never later: the quantities an
+            # account fixes overnight are fixed on what it knew overnight.
+            observed = self.reader.at(decision.as_of).observations(wanted, BarField.CLOSE)
+            decision_closes = {
+                name: float(observation.value)
+                for name, observation in observed.items()
+                if observation.value is not None
+            }
         return self.execution.rebalance(
             state,
             decision.accepted_weights,
@@ -466,6 +476,7 @@ class BacktestEngine:
             hold=decision.holds_positions,
             keep=decision.kept,
             cash_shares=decision.cash_shares,
+            decision_closes=decision_closes,
         )
 
     def _value(
