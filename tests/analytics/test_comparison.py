@@ -8,6 +8,7 @@ could have seen, and a currency mismatch refused rather than drawn.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
@@ -26,7 +27,9 @@ from quant_backtester.analytics.curves import Book, equity_curve
 from quant_backtester.backtest.runner import StrategyRunner, value_benchmark
 from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
+from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.schemas import ActionType
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
@@ -413,3 +416,50 @@ def test_a_split_and_a_dividend_on_one_day_are_refused(
     """Per share before or after the split? Unsaid, and the answers differ by the ratio."""
     with pytest.raises(ValueError, match="split and a distribution"):
         wealth([100.0, 50.0, 50.0], [(ActionType.SPLIT, 1, 2.0), (ActionType.DIVIDEND, 1, 5.0)])
+
+
+def test_a_benchmark_is_not_carried_past_its_delisting(
+    repository: MarketDataRepository,
+    make_bars: Callable[..., pd.DataFrame],
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+    sessions: tuple[date, ...],
+) -> None:
+    """Audit A15: the curve used to go flat at the last close, as if still held.
+
+    The book stops on a delisted line; its yardstick is held to the same rule.
+    """
+    registry = InstrumentRegistry(
+        [
+            replace(instrument, last_session=sessions[1])
+            if instrument.id == "ETF_OTHER"
+            else instrument
+            for instrument in instruments
+        ]
+    )
+    days = sessions[:4]
+    repository.save_checked_bars("ETF_EU", make_bars("ETF_EU", xpar, dict.fromkeys(days, 100.0)))
+    repository.save_checked_bars(
+        "ETF_OTHER", make_bars("ETF_OTHER", xpar, {days[0]: 100.0, days[1]: 101.0})
+    )
+    market = MarketDataReader(
+        repository=repository,
+        instruments=registry,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+    )
+    runner = StrategyRunner(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        base_currency="EUR",
+        analytics=CONFIG,
+        execution=FREE,
+        initial_cash=10_000.0,
+        timetable=PARIS,
+    )
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], days[0], days[-1])
+
+    with pytest.raises(ValueError, match="stopped trading"):
+        value_benchmark(result.backtest, market, "ETF_OTHER")
