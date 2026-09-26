@@ -75,7 +75,7 @@ from quant_backtester.data.revisions import (
     detect_revisions,
     merge_with_policy,
 )
-from quant_backtester.data.schemas import BARS_SCHEMA, LEVELS_SCHEMA, VINTAGES_SCHEMA
+from quant_backtester.data.schemas import BARS_SCHEMA, LEVELS_SCHEMA, VINTAGES_SCHEMA, CheckStatus
 from quant_backtester.data.sources.base import (
     DataSource,
     ProviderError,
@@ -141,6 +141,15 @@ class HistoryCoverage:
         Archived provider responses across every source. A name with fetches
         and no clean series was downloaded and refused, which is not the same
         problem as a name nobody ever fetched.
+    missing_sessions : tuple[date, ...] | None
+        For a ``BAR``, every session of its venue inside the window it is
+        measured over that has no stored bar - inside the span as well as
+        before and after it. ``None`` for a published series: its release
+        calendar is not a venue's, and one is not invented to count against.
+    contested_sessions : tuple[date, ...] | None
+        For a ``BAR``, the stored sessions the cross-check marked
+        ``CONFLICT``: present on disk, and served as holes. ``None`` for a
+        published series.
     """
 
     instrument_id: str
@@ -149,14 +158,39 @@ class HistoryCoverage:
     stored_from: date | None
     stored_until: date | None
     raw_fetches: int
+    missing_sessions: tuple[date, ...] | None = None
+    contested_sessions: tuple[date, ...] | None = None
 
     @property
-    def complete(self) -> bool:
-        """Return whether the store covers the whole declared window."""
+    def spans_declared_window(self) -> bool:
+        """Return whether the stored span reaches both ends of the declared window.
+
+        Only the ends: a series stored on the first and the last day and on
+        nothing between spans its window. Named for what it checks, which is
+        what ``complete`` used to check under a stronger name (audit A12).
+        """
         if self.stored_from is None or self.stored_until is None:
             return False
         starts = self.declared_from is None or self.stored_from <= self.declared_from
         return starts and self.stored_until >= self.declared_until
+
+    @property
+    def complete(self) -> bool:
+        """Return whether the store holds every session it should.
+
+        Returns
+        -------
+        bool
+            For a ``BAR``: the span reaches both ends and no session inside it
+            is missing. Contested sessions do not make it incomplete - they are
+            stored - and are reported beside it. For a published series, only
+            :attr:`spans_declared_window` can be said, and that is what this
+            returns; :attr:`missing_sessions` being ``None`` is how a reader
+            knows the inside was not checked.
+        """
+        if not self.spans_declared_window:
+            return False
+        return self.missing_sessions is None or not self.missing_sessions
 
     @property
     def missing_head(self) -> tuple[date, date] | None:
@@ -876,14 +910,40 @@ class MarketDataUpdater:
             len(self._repository.list_raw_fetches(instrument.id, source))
             for source in instrument.sources
         )
+        until = instrument.last_session or safe_end_date(
+            instrument, self._calendar_of(instrument), self._clock()
+        )
+        missing: tuple[date, ...] | None = None
+        contested: tuple[date, ...] | None = None
+        if instrument.data_type is DataType.BAR:
+            since = instrument.first_session or (dates[0] if dates else None)
+            expected = (
+                []
+                if since is None or since > until
+                else [
+                    session.session_date
+                    for session in self._venue_of(instrument).sessions(since, until)
+                    if instrument.is_listed(session.session_date)
+                ]
+            )
+            missing = tuple(sorted(set(expected) - set(dates)))
+            checked = self._repository.load_checked_bars(instrument.id)
+            contested = tuple(
+                sorted(
+                    checked.loc[
+                        checked["check_status"] == CheckStatus.CONFLICT.value, "session_date"
+                    ]
+                )
+            )
         return HistoryCoverage(
             instrument_id=instrument.id,
             declared_from=instrument.first_session,
-            declared_until=instrument.last_session
-            or safe_end_date(instrument, self._calendar_of(instrument), self._clock()),
+            declared_until=until,
             stored_from=dates[0] if dates else None,
             stored_until=dates[-1] if dates else None,
             raw_fetches=fetches,
+            missing_sessions=missing,
+            contested_sessions=contested,
         )
 
     def update_all(self) -> dict[str, ValidationReport]:
