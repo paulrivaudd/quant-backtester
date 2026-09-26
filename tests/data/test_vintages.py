@@ -565,3 +565,36 @@ def test_a_vintage_archive_is_found_where_it_is_stored(
 
     updater.rebuild_clean("US_GDP")
     assert len(repository.load_vintages("US_GDP")) == 2
+
+
+def test_an_archive_in_the_older_format_is_migrated_by_the_rebuild_it_asks_for(
+    market_root: Path, decision_calendar: CalendarRegistry
+) -> None:
+    """Audit N05: the rebuild read the old file to see if it was empty, and refused it.
+
+    The older normalizer dropped the withdrawal of June 2021; its file has no
+    withdrawn column. Rebuilt from the raw archive, the withdrawal is back.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quant_backtester.data.repository import StoreFormatError
+
+    source = OneExport(
+        export(GDP_20200131=["21098.827"], GDP_20210630=["."]),
+        datetime(2022, 1, 3, 12, 0, tzinfo=UTC),
+    )
+    updater = updater_over(market_root, decision_calendar, source)
+    updater.download("US_GDP", FIRST_QUARTER, date(2019, 3, 31))
+    path = market_root / "clean" / "vintages" / "US_GDP.parquet"
+    current = pq.read_table(path).to_pandas()
+    older = current.loc[~current["withdrawn"]].drop(columns=["withdrawn"])
+    pq.write_table(pa.Table.from_pandas(older, preserve_index=False), path)
+    with pytest.raises(StoreFormatError):
+        MarketDataRepository(market_root).load_vintages("US_GDP")
+
+    report = updater.rebuild_clean("US_GDP")
+
+    assert report.valid
+    stored = MarketDataRepository(market_root).load_vintages("US_GDP")
+    assert list(stored["withdrawn"]) == [False, True]
