@@ -41,6 +41,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
+from pathlib import Path
 
 import pandas as pd
 from matplotlib.figure import Figure
@@ -72,7 +73,7 @@ from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.numbers import require_finite_positive
 from quant_backtester.portfolio.allocation import PortfolioModel
 from quant_backtester.portfolio.limits import PortfolioLimits
-from quant_backtester.provenance import SourceState
+from quant_backtester.provenance import SourceState, environment_state
 from quant_backtester.signals.base import freeze
 from quant_backtester.signals.types import require_identifier
 from quant_backtester.strategies.base import Strategy
@@ -483,6 +484,11 @@ class StrategyRunner:
         runs were not the same code.
     benchmark : BenchmarkSpec | str | None
         What every run is measured against by default, recorded with it.
+    lockfile : Path | None
+        The ``uv.lock`` the environment was synced from, given by a script
+        from its checkout. Its digest, the Python version and the versions of
+        the numerical libraries are recorded with every run and enter its
+        ``run_id``; ``None`` records the lockfile as unrecorded.
 
     Raises
     ------
@@ -507,6 +513,7 @@ class StrategyRunner:
     schedule: DecisionSchedule = field(default_factory=EverySession)
     source: SourceState = field(default_factory=SourceState.unrecorded)
     benchmark: BenchmarkSpec | str | None = None
+    lockfile: Path | None = None
 
     def __post_init__(self) -> None:
         """Reject a runner that could not describe the runs it produces."""
@@ -629,6 +636,7 @@ class StrategyRunner:
                 "source": result.source.definition(),
                 "data_state": state.digest,
                 "inputs": _inputs_digest(self.reader, self.calendars),
+                "environment": environment_state(self.lockfile),
             },
             reader=self.reader,
             data_state=state,

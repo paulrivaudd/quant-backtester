@@ -162,6 +162,7 @@ def runner() -> StrategyRunner:
         initial_cash=INITIAL_CASH,
         source=git_source_state(REPOSITORY),
         benchmark=BENCHMARK,
+        lockfile=REPOSITORY / "uv.lock",
     )
 
 

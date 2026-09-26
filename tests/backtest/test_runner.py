@@ -1010,3 +1010,26 @@ def test_a_series_read_through_the_market_view_is_named_in_the_report(
 
     assert "RATE_US" in result.configuration["history_basis"]  # type: ignore[operator]
     assert "RATE_US" in result.report().render()
+
+
+def test_the_environment_is_part_of_the_run_id(runner: StrategyRunner, tmp_path: Path) -> None:
+    """Point 3.2: one commit, two installs - the run says which one it had."""
+    from dataclasses import replace as replaced
+
+    first_lock = tmp_path / "first.lock"
+    first_lock.write_text("pandas 3.0.5\n", encoding="utf-8")
+    other_lock = tmp_path / "other.lock"
+    other_lock.write_text("pandas 3.0.6\n", encoding="utf-8")
+    strategy = BuyAndHold(instruments=("ETF_EU",))
+
+    first = replaced(runner, lockfile=first_lock).run(
+        strategy, ["ETF_EU"], "2026-09-09", "2026-09-14"
+    )
+    other = replaced(runner, lockfile=other_lock).run(
+        strategy, ["ETF_EU"], "2026-09-09", "2026-09-14"
+    )
+
+    environment = first.configuration["environment"]
+    assert environment["python"].startswith("3.12")  # type: ignore[index]
+    assert environment["pandas"]  # type: ignore[index]
+    assert first.run_id != other.run_id
