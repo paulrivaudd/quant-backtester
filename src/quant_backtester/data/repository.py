@@ -172,6 +172,18 @@ class StoreBusy(RuntimeError):
     """
 
 
+class StoreFormatError(ValueError):
+    """Raised when a stored file predates the format this code reads.
+
+    Named, with the action to take, rather than surfacing as a ``KeyError``
+    three calls later (audit R11, decision D16). A clean file is derived from
+    ``raw/``, so the remedy for an old one is a rebuild, never an in-place
+    patch: a vintage archive written before withdrawals were kept, given a
+    ``withdrawn = False`` column, would still be missing every withdrawal the
+    older normalizer threw away.
+    """
+
+
 class TransactionDoomed(RuntimeError):
     """Raised when a transaction ends after a block joined to it failed.
 
@@ -242,6 +254,35 @@ class _StoreLock:
             self._mode = None
             fcntl.flock(descriptor, fcntl.LOCK_UN)
             os.close(descriptor)
+
+
+def _planned_move(move: object) -> tuple[Path, str | None]:
+    """Return one move of a commit manifest as ``(staged file, digest)``.
+
+    Parameters
+    ----------
+    move : object
+        The manifest's entry: ``{"source": ..., "sha256": ...}``, or - in a
+        manifest written before digests were recorded - the staged path alone.
+
+    Returns
+    -------
+    tuple[Path, str | None]
+        The staged file and its digest, ``None`` for the older format, so an
+        upgrade does not strand a commit that was interrupted before it
+        (audit R11).
+
+    Raises
+    ------
+    StoreFormatError
+        If the entry is neither.
+    """
+    if isinstance(move, str):
+        return Path(move), None
+    if isinstance(move, dict) and isinstance(move.get("source"), str):
+        digest = move.get("sha256")
+        return Path(move["source"]), None if digest is None else str(digest)
+    raise StoreFormatError(f"a commit manifest entry is not a move this code knows: {move!r}")
 
 
 def _sha256(path: Path) -> str:
@@ -615,10 +656,7 @@ class MarketDataRepository:
             moves = json.loads(manifest.read_text(encoding="utf-8"))
             self._apply(
                 staging,
-                {
-                    self.root / target: (Path(move["source"]), str(move["sha256"]))
-                    for target, move in moves.items()
-                },
+                {self.root / target: _planned_move(move) for target, move in moves.items()},
             )
         return handled
 
@@ -644,7 +682,7 @@ class MarketDataRepository:
         )
         self._apply(staging, moves)
 
-    def _apply(self, staging: Path, moves: Mapping[Path, tuple[Path, str]]) -> None:
+    def _apply(self, staging: Path, moves: Mapping[Path, tuple[Path, str | None]]) -> None:
         """Move every staged file onto its target, then drop the staging directory.
 
         Raises
@@ -657,8 +695,11 @@ class MarketDataRepository:
         """
         for target, (source, digest) in sorted(moves.items()):
             if not source.exists():
-                if target.exists() and _sha256(target) == digest:
-                    continue  # moved by an earlier pass of the same commit
+                if target.exists() and (digest is None or _sha256(target) == digest):
+                    # Moved by an earlier pass of the same commit. A manifest
+                    # of the older format records no digest, and is finished
+                    # under the rule it was written under: a target present.
+                    continue
                 raise RuntimeError(
                     f"{target.relative_to(self.root)} was staged and is neither in "
                     f"{staging.name} nor published; this commit cannot be completed"
@@ -1471,7 +1512,15 @@ def _load_or_empty(path: Path, schema: pa.Schema) -> pd.DataFrame:
     """
     if not path.exists():
         return schema.empty_table().to_pandas()
-    return pq.read_table(path).to_pandas()
+    table = pq.read_table(path)
+    missing = [name for name in schema.names if name not in table.column_names]
+    if missing:
+        raise StoreFormatError(
+            f"{path} was written in an older format: it lacks {', '.join(missing)}. It is "
+            "derived data - rebuild it from raw/ (scripts/update_market_data.py --rebuild "
+            "--only <instrument>), which also recovers what the older code dropped."
+        )
+    return table.to_pandas()
 
 
 def _only_instrument(frame: pd.DataFrame, instrument_id: str | None) -> pd.DataFrame:
