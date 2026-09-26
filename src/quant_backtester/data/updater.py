@@ -69,7 +69,7 @@ from quant_backtester.data.instruments import (
     VintagePolicy,
 )
 from quant_backtester.data.normalizer import NormalizedData, Normalizer
-from quant_backtester.data.repository import MarketDataRepository
+from quant_backtester.data.repository import MarketDataRepository, TransactionDoomed
 from quant_backtester.data.revisions import (
     AcceptedRevisions,
     detect_revisions,
@@ -888,10 +888,26 @@ class MarketDataUpdater:
         Returns
         -------
         ValidationReport
-            Issues found while replaying, in replay order.
+            Issues found while replaying, in replay order. If any is an error,
+            the report ends with ``REBUILD_ABANDONED`` and nothing was written.
+
+        Raises
+        ------
+        FileNotFoundError
+            If a fetch the journal says shaped the clean layer is no longer in
+            ``raw/``. Nothing is written.
+        StoreBusy
+            If someone else holds the store.
 
         Notes
         -----
+        The whole rebuild is one repository transaction: the emptying, every
+        replayed promotion, and nothing published until the last one has
+        passed. A replay that fails - an archive that no longer reads, a
+        fetch the validator now refuses - leaves the previous clean layer
+        exactly as it was, where emptying it first used to leave nothing
+        (audit A16).
+
         Exercice 9.5 (difficile, et c'est la methode qui prouve tout le reste).
 
         Rejoue les snapshots ``raw/`` dans l'ordre chronologique, applique
@@ -929,11 +945,58 @@ class MarketDataUpdater:
         replay rule of its own.
         """
         instrument = self._instruments.get(instrument_id)
-        self._reset_clean(instrument)
-        issues: list[ValidationIssue] = []
         applied = self._repository.load_applied_fetches(instrument.id)
+        archived = self._archived_fetches(instrument)
+        lost = sorted(applied - {(source_id, fetch_id) for fetch_id, source_id in archived})
+        if lost:
+            raise FileNotFoundError(
+                f"{instrument.id}: {len(lost)} fetch(es) shaped the clean layer and are no "
+                f"longer in raw/: {', '.join(f'{source}:{fetch}' for source, fetch in lost)}. "
+                "Nothing was rebuilt; the clean layer is as it was."
+            )
+        issues: list[ValidationIssue] = []
+        try:
+            with self._repository.transaction():
+                self._replay(instrument, applied, archived, issues)
+                if any(issue.severity is Severity.ERROR for issue in issues):
+                    raise _PromotionRefused([])
+        except (_PromotionRefused, TransactionDoomed):
+            issues.append(
+                _issue(
+                    "REBUILD_ABANDONED",
+                    Severity.ERROR,
+                    instrument.id,
+                    None,
+                    f"{instrument.id}: a replayed fetch no longer passes; nothing was "
+                    "rebuilt and the clean layer is as it was",
+                )
+            )
+        return ValidationReport(instrument_id=instrument.id, issues=issues)
+
+    def _replay(
+        self,
+        instrument: Instrument,
+        applied: set[tuple[str, str]],
+        archived: Sequence[tuple[str, str]],
+        issues: list[ValidationIssue],
+    ) -> None:
+        """Empty an instrument's clean tables and replay its applied fetches.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            Instrument to rebuild.
+        applied : set[tuple[str, str]]
+            ``(source, fetch_id)`` of every fetch that completed a promotion.
+        archived : Sequence[tuple[str, str]]
+            ``(fetch_id, source)`` of every archived fetch, oldest first.
+        issues : list[ValidationIssue]
+            Appended to as the replay goes, so a caller whose transaction
+            failed still has everything found up to the failure.
+        """
+        self._reset_clean(instrument)
         skipped: list[str] = []
-        for fetch_id, source_id in self._archived_fetches(instrument):
+        for fetch_id, source_id in archived:
             if (source_id, fetch_id) not in applied:
                 # Archived, then never promoted: a download refused by the
                 # validator, or a run that died after writing raw. Replaying it
@@ -943,7 +1006,7 @@ class MarketDataUpdater:
                 continue
             download = self._repository.load_raw(instrument.id, source_id, fetch_id)
             data, corrected = self._normalize(instrument, source_id, download)
-            issues += corrected
+            issues.extend(corrected)
             frames = {}
             frame = _canonical_frame(instrument, data)
             if frame is not None:
@@ -958,7 +1021,7 @@ class MarketDataUpdater:
                 extra_issues=[],
                 log=False,
             )
-            issues += list(report.issues)
+            issues.extend(report.issues)
         if skipped:
             issues.append(
                 _issue(
@@ -970,7 +1033,6 @@ class MarketDataUpdater:
                     f"not replayed: {', '.join(skipped)}. They stay in raw/ as evidence.",
                 )
             )
-        return ValidationReport(instrument_id=instrument.id, issues=issues)
 
     # -- fetching ----------------------------------------------------------
 

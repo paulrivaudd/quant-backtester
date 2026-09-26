@@ -1183,6 +1183,92 @@ def test_rebuild_is_idempotent(
     assert first == live
 
 
+def test_a_rebuild_that_cannot_read_an_archive_leaves_the_clean_layer_as_it_was(
+    updater: MarketDataUpdater, repository: MarketDataRepository
+) -> None:
+    """Audit A16: the clean layer used to be emptied before the first archive was read.
+
+    Fault injection only: one applied archive is overwritten with bytes that
+    are not Parquet. The rebuild fails, and the series it could not rebuild
+    is still there, byte for byte.
+    """
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    before = _clean_bytes(repository, "ETF_EU")
+    fetch_id = repository.list_raw_fetches("ETF_EU", "YAHOO")[0]
+    (repository.root / "raw" / "YAHOO" / "ETF_EU" / f"{fetch_id}.parquet").write_bytes(
+        b"not parquet"
+    )
+
+    with pytest.raises(pa.ArrowInvalid):
+        updater.rebuild_clean("ETF_EU")
+
+    assert _clean_bytes(repository, "ETF_EU") == before
+    assert list((repository.root / ".pending").iterdir()) == []
+
+
+def test_a_rebuild_missing_an_applied_archive_refuses_before_writing(
+    updater: MarketDataUpdater, repository: MarketDataRepository
+) -> None:
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    before = _clean_bytes(repository, "ETF_EU")
+    fetch_id = repository.list_raw_fetches("ETF_EU", "YAHOO")[0]
+    folder = repository.root / "raw" / "YAHOO" / "ETF_EU"
+    (folder / f"{fetch_id}.parquet").unlink()
+    (folder / f"{fetch_id}.json").unlink()
+
+    with pytest.raises(FileNotFoundError, match="no longer in raw"):
+        updater.rebuild_clean("ETF_EU")
+
+    assert _clean_bytes(repository, "ETF_EU") == before
+
+
+def test_a_rebuild_whose_replay_is_refused_is_abandoned_whole(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    """A replay the live path accepted and the rebuild now refuses publishes nothing.
+
+    Live, the refetched Tuesday was kept as stored. A policy since extended to
+    accept only its open would merge an open above the stored high on replay:
+    that fetch is refused, so the rebuild is not what the live path built,
+    and none of it is published.
+    """
+    sources = {"YAHOO": yahoo, "FRED": fred}
+    live = build_updater(repository, instruments, calendars, sources, clock)
+    live.download("ETF_EU", MONDAY, FRIDAY)
+    moved = yahoo.rows["ETF_EU"].copy()
+    moved.loc[1, ["open", "high", "low", "close"]] = [110.0, 111.0, 109.0, 110.0]
+    yahoo.rows["ETF_EU"] = moved
+    assert live.update("ETF_EU").valid
+    before = _clean_bytes(repository, "ETF_EU")
+    accepted = AcceptedRevisions(
+        [
+            AcceptedRevision(
+                instrument_id="ETF_EU",
+                source="YAHOO",
+                table="bars",
+                observation_date=TUESDAY,
+                field="open",
+                old_value=101.0,
+                new_value=110.0,
+                reason="synthetic: only the open was reviewed",
+            )
+        ]
+    )
+    later = build_updater(repository, instruments, calendars, sources, clock, accepted)
+
+    report = later.rebuild_clean("ETF_EU")
+
+    assert not report.valid
+    assert codes(report)[-1] == "REBUILD_ABANDONED"
+    assert "MERGED_BAR_INVALID" in codes(report)
+    assert _clean_bytes(repository, "ETF_EU") == before
+
+
 def test_rebuild_replays_the_policy_not_the_last_fetch(
     updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
 ) -> None:
