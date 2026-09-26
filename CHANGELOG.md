@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Performance
+- The reader prepares each series once per file version - contested sessions
+  and missing values removed, sorted - and each instant only slices and
+  filters it; corporate actions are sorted once per version of their table.
+  The records of every suite are identical byte for byte.
+
+### Research
+- `quant_backtester.research`: an append-only experiment register that counts
+  every variant, rejected ones included, and only accepts committed code; paper
+  plans fixed by fingerprint, whose logs are never rewritten.
+- `research/PROTOCOL.md`; two paper plans starting 2026-10-01;
+  `scripts/paper_trade.py`; `run_baselines.py --register`.
+
 ## 0.2.0 — 2026-09-26
 
 The fixes of two audits of 2026-09-26: the first (A01–A18, decisions D1–D10)

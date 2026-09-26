@@ -1,0 +1,8 @@
+# Committed on 2026-09-26, before its start. See research/PROTOCOL.md.
+name = "ROTATION_2_BUY_AND_HOLD"
+start = 2026-10-01
+universe = "ROTATION_2"
+# BuyAndHold(instruments=("ETF_WORLD",)), decided every session.
+strategy_fingerprint = "fd7545be8967485cd169ccca66f1ceec4c4e0181c301f6cd393654a9a52923ee"
+note = """The control: the world fund bought once and kept, under the same \
+costs, lots and calendar as the rotation it is compared with."""

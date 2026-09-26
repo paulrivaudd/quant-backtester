@@ -39,7 +39,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from quant_backtester.analytics.config import AnalyticsConfig
@@ -53,6 +53,7 @@ from quant_backtester.data.universes import UniverseRegistry
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.provenance import git_source_state
+from quant_backtester.research.registry import ExperimentRegistry, record_of
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
     BuyAndHold,
@@ -66,6 +67,9 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 
 STORE = REPOSITORY / "market_data"
 """The committed metadata and the local data next to it."""
+
+REGISTRY = REPOSITORY / "research" / "registry.jsonl"
+"""The experiment register, committed with the code."""
 
 UNIVERSE = "ROTATION_2"
 """The two PEA funds every experiment chooses among."""
@@ -224,8 +228,40 @@ def write_records(result: StrategyResult, directory: Path, name: str) -> None:
         frame.to_csv(directory / f"{name}_{view}.csv", float_format="%.17g")
 
 
+@dataclass(frozen=True, slots=True)
+class Keeping:
+    """Where each finished run goes besides the terminal.
+
+    Attributes
+    ----------
+    records : Path | None
+        Directory for each run's CSVs, or ``None``.
+    registry : ExperimentRegistry | None
+        The experiment register each run is appended to, or ``None``. Every
+        run is registered under its label as the hypothesis, so the register
+        counts every variant the suites have run.
+    """
+
+    records: Path | None = None
+    registry: ExperimentRegistry | None = None
+
+    def keep(self, result: StrategyResult, name: str, hypothesis: str) -> None:
+        """Write a run's records and register it, as asked."""
+        if self.records is not None:
+            write_records(result, self.records, name)
+        if self.registry is not None:
+            self.registry.register(
+                record_of(
+                    result,
+                    experiment_id=name,
+                    hypothesis=hypothesis,
+                    recorded_at=datetime.now(UTC),
+                )
+            )
+
+
 def run_baselines(
-    runs: StrategyRunner, periods: Sequence[tuple[str, str]], records: Path | None
+    runs: StrategyRunner, periods: Sequence[tuple[str, str]], keeping: Keeping
 ) -> None:
     """Run every baseline over every period, and print the table."""
     print(HEADER)
@@ -233,12 +269,11 @@ def run_baselines(
         for baseline in BASELINES:
             result = runs.run(baseline.strategy, UNIVERSE, start, end, schedule=baseline.schedule)
             print(row(baseline.label, result), flush=True)
-            if records is not None:
-                write_records(result, records, f"baselines_{baseline.label}_{start}_{end}")
+            keeping.keep(result, f"baselines_{baseline.label}_{start}_{end}", baseline.label)
         print()
 
 
-def run_readme(runs: StrategyRunner, records: Path | None) -> None:
+def run_readme(runs: StrategyRunner, keeping: Keeping) -> None:
     """Run what the README prints: the reference run in full, and the two baselines."""
     start, end = README_PERIOD
     reference = runs.run(REFERENCE.strategy, UNIVERSE, start, end, schedule=REFERENCE.schedule)
@@ -247,15 +282,13 @@ def run_readme(runs: StrategyRunner, records: Path | None) -> None:
     print()
     print(reference.compare().render())
     print(flush=True)
-    if records is not None:
-        write_records(reference, records, f"readme_{REFERENCE.label}_{start}_{end}")
+    keeping.keep(reference, f"readme_{REFERENCE.label}_{start}_{end}", REFERENCE.label)
     print(f"== buy and hold against a daily equal weight, both funds  {start} {end}")
     print(HEADER)
     for baseline in HOLD_AGAINST_REBALANCE:
         result = runs.run(baseline.strategy, UNIVERSE, start, end, schedule=baseline.schedule)
         print(row(baseline.label, result), flush=True)
-        if records is not None:
-            write_records(result, records, f"readme_{baseline.label}_{start}_{end}")
+        keeping.keep(result, f"readme_{baseline.label}_{start}_{end}", baseline.label)
     print()
 
 
@@ -294,7 +327,16 @@ def main() -> None:
         metavar="DIR",
         help="write every run's sessions, orders, fills, rejects and holdings there",
     )
+    parser.add_argument(
+        "--register",
+        action="store_true",
+        help="append every run to research/registry.jsonl (committed code only)",
+    )
     arguments = parser.parse_args()
+    keeping = Keeping(
+        records=arguments.records,
+        registry=ExperimentRegistry(REGISTRY) if arguments.register else None,
+    )
     periods = [parse_period(item) for item in arguments.period or []] or list(PERIODS)
     runs = runner()
     source = runs.source.definition()
@@ -308,9 +350,9 @@ def main() -> None:
     )
     print()
     if arguments.suite in ("readme", "all"):
-        run_readme(runs, arguments.records)
+        run_readme(runs, keeping)
     if arguments.suite in ("baselines", "all"):
-        run_baselines(runs, periods, arguments.records)
+        run_baselines(runs, periods, keeping)
 
 
 if __name__ == "__main__":

@@ -66,6 +66,7 @@ LAYERS = [
     "backtest",
     "analytics",
     "strategies",
+    "research",
 ]
 
 
@@ -206,3 +207,17 @@ def test_a_lower_layer_never_imports_a_higher_one(path: Path) -> None:
         if (layer := _layer_of(module)) is not None and LAYER_RANK[layer] > LAYER_RANK[own]
     )
     assert not upwards, f"{path.relative_to(PACKAGE)} imports {', '.join(upwards)}"
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted(path for path in PACKAGE.rglob("*.py") if "research" not in path.parts),
+    ids=lambda path: str(path.relative_to(PACKAGE)),
+)
+def test_nothing_below_the_research_layer_imports_it(path: Path):
+    """Research sits on top: it runs strategies and records them, and nothing needs it."""
+    reaching_up = sorted(
+        name for name in imported_modules(path) if name.startswith("quant_backtester.research")
+    )
+
+    assert not reaching_up, f"{path.name} imports {', '.join(reaching_up)}"
