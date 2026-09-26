@@ -2460,3 +2460,35 @@ def test_a_promotion_interrupted_half_way_leaves_the_store_as_it_was(
     assert repository.load_checked_bars("ETF_EU").empty
     # The raw response is still archived: it is evidence, not part of the change.
     assert repository.list_raw_fetches("ETF_EU", "YAHOO")
+
+
+@pytest.mark.parametrize("together", [True, False], ids=["one_fetch", "two_fetches"])
+def test_a_split_and_a_dividend_on_one_ex_date_are_refused_however_they_arrive(
+    updater: MarketDataUpdater,
+    repository: MarketDataRepository,
+    yahoo: FakeSource,
+    together: bool,
+) -> None:
+    """Audit R08: sent in two fetches, the pair was stored although the validator refuses it.
+
+    The fixture's first fetch carries a dividend on Wednesday. A split on the
+    same ex-date is refused whether it comes with it or after it, and a
+    refused fetch leaves the actions and the journal as they were.
+    """
+    if together:
+        yahoo.actions["ETF_EU"] = raw_actions(
+            [(WEDNESDAY, ActionType.DIVIDEND, 0.5), (WEDNESDAY, ActionType.SPLIT, 2.0)]
+        )
+        report = updater.download("ETF_EU", MONDAY, FRIDAY)
+        assert repository.load_corporate_actions("ETF_EU").empty
+    else:
+        assert updater.download("ETF_EU", MONDAY, FRIDAY).valid
+        before = repository.load_corporate_actions("ETF_EU")
+        applied = repository.load_applied_fetches("ETF_EU")
+        yahoo.actions["ETF_EU"] = raw_actions([(WEDNESDAY, ActionType.SPLIT, 2.0)])
+        report = updater.update("ETF_EU")
+        pd.testing.assert_frame_equal(repository.load_corporate_actions("ETF_EU"), before)
+        assert repository.load_applied_fetches("ETF_EU") == applied
+
+    assert not report.valid
+    assert "SPLIT_WITH_DISTRIBUTION" in [issue.code for issue in report.errors]
