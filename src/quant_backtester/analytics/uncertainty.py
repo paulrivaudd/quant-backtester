@@ -22,12 +22,15 @@ point-in-time, or an idealised execution real.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from itertools import pairwise
 
 import numpy as np
 import pandas as pd
+
+from quant_backtester.analytics.config import AnalyticsConfig
 
 
 class PairedStatistic(Enum):
@@ -38,9 +41,12 @@ class PairedStatistic(Enum):
     by multiplying by the sessions in a year."""
 
     SHARPE = "SHARPE"
-    """Annualised Sharpe ratio of the strategy less the control's, on the
-    per-session returns, with no risk-free rate: the same rate would be taken
-    from both."""
+    """Annualised Sharpe ratio of the strategy less the control's, computed as
+    the report computes it: per-session returns in excess of the analytics
+    convention's risk-free rate per session, their sample spread, annualised
+    by the square root of the sessions in a year. The rate does not cancel in
+    a difference of Sharpe ratios - each is divided by its own spread - so
+    leaving it out measured another statistic (audit of archive 10)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +71,9 @@ class PairedBootstrap:
         Number of resamples.
     seed : int
         Seed of the generator the draws came from.
+    analytics : Mapping[str, object]
+        The analytics convention both books were measured under: the sessions
+        in a year and the risk-free rate.
     """
 
     statistic: PairedStatistic
@@ -76,6 +85,7 @@ class PairedBootstrap:
     block: int
     draws: int
     seed: int
+    analytics: Mapping[str, object]
 
     def definition(self) -> dict[str, object]:
         """Return the result and everything it depends on, as it is recorded."""
@@ -89,6 +99,7 @@ class PairedBootstrap:
             "block": self.block,
             "draws": self.draws,
             "seed": self.seed,
+            "analytics": dict(self.analytics),
         }
 
 
@@ -98,22 +109,42 @@ def _returns(equity: pd.Series) -> list[float]:  # type: ignore[type-arg]
     return [after / before - 1.0 for before, after in pairwise(values)]
 
 
+class UndefinedStatistic(ValueError):
+    """Raised when a book's Sharpe ratio does not exist on a sample: its returns do not vary.
+
+    The report prints no Sharpe ratio for such a book rather than a zero, and
+    the bootstrap follows it: a draw is not dropped to make an interval, and
+    the whole comparison is refused with the cause.
+    """
+
+
 def _measure(
-    statistic: PairedStatistic, first: list[float], second: list[float], sessions_per_year: int
+    statistic: PairedStatistic, first: list[float], second: list[float], config: AnalyticsConfig
 ) -> float:
-    """Return one book's statistic less the other's."""
+    """Return one book's statistic less the other's, under the report's convention."""
     if statistic is PairedStatistic.MEAN_RETURN:
-        return (math.fsum(first) - math.fsum(second)) / len(first) * sessions_per_year
-    return _sharpe(first, sessions_per_year) - _sharpe(second, sessions_per_year)
+        # A common rate subtracted from both cancels in a difference of means.
+        return (math.fsum(first) - math.fsum(second)) / len(first) * config.sessions_per_year
+    return _sharpe(first, config, "strategy") - _sharpe(second, config, "control")
 
 
-def _sharpe(returns: list[float], sessions_per_year: int) -> float:
-    """Return an annualised Sharpe ratio with no risk-free rate; zero for a flat book."""
-    mean = math.fsum(returns) / len(returns)
-    variance = math.fsum((value - mean) ** 2 for value in returns) / (len(returns) - 1)
+def _sharpe(returns: list[float], config: AnalyticsConfig, book: str) -> float:
+    """Return the annualised Sharpe ratio exactly as ``analytics.performance`` computes it.
+
+    Raises
+    ------
+    UndefinedStatistic
+        If the excess returns do not vary: the ratio does not exist.
+    """
+    excess = [value - config.risk_free_per_session for value in returns]
+    mean = math.fsum(excess) / len(excess)
+    variance = math.fsum((value - mean) ** 2 for value in excess) / (len(excess) - 1)
     if variance == 0.0:
-        return 0.0
-    return mean / math.sqrt(variance) * math.sqrt(sessions_per_year)
+        raise UndefinedStatistic(
+            f"the {book}'s returns do not vary on this sample, so its Sharpe ratio does "
+            "not exist; the comparison is refused rather than read as zero"
+        )
+    return mean / math.sqrt(variance) * math.sqrt(config.sessions_per_year)
 
 
 def paired_block_bootstrap(
@@ -125,7 +156,7 @@ def paired_block_bootstrap(
     draws: int,
     seed: int,
     level: float,
-    sessions_per_year: int,
+    config: AnalyticsConfig,
 ) -> PairedBootstrap:
     """Resample the difference between a strategy and its control, in blocks of shared sessions.
 
@@ -144,8 +175,9 @@ def paired_block_bootstrap(
         Seed of the generator; the same seed gives the same draws.
     level : float
         Coverage of the interval, in ``(0, 1)``.
-    sessions_per_year : int
-        Annualisation, the analytics convention's.
+    config : AnalyticsConfig
+        The report's convention - sessions in a year and risk-free rate - so
+        that the difference resampled is the difference the report prints.
 
     Returns
     -------
@@ -154,6 +186,9 @@ def paired_block_bootstrap(
 
     Raises
     ------
+    UndefinedStatistic
+        For a Sharpe difference, if either book's returns do not vary on the
+        sample or on one of the draws.
     ValueError
         If the curves do not cover the same sessions, hold fewer than three
         points, or a parameter is out of range - a block longer than the
@@ -193,14 +228,14 @@ def paired_block_bootstrap(
                 statistic,
                 [first[index] for index in indices],
                 [second[index] for index in indices],
-                sessions_per_year,
+                config,
             )
         )
     tail = (1.0 - level) / 2.0
     ordered = sorted(resampled)
     return PairedBootstrap(
         statistic=statistic,
-        estimate=_measure(statistic, first, second, sessions_per_year),
+        estimate=_measure(statistic, first, second, config),
         low=float(np.quantile(ordered, tail)),
         high=float(np.quantile(ordered, 1.0 - tail)),
         level=level,
@@ -208,4 +243,5 @@ def paired_block_bootstrap(
         block=block,
         draws=draws,
         seed=seed,
+        analytics=config.definition(),
     )

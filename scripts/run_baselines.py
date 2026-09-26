@@ -332,7 +332,7 @@ def run_readme(runs: StrategyRunner, keeping: Keeping) -> None:
             draws=BOOTSTRAP_DRAWS,
             seed=BOOTSTRAP_SEED,
             level=BOOTSTRAP_LEVEL,
-            sessions_per_year=ANALYTICS.sessions_per_year,
+            config=ANALYTICS,
         )
         print(paired_row(paired))
     print(flush=True)
