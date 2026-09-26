@@ -413,9 +413,17 @@ purchases cut for want of cash                11
 sessions with nothing to choose from          61
 sessions missing a line of the target          0
 average cash                              14.27%
+largest weight held                      100.00%
 orders, fills, rejects                37, 37, 13
   INSUFFICIENT_CASH                           11
   NO_EXECUTION_PRICE                           2
+
+assumptions
+  fills: OPEN_AUCTION_NOTIONAL - sized and filled at the next opening price
+  gross: the same fills with no cost taken out - not a separate cost-free run
+  cash: earns nothing; the risk-free rate is used by the Sharpe ratio only
+  limits: cap target weights, before costs
+  a decision lives: one execution; a refused order is not retried
 ```
 
 Three points of return went to execution — **a sixth of everything the idea
@@ -586,10 +594,13 @@ the minimum trade value kept it still: without one, buy and hold on both funds
 traded 106 times over this README's period instead of once. A risk limit the
 kept book breaches still trades it down to the limit.
 
-It is also what makes a baseline honest. `BuyAndHold` buys while the book is
-empty and keeps its positions afterwards; `EqualWeightRebalance` restates the
-same target at every decision. Over this README's period they are two
-different strategies — one trade against four, 80 euros of costs against 86,
+It is also what makes a baseline honest. `BuyAndHold` buys its basket, completes
+it with the cash left if a name could not be bought the first time
+(`ctx.keep_and_buy`: the names held are kept, never traded back to equal
+weights), and keeps its positions afterwards; `EqualWeightRebalance` restates
+the same target at every decision. Over this README's period they are two
+different strategies — one session of trading against four (two fills against
+seven), 80 euros of costs against 86,
 no refused order against 375, most of them rebalancings too small to send — and
 calling the second one "buy and hold", as an earlier version of this project
 did, hides the very thing the comparison exists to measure.
@@ -684,6 +695,10 @@ annualised volatility         14.39%        14.69%
 max drawdown                 -21.65%       -21.66%
 sharpe ratio                    0.54          0.67
 excess return                 -4.01%
+
+ETF_WORLD is a yardstick, not an alternative that was traded: one share
+held from the first close, with no cost, no lot and no cash left over. The
+strategy starts in cash and trades at the next open on its own schedule.
 ```
 
 Four points of it are the single contested bar of 24 October 2025: the strategy
@@ -713,37 +728,37 @@ orders, fills, rejects and holdings so that two versions of the code can be
 compared run for run.
 
 ```text
-strategy            period                         net    gross   a year  sharpe   max dd     costs  trades  rejects  est.  vs world
-buy_and_hold        2018-07-16 2026-09-17      164.10%  164.18%   12.62%    0.71  -33.59%        80       1        0     1     0.44%
-equal_weight        2018-07-16 2026-09-17      182.29%  182.42%   13.54%    0.74  -33.57%       127      23      106     1    18.63%
+strategy            period                         net    gross   a year  sharpe   max dd     costs  rebal.  fills  rejects  est.  vs world
+buy_and_hold        2018-07-16 2026-09-17      164.10%  164.18%   12.62%    0.71  -33.59%        80       1      1        0     1     0.44%
+equal_weight        2018-07-16 2026-09-17      182.29%  182.42%   13.54%    0.74  -33.57%       127      23     40      106     1    18.63%
                     rejects: BELOW_MINIMUM_TRADE 92, INSUFFICIENT_CASH 14
-momentum_rotation   2018-07-16 2026-09-17      160.40%  183.22%   12.42%    0.68  -33.62%    22,824      86       65     1    -3.26%
+momentum_rotation   2018-07-16 2026-09-17      160.40%  183.22%   12.42%    0.68  -33.62%    22,824      86    169       65     1    -3.26%
                     rejects: INSUFFICIENT_CASH 63, NO_EXECUTION_PRICE 2
-momentum_vix        2018-07-16 2026-09-17      124.37%  161.29%   10.39%    0.66  -23.11%    36,920     214      108     1   -39.29%
+momentum_vix        2018-07-16 2026-09-17      124.37%  161.29%   10.39%    0.66  -23.11%    36,920     214    289      108     1   -39.29%
                     rejects: INSUFFICIENT_CASH 106, NO_EXECUTION_PRICE 2
 
-buy_and_hold        2019-01-02 2021-12-31       82.30%   82.38%   22.20%    1.08  -33.61%        80       1        0     0     1.37%
-equal_weight        2019-01-02 2021-12-31       77.41%   77.50%   21.09%    1.02  -33.56%        90       6       45     0    -3.51%
+buy_and_hold        2019-01-02 2021-12-31       82.30%   82.38%   22.20%    1.08  -33.61%        80       1      1        0     0     1.37%
+equal_weight        2019-01-02 2021-12-31       77.41%   77.50%   21.09%    1.02  -33.56%        90       6     10       45     0    -3.51%
                     rejects: BELOW_MINIMUM_TRADE 41, INSUFFICIENT_CASH 4
-momentum_rotation   2019-01-02 2021-12-31       92.21%   97.34%   24.38%    1.14  -33.62%     5,130      24       17     0    11.29%
+momentum_rotation   2019-01-02 2021-12-31       92.21%   97.34%   24.38%    1.14  -33.62%     5,130      24     47       17     0    11.29%
                     rejects: INSUFFICIENT_CASH 17
-momentum_vix        2019-01-02 2021-12-31       78.91%   88.94%   21.44%    1.26  -12.21%    10,025      69       39     0    -2.01%
+momentum_vix        2019-01-02 2021-12-31       78.91%   88.94%   21.44%    1.26  -12.21%    10,025      69     91       39     0    -2.01%
                     rejects: INSUFFICIENT_CASH 39
 
-buy_and_hold        2022-01-03 2023-12-29        2.13%    2.21%    1.07%    0.01  -16.99%        80       1        0     0    -0.82%
-equal_weight        2022-01-03 2023-12-29        9.34%    9.42%    4.60%    0.24  -15.54%        83       4       30     0     6.39%
+buy_and_hold        2022-01-03 2023-12-29        2.13%    2.21%    1.07%    0.01  -16.99%        80       1      1        0     0    -0.82%
+equal_weight        2022-01-03 2023-12-29        9.34%    9.42%    4.60%    0.24  -15.54%        83       4      5       30     0     6.39%
                     rejects: BELOW_MINIMUM_TRADE 28, INSUFFICIENT_CASH 2
-momentum_rotation   2022-01-03 2023-12-29       -1.05%    2.61%   -0.53%   -0.08  -18.75%     3,662      26       18     0    -4.00%
+momentum_rotation   2022-01-03 2023-12-29       -1.05%    2.61%   -0.53%   -0.08  -18.75%     3,662      26     51       18     0    -4.00%
                     rejects: INSUFFICIENT_CASH 18
-momentum_vix        2022-01-03 2023-12-29       -8.83%   -3.23%   -4.55%   -0.39  -23.31%     5,605      63       30     0   -11.78%
+momentum_vix        2022-01-03 2023-12-29       -8.83%   -3.23%   -4.55%   -0.39  -23.31%     5,605      63     83       30     0   -11.78%
                     rejects: INSUFFICIENT_CASH 30
 
-buy_and_hold        2024-01-02 2026-09-17       53.43%   53.51%   17.13%    1.09  -21.61%        80       1        0     1    -0.19%
-equal_weight        2024-01-02 2026-09-17       49.50%   49.59%   16.01%    0.99  -22.46%        90       6       25     1    -4.13%
+buy_and_hold        2024-01-02 2026-09-17       53.43%   53.51%   17.13%    1.09  -21.61%        80       1      1        0     1    -0.19%
+equal_weight        2024-01-02 2026-09-17       49.50%   49.59%   16.01%    0.99  -22.46%        90       6     11       25     1    -4.13%
                     rejects: BELOW_MINIMUM_TRADE 22, INSUFFICIENT_CASH 3
-momentum_rotation   2024-01-02 2026-09-17       47.99%   54.51%   15.58%    0.98  -21.62%     6,522      35       23     1    -5.63%
+momentum_rotation   2024-01-02 2026-09-17       47.99%   54.51%   15.58%    0.98  -21.62%     6,522      35     67       23     1    -5.63%
                     rejects: INSUFFICIENT_CASH 21, NO_EXECUTION_PRICE 2
-momentum_vix        2024-01-02 2026-09-17       37.65%   47.78%   12.53%    0.96  -13.47%    10,124      76       34     1   -15.97%
+momentum_vix        2024-01-02 2026-09-17       37.65%   47.78%   12.53%    0.96  -13.47%    10,124      76    107       34     1   -15.97%
                     rejects: INSUFFICIENT_CASH 32, NO_EXECUTION_PRICE 2
 ```
 
