@@ -181,6 +181,10 @@ class RunQuality:
     average_cash_share : float | None
         Mean fraction of the book held in cash at the close. ``None`` for a run
         with no session.
+    max_realised_weight : float | None
+        The largest fraction of the book any one position was at a close.
+        Limits cap target weights before costs (decision D6), so a held weight
+        can sit above a cap; this is how far. ``None`` when nothing was held.
     """
 
     sessions: int
@@ -195,6 +199,7 @@ class RunQuality:
     sessions_with_nothing_to_choose: int
     sessions_partially_invested: int
     average_cash_share: float | None
+    max_realised_weight: float | None
 
     def __post_init__(self) -> None:
         """Freeze the counts by reason, in reason order."""
@@ -248,6 +253,7 @@ class RunQuality:
             if record.decision is not None:
                 waiting = record.decision.accepted_weights
         shares = [record.cash / record.net_equity for record in records if record.net_equity > 0.0]
+        held = [weight for record in records for weight in record.actual_weights.values()]
         return cls(
             sessions=len(records),
             decisions=sum(1 for record in records if record.decided),
@@ -267,4 +273,5 @@ class RunQuality:
             ),
             sessions_partially_invested=partially_invested,
             average_cash_share=math.fsum(shares) / len(shares) if shares else None,
+            max_realised_weight=max(held) if held else None,
         )

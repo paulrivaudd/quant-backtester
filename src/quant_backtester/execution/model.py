@@ -54,6 +54,17 @@ from quant_backtester.numbers import require_finite_non_negative, require_unit_f
 from quant_backtester.portfolio.state import PortfolioState, UnvaluablePosition
 from quant_backtester.portfolio.targets import WEIGHT_SUM_TOLERANCE
 
+FILL_MODEL = "OPEN_AUCTION_NOTIONAL"
+"""The name of the one fill model here, recorded with every run.
+
+A decision taken after a close is traded at the next opening auction: the
+book is valued at that auction's prices, each order is sized from them, and
+filled at them, sales first. It is an allocation in notional at a known price
+- a research approximation, and not the same thing as quantities fixed before
+the auction, whose cash would have to cover an opening gap (audit, section
+5.1). Its name travels with the result so that nobody reads it as the other.
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class Execution:
@@ -199,6 +210,7 @@ class ExecutionModel:
     def definition(self) -> dict[str, object]:
         """Return the model as it is recorded with a run."""
         return {
+            "fill_model": FILL_MODEL,
             "fill": "market order at the opening auction, sized at its price",
             "costs": self.costs.definition(),
             "minimum_trade_value": self.minimum_trade_value,

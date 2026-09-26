@@ -748,3 +748,37 @@ def test_two_fills_on_one_session_are_one_rebalancing_and_two_fills(
     assert len(result.fills()) == 2
     assert report.quality.fills == 2
     assert report.costs.rebalancings == 1
+
+
+def test_a_report_states_the_model_it_was_produced_under(runner: StrategyRunner) -> None:
+    """Audit section 5: fills, gross, cash, limits and a decision's life, said in the report."""
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    rendered = result.report().render()
+
+    assert "OPEN_AUCTION_NOTIONAL" in rendered
+    assert "not a separate cost-free run" in rendered
+    assert "target weights, before costs" in rendered
+    assert "one execution" in rendered
+    assert result.configuration["decision_lifetime"] == "one execution"
+
+
+def test_a_limit_caps_the_target_and_the_report_shows_the_weight_held(
+    runner: StrategyRunner,
+) -> None:
+    """Decision D6: capped at 50% before a 1% commission, the position ends above it."""
+    from dataclasses import replace as replaced
+
+    from quant_backtester.portfolio.limits import PortfolioLimits
+
+    capped = replaced(
+        runner,
+        limits=PortfolioLimits(max_weight_per_instrument=0.5),
+        execution=ExecutionModel(costs=CostModel(commission_rate=0.01)),
+    )
+    result = capped.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-10")
+
+    held = result.report().quality.max_realised_weight
+    assert held is not None
+    assert held > 0.5
+    assert "largest weight held" in result.report().render()

@@ -101,6 +101,7 @@ def test_the_limits_describe_themselves_for_the_record() -> None:
         "max_weight_per_instrument": 0.4,
         "max_gross": 1.0,
         "long_only": True,
+        "applies_to": "target weights, before costs",
     }
 
 

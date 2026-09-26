@@ -596,6 +596,10 @@ class BacktestEngine:
             "portfolio": self.portfolio.definition(),
             "execution": self.execution.definition(),
             "quantity_steps": {name: self.instruments.get(name).quantity_step for name in members},
+            # Decision D9: a decision is sent to the next open and to that one
+            # only. An order refused there is not carried: the next decision
+            # replaces it, and on a monthly schedule that is a month away.
+            "decision_lifetime": "one execution",
         }
 
 

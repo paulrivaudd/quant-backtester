@@ -113,7 +113,12 @@ def test_what_the_strategy_said_about_its_choice_is_carried_through(
 def test_the_model_describes_itself_for_the_record() -> None:
     """A result says which limits the book was held to."""
     assert PortfolioModel(PortfolioLimits(max_gross=0.8)).definition() == {
-        "limits": {"max_weight_per_instrument": 1.0, "max_gross": 0.8, "long_only": True}
+        "limits": {
+            "max_weight_per_instrument": 1.0,
+            "max_gross": 0.8,
+            "long_only": True,
+            "applies_to": "target weights, before costs",
+        }
     }
 
 

@@ -12,6 +12,7 @@ out for a terminal.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import pandas as pd
@@ -52,6 +53,12 @@ class PerformanceReport:
     config : AnalyticsConfig
         The conventions every annualised figure depends on, carried along so
         that a report can be reproduced from itself.
+    assumptions : tuple[str, ...]
+        What the figures take for granted about the simulation, one line each:
+        how orders were filled, what "gross" is, what cash earns, what a limit
+        caps and how long a decision lives. Read from the run's configuration,
+        so a report states the model it was produced under rather than leaving
+        a reader to assume a stronger one (audit, section 5).
     """
 
     gross: PerformanceStats
@@ -60,6 +67,7 @@ class PerformanceReport:
     quality: RunQuality
     instruments: InstrumentAttribution
     config: AnalyticsConfig
+    assumptions: tuple[str, ...] = ()
 
     @classmethod
     def of(cls, result: BacktestResult, config: AnalyticsConfig) -> PerformanceReport:
@@ -86,6 +94,7 @@ class PerformanceReport:
             quality=RunQuality.of(result),
             instruments=InstrumentAttribution.of(result),
             config=config,
+            assumptions=_assumptions(result),
         )
 
     def as_frame(self) -> pd.DataFrame:
@@ -155,6 +164,8 @@ class PerformanceReport:
         lines.extend(
             ("", self._cost_block(), "", self._instrument_block(), "", self._quality_block())
         )
+        if self.assumptions:
+            lines.extend(("", "assumptions", *(f"  {line}" for line in self.assumptions)))
         return "\n".join(lines)
 
     def _instrument_block(self) -> str:
@@ -199,6 +210,7 @@ class PerformanceReport:
             f"{'sessions missing a line of the target':<40}"
             f"{quality.sessions_partially_invested:>8}",
             f"{'average cash':<40}{_percent(quality.average_cash_share):>8}",
+            f"{'largest weight held':<40}{_percent(quality.max_realised_weight):>8}",
             f"{'orders, fills, rejects':<32}"
             f"{f'{quality.orders}, {quality.fills}, {quality.rejects}':>16}",
         ]
@@ -206,6 +218,35 @@ class PerformanceReport:
             f"{'  ' + reason:<40}{count:>8}" for reason, count in quality.rejects_by_reason.items()
         )
         return "\n".join(lines)
+
+
+def _assumptions(result: BacktestResult) -> tuple[str, ...]:
+    """Return the simulation's assumptions as a report states them.
+
+    Parameters
+    ----------
+    result : BacktestResult
+        A finished run; only its recorded configuration is read.
+
+    Returns
+    -------
+    tuple[str, ...]
+        One line per assumption, in a fixed order.
+    """
+    configuration = result.configuration
+    execution = configuration.get("execution")
+    fill_model = execution.get("fill_model") if isinstance(execution, Mapping) else None
+    portfolio = configuration.get("portfolio")
+    limits = portfolio.get("limits") if isinstance(portfolio, Mapping) else None
+    applies_to = limits.get("applies_to") if isinstance(limits, Mapping) else None
+    lifetime = configuration.get("decision_lifetime")
+    return (
+        f"fills: {fill_model or 'not recorded'} - sized and filled at the next opening price",
+        "gross: the same fills with no cost taken out - not a separate cost-free run",
+        "cash: earns nothing; the risk-free rate is used by the Sharpe ratio only",
+        f"limits: cap {applies_to or 'not recorded'}",
+        f"a decision lives: {lifetime or 'not recorded'}; a refused order is not retried",
+    )
 
 
 def _percent(value: float | None) -> str:
