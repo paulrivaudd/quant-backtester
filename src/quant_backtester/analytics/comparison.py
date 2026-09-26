@@ -113,11 +113,11 @@ class BenchmarkSpec:
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class BenchmarkCurve:
     """A benchmark valued over a run's sessions, and how it had to be valued.
 
-    Attributes
+    Parameters
     ----------
     spec : BenchmarkSpec
         What was held.
@@ -128,11 +128,41 @@ class BenchmarkCurve:
         Sessions valued at a close from before them, because the benchmark's
         own venue was shut while the strategy's was open. Named rather than
         filled in silently: a curve with a flat week in it should say why.
+
+    Notes
+    -----
+    The values are kept as a tuple and :attr:`equity` builds a new series on
+    every read. A frozen dataclass holding a ``pd.Series`` froze the attribute
+    and not the series: ``curve.equity.iloc[-1] = 99999`` rewrote the
+    benchmark a finished run keeps, and every later comparison with it
+    (audit R06).
     """
 
     spec: BenchmarkSpec
-    equity: pd.Series  # type: ignore[type-arg]
-    marked_from_earlier: tuple[date, ...] = ()
+    values: tuple[float, ...]
+    sessions: tuple[date, ...]
+    marked_from_earlier: tuple[date, ...]
+
+    def __init__(
+        self,
+        spec: BenchmarkSpec,
+        equity: pd.Series,  # type: ignore[type-arg]
+        marked_from_earlier: tuple[date, ...] = (),
+    ) -> None:
+        object.__setattr__(self, "spec", spec)
+        object.__setattr__(self, "values", tuple(float(value) for value in equity))
+        object.__setattr__(self, "sessions", tuple(equity.index))
+        object.__setattr__(self, "marked_from_earlier", tuple(marked_from_earlier))
+
+    @property
+    def equity(self) -> pd.Series:  # type: ignore[type-arg]
+        """Return the curve as a series of its own, indexed by session date."""
+        return pd.Series(
+            list(self.values),
+            index=pd.Index(list(self.sessions), dtype="object", name="session_date"),
+            name=self.spec.name,
+            dtype="float64",
+        )
 
 
 @dataclass(frozen=True, slots=True)
