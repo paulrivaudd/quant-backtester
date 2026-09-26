@@ -782,3 +782,95 @@ def test_a_limit_caps_the_target_and_the_report_shows_the_weight_held(
     assert held is not None
     assert held > 0.5
     assert "largest weight held" in result.report().render()
+
+
+def test_a_basket_is_completed_with_the_cash_there_is_at_the_open(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+) -> None:
+    """Audit R05: the completion was a share of equity fixed at the close.
+
+    ETF_EU is bought, 50 at 100; ETF_OTHER's open is contested. Overnight
+    ETF_EU halves. Half of the new equity (7 500) is 3 750, and 1 250 of the
+    cash stayed idle for good; bought with the cash there is, ETF_OTHER gets
+    50 at 100 and the cash is spent.
+    """
+    from quant_backtester.data.schemas import BarField
+
+    days = (date(2026, 9, 9), date(2026, 9, 10), date(2026, 9, 11), date(2026, 9, 14))
+    market = make_market(
+        {
+            "ETF_EU": make_bars(
+                "ETF_EU", xpar, dict(zip(days, (100.0, 100.0, 50.0, 50.0), strict=True))
+            ),
+            "ETF_OTHER": make_bars(
+                "ETF_OTHER",
+                xpar,
+                dict.fromkeys(days, 100.0),
+                contested={days[1]: (BarField.OPEN,)},
+            ),
+        }
+    )
+    free = StrategyRunner(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        base_currency="EUR",
+        analytics=CONFIG,
+        initial_cash=10_000.0,
+        execution=ExecutionModel(costs=CostModel()),
+        timetable=PARIS,
+    )
+
+    result = free.run(
+        BuyAndHold(instruments=("ETF_EU", "ETF_OTHER")), ["ETF_EU", "ETF_OTHER"], days[0], days[-1]
+    )
+
+    holdings = result.holdings()
+    assert holdings["ETF_EU"].iloc[-1] == pytest.approx(50.0)
+    assert holdings["ETF_OTHER"].iloc[-1] == pytest.approx(50.0)
+    assert holdings["cash"].iloc[-1] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_a_cash_purchase_leaves_room_for_its_commission(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+) -> None:
+    """Sized net of the commission, the completion is not cut for want of cash."""
+    from quant_backtester.data.schemas import BarField
+
+    days = (date(2026, 9, 9), date(2026, 9, 10), date(2026, 9, 11), date(2026, 9, 14))
+    market = make_market(
+        {
+            "ETF_EU": make_bars("ETF_EU", xpar, dict.fromkeys(days, 100.0)),
+            "ETF_OTHER": make_bars(
+                "ETF_OTHER",
+                xpar,
+                dict.fromkeys(days, 100.0),
+                contested={days[1]: (BarField.OPEN,)},
+            ),
+        }
+    )
+    charged = StrategyRunner(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        base_currency="EUR",
+        analytics=CONFIG,
+        initial_cash=10_000.0,
+        execution=ExecutionModel(costs=CostModel(commission_rate=0.01, minimum_commission=2.0)),
+        timetable=PARIS,
+    )
+
+    result = charged.run(
+        BuyAndHold(instruments=("ETF_EU", "ETF_OTHER")), ["ETF_EU", "ETF_OTHER"], days[0], days[-1]
+    )
+
+    rejects = result.rejects()
+    cut = rejects.loc[rejects["reason"] == "INSUFFICIENT_CASH", "instrument_id"]
+    assert "ETF_OTHER" not in set(cut)
+    assert result.holdings()["cash"].iloc[-1] == pytest.approx(0.0, abs=1e-6)

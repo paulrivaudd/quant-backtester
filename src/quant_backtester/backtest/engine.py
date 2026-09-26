@@ -451,6 +451,7 @@ class BacktestEngine:
             universe=self._members(session_date),
             hold=decision.holds_positions,
             keep=decision.kept,
+            cash_shares=decision.cash_shares,
         )
 
     def _value(

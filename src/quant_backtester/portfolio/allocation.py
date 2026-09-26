@@ -58,6 +58,10 @@ class ConstrainedTarget:
     kept : frozenset[str]
         Instruments whose positions get no order while the rest is traded:
         those the strategy kept that no limit cut.
+    cash_shares : Mapping[str, float]
+        Lines sized on the cash at the execution instant: those the strategy
+        asked for that no limit cut. A cut line is sized on its accepted
+        weight, like any other.
 
     Raises
     ------
@@ -82,6 +86,7 @@ class ConstrainedTarget:
     )
     hold_positions: bool = False
     kept: frozenset[str] = frozenset()
+    cash_shares: Mapping[str, float] = field(default_factory=lambda: MappingProxyType({}))
 
     def __post_init__(self) -> None:
         """Check the two sides tell one consistent story, and freeze them."""
@@ -133,6 +138,12 @@ class ConstrainedTarget:
                 f"{sorted(kept & set(adjustments))} is kept and a limit cut it: the cut is a trade"
             )
         object.__setattr__(self, "kept", kept)
+        cash_shares = dict(self.cash_shares)
+        if not set(cash_shares) <= set(accepted) or set(cash_shares) & set(adjustments):
+            raise ValueError(
+                f"{sorted(cash_shares)} are sized on cash, and must be accepted lines no limit cut"
+            )
+        object.__setattr__(self, "cash_shares", MappingProxyType(cash_shares))
         object.__setattr__(self, "requested_weights", MappingProxyType(requested))
         object.__setattr__(self, "accepted_weights", MappingProxyType(accepted))
         object.__setattr__(self, "adjustments", MappingProxyType(adjustments))
@@ -209,6 +220,11 @@ class PortfolioDecision:
     def kept(self) -> frozenset[str]:
         """Return the lines that get no order while the rest of the book is traded."""
         return self.constrained.kept
+
+    @property
+    def cash_shares(self) -> Mapping[str, float]:
+        """Return the lines sized on the cash at the execution instant."""
+        return self.constrained.cash_shares
 
     @property
     def considered(self) -> int:
@@ -295,5 +311,10 @@ class PortfolioModel:
                 hold_positions=requested.hold_positions and not adjustments,
                 # Likewise for a single kept line: one a limit cut is traded.
                 kept=requested.kept - set(adjustments),
+                cash_shares={
+                    name: share
+                    for name, share in requested.cash_shares.items()
+                    if name not in adjustments
+                },
             ),
         )
