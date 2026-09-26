@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 import numpy as np
 import pandas as pd
 import pytest
 
+from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.performance import PerformanceStats
 from quant_backtester.analytics.uncertainty import (
     PairedStatistic,
+    UndefinedStatistic,
     paired_block_bootstrap,
 )
 
@@ -24,7 +29,31 @@ def noise(count: int, seed: int, scale: float = 0.01) -> list[float]:
     return list(np.random.default_rng(seed).normal(0.0, scale, count))
 
 
-SETTINGS = {"block": 5, "draws": 400, "seed": 7, "level": 0.9, "sessions_per_year": 255}
+CONFIG = AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.0)
+
+
+def boot(
+    strategy: pd.Series,
+    control: pd.Series,
+    statistic: PairedStatistic,
+    *,
+    block: int = 5,
+    draws: int = 400,
+    seed: int = 7,
+    level: float = 0.9,
+    config: AnalyticsConfig = CONFIG,
+):
+    """Run the bootstrap with the test settings, some of them replaced."""
+    return paired_block_bootstrap(
+        strategy,
+        control,
+        statistic=statistic,
+        block=block,
+        draws=draws,
+        seed=seed,
+        level=level,
+        config=config,
+    )
 
 
 @pytest.mark.parametrize("statistic", list(PairedStatistic))
@@ -32,7 +61,7 @@ def test_two_identical_books_differ_by_nothing_in_every_draw(statistic: PairedSt
     """C02 acceptance: the same curve twice gives a zero difference, estimate and interval."""
     book = curve(noise(250, 1))
 
-    result = paired_block_bootstrap(book, book.copy(), statistic=statistic, **SETTINGS)
+    result = boot(book, book.copy(), statistic)
 
     assert (result.estimate, result.low, result.high) == (0.0, 0.0, 0.0)
 
@@ -40,11 +69,9 @@ def test_two_identical_books_differ_by_nothing_in_every_draw(statistic: PairedSt
 def test_the_same_seed_gives_the_same_interval_and_another_seed_another() -> None:
     strategy, control = curve(noise(250, 1)), curve(noise(250, 2))
 
-    first = paired_block_bootstrap(strategy, control, statistic=PairedStatistic.SHARPE, **SETTINGS)
-    again = paired_block_bootstrap(strategy, control, statistic=PairedStatistic.SHARPE, **SETTINGS)
-    other = paired_block_bootstrap(
-        strategy, control, statistic=PairedStatistic.SHARPE, **(SETTINGS | {"seed": 8})
-    )
+    first = boot(strategy, control, PairedStatistic.SHARPE)
+    again = boot(strategy, control, PairedStatistic.SHARPE)
+    other = boot(strategy, control, PairedStatistic.SHARPE, seed=8)
 
     assert first == again
     assert (first.low, first.high) != (other.low, other.high)
@@ -56,9 +83,7 @@ def test_a_constant_edge_is_measured_exactly_and_with_no_spread() -> None:
     strategy = curve([value + 0.001 for value in base])
     control = curve(base)
 
-    result = paired_block_bootstrap(
-        strategy, control, statistic=PairedStatistic.MEAN_RETURN, **SETTINGS
-    )
+    result = boot(strategy, control, PairedStatistic.MEAN_RETURN)
 
     assert result.estimate == pytest.approx(0.001 * 255)
     assert result.low == pytest.approx(0.001 * 255)
@@ -72,17 +97,13 @@ def test_pairing_keeps_what_the_books_share() -> None:
     strategy = curve([c + o for c, o in zip(common, own, strict=True)])
     control = curve(common)
 
-    paired = paired_block_bootstrap(
-        strategy, control, statistic=PairedStatistic.MEAN_RETURN, **SETTINGS
-    )
+    paired = boot(strategy, control, PairedStatistic.MEAN_RETURN)
 
     assert paired.high - paired.low < 0.1
 
 
 def test_everything_the_result_depends_on_is_recorded() -> None:
-    result = paired_block_bootstrap(
-        curve(noise(50, 1)), curve(noise(50, 2)), statistic=PairedStatistic.SHARPE, **SETTINGS
-    )
+    result = boot(curve(noise(50, 1)), curve(noise(50, 2)), PairedStatistic.SHARPE)
 
     assert result.definition() | {"estimate": 0, "low": 0, "high": 0} == {
         "statistic": "SHARPE",
@@ -94,6 +115,7 @@ def test_everything_the_result_depends_on_is_recorded() -> None:
         "block": 5,
         "draws": 400,
         "seed": 7,
+        "analytics": {"sessions_per_year": 255, "risk_free_rate": 0.0, "minimum_sessions": 60},
     }
 
 
@@ -110,21 +132,62 @@ def test_parameters_out_of_range_are_refused(change: dict[str, object], message:
     book = curve(noise(250, 1))
 
     with pytest.raises(ValueError, match=message):
-        paired_block_bootstrap(
-            book,
-            book,
-            statistic=PairedStatistic.SHARPE,
-            **(SETTINGS | change),  # type: ignore[arg-type]
-        )
+        boot(book, book, PairedStatistic.SHARPE, **change)  # type: ignore[arg-type]
 
 
 def test_books_over_different_sessions_are_not_compared() -> None:
     book = curve(noise(50, 1))
 
     with pytest.raises(ValueError, match="same sessions"):
-        paired_block_bootstrap(
-            book,
-            book.iloc[1:],
-            statistic=PairedStatistic.SHARPE,
-            **SETTINGS,  # type: ignore[arg-type]
-        )
+        boot(book, book.iloc[1:], PairedStatistic.SHARPE)
+
+
+def test_the_sharpe_difference_is_the_one_the_report_prints() -> None:
+    """Audit of archive 10: with no risk-free rate the difference was -0.079, of the wrong sign.
+
+    The rate does not cancel in a difference of Sharpe ratios - each is divided
+    by its own spread - so the bootstrap measures under the report's convention.
+    """
+    first = curve([0.0008 - 0.008, 0.0008 + 0.008] * 50)
+    second = curve([0.00021 - 0.002, 0.00021 + 0.002] * 50)
+    config = AnalyticsConfig(sessions_per_year=252, risk_free_rate=0.02, minimum_sessions=2)
+    index = pd.Index([date(2026, 1, 1) + timedelta(days=n) for n in range(101)])
+
+    result = paired_block_bootstrap(
+        first,
+        second,
+        statistic=PairedStatistic.SHARPE,
+        block=10,
+        draws=100,
+        seed=1,
+        level=0.9,
+        config=config,
+    )
+    reported = [
+        PerformanceStats.from_equity(book.set_axis(index), config).sharpe_ratio
+        for book in (first, second)
+    ]
+
+    assert result.estimate == pytest.approx(0.3864918659)
+    assert reported[0] is not None and reported[1] is not None
+    assert result.estimate == pytest.approx(reported[0] - reported[1])
+
+
+def test_a_mean_return_difference_does_not_depend_on_the_rate() -> None:
+    strategy, control = curve(noise(250, 1)), curve(noise(250, 2))
+    rated = AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.05)
+
+    free = boot(strategy, control, PairedStatistic.MEAN_RETURN)
+    with_rate = boot(strategy, control, PairedStatistic.MEAN_RETURN, config=rated)
+
+    assert (with_rate.estimate, with_rate.low, with_rate.high) == pytest.approx(
+        (free.estimate, free.low, free.high)
+    )
+
+
+def test_a_book_that_does_not_vary_has_no_sharpe_and_is_not_compared() -> None:
+    """The report prints no Sharpe for it; the bootstrap refuses rather than reads zero."""
+    flat = curve([0.0] * 100)
+
+    with pytest.raises(UndefinedStatistic, match="control's returns do not vary"):
+        boot(curve(noise(100, 1)), flat, PairedStatistic.SHARPE)
