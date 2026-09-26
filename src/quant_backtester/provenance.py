@@ -16,10 +16,14 @@ helper a script calls, deliberately, from the checkout it runs in.
 
 from __future__ import annotations
 
+import hashlib
+import platform
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from enum import Enum
+from importlib import metadata
 from pathlib import Path
 
 _COMMIT = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?")
@@ -141,3 +145,45 @@ def git_source_state(path: Path) -> SourceState:
     commit = head.stdout.strip()
     status = SourceStatus.DIRTY if changes.stdout.strip() else SourceStatus.CLEAN
     return SourceState(status, commit)
+
+
+ENVIRONMENT_PACKAGES: tuple[str, ...] = ("numpy", "pandas", "pyarrow", "scipy")
+"""The libraries whose version can change a number a run prints."""
+
+
+def environment_state(lockfile: Path | None = None) -> dict[str, str]:
+    """Return the environment a run is computed in, as it can be stated.
+
+    Parameters
+    ----------
+    lockfile : Path | None
+        The ``uv.lock`` the environment was synced from, when the caller knows
+        it - a script, from the checkout it runs in. ``None`` records the
+        lockfile as unrecorded rather than guessing where one is.
+
+    Returns
+    -------
+    dict[str, str]
+        The Python version and implementation, the platform, the SHA-256 of
+        the lockfile, and the installed version of each library of
+        :data:`ENVIRONMENT_PACKAGES`. A commit pins the lockfile a checkout
+        holds, not the environment actually installed from it; two machines
+        with one commit and two installs are two environments, and a run says
+        which one it had (audit of archive 9, point 3.2).
+    """
+    state = {
+        "python": platform.python_version(),
+        "implementation": platform.python_implementation(),
+        "platform": sys.platform,
+        "lockfile_sha256": (
+            hashlib.sha256(lockfile.read_bytes()).hexdigest()
+            if lockfile is not None
+            else "UNRECORDED"
+        ),
+    }
+    for name in ENVIRONMENT_PACKAGES:
+        try:
+            state[name] = metadata.version(name)
+        except metadata.PackageNotFoundError:
+            state[name] = "NOT_INSTALLED"
+    return state

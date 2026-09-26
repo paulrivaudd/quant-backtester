@@ -663,7 +663,10 @@ interleaved - and records the SHA-256 of every file under `clean/` and
 other benchmark asked for later is valued only if the store still has the same
 digest, and `StoreChanged` is raised otherwise, since a revised close would
 otherwise move the conclusion of a finished run. `run_id` hashes the whole
-record: the same question asked of other data is another run.
+record - the calendars and instruments the run was handed, and its
+environment: Python, the digest of `uv.lock` and the versions of the numerical
+libraries: the same question asked of other data, or in another environment,
+is another run.
 
 A fingerprint hashes a *configuration*, never the source that read it, so two
 runs of an edited `decide` share one. What tells them apart is the state of the
