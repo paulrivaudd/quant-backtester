@@ -37,9 +37,11 @@ a run is built. The economics are enforced rather than assumed: the trading
 universe holds only instruments the registry says can be bought, all quoted in
 the book's own currency and checked before the first session; weights are
 long-only fractions of one book; a purchase is sized at the price it will be
-paid and rounded down to whole shares; the sales pay for the purchases; cash
-cannot go below zero; and an order is only ever filled at an opening price of
-its own session.
+paid; every order is a whole number of lots rounded down, so a trade is
+truncated towards zero and a position ends within a lot of its target; the
+sales pay for the purchases; cash cannot go below zero; an order is only ever
+filled at an opening price of its own session; and a book asked to keep what it
+holds sends no order at all.
 
 **Analytics has its first version**: equity curves, drawdowns, the usual ratios,
 the split of what execution took, and the caveats a run has to be read with.
@@ -284,6 +286,7 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.12.
 
 ```bash
 uv sync                          # create the environment from uv.lock
+git config core.hooksPath .githooks   # once per clone: the commit-message hook
 uv run pytest                    # offline suite
 uv run pytest -m network         # the live provider checks, opt in
 uv run ruff check . && uv run ruff format --check .
@@ -539,7 +542,7 @@ answers for that instant:
 | `ctx.universe` | the names this session's universe allows |
 
 and the decision is expressed through `ctx.weights`, `ctx.equal_weight`,
-`ctx.cash` and `ctx.hold_current`, which refuse a book nobody could hold: a
+`ctx.cash` and `ctx.hold_positions`, which refuse a book nobody could hold: a
 negative weight, a sum above one, a name outside the universe, an instrument
 the registry declares untradable.
 
@@ -550,7 +553,7 @@ hidden:
 ```python
 vix = ctx.market.value("VIX")
 if not vix.usable(max_age_sessions=1):
-    return ctx.hold_current()
+    return ctx.hold_positions()
 if vix.value > 30:
     return ctx.cash()
 ```
@@ -562,17 +565,24 @@ observations spanning twenty-six sessions are refused here exactly as they are
 there. The rule of thumb: a *decision* belongs in a strategy, and a
 *transformation* worth reusing belongs in a signal.
 
-`hold_current()` is there for the day a signal cannot be computed. Standing
+`hold_positions()` is there for the day a signal cannot be computed. Standing
 aside and not trading on bad data are both defensible, they are different
 strategies, and a framework offering only `cash()` would quietly make every
-strategy choose the first.
+strategy choose the first. It keeps the positions and sends no order - which is
+not the same as asking for the weights the book has: those are the weights of
+the close, two funds drift apart overnight, and a target restated in weights
+trades that drift every morning. An earlier version did exactly that, and only
+the minimum trade value kept it still: without one, buy and hold on both funds
+traded 106 times over this README's period instead of once. A risk limit the
+kept book breaches still trades it down to the limit.
 
 It is also what makes a baseline honest. `BuyAndHold` buys while the book is
-empty and asks for the book it has afterwards; `EqualWeightRebalance` restates
-the same target at every decision. Over this README's period they are two
-different strategies — one rebalancing against four, 80 euros of costs against
-86 — and calling the second one "buy and hold", as an earlier version of this
-project did, hides the very thing the comparison exists to measure.
+empty and keeps its positions afterwards; `EqualWeightRebalance` restates the
+same target at every decision. Over this README's period they are two
+different strategies — one trade against four, 80 euros of costs against 86,
+no refused order against 375, most of them rebalancings too small to send — and
+calling the second one "buy and hold", as an earlier version of this project
+did, hides the very thing the comparison exists to measure.
 
 ## Running one
 
@@ -673,30 +683,45 @@ history both funds share and over three regimes inside it, with the costs of
 this README - five basis points of commission with a one-euro floor, two of
 half spread, one of slippage, no order under five hundred euros - and 100,000
 euros each time. Every line is a `StrategyResult` carrying its configuration,
-its fingerprint and the state of the code; the whole table takes about forty
-minutes, most of it the signals re-reading the store.
+its fingerprint and the state of the code, followed by its refused orders by
+reason; the table takes about five minutes. `--suite readme` prints every
+other figure of this README, and `--records DIR` writes each run's sessions,
+orders, fills, rejects and holdings so that two versions of the code can be
+compared run for run.
 
 ```text
 strategy            period                         net    gross   a year  sharpe   max dd     costs  trades  rejects  est.  vs world
-buy_and_hold        2018-07-16 2026-09-17      164.10%  164.18%   12.62%    0.71  -33.59%        80       1        2     1     0.44%
+buy_and_hold        2018-07-16 2026-09-17      164.10%  164.18%   12.62%    0.71  -33.59%        80       1        0     1     0.44%
 equal_weight        2018-07-16 2026-09-17      182.29%  182.42%   13.54%    0.74  -33.57%       127      23      106     1    18.63%
+                    rejects: BELOW_MINIMUM_TRADE 92, INSUFFICIENT_CASH 14
 momentum_rotation   2018-07-16 2026-09-17      160.40%  183.22%   12.42%    0.68  -33.62%    22,824      86       65     1    -3.26%
+                    rejects: INSUFFICIENT_CASH 63, NO_EXECUTION_PRICE 2
 momentum_vix        2018-07-16 2026-09-17      124.37%  161.29%   10.39%    0.66  -23.11%    36,920     214      108     1   -39.29%
+                    rejects: INSUFFICIENT_CASH 106, NO_EXECUTION_PRICE 2
 
 buy_and_hold        2019-01-02 2021-12-31       82.30%   82.38%   22.20%    1.08  -33.61%        80       1        0     0     1.37%
 equal_weight        2019-01-02 2021-12-31       77.41%   77.50%   21.09%    1.02  -33.56%        90       6       45     0    -3.51%
+                    rejects: BELOW_MINIMUM_TRADE 41, INSUFFICIENT_CASH 4
 momentum_rotation   2019-01-02 2021-12-31       92.21%   97.34%   24.38%    1.14  -33.62%     5,130      24       17     0    11.29%
+                    rejects: INSUFFICIENT_CASH 17
 momentum_vix        2019-01-02 2021-12-31       78.91%   88.94%   21.44%    1.26  -12.21%    10,025      69       39     0    -2.01%
+                    rejects: INSUFFICIENT_CASH 39
 
 buy_and_hold        2022-01-03 2023-12-29        2.13%    2.21%    1.07%    0.01  -16.99%        80       1        0     0    -0.82%
 equal_weight        2022-01-03 2023-12-29        9.34%    9.42%    4.60%    0.24  -15.54%        83       4       30     0     6.39%
+                    rejects: BELOW_MINIMUM_TRADE 28, INSUFFICIENT_CASH 2
 momentum_rotation   2022-01-03 2023-12-29       -1.05%    2.61%   -0.53%   -0.08  -18.75%     3,662      26       18     0    -4.00%
+                    rejects: INSUFFICIENT_CASH 18
 momentum_vix        2022-01-03 2023-12-29       -8.83%   -3.23%   -4.55%   -0.39  -23.31%     5,605      63       30     0   -11.78%
+                    rejects: INSUFFICIENT_CASH 30
 
-buy_and_hold        2024-01-02 2026-09-17       53.43%   53.51%   17.13%    1.09  -21.61%        80       1        2     1    -0.19%
+buy_and_hold        2024-01-02 2026-09-17       53.43%   53.51%   17.13%    1.09  -21.61%        80       1        0     1    -0.19%
 equal_weight        2024-01-02 2026-09-17       49.50%   49.59%   16.01%    0.99  -22.46%        90       6       25     1    -4.13%
+                    rejects: BELOW_MINIMUM_TRADE 22, INSUFFICIENT_CASH 3
 momentum_rotation   2024-01-02 2026-09-17       47.99%   54.51%   15.58%    0.98  -21.62%     6,522      35       23     1    -5.63%
+                    rejects: INSUFFICIENT_CASH 21, NO_EXECUTION_PRICE 2
 momentum_vix        2024-01-02 2026-09-17       37.65%   47.78%   12.53%    0.96  -13.47%    10,124      76       34     1   -15.97%
+                    rejects: INSUFFICIENT_CASH 32, NO_EXECUTION_PRICE 2
 ```
 
 Over eight years the simplest things win. Half and half, rebalanced monthly,
@@ -710,10 +735,12 @@ the thinnest universe a ranking can have, and over these years the S&P 500
 fund simply outran the world one. It is what the chain was built to be able to
 say.
 
-The `rejects` column is mostly orders under the minimum trade value - the
-fraction of a rebalancing the drift between two decisions calls for - and
-`est.` counts the sessions a position was valued on an older close: the
-contested bar of 24 October 2025.
+The refused orders say what each strategy runs into: the equal weight's are
+mostly rebalancings too small to send, the rotations' are purchases cut to the
+cash a switch leaves once the sale has paid its costs, and buy and hold has
+none at all - it keeps its positions and sends nothing. `est.` counts the
+sessions a position was valued on an older close: the contested bar of
+24 October 2025.
 
 ## What a strategy may not do
 
@@ -744,8 +771,10 @@ back no reader, a decision taken on a store that knows what happens tomorrow is
 identical to one taken without it, and every part of a context must answer for
 the same instant or it cannot be built.
 
-Other scripts: `run_baselines.py` runs the four baselines over several
-periods, `generate_calendars.py` rewrites the committed calendars from
+Other scripts: `run_baselines.py` runs the named experiments every figure of
+this README comes from (`--suite readme`, `--suite baselines`, `--records` to
+keep every run's sessions, orders and fills), `generate_calendars.py` rewrites
+the committed calendars from
 `exchange_calendars`, `check_calendar_coverage.py` says when they need
 extending, and `accept_revision.py` builds the entry that approves one detected
 correction.
