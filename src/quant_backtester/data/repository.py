@@ -422,6 +422,42 @@ class MarketDataRepository:
             path: kept for path, kept in self._decoded.items() if not path.is_relative_to(staging)
         }
 
+    def version(
+        self, table: str, instrument_id: str | None = None
+    ) -> tuple[int, int, int, int] | None:
+        """Return the version of an instrument's clean file, ``None`` when there is none.
+
+        Parameters
+        ----------
+        table : str
+            ``"checked_bars"``, ``"levels"``, or any other directory of
+            ``clean/`` holding one file per instrument - or, with no
+            instrument, a table of ``clean/`` held in one file, such as
+            ``"corporate_actions"``.
+        instrument_id : str | None
+            Instrument concerned; ``None`` for a single-file table.
+
+        Returns
+        -------
+        tuple[int, int, int, int] | None
+            Device, inode, size and modification time to the nanosecond of the
+            file a read would open now - this transaction's staged copy
+            included. Every write is a new file renamed into place, so a
+            changed file has a new version: what a cache of anything derived
+            from the file is keyed on.
+        """
+        clean = self.root / "clean"
+        path = self._current(
+            clean / f"{table}.parquet"
+            if instrument_id is None
+            else clean / table / f"{instrument_id}.parquet"
+        )
+        try:
+            status = path.stat()
+        except FileNotFoundError:
+            return None
+        return (status.st_dev, status.st_ino, status.st_size, status.st_mtime_ns)
+
     def _load(self, path: Path, schema: pa.Schema) -> pd.DataFrame:
         """Return a file of the clean layer, decoded once per version of it.
 

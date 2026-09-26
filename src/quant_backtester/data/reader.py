@@ -51,6 +51,7 @@ comparable, which is what a strategy actually needs to decide.
 from __future__ import annotations
 
 import re
+from bisect import bisect_left, bisect_right
 from collections.abc import Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
@@ -335,6 +336,36 @@ def _empty_values_frame() -> pd.DataFrame:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _PreparedSeries:
+    """One field's rows with a value, sorted, as every instant starts from them."""
+
+    dates: list[date]
+    rows: pd.DataFrame
+
+
+PreparedCache = dict[tuple[str, str, tuple[int, int, int, int] | None], _PreparedSeries]
+"""Prepared series by instrument, field and file version, shared by a reader's instants."""
+
+ActionsCache = dict[tuple[str, tuple[int, int, int, int] | None], pd.DataFrame]
+"""An instrument's corporate actions, sorted, by version of the action table."""
+
+
+def _rows(stored: pd.DataFrame, dates: str, values: str, available: str) -> pd.DataFrame:
+    """Return the three columns every read works on, taken from a stored frame.
+
+    The instants stay a datetime array end to end: turned into Python objects
+    and inferred back, they cost more than everything else here.
+    """
+    return pd.DataFrame(
+        {
+            "observation_date": stored[dates].to_numpy(),
+            "value": stored[values].to_numpy(dtype="float64"),
+            "available_at_utc": stored[available].array,
+        }
+    )
+
+
 class PointInTimeReader:
     """Market data as it was knowable at one instant.
 
@@ -370,11 +401,15 @@ class PointInTimeReader:
         calendars: CalendarRegistry,
         as_of: datetime,
         reference_calendar_id: str,
+        prepared: PreparedCache | None = None,
+        actions: ActionsCache | None = None,
     ) -> None:
         self._repository = repository
         self._instruments = instruments
         self._calendars = calendars
         self._as_of = _require_aware(as_of, "as_of")
+        self._prepared: PreparedCache = {} if prepared is None else prepared
+        self._actions: ActionsCache = {} if actions is None else actions
         # Resolve now: an unknown calendar must fail when the reader is built,
         # not on the first read that happens to need an age.
         self._reference_calendar = calendars.get(reference_calendar_id)
@@ -603,9 +638,16 @@ class PointInTimeReader:
         le seul garde-fou qui empeche un split posterieur a la date de decision
         de retro-ajuster une serie.
         """
-        frame = self._repository.load_corporate_actions(instrument_id)
-        frame = frame.loc[frame["available_at_utc"] <= self._as_of]
-        frame = frame.sort_values(["ex_date", "action_type"], kind="stable")
+        key = (instrument_id, self._repository.version("corporate_actions"))
+        prepared = self._actions.get(key)
+        if prepared is None:
+            # Read and sorted once per version of the table, as the series
+            # are; filtering a sorted frame keeps its order.
+            prepared = self._repository.load_corporate_actions(instrument_id)
+            prepared = prepared.sort_values(["ex_date", "action_type"], kind="stable")
+            prepared = prepared.reset_index(drop=True)
+            self._actions[key] = prepared
+        frame = prepared.loc[prepared["available_at_utc"] <= self._as_of]
         return frame.reset_index(drop=True)
 
     def adjusted_history(
@@ -782,34 +824,65 @@ class PointInTimeReader:
             number to hand a strategy. A session contested on another field is
             kept, since nothing is wrong with the value asked for.
         """
-        if instrument.data_type is DataType.BAR:
-            stored = self._repository.load_checked_bars(instrument.id, start=start, end=end)
-            stored = stored.loc[~_contested(cast(pd.Series, stored["conflicting_fields"]), field)]
-            observation_date = stored["session_date"]
-            value = stored[field.value]
-            available_at = stored[AVAILABILITY_COLUMN[field]]
-        elif instrument.vintage_policy is VintagePolicy.AS_OF_DECISION:
+        if instrument.vintage_policy is VintagePolicy.AS_OF_DECISION:
             stored = self._vintage_rows(instrument, start=start, end=end)
-            observation_date = stored["observation_date"]
-            value = stored["value"]
-            available_at = stored["available_at_utc"]
-        else:
-            stored = self._repository.load_levels(instrument.id, start=start, end=end)
-            observation_date = stored["observation_date"]
-            value = stored["value"]
-            available_at = stored["available_at_utc"]
-        # The instants stay a datetime array end to end: turned into Python
-        # objects and inferred back, they cost more than everything else here.
-        rows = pd.DataFrame(
-            {
-                "observation_date": observation_date.to_numpy(),
-                "value": value.to_numpy(dtype="float64"),
-                "available_at_utc": available_at.array,
-            }
-        )
+            rows = _rows(stored, "observation_date", "value", "available_at_utc")
+            rows = rows.loc[rows["available_at_utc"] <= self._as_of]
+            rows = rows.loc[rows["value"].notna()]
+            return rows.sort_values("observation_date", kind="stable").reset_index(drop=True)
+        prepared = self._prepared_series(instrument, field)
+        low = 0 if start is None else bisect_left(prepared.dates, start)
+        high = len(prepared.dates) if end is None else bisect_right(prepared.dates, end)
+        rows = prepared.rows.iloc[low:high]
         rows = rows.loc[rows["available_at_utc"] <= self._as_of]
+        return rows.reset_index(drop=True)
+
+    def _prepared_series(self, instrument: Instrument, field: BarField) -> _PreparedSeries:
+        """Return a series cleaned of what no instant may see, prepared once per file version.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            A ``BAR`` or a ``LEVEL`` read as one series.
+        field : BarField
+            Field read; ignored for a ``LEVEL``.
+
+        Returns
+        -------
+        _PreparedSeries
+            Every stored row with a value, less the sessions where this very
+            field is contested, sorted by observation date. What is left to do
+            at an instant - bounds on the dates, and the rows not yet
+            available - is a slice and a comparison.
+
+        Notes
+        -----
+        None of that preparation depends on the instant, and doing it on every
+        read was half of every backtest: the store was copied, a string column
+        searched and a frame built and sorted four thousand times a run over
+        the same file (profiled 2026-09-26, lot 6). It is cached on the
+        reader, keyed on the file's version: a promotion writes a new file,
+        whose version is new, so nothing stale is ever served. Filtering and
+        sorting commute - both keep order and a stable sort keeps ties - so a
+        read returns exactly the frame it returned before.
+        """
+        table = "checked_bars" if instrument.data_type is DataType.BAR else "levels"
+        key = (instrument.id, field.value, self._repository.version(table, instrument.id))
+        prepared = self._prepared.get(key)
+        if prepared is not None:
+            return prepared
+        if instrument.data_type is DataType.BAR:
+            stored = self._repository.load_checked_bars(instrument.id)
+            stored = stored.loc[~_contested(cast(pd.Series, stored["conflicting_fields"]), field)]
+            rows = _rows(stored, "session_date", field.value, AVAILABILITY_COLUMN[field])
+        else:
+            stored = self._repository.load_levels(instrument.id)
+            rows = _rows(stored, "observation_date", "value", "available_at_utc")
         rows = rows.loc[rows["value"].notna()]
-        return rows.sort_values("observation_date", kind="stable").reset_index(drop=True)
+        rows = rows.sort_values("observation_date", kind="stable").reset_index(drop=True)
+        prepared = _PreparedSeries(dates=list(rows["observation_date"]), rows=rows)
+        self._prepared[key] = prepared
+        return prepared
 
     def _vintage_rows(
         self, instrument: Instrument, start: date | None = None, end: date | None = None
@@ -1003,6 +1076,8 @@ class MarketDataReader:
         self._calendars = calendars
         # Fail here rather than at the first `at()` of a long run.
         self._reference_calendar = calendars.get(reference_calendar_id)
+        self._prepared: PreparedCache = {}
+        self._actions: ActionsCache = {}
 
     def at(self, as_of: datetime) -> PointInTimeReader:
         """Return a reader frozen at one instant.
@@ -1028,6 +1103,8 @@ class MarketDataReader:
             self._calendars,
             as_of,
             self._reference_calendar.calendar_id,
+            prepared=self._prepared,
+            actions=self._actions,
         )
 
     def pinned(self) -> AbstractContextManager[StoreState]:
