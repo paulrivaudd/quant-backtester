@@ -230,6 +230,7 @@ class ExecutionModel:
         universe: Collection[str],
         hold: bool = False,
         keep: Collection[str] = (),
+        cash_shares: Mapping[str, float] | None = None,
     ) -> Execution:
         """Trade the book towards the target weights, at one execution instant.
 
@@ -269,6 +270,11 @@ class ExecutionModel:
             Instruments whose positions are left exactly as they are while the
             others are traded: no order, and no reject, is built for them. Their
             value still counts in the equity every other order is sized on.
+        cash_shares : Mapping[str, float] | None
+            Lines sized on a share of the cash the book holds at ``at``, net of
+            the commission the purchase will pay, instead of a share of the
+            equity: a basket completed with the cash left buys with that cash,
+            whatever the lines already held did overnight (decision D12).
 
         Returns
         -------
@@ -335,6 +341,7 @@ class ExecutionModel:
             state,
             {name: weight for name, weight in target.items() if name not in keep},
             keep=frozenset(keep),
+            cash_shares=cash_shares or {},
             equity=equity,
             at=at,
             session=session,
@@ -386,6 +393,18 @@ class ExecutionModel:
             orders=tuple(line.order for line in (*sells, *buys)),
             fills=tuple(fills),
             rejects=tuple(sorted(rejects, key=lambda reject: reject.instrument_id)),
+        )
+
+    def _spendable(self, cash: float) -> float:
+        """Return the notional a purchase can be worth and still pay its commission.
+
+        The fill price already carries the spread and the slippage; what is
+        left to fit in the cash is the commission, a rate with a floor.
+        """
+        costs = self.costs
+        return max(
+            0.0,
+            min(cash - costs.minimum_commission, cash / (1.0 + costs.commission_rate)),
         )
 
     @staticmethod
@@ -445,8 +464,10 @@ class ExecutionModel:
         base_currency: str,
         universe: Collection[str],
         keep: frozenset[str] = frozenset(),
+        cash_shares: Mapping[str, float] | None = None,
     ) -> tuple[list[_Line], list[_Line], list[ExecutionReject]]:
         """Return the sales, the purchases and the rejects the target calls for."""
+        shares = cash_shares or {}
         sells: list[_Line] = []
         buys: list[_Line] = []
         rejects: list[ExecutionReject] = []
@@ -478,7 +499,11 @@ class ExecutionModel:
                     line, refusal, side, quantity = self._line(
                         instrument_id,
                         price=price,
-                        value=equity * weight,
+                        value=(
+                            self._spendable(state.cash) * shares[instrument_id]
+                            if instrument_id in shares
+                            else equity * weight
+                        ),
                         held=held,
                         step=step,
                         at=at,

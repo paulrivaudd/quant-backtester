@@ -524,13 +524,16 @@ class StrategyContext:
     def keep_and_buy(
         self, purchases: Mapping[str, float], among: Selection | None = None
     ) -> TargetAllocation:
-        """Return the decision to keep every held position and buy new ones.
+        """Return the decision to keep every held position and buy new ones with the cash.
 
         Parameters
         ----------
         purchases : Mapping[str, float]
-            Fraction of capital per instrument not held yet. Together with the
-            book's own weights they may not exceed the whole book.
+            Share of the book's cash to spend on each instrument not held yet,
+            together at most one. The cash is the cash at the execution
+            instant, net of the commission: the lines already held can move
+            overnight, and a share of equity fixed at the close would then buy
+            more or less than the cash there is (audit R05, decision D12).
         among : Selection | None
             What the strategy was choosing among, as for :meth:`cash`.
 
@@ -563,7 +566,14 @@ class StrategyContext:
             )
         for instrument_id in held:
             self._require_targetable(instrument_id)
-        return replace(self.weights({**held, **purchases}, among=among), kept=frozenset(held))
+        book = self.portfolio
+        cash_weight = book.cash / book.equity if book.equity > 0.0 else 0.0
+        recorded = {name: share * cash_weight for name, share in purchases.items()}
+        return replace(
+            self.weights({**held, **recorded}, among=among),
+            kept=frozenset(held),
+            cash_shares=dict(purchases),
+        )
 
     def _require_targetable(self, instrument_id: str) -> None:
         """Raise unless the book may actually hold this instrument."""

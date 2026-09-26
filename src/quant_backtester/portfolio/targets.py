@@ -74,6 +74,14 @@ class TargetAllocation:
         Their weights are the book's own, checked by the engine; they get no
         order however far their prices move overnight. Empty when
         ``hold_positions`` is set, which already keeps everything.
+    cash_shares : Mapping[str, float]
+        Lines to buy with a share of the cash the book holds at the execution
+        instant, rather than a share of its equity: what completing a basket
+        means (decision D12). Their ``weights`` record what that cash was worth
+        at the decision; the order is sized on the cash there is at the open,
+        which a weight of equity is not once the lines already held have
+        moved overnight. Each is a fraction of ``[0, 1]``, together at most
+        one, never on a kept line.
 
     Raises
     ------
@@ -118,6 +126,7 @@ class TargetAllocation:
     skipped: Mapping[str, SignalStatus] = field(default_factory=lambda: MappingProxyType({}))
     hold_positions: bool = False
     kept: frozenset[str] = frozenset()
+    cash_shares: Mapping[str, float] = field(default_factory=lambda: MappingProxyType({}))
 
     def __post_init__(self) -> None:
         """Check the decision is one a portfolio could hold, then freeze it."""
@@ -171,6 +180,16 @@ class TargetAllocation:
         if kept and self.hold_positions:
             raise ValueError("a decision holding every position has no lines to keep apart")
         object.__setattr__(self, "kept", kept)
+        cash_shares = dict(self.cash_shares)
+        for name, share in cash_shares.items():
+            require_unit_fraction(share, f"the cash share of {name}")
+        if not set(cash_shares) <= set(weights) or set(cash_shares) & kept:
+            raise ValueError(
+                f"cash shares {sorted(cash_shares)} must be lines of the target, and not kept ones"
+            )
+        if math.fsum(cash_shares.values()) > 1.0 + WEIGHT_SUM_TOLERANCE:
+            raise ValueError("the cash shares add up to more than the cash there is")
+        object.__setattr__(self, "cash_shares", MappingProxyType(cash_shares))
         object.__setattr__(self, "weights", MappingProxyType(weights))
         object.__setattr__(self, "selected", selected)
         object.__setattr__(self, "considered", considered)

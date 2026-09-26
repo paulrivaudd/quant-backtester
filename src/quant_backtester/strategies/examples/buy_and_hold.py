@@ -80,6 +80,4 @@ class BuyAndHold(Strategy):
             return ctx.equal_weight(self.instruments)
         if not missing:
             return ctx.hold_positions()
-        book = ctx.portfolio
-        cash = book.cash / book.equity if book.equity > 0.0 else 0.0
-        return ctx.keep_and_buy({name: cash / len(missing) for name in missing})
+        return ctx.keep_and_buy({name: 1.0 / len(missing) for name in missing})

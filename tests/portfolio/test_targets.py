@@ -192,3 +192,22 @@ def test_a_whole_hold_has_no_lines_to_keep_apart() -> None:
         TargetAllocation(
             as_of=AS_OF, weights={"A": 0.5}, hold_positions=True, kept=frozenset({"A"})
         )
+
+
+def test_cash_shares_add_up_to_at_most_the_cash() -> None:
+    with pytest.raises(ValueError, match="more than the cash"):
+        TargetAllocation(
+            as_of=AS_OF, weights={"A": 0.3, "B": 0.3}, cash_shares={"A": 0.6, "B": 0.6}
+        )
+
+
+def test_a_cash_share_is_a_line_of_the_target_and_not_a_kept_one() -> None:
+    with pytest.raises(ValueError, match="not kept ones"):
+        TargetAllocation(
+            as_of=AS_OF,
+            weights={"A": 0.5, "B": 0.5},
+            kept=frozenset({"A"}),
+            cash_shares={"A": 1.0},
+        )
+    with pytest.raises(ValueError, match="lines of the target"):
+        TargetAllocation(as_of=AS_OF, weights={"A": 0.5}, cash_shares={"B": 1.0})
