@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
@@ -1415,3 +1416,65 @@ def test_a_reader_opened_before_an_interrupted_commit_never_reads_it_half_publis
     assert checked == doubled_checked["close"].tolist()
     assert state.files == reader.state().files
     assert not list((market_root / ".pending").iterdir())
+
+
+def test_a_commit_interrupted_under_the_older_manifest_format_is_finished(market_root):
+    """Audit R11: a manifest without digests used to stop the repository from opening."""
+    repository = MarketDataRepository(market_root)
+    repository.save_bars("SPY", make_bars())
+    target = market_root / "clean" / "bars" / "SPY.parquet"
+    staging = market_root / ".pending" / "older"
+    staged = staging / "clean" / "bars" / "SPY.parquet"
+    staged.parent.mkdir(parents=True)
+    os.replace(target, staged)
+    (staging / "COMMIT.json").write_text(
+        json.dumps({"clean/bars/SPY.parquet": str(staged)}), encoding="utf-8"
+    )
+
+    reopened = MarketDataRepository(market_root)
+
+    assert len(reopened.load_bars("SPY")) == len(SESSIONS)
+    assert not staging.exists()
+
+
+def test_an_older_manifest_whose_file_was_already_moved_is_taken_as_moved(market_root):
+    repository = MarketDataRepository(market_root)
+    repository.save_bars("SPY", make_bars())
+    staging = market_root / ".pending" / "older"
+    staging.mkdir(parents=True)
+    (staging / "COMMIT.json").write_text(
+        json.dumps({"clean/bars/SPY.parquet": str(staging / "clean" / "bars" / "SPY.parquet")}),
+        encoding="utf-8",
+    )
+
+    reopened = MarketDataRepository(market_root)
+
+    assert len(reopened.load_bars("SPY")) == len(SESSIONS)
+    assert not staging.exists()
+
+
+def test_a_clean_file_in_an_older_format_is_named_with_what_to_do(market_root):
+    """A vintage archive written before ``withdrawn`` existed: rebuild it, do not patch it."""
+    from quant_backtester.data.repository import StoreFormatError
+
+    older = pd.DataFrame(
+        {
+            "instrument_id": ["US_GDP"],
+            "observation_date": [date(2019, 1, 1)],
+            "vintage_date": [date(2020, 1, 31)],
+            "value": [21_098.827],
+            "available_at_utc": pd.Series(
+                [datetime(2020, 1, 31, 13, 30, tzinfo=UTC)], dtype="datetime64[us, UTC]"
+            ),
+            "source": ["ALFRED"],
+            "source_fetch_id": [FETCH_ID],
+        }
+    )
+    path = market_root / "clean" / "vintages" / "US_GDP.parquet"
+    path.parent.mkdir(parents=True)
+    pq.write_table(pa.Table.from_pandas(older, preserve_index=False), path)
+
+    with pytest.raises(StoreFormatError, match="withdrawn") as raised:
+        MarketDataRepository(market_root).load_vintages("US_GDP")
+
+    assert "--rebuild" in str(raised.value)
