@@ -66,6 +66,32 @@ class VintagePolicy(Enum):
     to it - which is what a point-in-time macro series means."""
 
 
+class HistoryBasis(Enum):
+    """What the stored history of an instrument is, as a record of the past.
+
+    A reader filters by publication instant, which says *when* a value could
+    have been known and not *which* value was known then: a series loaded
+    today holds today's telling of the past. Each instrument says which of
+    three things its history is, because the three support different claims
+    and none of them is the default (decision D10 of the 2026-09-26 audit).
+    """
+
+    ARCHIVED_VINTAGES = "ARCHIVED_VINTAGES"
+    """Every value as it was published, vintage by vintage: a decision reads
+    what it could have read. Only a series stored as vintages
+    (``AS_OF_DECISION``) is this."""
+
+    ASSUMED_UNREVISED = "ASSUMED_UNREVISED"
+    """Today's telling, taken as the telling of the time because values of
+    this kind are not restated - an exchange's closing print, a reference rate
+    published once. An assumption, and ``history_note`` says why it is made."""
+
+    RESTATED = "RESTATED"
+    """Today's telling of a series known to be revised: a decision reads
+    numbers published after it. Honest for a study that says so; a backtest
+    reading it has a look-ahead it has to state."""
+
+
 class DistributionPolicy(Enum):
     """What a fund does with the income of the assets it holds."""
 
@@ -274,6 +300,14 @@ class Instrument:
         For a fund or a share class, whether income is paid out or reinvested.
         ``None`` for anything else - an index distributes nothing, and a single
         share's policy is the issuer's dividend decision, not a fund rule.
+    history_basis : HistoryBasis | None
+        What the stored history is as a record of the past. Required in
+        ``instruments.toml``; ``None`` only for an instrument built in code, as
+        a test builds one.
+    history_note : str | None
+        Why that basis holds for this series - the evidence for an assumption,
+        or the look-ahead a restated series carries. Declared with the basis
+        and never without it.
     """
 
     id: str
@@ -293,6 +327,8 @@ class Instrument:
     vintage_policy: VintagePolicy | None = None
     check_sources: tuple[CheckSource, ...] = ()
     distribution_policy: DistributionPolicy | None = None
+    history_basis: HistoryBasis | None = None
+    history_note: str | None = None
 
     def __post_init__(self) -> None:
         """Reject an instrument whose availability could not be computed.
@@ -347,6 +383,23 @@ class Instrument:
                     f"Instrument {self.id} is not tradable: a quantity_step sizes an order"
                 )
         self._check_vintages()
+        self._check_history_basis()
+
+    def _check_history_basis(self) -> None:
+        """Reject a history basis that contradicts how the series is stored."""
+        if (self.history_basis is None) != (self.history_note is None):
+            raise ValueError(
+                f"Instrument {self.id}: history_basis and history_note are declared together"
+            )
+        if self.history_note is not None and not self.history_note.strip():
+            raise ValueError(f"Instrument {self.id}: history_note is empty")
+        archived = self.history_basis is HistoryBasis.ARCHIVED_VINTAGES
+        as_of_decision = self.vintage_policy is VintagePolicy.AS_OF_DECISION
+        if self.history_basis is not None and archived != as_of_decision:
+            raise ValueError(
+                f"Instrument {self.id}: ARCHIVED_VINTAGES is what a series stored as "
+                "vintages (AS_OF_DECISION) is, and only that"
+            )
 
     def _check_vintages(self) -> None:
         """Reject a vintage declaration that does not say what it reads.
@@ -703,6 +756,8 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
             "primary_source",
             "source_symbol",
             "tradable",
+            "history_basis",
+            "history_note",
         ),
         context,
     )
@@ -730,6 +785,8 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
             None if table.get("vintage_policy") is None else VintagePolicy(table["vintage_policy"])
         ),
         check_sources=tuple(check_sources),
+        history_basis=HistoryBasis(table["history_basis"]),
+        history_note=table["history_note"],
     )
 
 
