@@ -1063,6 +1063,9 @@ def validate_corporate_actions(instrument: Instrument, frame: pd.DataFrame) -> V
     ValidationReport
         Issues found, sorted by ex-date, all ``ERROR``: ``MISSING_COLUMN`` (alone),
         ``DUPLICATE_ACTION`` (same type twice on one ex-date),
+        ``SPLIT_WITH_DISTRIBUTION`` (a split and a dividend, ordinary or
+        special, on one ex-date: the unit of the amount is undeclared -
+        decision D2 of the 2026-09-26 audit),
         ``NON_FINITE_VALUE`` (then no other check of the value),
         ``UNKNOWN_ACTION_TYPE``, ``INVALID_SPLIT_RATIO`` (a split ratio must be
         positive and not 1; below 1 is a reverse split, and valid),
@@ -1110,6 +1113,24 @@ def validate_corporate_actions(instrument: Instrument, frame: pd.DataFrame) -> V
                     ex_date,
                     f"{action_type} appears {count} times on {ex_date}",
                     {"action_type": action_type, "count": count},
+                )
+            )
+    kinds_by_day: dict[date, set[str]] = {}
+    for ex_date, action_type in occurrences:
+        kinds_by_day.setdefault(ex_date, set()).add(action_type)
+    distributions = {ActionType.DIVIDEND.value, ActionType.SPECIAL_DIVIDEND.value}
+    for ex_date, kinds in sorted(kinds_by_day.items()):
+        if ActionType.SPLIT.value in kinds and kinds & distributions:
+            issues.append(
+                _issue(
+                    "SPLIT_WITH_DISTRIBUTION",
+                    Severity.ERROR,
+                    instrument,
+                    ex_date,
+                    f"a split and a distribution share the ex-date {ex_date}; whether the "
+                    "amount is per share before or after the split is not declared, and the "
+                    "two readings differ by the ratio",
+                    {"action_types": sorted(kinds)},
                 )
             )
     known_types = {action_type.value for action_type in ActionType}

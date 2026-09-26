@@ -639,9 +639,20 @@ def test_clean_actions_have_no_issue() -> None:
     assert report.valid
 
 
-def test_a_split_and_a_dividend_on_the_same_ex_date_are_valid() -> None:
-    same_day = actions([("SPLIT", date(2020, 8, 31), 4.0), ("DIVIDEND", date(2020, 8, 31), 0.2)])
-    assert validate_corporate_actions(make_instrument(), same_day).issues == []
+@pytest.mark.parametrize("distribution", ["DIVIDEND", "SPECIAL_DIVIDEND"])
+def test_a_split_and_a_distribution_on_the_same_ex_date_are_refused(distribution: str) -> None:
+    """Per share before the split or after it? Unsaid, and the answers differ by the ratio."""
+    same_day = actions([("SPLIT", date(2020, 8, 31), 4.0), (distribution, date(2020, 8, 31), 0.2)])
+
+    report = validate_corporate_actions(make_instrument(), same_day)
+
+    assert codes(report) == ["SPLIT_WITH_DISTRIBUTION"]
+    assert report.issues[0].observation_date == date(2020, 8, 31)
+
+
+def test_a_split_and_a_dividend_on_different_days_are_valid() -> None:
+    apart = actions([("SPLIT", date(2020, 8, 31), 4.0), ("DIVIDEND", date(2020, 9, 1), 0.2)])
+    assert validate_corporate_actions(make_instrument(), apart).issues == []
 
 
 @pytest.mark.parametrize("action_type", ["SPLIT", "DIVIDEND", "SPIN_OFF"])
