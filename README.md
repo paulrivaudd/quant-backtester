@@ -732,6 +732,29 @@ Both intervals hold zero. Over 437 sessions the rotation is neither better
 nor worse than keeping the world fund, and no figure of this README says
 otherwise - which is what `research/PROTOCOL.md` is for.
 
+Nor does the gap depend much on how the orders are simulated.
+`scripts/sensitivity.py` runs both books with quantities fixed at the
+decision's close instead of the opening auction's notional, and at twice the
+declared costs:
+
+```text
+scenario              book                      net  sharpe     costs  rejects
+notional, costs x1    reference_rotation     16.19%    0.54     3,119       13
+notional, costs x1    control_world          20.71%    0.69        80        0
+notional, costs x2    reference_rotation     12.84%    0.43     6,146       15
+notional, costs x2    control_world          20.63%    0.69       160        0
+overnight, costs x1   reference_rotation     16.10%    0.54     3,118       64
+overnight, costs x1   control_world          20.59%    0.69        79        0
+overnight, costs x2   reference_rotation     12.76%    0.42     6,139       38
+overnight, costs x2   control_world          20.51%    0.69       159        0
+```
+
+Fixing the quantities overnight costs the rotation a tenth of a point and
+turns more purchases into cuts - an open above the close leaves an order
+bigger than the cash. The costs are what it is sensitive to: twice them take
+three and a half points from the rotation and nothing from the fund it is
+measured against.
+
 The benchmark is read at the run's own decision instants, so adding data after
 the last session changes none of its figures; a session its venue did not hold
 is marked at the last close that existed and named; and one quoted in another
