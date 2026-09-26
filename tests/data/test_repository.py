@@ -1367,3 +1367,51 @@ def test_the_state_names_every_clean_and_metadata_file_and_changes_with_one(mark
     assert before.files["clean/bars/SPY.parquet"] != after.files["clean/bars/SPY.parquet"]
     assert before.digest != after.digest
     assert repository.state().digest == after.digest
+
+
+def test_a_reader_opened_before_an_interrupted_commit_never_reads_it_half_published(
+    market_root, monkeypatch
+):
+    """Audit R03: bars at 200 beside verdicts at 100, read as one state.
+
+    A transaction rewrites both files; the process dies after moving the
+    first. A repository opened before the crash - so its own recovery ran too
+    early - enters a reading and must see both files new, or neither.
+    """
+    import quant_backtester.data.repository as module
+
+    writer = MarketDataRepository(market_root)
+    writer.save_bars("SPY", make_bars())
+    writer.save_checked_bars("SPY", make_checked_bars())
+    reader = MarketDataRepository(market_root)
+    doubled_bars = make_bars()
+    doubled_bars["close"] = doubled_bars["close"] * 2
+    doubled_checked = make_checked_bars()
+    doubled_checked["close"] = doubled_checked["close"] * 2
+
+    moves: list[int] = []
+    real_replace = os.replace
+
+    def crash_after_the_first_move(source: str | Path, target: str | Path) -> None:
+        # Staging writes and the manifest are renames too; only a move onto
+        # the published tree is one of the commit's moves.
+        if ".pending" not in str(target):
+            if moves:
+                raise KeyboardInterrupt("the process died between two moves")
+            moves.append(1)
+        real_replace(source, target)
+
+    monkeypatch.setattr(module.os, "replace", crash_after_the_first_move)
+    with pytest.raises(KeyboardInterrupt), writer.transaction():
+        writer.save_bars("SPY", doubled_bars)
+        writer.save_checked_bars("SPY", doubled_checked)
+    monkeypatch.setattr(module.os, "replace", real_replace)
+
+    with reader.reading() as state:
+        bars = reader.load_bars("SPY")["close"].tolist()
+        checked = reader.load_checked_bars("SPY")["close"].tolist()
+
+    assert bars == doubled_bars["close"].tolist()
+    assert checked == doubled_checked["close"].tolist()
+    assert state.files == reader.state().files
+    assert not list((market_root / ".pending").iterdir())
