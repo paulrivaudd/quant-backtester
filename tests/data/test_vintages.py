@@ -242,13 +242,15 @@ class OneExport:
     def __init__(self, body: pd.DataFrame, retrieved_at: datetime) -> None:
         self.body = body
         self.retrieved_at = retrieved_at
+        self.asked: list[tuple[date, date]] = []
 
     def available_from(self, instrument: Instrument) -> None:
         """Return ``None``: the archive serves its whole history."""
         return None
 
     def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
-        """Return the recorded export, unfiltered."""
+        """Return the recorded export, unfiltered, and note the range asked."""
+        self.asked.append((start, end))
         return RawDownload(
             instrument_id=instrument.id,
             source=self.source_id,
@@ -494,3 +496,36 @@ def test_an_observation_outside_the_request_is_not_withdrawn(
     first_quarter = stored.loc[stored["observation_date"] == FIRST_QUARTER]
     assert not bool(first_quarter["withdrawn"].any())
     assert len(first_quarter) == 2
+
+
+def test_a_vintage_archive_is_found_where_it_is_stored(
+    market_root: Path, decision_calendar: CalendarRegistry
+) -> None:
+    """Audit A10: the store and the updater looked for a vintage series in ``levels``.
+
+    It looked absent: no dates, a coverage of nothing, and an update that
+    resumed from the first session of 1947 instead of from what was stored.
+    """
+    first = OneExport(
+        export(GDP_20200131=["21098.827"], GDP_20210630=["21115.309"]),
+        datetime(2022, 1, 3, 12, 0, tzinfo=UTC),
+    )
+    updater = updater_over(market_root, decision_calendar, first)
+    updater.download("US_GDP", FIRST_QUARTER, date(2019, 3, 31))
+    repository = MarketDataRepository(market_root)
+
+    assert repository.exists("US_GDP")
+    assert repository.first_date("US_GDP") == FIRST_QUARTER
+    assert repository.last_date("US_GDP") == FIRST_QUARTER
+    coverage = updater.history_coverage("US_GDP")
+    assert coverage.stored_from == FIRST_QUARTER
+    assert coverage.stored_until == FIRST_QUARTER
+
+    first.asked.clear()
+    first.retrieved_at = datetime(2022, 1, 5, 12, 0, tzinfo=UTC)
+    assert updater.update("US_GDP").valid
+    assert first.asked[0][0] == FIRST_QUARTER
+    assert len(repository.load_vintages("US_GDP")) == 2
+
+    updater.rebuild_clean("US_GDP")
+    assert len(repository.load_vintages("US_GDP")) == 2

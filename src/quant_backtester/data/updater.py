@@ -220,16 +220,35 @@ def _withdrawal_issues(instrument: Instrument, frame: pd.DataFrame) -> list[Vali
     ]
 
 
-def _canonical_frame(instrument: Instrument, data: NormalizedData) -> pd.DataFrame | None:
-    """Return the frame an instrument's own kind of series is stored as.
+def clean_table(instrument: Instrument) -> str:
+    """Return the clean table an instrument's series is stored in.
 
-    A ``BAR`` produces bars and a ``LEVEL`` produces levels, except for a
-    published series read as of each decision, which produces a vintage archive
-    instead: the same observations, one row per vintage they were restated in.
+    Parameters
+    ----------
+    instrument : Instrument
+        Instrument concerned.
+
+    Returns
+    -------
+    str
+        ``"bars"`` for a ``BAR``; ``"vintages"`` for a published series read
+        as of each decision, stored one row per vintage it was restated in;
+        ``"levels"`` for any other published series. The one place the choice
+        is made.
     """
     if instrument.data_type is DataType.BAR:
-        return data.bars
+        return "bars"
     if instrument.vintage_policy is VintagePolicy.AS_OF_DECISION:
+        return "vintages"
+    return "levels"
+
+
+def _canonical_frame(instrument: Instrument, data: NormalizedData) -> pd.DataFrame | None:
+    """Return the frame an instrument's own kind of series is stored as."""
+    table = clean_table(instrument)
+    if table == "bars":
+        return data.bars
+    if table == "vintages":
         return data.vintages
     return data.levels
 
@@ -747,7 +766,8 @@ class MarketDataUpdater:
                 )
             start = instrument.first_session
         else:
-            dates = sorted(stored[key_column])
+            # Distinct dates: a vintage archive holds one row per vintage.
+            dates = sorted(set(stored[key_column]))
             start = dates[max(0, len(dates) - 1 - self._overlap_sessions)]
         if start > end:
             raise ValueError(
@@ -759,9 +779,11 @@ class MarketDataUpdater:
         issues = fetch_issues + issues
         primary = downloads[instrument.primary_source]
         incoming = frames.get(instrument.primary_source)
+        # A vintage archive is never rebased: a vintage whose value moves is
+        # a rewrite, which the promotion refuses on its own.
         factor = (
             None
-            if incoming is None or stored.empty
+            if incoming is None or stored.empty or clean_table(instrument) == "vintages"
             else _rebasing_factor(stored, incoming, key_column, self._value_columns(instrument))
         )
         if factor is not None:
@@ -849,7 +871,7 @@ class MarketDataUpdater:
         instrument = self._instruments.get(instrument_id)
         stored = self._stored_frame(instrument)
         key_column = self._key_column(instrument)
-        dates = sorted(stored[key_column]) if not stored.empty else []
+        dates = sorted(set(stored[key_column])) if not stored.empty else []
         fetches = sum(
             len(self._repository.list_raw_fetches(instrument.id, source))
             for source in instrument.sources
@@ -2148,9 +2170,21 @@ class MarketDataUpdater:
         return REBASE_FIELDS if instrument.data_type is DataType.BAR else LEVEL_VALUE_COLUMNS
 
     def _stored_frame(self, instrument: Instrument) -> pd.DataFrame:
-        """Return the instrument's stored clean rows, bars or levels."""
-        if instrument.data_type is DataType.BAR:
+        """Return the instrument's stored clean rows, from the table it lives in.
+
+        Notes
+        -----
+        The table is :func:`clean_table`'s answer, the one every other reader
+        of the store asks. Reading ``levels`` for every non-bar instrument
+        made a vintage archive look empty: the resume point fell back to the
+        first session, and each update fetched the whole history again
+        (audit A10).
+        """
+        table = clean_table(instrument)
+        if table == "bars":
             return self._repository.load_bars(instrument.id)
+        if table == "vintages":
+            return self._repository.load_vintages(instrument.id)
         return self._repository.load_levels(instrument.id)
 
     def _archived_fetches(self, instrument: Instrument) -> list[tuple[str, str]]:

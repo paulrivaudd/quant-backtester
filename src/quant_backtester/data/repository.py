@@ -1331,16 +1331,17 @@ class MarketDataRepository:
         Returns
         -------
         bool
-            ``True`` if a clean bars or levels file exists.
+            ``True`` if a clean bars, levels or vintages file exists.
 
         Notes
         -----
         Exercice 3.15 (facile).
         """
         clean = self.root / "clean"
-        bars = self._current(clean / "bars" / f"{instrument_id}.parquet")
-        levels = self._current(clean / "levels" / f"{instrument_id}.parquet")
-        return bars.exists() or levels.exists()
+        return any(
+            self._current(clean / table / f"{instrument_id}.parquet").exists()
+            for table in ("bars", "levels", "vintages")
+        )
 
     def first_date(self, instrument_id: str) -> date | None:
         """Return the earliest stored observation date.
@@ -1383,7 +1384,7 @@ class MarketDataRepository:
         return max(dates) if dates else None
 
     def _stored_dates(self, instrument_id: str) -> list[date]:
-        """Return the dates stored for an instrument, bars first, then levels.
+        """Return the dates stored for an instrument, from bars, levels or vintages.
 
         Parameters
         ----------
@@ -1393,13 +1394,17 @@ class MarketDataRepository:
         Returns
         -------
         list[date]
-            ``session_date`` of its bars or ``observation_date`` of its levels;
-            empty if it has neither.
+            ``session_date`` of its bars, or ``observation_date`` of its levels
+            or of its vintage archive - one per row, so an observation restated
+            in several vintages appears once per vintage; empty if it has none.
+            Leaving the vintages out made an archived series look empty (audit
+            A10).
         """
         clean = self.root / "clean"
         for path, column in (
             (self._current(clean / "bars" / f"{instrument_id}.parquet"), "session_date"),
             (self._current(clean / "levels" / f"{instrument_id}.parquet"), "observation_date"),
+            (self._current(clean / "vintages" / f"{instrument_id}.parquet"), "observation_date"),
         ):
             if path.exists():
                 return pq.read_table(path, columns=[column]).column(column).to_pylist()
