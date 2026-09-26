@@ -740,6 +740,60 @@ def test_accepted_revision_is_applied(
     assert row["open"] == 101.0
 
 
+def test_an_accepted_field_that_breaks_the_merged_bar_refuses_the_whole_promotion(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    """Two valid bars, merged field by field, are not necessarily a valid bar.
+
+    Tuesday is stored at 101 / 102 / 100 / 101 and refetched at 110 / 111 /
+    109 / 110, both valid. Only the open was reviewed into the policy, so the
+    merge would store an open of 110 above a high of 102 - a bar no source
+    ever served. The promotion is refused and nothing it wrote survives.
+    """
+    accepted = AcceptedRevisions(
+        [
+            AcceptedRevision(
+                instrument_id="ETF_EU",
+                source="YAHOO",
+                table="bars",
+                observation_date=TUESDAY,
+                field="open",
+                old_value=101.0,
+                new_value=110.0,
+                reason="synthetic: only the open was reviewed",
+            )
+        ]
+    )
+    updater = build_updater(
+        repository, instruments, calendars, {"YAHOO": yahoo, "FRED": fred}, clock, accepted
+    )
+    updater.download("ETF_EU", MONDAY, FRIDAY)
+    bars_before = repository.load_bars("ETF_EU")
+    checked_before = repository.load_checked_bars("ETF_EU")
+    applied_before = repository.load_applied_fetches("ETF_EU")
+    moved = yahoo.rows["ETF_EU"].copy()
+    moved.loc[1, ["open", "high", "low", "close"]] = [110.0, 111.0, 109.0, 110.0]
+    yahoo.rows["ETF_EU"] = moved
+
+    report = updater.update("ETF_EU")
+
+    assert not report.valid
+    refused = [issue for issue in report.errors if issue.code == "MERGED_BAR_INVALID"]
+    assert [issue.observation_date for issue in refused] == [TUESDAY]
+    assert refused[0].context["rules"] == ["OHLC_ORDER"]
+    assert "VALUE_REVISED" in codes(report)
+    pd.testing.assert_frame_equal(repository.load_bars("ETF_EU"), bars_before)
+    pd.testing.assert_frame_equal(repository.load_checked_bars("ETF_EU"), checked_before)
+    assert repository.load_applied_fetches("ETF_EU") == applied_before
+    logged = pd.read_parquet(repository.root / "validation" / "validation_log.parquet")
+    assert "MERGED_BAR_INVALID" in set(logged["code"])
+
+
 def test_constant_factor_shift_triggers_a_full_refetch(
     updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
 ) -> None:
