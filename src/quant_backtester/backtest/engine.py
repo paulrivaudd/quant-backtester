@@ -53,7 +53,7 @@ from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.backtest.market import StrategyMarketView
 from quant_backtester.backtest.records import BacktestRecord
 from quant_backtester.backtest.result import BacktestResult
-from quant_backtester.data.calendars import CalendarRegistry
+from quant_backtester.data.calendars import CalendarCoverageError, CalendarRegistry
 from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.schemas import BarField
@@ -270,9 +270,14 @@ class BacktestEngine:
         definition = self._strategy_definition()
         fingerprint = self.strategy.fingerprint()
         configuration = self._configuration(sessions)
-        deciding = config.schedule.decision_sessions(
-            sessions, following=calendar.next_session(sessions[-1]).session_date
-        )
+        # Asked of the calendar only where it can answer: a run ending on the
+        # last covered session is a legitimate run, and every-session
+        # decisions do not need the session after it (audit R10).
+        try:
+            following: date | None = calendar.next_session(sessions[-1]).session_date
+        except CalendarCoverageError:
+            following = None
+        deciding = config.schedule.decision_sessions(sessions, following=following)
         signal_engine = SignalEngine()
 
         state = PortfolioState.opening(

@@ -48,7 +48,9 @@ class EverySession:
         """Return what identifies this schedule, for the record of a run."""
         return _definition_of(self)
 
-    def decision_sessions(self, sessions: Sequence[date], following: date) -> frozenset[date]:
+    def decision_sessions(
+        self, sessions: Sequence[date], following: date | None
+    ) -> frozenset[date]:
         """Return every session as a decision session."""
         return frozenset(sessions)
 
@@ -86,7 +88,9 @@ class EveryNSessions:
         """
         return _definition_of(self)
 
-    def decision_sessions(self, sessions: Sequence[date], following: date) -> frozenset[date]:
+    def decision_sessions(
+        self, sessions: Sequence[date], following: date | None
+    ) -> frozenset[date]:
         """Return every ``n``-th session, counted from the start of the run."""
         return frozenset(sessions[:: self.n])
 
@@ -106,16 +110,20 @@ class Weekly:
         """Return what identifies this schedule, for the record of a run."""
         return _definition_of(self)
 
-    def decision_sessions(self, sessions: Sequence[date], following: date) -> frozenset[date]:
+    def decision_sessions(
+        self, sessions: Sequence[date], following: date | None
+    ) -> frozenset[date]:
         """Return the last session of each ISO week, of those inside the run.
 
         Parameters
         ----------
         sessions : Sequence[date]
             The run's sessions, in order.
-        following : date
+        following : date | None
             The calendar's first session after the run. When it falls in the
             same week as the run's last session, that week has not ended.
+            ``None`` when the calendar's coverage stops at the run's end: then
+            nobody knows, and the last week is not called ended.
 
         Returns
         -------
@@ -140,16 +148,20 @@ class Monthly:
         """Return what identifies this schedule, for the record of a run."""
         return _definition_of(self)
 
-    def decision_sessions(self, sessions: Sequence[date], following: date) -> frozenset[date]:
+    def decision_sessions(
+        self, sessions: Sequence[date], following: date | None
+    ) -> frozenset[date]:
         """Return the last session of each month, of those inside the run.
 
         Parameters
         ----------
         sessions : Sequence[date]
             The run's sessions, in order.
-        following : date
+        following : date | None
             The calendar's first session after the run. When it falls in the
             same month as the run's last session, that month has not ended.
+            ``None`` when the calendar's coverage stops at the run's end: then
+            nobody knows, and the last month is not called ended.
 
         Returns
         -------
@@ -184,15 +196,20 @@ def _definition_of(schedule: object) -> dict[str, object]:
 
 
 def _last_of(
-    sessions: Sequence[date], following: date, period: Callable[[date], object]
+    sessions: Sequence[date], following: date | None, period: Callable[[date], object]
 ) -> frozenset[date]:
-    """Return the last session of each period, dropping one the run cut short."""
-    if sessions and following <= sessions[-1]:
+    """Return the last session of each period, dropping one the run cut short.
+
+    A last period whose end cannot be known - the calendar stops with the run
+    - is dropped as well: a decision on it would be the invented period end
+    this rule exists to prevent, and that decision is never executed anyway.
+    """
+    if following is not None and sessions and following <= sessions[-1]:
         raise ValueError(f"the session after the run, {following}, is not after {sessions[-1]}")
     last: dict[object, date] = {}
     for session in sessions:
         last[period(session)] = session
-    if sessions and period(following) == period(sessions[-1]):
+    if sessions and (following is None or period(following) == period(sessions[-1])):
         del last[period(sessions[-1])]
     return frozenset(last.values())
 

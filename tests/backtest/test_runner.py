@@ -971,3 +971,22 @@ def test_a_report_names_the_history_basis_of_what_the_run_read(runner: StrategyR
 
     assert result.configuration["history_basis"] == {"ETF_EU": None}
     assert "history read: UNDECLARED ETF_EU" in result.report().render()
+
+
+def _stays_in_cash(ctx: StrategyContext) -> TargetAllocation:
+    """Hold nothing, whatever the session."""
+    return ctx.cash()
+
+
+def test_a_run_may_end_on_the_last_session_its_calendar_covers(
+    runner: StrategyRunner,
+) -> None:
+    """Audit R10: every run asked the calendar for the session after its end, and raised."""
+    cash = FunctionalStrategy(strategy_id="cash", decision=_stays_in_cash)
+
+    result = runner.run(cash, [], "2026-12-30", "2026-12-31")
+
+    assert [record.session_date for record in result.records()] == [
+        date(2026, 12, 30),
+        date(2026, 12, 31),
+    ]

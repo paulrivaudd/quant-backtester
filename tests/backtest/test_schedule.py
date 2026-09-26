@@ -225,3 +225,13 @@ def test_a_session_with_no_decision_carries_the_target_still_standing(
     assert result.records[1].target_invested == 1.0
     assert result.records[1].decided is False
     assert result.records[1].decision is None
+
+
+@pytest.mark.parametrize("schedule", [Weekly(), Monthly()], ids=["weekly", "monthly"])
+def test_a_period_whose_end_nobody_can_know_is_not_called_ended(
+    schedule: Weekly | Monthly,
+) -> None:
+    """The calendar stops with the run: its last week or month is not decided on."""
+    chosen = schedule.decision_sessions(SEPTEMBER, following=None)
+
+    assert date(2026, 9, 14) not in chosen
