@@ -739,6 +739,7 @@ def value_benchmark(
     instrument = reader.instruments.get(specification.instrument_id)
     if base_currency is not None:
         _require_same_currency(reader, specification, base_currency)
+    timetable = result.config.timetable
     wealth = 1.0
     path: list[float] = []
     stale: list[date] = []
@@ -773,6 +774,7 @@ def value_benchmark(
             # knowable now are walked.
             actions = market.corporate_actions(instrument.id)
             keys = list(zip(actions["ex_date"], actions["action_type"], strict=True))
+            known_at = [pd.Timestamp(at) for at in actions["available_at_utc"]]
             since: date = last[0]
             until: date = row["observation_date"]
             closes = market.history(instrument.id, BarField.CLOSE, start=since)
@@ -784,10 +786,19 @@ def value_benchmark(
             ]
             steps_from = last[1]
             for day, price in steps:
-                # Each action is counted on the step whose close is the first
-                # on or after its ex-date; one announced late is counted on the
-                # first step after it is known, never back-dated.
-                due = [key not in counted and first_observed < key[0] <= day for key in keys]
+                # The chronology is the benchmark's own (decision D17): a step
+                # is one of its closes, dated at the timetable's valuation
+                # instant of that session, and an action counts on the first
+                # step on or after its ex-date at which it was already known.
+                # Judged by what this valuation knows, an action announced on
+                # the 7th was reinvested at the close of the 3rd whenever the
+                # run's calendar skipped both, and not when it held them all
+                # (audit N01): the same history, two answers.
+                step_at = pd.Timestamp(timetable.valuation_instant(day))
+                due = [
+                    key not in counted and first_observed < key[0] <= day and at <= step_at
+                    for key, at in zip(keys, known_at, strict=True)
+                ]
                 wealth *= session_growth(
                     instrument.id,
                     previous_close=steps_from,
