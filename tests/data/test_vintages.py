@@ -17,6 +17,7 @@ import pytest
 
 from quant_backtester.data.bar_corrections import BarCorrections
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
+from quant_backtester.data.conflict_reviews import ConflictReviews
 from quant_backtester.data.corporate_actions import ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy
 from quant_backtester.data.instruments import (
@@ -286,6 +287,7 @@ def updater_over(
         bar_corrections=BarCorrections([]),
         cross_check_policy=CrossCheckPolicy(price_rel_tolerance=1e-6, volume_rel_tolerance=0.0),
         known_gaps=KnownGaps([]),
+        conflict_reviews=ConflictReviews([]),
         clock=lambda: datetime(2022, 1, 3, 12, 0, tzinfo=UTC),
     )
 

@@ -182,6 +182,11 @@ class CheckStatus(Enum):
     CONFLICT = "CONFLICT"
     """Two sources disagree beyond a tolerance, or only one of them has a value."""
 
+    REVIEWED = "REVIEWED"
+    """Two sources disagreed, and a committed review chose one source's bar for
+    exactly the values it was written for. Served, and never taken for an
+    agreement: see :mod:`quant_backtester.data.conflict_reviews`."""
+
 
 CHECKED_BARS_SCHEMA: Final = pa.schema(
     [

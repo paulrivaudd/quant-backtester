@@ -29,6 +29,7 @@ from pathlib import Path
 
 from quant_backtester.data.bar_corrections import BarCorrections
 from quant_backtester.data.calendars import CalendarRegistry
+from quant_backtester.data.conflict_reviews import ConflictReviews
 from quant_backtester.data.corporate_actions import ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy
 from quant_backtester.data.instruments import InstrumentRegistry
@@ -87,6 +88,7 @@ def build_updater(root: Path) -> MarketDataUpdater:
         bar_corrections=BarCorrections.from_toml(metadata / "bar_corrections.toml"),
         cross_check_policy=CrossCheckPolicy.from_toml(metadata / "crosscheck.toml"),
         known_gaps=KnownGaps.from_toml(metadata / "known_gaps.toml"),
+        conflict_reviews=ConflictReviews.from_toml(metadata / "conflict_reviews.toml"),
     )
 
 

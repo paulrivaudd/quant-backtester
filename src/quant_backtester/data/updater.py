@@ -59,6 +59,7 @@ import pandas as pd
 
 from quant_backtester.data.bar_corrections import BarCorrection, BarCorrections
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
+from quant_backtester.data.conflict_reviews import ConflictReviews
 from quant_backtester.data.corporate_actions import ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy, cross_check_bars
 from quant_backtester.data.instruments import (
@@ -663,6 +664,10 @@ class MarketDataUpdater:
         ``metadata/crosscheck.toml``. Required, and passed in like the accepted
         revisions: it decides which bars a strategy is allowed to see, so it is
         committed configuration rather than a default living in code.
+    conflict_reviews : ConflictReviews
+        Contested sessions settled by review, declared in
+        ``metadata/conflict_reviews.toml``: served from the source a review
+        chose, for exactly the values it was written for.
     known_gaps : KnownGaps
         Sessions reviewed as missing, declared in ``metadata/known_gaps.toml``.
         Coverage tells them apart from gaps nobody has looked at, and a fetch
@@ -692,6 +697,7 @@ class MarketDataUpdater:
         bar_corrections: BarCorrections,
         cross_check_policy: CrossCheckPolicy,
         known_gaps: KnownGaps,
+        conflict_reviews: ConflictReviews,
         overlap_sessions: int = 5,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
@@ -715,6 +721,7 @@ class MarketDataUpdater:
         self._bar_corrections = bar_corrections
         self._cross_check_policy = cross_check_policy
         self._known_gaps = known_gaps
+        self._conflict_reviews = conflict_reviews
         self._overlap_sessions = overlap_sessions
         self._clock = clock
 
@@ -1278,6 +1285,7 @@ class MarketDataUpdater:
             canonical,
             reference_source=instrument.primary_source,
             policy=self._cross_check_policy,
+            reviews=self._conflict_reviews,
         )
         if expected.equals(checked):
             return
@@ -2146,6 +2154,7 @@ class MarketDataUpdater:
             judge_frames,
             reference_source=instrument.primary_source,
             policy=self._cross_check_policy,
+            reviews=self._conflict_reviews,
         )
         kept = stored.loc[~stored["session_date"].isin(to_judge)]
         pieces = [frame for frame in (kept, fresh) if not frame.empty]
