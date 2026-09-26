@@ -76,7 +76,13 @@ from quant_backtester.data.revisions import (
     detect_revisions,
     merge_with_policy,
 )
-from quant_backtester.data.schemas import BARS_SCHEMA, LEVELS_SCHEMA, VINTAGES_SCHEMA, CheckStatus
+from quant_backtester.data.schemas import (
+    BARS_SCHEMA,
+    CHECKED_BARS_SCHEMA,
+    LEVELS_SCHEMA,
+    VINTAGES_SCHEMA,
+    CheckStatus,
+)
 from quant_backtester.data.sources.base import (
     DataSource,
     ProviderError,
@@ -2336,28 +2342,34 @@ class MarketDataUpdater:
 
         Notes
         -----
-        A table the instrument has no rows in is left untouched rather than
+        A table the instrument has no file in is left untouched rather than
         created empty: a rebuild must not add files the pipeline never wrote,
         or two trees holding the same data would stop comparing equal.
+
+        Whether a file is there is asked of its version, never by decoding it.
+        A file written in an older format is exactly what a rebuild is run to
+        replace, and reading it with the current schema refused it, so the
+        rebuild the error recommended failed on the error (audit N05).
         """
+        version = self._repository.version
         if instrument.data_type is DataType.BAR:
-            if not self._repository.load_bars(instrument.id).empty:
+            if version("bars", instrument.id) is not None:
                 self._repository.save_bars(instrument.id, BARS_SCHEMA.empty_table().to_pandas())
             for check in instrument.check_sources:
-                stored = self._repository.load_check_bars(instrument.id, check.source)
-                if not stored.empty:
+                if version(f"check_bars/{check.source}", instrument.id) is not None:
                     self._repository.save_check_bars(
                         instrument.id, check.source, BARS_SCHEMA.empty_table().to_pandas()
                     )
-            checked = self._repository.load_checked_bars(instrument.id)
-            if not checked.empty:
-                self._repository.save_checked_bars(instrument.id, checked.iloc[0:0])
+            if version("checked_bars", instrument.id) is not None:
+                self._repository.save_checked_bars(
+                    instrument.id, CHECKED_BARS_SCHEMA.empty_table().to_pandas()
+                )
         elif instrument.vintage_policy is VintagePolicy.AS_OF_DECISION:
-            if not self._repository.load_vintages(instrument.id).empty:
+            if version("vintages", instrument.id) is not None:
                 self._repository.save_vintages(
                     instrument.id, VINTAGES_SCHEMA.empty_table().to_pandas()
                 )
-        elif not self._repository.load_levels(instrument.id).empty:
+        elif version("levels", instrument.id) is not None:
             self._repository.save_levels(instrument.id, LEVELS_SCHEMA.empty_table().to_pandas())
         stored_all = self._repository.load_corporate_actions()
         mine = stored_all["instrument_id"] == instrument.id
