@@ -344,11 +344,19 @@ class _PreparedSeries:
     rows: pd.DataFrame
 
 
-PreparedCache = dict[tuple[str, str, tuple[int, int, int, int] | None], _PreparedSeries]
-"""Prepared series by instrument, field and file version, shared by a reader's instants."""
+FileVersion = tuple[int, int, int, int] | None
+"""A clean file's version, as :meth:`MarketDataRepository.version` gives it."""
 
-ActionsCache = dict[tuple[str, tuple[int, int, int, int] | None], pd.DataFrame]
-"""An instrument's corporate actions, sorted, by version of the action table."""
+PreparedCache = dict[tuple[str, str], tuple[FileVersion, _PreparedSeries]]
+"""The prepared series of each instrument and field, with the file version it was made from.
+
+One entry per series, not per version: a newer version replaces the older one,
+so a reader kept for a long session holds one copy of each series however many
+promotions it lives through (audit N09).
+"""
+
+ActionsCache = dict[str, tuple[FileVersion, pd.DataFrame]]
+"""An instrument's corporate actions, sorted, with the version of the action table."""
 
 
 def _rows(stored: pd.DataFrame, dates: str, values: str, available: str) -> pd.DataFrame:
@@ -638,15 +646,17 @@ class PointInTimeReader:
         le seul garde-fou qui empeche un split posterieur a la date de decision
         de retro-ajuster une serie.
         """
-        key = (instrument_id, self._repository.version("corporate_actions"))
-        prepared = self._actions.get(key)
-        if prepared is None:
+        version = self._repository.version("corporate_actions")
+        kept = self._actions.get(instrument_id)
+        if kept is not None and kept[0] == version:
+            prepared = kept[1]
+        else:
             # Read and sorted once per version of the table, as the series
             # are; filtering a sorted frame keeps its order.
             prepared = self._repository.load_corporate_actions(instrument_id)
             prepared = prepared.sort_values(["ex_date", "action_type"], kind="stable")
             prepared = prepared.reset_index(drop=True)
-            self._actions[key] = prepared
+            self._actions[instrument_id] = (version, prepared)
         frame = prepared.loc[prepared["available_at_utc"] <= self._as_of]
         return frame.reset_index(drop=True)
 
@@ -867,10 +877,11 @@ class PointInTimeReader:
         read returns exactly the frame it returned before.
         """
         table = "checked_bars" if instrument.data_type is DataType.BAR else "levels"
-        key = (instrument.id, field.value, self._repository.version(table, instrument.id))
-        prepared = self._prepared.get(key)
-        if prepared is not None:
-            return prepared
+        key = (instrument.id, field.value)
+        version = self._repository.version(table, instrument.id)
+        kept = self._prepared.get(key)
+        if kept is not None and kept[0] == version:
+            return kept[1]
         if instrument.data_type is DataType.BAR:
             stored = self._repository.load_checked_bars(instrument.id)
             stored = stored.loc[~_contested(cast(pd.Series, stored["conflicting_fields"]), field)]
@@ -881,7 +892,7 @@ class PointInTimeReader:
         rows = rows.loc[rows["value"].notna()]
         rows = rows.sort_values("observation_date", kind="stable").reset_index(drop=True)
         prepared = _PreparedSeries(dates=list(rows["observation_date"]), rows=rows)
-        self._prepared[key] = prepared
+        self._prepared[key] = (version, prepared)
         return prepared
 
     def _vintage_rows(

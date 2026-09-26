@@ -1156,3 +1156,17 @@ def test_a_new_version_of_the_file_is_read_again(
     )
 
     assert list(reader.at(evening).history("EQ_US")) == [100.0, 150.0]
+
+
+def test_a_long_lived_reader_keeps_one_prepared_copy_per_series(
+    reader: MarketDataReader, repository: MarketDataRepository, xnys: TradingCalendar
+) -> None:
+    """Audit N09: twenty promotions left twenty prepared versions of one series."""
+    evening = paris(THURSDAY, 23)
+    for step in range(20):
+        repository.save_checked_bars(
+            "EQ_US", checked_bars("EQ_US", xnys, [(MONDAY, 100.0 + step), (TUESDAY, 101.0)])
+        )
+        assert list(reader.at(evening).history("EQ_US")) == [100.0 + step, 101.0]
+
+    assert len(reader._prepared) == 1
