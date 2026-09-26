@@ -54,6 +54,7 @@ from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.provenance import git_source_state
 from quant_backtester.research.archive import keep
+from quant_backtester.research.hypotheses import Hypotheses
 from quant_backtester.research.registry import ExperimentRegistry, record_of
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
@@ -71,6 +72,9 @@ STORE = REPOSITORY / "market_data"
 
 REGISTRY = REPOSITORY / "research" / "registry.jsonl"
 """The experiment register, committed with the code."""
+
+HYPOTHESES = REPOSITORY / "research" / "hypotheses.toml"
+"""The written hypotheses every registered run is filed under."""
 
 UNIVERSE = "ROTATION_2"
 """The two PEA funds every experiment chooses among."""
@@ -350,7 +354,11 @@ def main() -> None:
     arguments = parser.parse_args()
     keeping = Keeping(
         records=arguments.records,
-        registry=ExperimentRegistry(REGISTRY) if arguments.register else None,
+        registry=(
+            ExperimentRegistry(REGISTRY, Hypotheses.from_toml(HYPOTHESES))
+            if arguments.register
+            else None
+        ),
         kept=arguments.keep,
     )
     periods = [parse_period(item) for item in arguments.period or []] or list(PERIODS)

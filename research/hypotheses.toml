@@ -1,0 +1,71 @@
+# Hypotheses, written before the experiments that test them - committed, like
+# every decision a result is reproduced from. See research/PROTOCOL.md and
+# quant_backtester.research.hypotheses.
+#
+# The seven below name the runs made before this file existed: they are
+# EXPLORATORY, declared on the day this file was written, after their runs.
+# They describe what was looked at; they test nothing. A new idea is written
+# here as PREREGISTERED before its first variant is run.
+
+[[hypothesis]]
+hypothesis_id = "reference_rotation"
+status = "EXPLORATORY"
+written_on = 2026-09-26
+statement = "Holding the better of two PEA funds on 60-session momentum beats holding the world fund."
+universe = "ROTATION_2"
+prediction = "Higher net return than buy and hold of ETF_WORLD over the same sessions."
+refutation = "Lower net return than buy and hold of ETF_WORLD over the same sessions, net of costs."
+
+[[hypothesis]]
+hypothesis_id = "buy_and_hold_both"
+status = "EXPLORATORY"
+written_on = 2026-09-26
+statement = "Buying both funds once is the passive yardstick of ROTATION_2."
+universe = "ROTATION_2"
+prediction = "One session of trading, costs of one purchase per fund."
+refutation = "Trades after the initial purchase."
+
+[[hypothesis]]
+hypothesis_id = "equal_weight_daily"
+status = "EXPLORATORY"
+written_on = 2026-09-26
+statement = "Restating half and half every session costs more than holding and earns no more."
+universe = "ROTATION_2"
+prediction = "Net return no higher than buy_and_hold_both, costs higher."
+refutation = "Higher net return than buy_and_hold_both over the same sessions."
+
+[[hypothesis]]
+hypothesis_id = "buy_and_hold"
+status = "EXPLORATORY"
+written_on = 2026-09-26
+statement = "Buying the world fund once is the baseline every other rule is judged against."
+universe = "ROTATION_2"
+prediction = "One purchase, no trade after it."
+refutation = "Trades after the initial purchase."
+
+[[hypothesis]]
+hypothesis_id = "equal_weight"
+status = "EXPLORATORY"
+written_on = 2026-09-26
+statement = "Half and half, rebalanced monthly, beats holding either fund alone."
+universe = "ROTATION_2"
+prediction = "Higher net return than buy_and_hold over each period."
+refutation = "Lower net return than buy_and_hold over a period."
+
+[[hypothesis]]
+hypothesis_id = "momentum_rotation"
+status = "EXPLORATORY"
+written_on = 2026-09-26
+statement = "Rotating into the fund with the better 60-session momentum beats holding the world fund."
+universe = "ROTATION_2"
+prediction = "Higher net return than buy_and_hold over each period."
+refutation = "Lower net return than buy_and_hold over a period, net of costs."
+
+[[hypothesis]]
+hypothesis_id = "momentum_vix"
+status = "EXPLORATORY"
+written_on = 2026-09-26
+statement = "Standing aside while the VIX is high cuts the drawdown of the rotation for less than it costs."
+universe = "ROTATION_2"
+prediction = "Smaller maximum drawdown than momentum_rotation, at a similar net return."
+refutation = "A drawdown no smaller than momentum_rotation's, or a net return clearly lower."

@@ -26,6 +26,7 @@ from pathlib import Path
 
 from quant_backtester.backtest.runner import StrategyResult
 from quant_backtester.provenance import SourceStatus
+from quant_backtester.research.hypotheses import Hypotheses, HypothesisStatus
 from quant_backtester.research.journal import exclusive
 from quant_backtester.signals.types import require_identifier
 
@@ -185,18 +186,56 @@ def record_of(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class VerdictEvent:
+    """A judgement of a registered experiment, added after it and never in place of it.
+
+    Attributes
+    ----------
+    experiment_id : str
+        The experiment judged.
+    verdict : Verdict
+        ``KEPT`` or ``REJECTED``.
+    note : str
+        Why. Required.
+    decided_at : str
+        ISO instant of the judgement.
+    """
+
+    experiment_id: str
+    verdict: Verdict
+    note: str
+    decided_at: str
+
+    def as_json(self) -> str:
+        """Return the event as one canonical JSON line."""
+        values = asdict(self)
+        values["verdict"] = self.verdict.value
+        return json.dumps(values, sort_keys=True, separators=(",", ":"))
+
+
 class ExperimentRegistry:
-    """The append-only register, one JSON line per experiment.
+    """The append-only register, one JSON line per experiment, and its verdicts.
 
     Parameters
     ----------
     path : Path
         The register file, committed with the code. Created by the first
-        registration.
+        registration. Verdicts are appended to ``verdicts.jsonl`` beside it.
+    hypotheses : Hypotheses
+        The written hypotheses. A run is filed under one of them or not at
+        all, and a preregistered one must have been written by the day the
+        run is registered.
     """
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, hypotheses: Hypotheses) -> None:
         self.path = path
+        self.hypotheses = hypotheses
+
+    @property
+    def verdicts_path(self) -> Path:
+        """Return the file the verdicts are appended to."""
+        return self.path.with_name("verdicts.jsonl")
 
     def records(self) -> list[ExperimentRecord]:
         """Return every registered experiment, in the order it was registered."""
@@ -211,10 +250,25 @@ class ExperimentRegistry:
         Raises
         ------
         UnrecordableRun
-            If its ``experiment_id`` is already registered, or its ``run_id``
-            is: the same run registered twice would be counted twice, and an
-            experiment renamed would be counted as a new idea.
+            If its hypothesis is not written, or is preregistered and was
+            written after the run; if its ``experiment_id`` is already
+            registered, or its ``run_id`` is: the same run registered twice
+            would be counted twice, and an experiment renamed would be counted
+            as a new idea.
         """
+        try:
+            hypothesis = self.hypotheses.get(record.hypothesis)
+        except KeyError as error:
+            raise UnrecordableRun(str(error)) from None
+        recorded_on = datetime.fromisoformat(record.recorded_at).date()
+        if (
+            hypothesis.status is HypothesisStatus.PREREGISTERED
+            and hypothesis.written_on > recorded_on
+        ):
+            raise UnrecordableRun(
+                f"{record.experiment_id} was run on {recorded_on} and its hypothesis was "
+                f"written on {hypothesis.written_on}: that is not a preregistration"
+            )
         # Checked and appended under one lock: two writers that both read
         # before either wrote registered the same run twice (audit N07).
         with exclusive(self.path):
@@ -228,6 +282,72 @@ class ExperimentRegistry:
                     )
             with self.path.open("a", encoding="utf-8") as handle:
                 handle.write(record.as_json() + "\n")
+
+    def judge(
+        self, experiment_id: str, verdict: Verdict, note: str, decided_at: datetime
+    ) -> VerdictEvent:
+        """Append a judgement of a registered experiment.
+
+        Parameters
+        ----------
+        experiment_id : str
+            The experiment.
+        verdict : Verdict
+            ``KEPT`` or ``REJECTED``.
+        note : str
+            Why - required.
+        decided_at : datetime
+            Timezone-aware instant of the judgement.
+
+        Returns
+        -------
+        VerdictEvent
+            The event appended. The experiment's own line is untouched, and
+            no variant is added: a verdict is not a new run (C02).
+
+        Raises
+        ------
+        UnrecordableRun
+            If the experiment is not registered, the verdict is ``PENDING``,
+            or the note is blank.
+        """
+        if decided_at.tzinfo is None:
+            raise ValueError(f"decided_at must be timezone-aware, got {decided_at!r}")
+        if verdict is Verdict.PENDING:
+            raise UnrecordableRun("a verdict is KEPT or REJECTED; PENDING is the absence of one")
+        if not note.strip():
+            raise UnrecordableRun(f"{experiment_id} is judged {verdict.value} without a reason")
+        if experiment_id not in {record.experiment_id for record in self.records()}:
+            raise UnrecordableRun(f"{experiment_id} is not registered")
+        event = VerdictEvent(experiment_id, verdict, note, decided_at.isoformat())
+        with (
+            exclusive(self.verdicts_path),
+            self.verdicts_path.open("a", encoding="utf-8") as handle,
+        ):
+            handle.write(event.as_json() + "\n")
+        return event
+
+    def verdicts(self) -> list[VerdictEvent]:
+        """Return every judgement, in the order it was made."""
+        if not self.verdicts_path.exists():
+            return []
+        events = []
+        for line in self.verdicts_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                values = json.loads(line)
+                values["verdict"] = Verdict(values["verdict"])
+                events.append(VerdictEvent(**values))
+        return events
+
+    def verdict_of(self, experiment_id: str) -> Verdict:
+        """Return an experiment's standing verdict: its latest judgement, or its own."""
+        judged = [event for event in self.verdicts() if event.experiment_id == experiment_id]
+        if judged:
+            return judged[-1].verdict
+        for record in self.records():
+            if record.experiment_id == experiment_id:
+                return record.verdict
+        raise KeyError(f"{experiment_id} is not registered")
 
     def variants(self) -> Mapping[str, int]:
         """Return how many experiments each hypothesis took, rejected ones included."""
