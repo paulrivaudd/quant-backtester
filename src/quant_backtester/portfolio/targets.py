@@ -77,7 +77,9 @@ class TargetAllocation:
     cash_shares : Mapping[str, float]
         Lines to buy with a share of the cash the book holds at the execution
         instant, rather than a share of its equity: what completing a basket
-        means (decision D12). Their ``weights`` record what that cash was worth
+        means (decision D12). A share is a budget, every cost of the purchase
+        included, so ``1 - sum(shares)`` of the cash is left (decision D21).
+        Their ``weights`` record what that cash was worth
         at the decision; the order is sized on the cash there is at the open,
         which a weight of equity is not once the lines already held have
         moved overnight. Each is a fraction of ``[0, 1]``, together at most
