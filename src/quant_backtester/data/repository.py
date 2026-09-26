@@ -64,6 +64,7 @@ import json
 import os
 import shutil
 import tempfile
+import threading
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -206,12 +207,19 @@ class _StoreLock:
     A lock belongs to an open file description, so two repository objects in
     one process exclude each other exactly as two processes do: that is what
     makes the second object of a test the same hazard as a second process.
+
+    Reentrant for the thread that holds it, and for no other (decision D20).
+    A second thread entering while the first held the lock used to be taken
+    for a nested call: when the first left, the lock was released under the
+    second, and a writer got in while it was still reading (audit N04). A
+    repository is used by one thread at a time; each thread opens its own.
     """
 
     def __init__(self, path: Path) -> None:
         self._path = path
         self._descriptor: int | None = None
         self._mode: int | None = None
+        self._owner: int | None = None
 
     @contextmanager
     def hold(self, mode: int, what: str) -> Iterator[None]:
@@ -231,6 +239,11 @@ class _StoreLock:
             lock for reading and asks to write inside that.
         """
         if self._descriptor is not None:
+            if self._owner != threading.get_ident():
+                raise StoreBusy(
+                    f"cannot {what}: this repository is held by another thread. A repository "
+                    "is used by one thread at a time - give each thread its own"
+                )
             if mode == fcntl.LOCK_EX and self._mode != fcntl.LOCK_EX:
                 raise StoreBusy(f"cannot {what} while this repository holds the store for reading")
             yield
@@ -247,11 +260,13 @@ class _StoreLock:
             ) from None
         self._descriptor = descriptor
         self._mode = mode
+        self._owner = threading.get_ident()
         try:
             yield
         finally:
             self._descriptor = None
             self._mode = None
+            self._owner = None
             fcntl.flock(descriptor, fcntl.LOCK_UN)
             os.close(descriptor)
 
