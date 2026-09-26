@@ -389,37 +389,36 @@ print(report.render())
 437 sessions, 1.71 years, 255 sessions/year, risk-free 2.00%
 
                                gross         net
-total return                  19.31%      16.19%
-annualised return             10.90%       9.20%
-annualised volatility         14.32%      14.39%
+total return                  20.29%      16.66%
+annualised return             11.44%       9.46%
+annualised volatility         14.90%      15.00%
 max drawdown                 -21.60%     -21.65%
-sharpe ratio                    0.65        0.54
+sharpe ratio                    0.67        0.54
 
-costs                       3,119.40
-  commission                1,949.63
-  spread                      779.85
-  slippage                    389.92
-  drag on the return           3.12%
-  share of gross              16.16%
-  rebalancings                    20
-  per rebalancing             155.97
-  turnover                    37.84x
-  turnover a year             22.18x
+costs                       3,624.22
+  commission                2,265.14
+  spread                      906.05
+  slippage                    453.03
+  drag on the return           3.62%
+  share of gross              17.86%
+  rebalancings                    22
+  per rebalancing             164.74
+  turnover                    43.91x
+  turnover a year             25.74x
 
 by instrument                    net       gross        cost    held
-  ETF_SP500_PEA            15,742.11   17,260.63    1,518.52     165
-  ETF_WORLD                   446.51    2,047.40    1,600.88     210
+  ETF_SP500_PEA            15,582.12   17,436.65    1,854.53     200
+  ETF_WORLD                 1,081.84    2,851.52    1,769.69     236
 
-sessions valued on an older price              1
-sessions without an execution price            2
-purchases cut for want of cash                11
-sessions with nothing to choose from          61
+sessions valued on an older price              0
+sessions without an execution price            0
+purchases cut for want of cash                14
+sessions with nothing to choose from           0
 sessions missing a line of the target          0
-average cash                              14.27%
+average cash                               0.39%
 largest weight held                      100.00%
-orders, fills, rejects                37, 37, 13
-  INSUFFICIENT_CASH                           11
-  NO_EXECUTION_PRICE                           2
+orders, fills, rejects                43, 43, 14
+  INSUFFICIENT_CASH                           14
 
 assumptions
   fills: OPEN_AUCTION_NOTIONAL - sized and filled at the next opening price
@@ -430,15 +429,16 @@ assumptions
   history read: ASSUMED_UNREVISED ETF_SP500_PEA, ETF_WORLD
 ```
 
-Three points of return went to execution — **a sixth of everything the idea
-earned** — and a Sharpe ratio of 0.65 that an investor would have experienced
-as 0.54. Twenty switches in twenty-one months is not a hyperactive strategy,
+Three and a half points of return went to execution — **close to a fifth of
+everything the idea earned** — and a Sharpe ratio of 0.67 that an investor
+would have experienced as 0.54. Twenty-two switches in twenty-one months is not
+a hyperactive strategy,
 and it still costs that much: the kind of fact a backtest without a cost model
 cannot show, which is why this one refuses to report a return without one.
 
 The instrument block is the one that should worry its author. The world ETF
-was held for 210 of the 375 invested sessions and returned 447 euros of the
-16,189: it paid 1,601 in costs to earn 2,047 gross. Practically the whole
+was held for 236 of the 436 invested sessions and returned 1,082 euros of the
+16,664: it paid 1,770 in costs to earn 2,852 gross. Practically the whole
 result is the other leg. A rotation between two funds whose gain comes from one
 of them is not a rotation that works - it is a strategy that was right once,
 and the total return alone cannot tell the difference. The decomposition is
@@ -446,29 +446,25 @@ exact: every instrument's share is computed from the quantities, the fills and
 the closes the run itself recorded, and what it fails to explain is reported
 rather than absorbed.
 
-The last block is not decoration. Sixty-one sessions had nothing to choose
-from, and they are one story: on 24 October 2025 the two providers disagreed
-on the world ETF's bar, so the reader serves that session as a hole rather than
-as a price. A sixty-session momentum needs sixty sessions in a row, and it took
-sixty-one for the hole to leave the window - during which the ranking had one
-instrument where it needs two, the strategy had nothing to choose from, and the
-book stood in cash: that is most of the fourteen percent of average cash. The
-same session is the one valued on an older price and one of the two on which
-an order met no opening price of its own. Eleven purchases were cut, because a
-switch pays the sale's costs out of its proceeds and the commission on top of
-the purchase, and execution lends nothing: each cut is a reject on the record,
-with the units it cost.
+The last block is not decoration, and it is where this README was once wrong.
+On 24 October 2025 the two providers disagreed on both funds' bar - Yahoo
+served a flat placeholder with no volume, Euronext the venue's real bar - and
+the reader served the session as a hole. A sixty-session momentum needs sixty
+sessions in a row, so for sixty-one sessions the ranking had one instrument
+where it needs two, the strategy had nothing to choose from, and the book
+stood in cash. This README used to say that the hole cost the strategy four
+points. It never measured it. The session is now settled by a committed review
+(`metadata/conflict_reviews.toml`, served from Euronext and marked
+`REVIEWED`, never `CONFIRMED`), and the run was made again with that review as
+the only change: **the hole cost 0.47 point**, not four - 16.19% net became
+16.66%, the sixty-one sessions with nothing to choose from became none, and
+the average cash fell from fourteen percent to under one. Fourteen purchases
+are still cut, because a switch pays the sale's costs out of its proceeds and
+the commission on top of the purchase, and execution lends nothing: each cut
+is a reject on the record, with the units it cost.
 
-These figures are the same, to the cent, as before the execution layer was
-rebuilt around the specification: a purchase is now sized at the price it will
-be paid rather than at the open, and in whole shares both routes land on the
-same quantity once the cash has had its say. What changed is what the record
-can say about it - the spread and the slippage apart, every refusal with its
-reason, the orders against the fills.
-
-Those lines are the caveats the figures above have to be read with. A single
-contested bar cost this strategy a quarter of its year, and a report that left
-that out would be describing a strategy nobody ran.
+Those lines are the caveats the figures above have to be read with, and a
+caveat is only worth what was measured about it.
 
 Inside a session the order is fixed, and it is what stops a strategy buying at
 the close it just read. The three instants are declared in the run's
@@ -605,7 +601,7 @@ weights), and keeps its positions afterwards; `EqualWeightRebalance` restates
 the same target at every decision. Over this README's period they are two
 different strategies — one session of trading against four (two fills against
 seven), 80 euros of costs against 86,
-no refused order against 375, most of them rebalancings too small to send — and
+no refused order against 372, most of them rebalancings too small to send — and
 calling the second one "buy and hold", as an earlier version of this project
 did, hides the very thing the comparison exists to measure.
 
@@ -696,26 +692,25 @@ behind:
 437 sessions, strategy against ETF_WORLD
 
                             strategy     ETF_WORLD
-total return                  16.19%        20.19%
-annualised return              9.20%        11.39%
-annualised volatility         14.39%        14.69%
+total return                  16.66%        20.19%
+annualised return              9.46%        11.39%
+annualised volatility         15.00%        14.67%
 max drawdown                 -21.65%       -21.66%
 sharpe ratio                    0.54          0.67
-excess return                 -4.01%
+excess return                 -3.53%
 
 ETF_WORLD is a yardstick, not an alternative that was traded: one share
 held from the first close, with no cost, no lot and no cash left over. The
 strategy starts in cash and trades at the next open on its own schedule.
 ```
 
-Four points of it are the single contested bar of 24 October 2025: the strategy
-held nothing for the sixty-one sessions its sixty-session window needed to
-clear the hole, and the benchmark kept moving. A picture makes that plateau
-obvious where a table does not, which is what `result.plot()` is for — it
-returns a figure and never calls `show`, so a notebook displays it, a script
-saves it and a test inspects it.
+Less than half a point of that gap was the contested bar of 24 October 2025:
+reviewed, it moved the strategy from 16.19% to 16.66%, and the gap to the
+index from 4.01 points to 3.53. A picture shows where the rest went, which is
+what `result.plot()` is for — it returns a figure and never calls `show`, so a
+notebook displays it, a script saves it and a test inspects it.
 
-Against the index the strategy trails by four points, and against the fund it
+Against the index the strategy trails by three and a half points, and against the fund it
 could actually have bought instead - the world fund bought once, under the same
 costs, lots and cash - the question is whether that gap means anything. The
 readme suite answers with a paired block bootstrap of the two books, the same
@@ -724,13 +719,15 @@ blocks of ten sessions drawn for both, 2 000 draws, seed 20260926:
 ```text
 == reference_rotation against the executable control, control_world
 difference      estimate       low      high   level
-mean_return       -0.023    -0.063     0.017     90%
-sharpe            -0.142    -0.445     0.151     90%
+mean_return       -0.019    -0.034     0.002     90%
+sharpe            -0.149    -0.286    -0.010     90%
 ```
 
-Both intervals hold zero. Over 437 sessions the rotation is neither better
-nor worse than keeping the world fund, and no figure of this README says
-otherwise - which is what `research/PROTOCOL.md` is for.
+The mean-return interval only just holds zero; the Sharpe interval does not.
+Over 437 sessions the rotation took on more risk than keeping the world fund
+for no more return, and at this level its Sharpe ratio is the lower of the
+two. Nothing in this README says it is the better strategy - which is what
+`research/PROTOCOL.md` is for.
 
 Nor does the gap depend much on how the orders are simulated.
 `scripts/sensitivity.py` runs both books with quantities fixed at the
@@ -739,21 +736,21 @@ declared costs:
 
 ```text
 scenario              book                      net  sharpe     costs  rejects
-notional, costs x1    reference_rotation     16.19%    0.54     3,119       13
+notional, costs x1    reference_rotation     16.66%    0.54     3,624       14
 notional, costs x1    control_world          20.71%    0.69        80        0
-notional, costs x2    reference_rotation     12.84%    0.43     6,146       15
+notional, costs x2    reference_rotation     12.77%    0.41     7,121       17
 notional, costs x2    control_world          20.63%    0.69       160        0
-overnight, costs x1   reference_rotation     16.10%    0.54     3,118       64
+overnight, costs x1   reference_rotation     16.65%    0.54     3,623       64
 overnight, costs x1   control_world          20.59%    0.69        79        0
-overnight, costs x2   reference_rotation     12.76%    0.42     6,139       38
+overnight, costs x2   reference_rotation     12.76%    0.41     7,118       38
 overnight, costs x2   control_world          20.51%    0.69       159        0
 ```
 
-Fixing the quantities overnight costs the rotation a tenth of a point and
+Fixing the quantities overnight costs the rotation a hundredth of a point and
 turns more purchases into cuts - an open above the close leaves an order
 bigger than the cash. The costs are what it is sensitive to: twice them take
-three and a half points from the rotation and nothing from the fund it is
-measured against.
+almost four points from the rotation and nothing from the fund it is measured
+against.
 
 The benchmark is read at the run's own decision instants, so adding data after
 the last session changes none of its figures; a session its venue did not hold
@@ -776,13 +773,13 @@ can be compared run for run.
 
 ```text
 strategy            period                         net    gross   a year  sharpe   max dd     costs  rebal.  fills  rejects  est.  vs world
-buy_and_hold        2018-07-16 2026-09-17      164.10%  164.18%   12.62%    0.71  -33.59%        80       1      1        0     1     0.44%
-equal_weight        2018-07-16 2026-09-17      182.29%  182.42%   13.54%    0.74  -33.57%       127      23     40      106     1    18.63%
+buy_and_hold        2018-07-16 2026-09-17      164.10%  164.18%   12.62%    0.71  -33.59%        80       1      1        0     0     0.44%
+equal_weight        2018-07-16 2026-09-17      182.29%  182.42%   13.54%    0.74  -33.57%       127      23     40      106     0    18.63%
                     rejects: BELOW_MINIMUM_TRADE 92, INSUFFICIENT_CASH 14
-momentum_rotation   2018-07-16 2026-09-17      160.40%  183.22%   12.42%    0.68  -33.62%    22,824      86    169       65     1    -3.26%
-                    rejects: INSUFFICIENT_CASH 63, NO_EXECUTION_PRICE 2
-momentum_vix        2018-07-16 2026-09-17      124.37%  161.29%   10.39%    0.66  -23.11%    36,920     214    289      108     1   -39.29%
-                    rejects: INSUFFICIENT_CASH 106, NO_EXECUTION_PRICE 2
+momentum_rotation   2018-07-16 2026-09-17      161.49%  185.44%   12.48%    0.68  -33.62%    23,957      88    175       64     0    -2.17%
+                    rejects: INSUFFICIENT_CASH 64
+momentum_vix        2018-07-16 2026-09-17      121.50%  159.70%   10.22%    0.65  -23.11%    38,203     218    297      109     0   -42.16%
+                    rejects: INSUFFICIENT_CASH 109
 
 buy_and_hold        2019-01-02 2021-12-31       82.30%   82.38%   22.20%    1.08  -33.61%        80       1      1        0     0     1.37%
 equal_weight        2019-01-02 2021-12-31       77.41%   77.50%   21.09%    1.02  -33.56%        90       6     10       45     0    -3.51%
@@ -800,20 +797,20 @@ momentum_rotation   2022-01-03 2023-12-29       -1.05%    2.61%   -0.53%   -0.08
 momentum_vix        2022-01-03 2023-12-29       -8.83%   -3.23%   -4.55%   -0.39  -23.31%     5,605      63     83       30     0   -11.78%
                     rejects: INSUFFICIENT_CASH 30
 
-buy_and_hold        2024-01-02 2026-09-17       53.43%   53.51%   17.13%    1.09  -21.61%        80       1      1        0     1    -0.19%
-equal_weight        2024-01-02 2026-09-17       49.50%   49.59%   16.01%    0.99  -22.46%        90       6     11       25     1    -4.13%
+buy_and_hold        2024-01-02 2026-09-17       53.43%   53.51%   17.13%    1.09  -21.61%        80       1      1        0     0    -0.19%
+equal_weight        2024-01-02 2026-09-17       49.50%   49.59%   16.01%    0.99  -22.46%        90       6     11       25     0    -4.13%
                     rejects: BELOW_MINIMUM_TRADE 22, INSUFFICIENT_CASH 3
-momentum_rotation   2024-01-02 2026-09-17       47.99%   54.51%   15.58%    0.98  -21.62%     6,522      35     67       23     1    -5.63%
-                    rejects: INSUFFICIENT_CASH 21, NO_EXECUTION_PRICE 2
-momentum_vix        2024-01-02 2026-09-17       37.65%   47.78%   12.53%    0.96  -13.47%    10,124      76    107       34     1   -15.97%
-                    rejects: INSUFFICIENT_CASH 32, NO_EXECUTION_PRICE 2
+momentum_rotation   2024-01-02 2026-09-17       48.62%   55.78%   15.76%    0.97  -21.62%     7,166      37     73       22     0    -5.01%
+                    rejects: INSUFFICIENT_CASH 22
+momentum_vix        2024-01-02 2026-09-17       35.90%   46.81%   11.99%    0.88  -13.47%    10,915      80    115       32     0   -17.73%
+                    rejects: INSUFFICIENT_CASH 32
 ```
 
 Over eight years the simplest things win. Half and half, rebalanced monthly,
 beats everything; the rotation earns, gross, what the equal weight keeps net,
-and hands twenty-three points of it to 86 sessions of switching. The VIX gate does what it
+and hands twenty-four points of it to 88 sessions of switching. The VIX gate does what it
 says - its worst fall is a third smaller over the whole history, and its
-Sharpe ratio is the best of 2019-2021 - and pays for it twice: 214 sessions of trading, and
+Sharpe ratio is the best of 2019-2021 - and pays for it twice: 218 sessions of trading, and
 the rebounds it sits out. In 2022-2023 both rotations lose money net, the gated
 one even before costs. None of this is a verdict on momentum: two funds are
 the thinnest universe a ranking can have, and over these years the S&P 500
@@ -824,8 +821,8 @@ The refused orders say what each strategy runs into: the equal weight's are
 mostly rebalancings too small to send, the rotations' are purchases cut to the
 cash a switch leaves once the sale has paid its costs, and buy and hold has
 none at all - it keeps its positions and sends nothing. `est.` counts the
-sessions a position was valued on an older close: the contested bar of
-24 October 2025.
+sessions a position was valued on an older close: none, since the contested
+bar of 24 October 2025 was reviewed.
 
 ## Research: what is left to test, and how
 
