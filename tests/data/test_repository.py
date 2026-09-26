@@ -1140,3 +1140,109 @@ def test_a_transaction_that_wrote_nothing_leaves_nothing_behind(market_root):
         pass
 
     assert list((market_root / ".pending").iterdir()) == []
+
+
+# --- a file decoded once per version -----------------------------------------------
+
+
+def count_decodes(monkeypatch: pytest.MonkeyPatch) -> list[Path]:
+    """Count every file actually decoded from disk, by patching the one reader of them."""
+    import quant_backtester.data.repository as repository_module
+
+    decoded: list[Path] = []
+    original = repository_module._load_or_empty
+
+    def counting(path: Path, schema: object) -> pd.DataFrame:
+        decoded.append(path)
+        return original(path, schema)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(repository_module, "_load_or_empty", counting)
+    return decoded
+
+
+def test_an_unchanged_file_is_decoded_once(
+    market_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A backtest reads the same few files thousands of times; decoding them once is enough."""
+    repository = MarketDataRepository(market_root)
+    repository.save_checked_bars("SPY", make_checked_bars())
+    decoded = count_decodes(monkeypatch)
+
+    first = repository.load_checked_bars("SPY")
+    second = repository.load_checked_bars("SPY")
+
+    assert len(decoded) == 1
+    pd.testing.assert_frame_equal(first, second)
+
+
+def test_a_replaced_file_is_read_again(market_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every write is a new file renamed into place, so a new version is never served stale."""
+    repository = MarketDataRepository(market_root)
+    repository.save_checked_bars("SPY", make_checked_bars())
+    decoded = count_decodes(monkeypatch)
+    repository.load_checked_bars("SPY")
+
+    repository.save_checked_bars("SPY", make_checked_bars(status="SINGLE_SOURCE"))
+    reloaded = repository.load_checked_bars("SPY")
+
+    assert len(decoded) == 2
+    assert set(reloaded["check_status"]) == {"SINGLE_SOURCE"}
+
+
+def test_a_file_written_by_another_repository_is_read_again(market_root: Path) -> None:
+    """Two handles on one store: the version is the file's, not the handle's."""
+    reading = MarketDataRepository(market_root)
+    writing = MarketDataRepository(market_root)
+    writing.save_checked_bars("SPY", make_checked_bars())
+    assert set(reading.load_checked_bars("SPY")["check_status"]) == {"CONFIRMED"}
+
+    writing.save_checked_bars("SPY", make_checked_bars(status="SINGLE_SOURCE"))
+
+    assert set(reading.load_checked_bars("SPY")["check_status"]) == {"SINGLE_SOURCE"}
+
+
+def test_editing_a_loaded_frame_does_not_edit_the_next_one(market_root: Path) -> None:
+    """What a caller gets is its own copy: the kept frame is out of its reach."""
+    repository = MarketDataRepository(market_root)
+    repository.save_checked_bars("SPY", make_checked_bars())
+
+    edited = repository.load_checked_bars("SPY")
+    edited["close"] = -1.0
+    edited.loc[0, "check_status"] = "CONFLICT"
+
+    fresh = repository.load_checked_bars("SPY")
+    pd.testing.assert_frame_equal(fresh, make_checked_bars())
+
+
+def test_an_absent_file_is_still_an_empty_frame_with_its_columns(market_root: Path) -> None:
+    """Nothing to decode, nothing kept, and the same answer as before the cache."""
+    repository = MarketDataRepository(market_root)
+
+    assert repository.load_checked_bars("NOPE").empty
+    repository.save_checked_bars("NOPE", make_checked_bars(instrument_id="NOPE"))
+    assert len(repository.load_checked_bars("NOPE")) == len(SESSIONS)
+
+
+def test_a_transaction_reads_what_it_staged_and_then_what_it_committed(market_root: Path) -> None:
+    """The staged copy is another file, and the committed one is a new version."""
+    repository = MarketDataRepository(market_root)
+    repository.save_checked_bars("SPY", make_checked_bars())
+    repository.load_checked_bars("SPY")
+
+    with repository.transaction():
+        repository.save_checked_bars("SPY", make_checked_bars(status="SINGLE_SOURCE"))
+        assert set(repository.load_checked_bars("SPY")["check_status"]) == {"SINGLE_SOURCE"}
+
+    assert set(repository.load_checked_bars("SPY")["check_status"]) == {"SINGLE_SOURCE"}
+
+
+def test_a_transaction_leaves_no_decoded_copy_of_its_staged_files(market_root: Path) -> None:
+    """Staged files are gone once the transaction ends; their decoded copies go with them."""
+    repository = MarketDataRepository(market_root)
+
+    with repository.transaction():
+        repository.save_checked_bars("SPY", make_checked_bars())
+        repository.load_checked_bars("SPY")
+        assert any(".pending" in str(path) for path in repository._decoded)
+
+    assert not any(".pending" in str(path) for path in repository._decoded)

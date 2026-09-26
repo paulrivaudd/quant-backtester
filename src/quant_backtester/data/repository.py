@@ -163,6 +163,15 @@ class MarketDataRepository:
     Opening a repository finishes or discards whatever a previous run left
     behind - see :meth:`transaction`. It is the one side effect a constructor
     here has, and it is the price of a store that can be interrupted.
+
+    A file of the clean layer is decoded once per *version* of it and kept:
+    a backtest reads the same few files thousands of times, and decoding them
+    each time was a quarter of every run. A version is the file's device,
+    inode, size and modification time to the nanosecond, so a file replaced -
+    every write here is a new file renamed into place - is read again, and one
+    that has not changed is never read twice. What a caller gets is its own
+    copy: under pandas' copy-on-write, nothing it does to the frame reaches
+    the one kept here.
     """
 
     def __init__(self, root: Path) -> None:
@@ -171,7 +180,53 @@ class MarketDataRepository:
         self.root = root
         self._staged: dict[Path, Path] | None = None
         self._staging: Path | None = None
+        self._decoded: dict[Path, tuple[tuple[int, int, int, int], pd.DataFrame]] = {}
         self.recover()
+
+    def _forget(self, staging: Path) -> None:
+        """Drop the decoded copies of a transaction's staged files.
+
+        They are read while the transaction writes and are gone once it ends -
+        moved into place, or discarded - so keeping them would only grow the
+        cache by one frame per staged file for as long as a rebuild runs.
+        """
+        self._decoded = {
+            path: kept for path, kept in self._decoded.items() if not path.is_relative_to(staging)
+        }
+
+    def _load(self, path: Path, schema: pa.Schema) -> pd.DataFrame:
+        """Return a file of the clean layer, decoded once per version of it.
+
+        Parameters
+        ----------
+        path : Path
+            File to read.
+        schema : pa.Schema
+            Its schema, for the empty frame an absent file gives.
+
+        Returns
+        -------
+        pd.DataFrame
+            The stored rows, as :func:`_load_or_empty` reads them, in a frame
+            of the caller's own.
+
+        Notes
+        -----
+        The version is taken before the file is read. Should the file be
+        replaced in between, the frame kept is newer than its version says,
+        and the next call - seeing a version that does not match - reads it
+        again: the cache can only ever err towards reading once too often.
+        """
+        try:
+            status = path.stat()
+        except FileNotFoundError:
+            return _load_or_empty(path, schema)
+        version = (status.st_dev, status.st_ino, status.st_size, status.st_mtime_ns)
+        kept = self._decoded.get(path)
+        if kept is None or kept[0] != version:
+            kept = (version, _load_or_empty(path, schema))
+            self._decoded[path] = kept
+        return kept[1].copy(deep=False)
 
     # -- transactions ------------------------------------------------------
 
@@ -226,11 +281,13 @@ class MarketDataRepository:
         except BaseException:
             self._staged = None
             self._staging = None
+            self._forget(staging)
             shutil.rmtree(staging, ignore_errors=True)
             raise
         staged = self._staged
         self._staged = None
         self._staging = None
+        self._forget(staging)
         self._commit(staging, staged)
 
     def recover(self) -> list[Path]:
@@ -643,7 +700,7 @@ class MarketDataRepository:
             Its canonical bars; an empty frame with the right columns if it has
             never served any.
         """
-        return _load_or_empty(
+        return self._load(
             self._current(self._check_bars_path(instrument_id, source_id)), BARS_SCHEMA
         )
 
@@ -671,7 +728,7 @@ class MarketDataRepository:
             decision, not the repository's.
         """
         path = self._current(self.root / "clean" / "checked_bars" / f"{instrument_id}.parquet")
-        frame = _load_or_empty(path, CHECKED_BARS_SCHEMA)
+        frame = self._load(path, CHECKED_BARS_SCHEMA)
         # session_date holds datetime.date objects: compare with dates, not Timestamps.
         if start is not None:
             frame = frame.loc[frame["session_date"] >= start]
@@ -757,7 +814,7 @@ class MarketDataRepository:
             the right columns when the instrument has none.
         """
         path = self._current(self.root / "clean" / "vintages" / f"{instrument_id}.parquet")
-        return _load_or_empty(path, VINTAGES_SCHEMA)
+        return self._load(path, VINTAGES_SCHEMA)
 
     def load_levels(
         self, instrument_id: str, start: date | None = None, end: date | None = None
@@ -781,7 +838,7 @@ class MarketDataRepository:
         Exercice 3.9 (facile).
         """
         path = self._current(self.root / "clean" / "levels" / f"{instrument_id}.parquet")
-        frame = _load_or_empty(path, LEVELS_SCHEMA)
+        frame = self._load(path, LEVELS_SCHEMA)
         # observation_date holds datetime.date objects: compare with dates, not Timestamps.
         if start is not None:
             frame = frame.loc[frame["observation_date"] >= start]
@@ -829,7 +886,7 @@ class MarketDataRepository:
         Exercice 3.11 (facile).
         """
         path = self._current(self.root / "clean" / "corporate_actions.parquet")
-        return _only_instrument(_load_or_empty(path, CORPORATE_ACTIONS_SCHEMA), instrument_id)
+        return _only_instrument(self._load(path, CORPORATE_ACTIONS_SCHEMA), instrument_id)
 
     def append_revisions(self, frame: pd.DataFrame) -> None:
         """Append detected revisions to the detection log.
@@ -900,7 +957,7 @@ class MarketDataRepository:
         set[tuple[str, str]]
             Empty when nothing was ever recorded for it.
         """
-        frame = _load_or_empty(self._current(self._applied_fetches_path), APPLIED_FETCHES_SCHEMA)
+        frame = self._load(self._current(self._applied_fetches_path), APPLIED_FETCHES_SCHEMA)
         mine = frame.loc[frame["instrument_id"] == instrument_id]
         return {
             (str(source), str(fetch))
@@ -931,7 +988,7 @@ class MarketDataRepository:
         Exercice 3.13 (facile).
         """
         path = self._current(self.root / "clean" / "revisions.parquet")
-        return _only_instrument(_load_or_empty(path, REVISIONS_SCHEMA), instrument_id)
+        return _only_instrument(self._load(path, REVISIONS_SCHEMA), instrument_id)
 
     def append_validation_log(
         self, reports: Sequence[ValidationReport], checked_at_utc: datetime

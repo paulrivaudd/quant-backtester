@@ -1005,3 +1005,49 @@ def test_the_registry_is_reachable_from_the_reader(
 ) -> None:
     """The engine needs the universe, and gets it without a second wiring."""
     assert reader.instruments is instruments
+
+
+# -- the vectorised contested mask, held to the naive rule --------------------------------
+
+
+@pytest.mark.parametrize("field", list(BarField), ids=lambda field: field.value)
+def test_the_vectorised_mask_agrees_with_the_naive_rule_cell_by_cell(field: BarField) -> None:
+    """The reader filters with a regular expression; the rule it implements is the loop.
+
+    Every awkward cell a cross-check or a hand edit could leave: empty, missing,
+    one field, several, a name that only starts like a field, a space after a
+    comma, a field twice.
+    """
+    from quant_backtester.data.reader import _contested, _is_contested
+
+    cells = [
+        "",
+        None,
+        float("nan"),
+        "close",
+        "low",
+        "close,low",
+        "high,low,open",
+        "closed",
+        "open_interest",
+        "low, close",
+        " close",
+        "close,close",
+        "volume",
+        "open,close,high,low,volume",
+    ]
+    series = pd.Series(cells, dtype="object")
+
+    vectorised = list(_contested(series, field))
+    naive = [_is_contested(cell, field) for cell in cells]
+
+    assert vectorised == naive
+
+
+def test_the_vectorised_mask_handles_the_stored_string_dtype() -> None:
+    """The column comes back from Parquet as strings, not objects; the answer is the same."""
+    from quant_backtester.data.reader import _contested
+
+    stored = pd.Series(["", "close", "low,open"], dtype="str")
+
+    assert list(_contested(stored, BarField.LOW)) == [False, False, True]
