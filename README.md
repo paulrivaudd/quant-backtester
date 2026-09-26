@@ -715,6 +715,23 @@ obvious where a table does not, which is what `result.plot()` is for — it
 returns a figure and never calls `show`, so a notebook displays it, a script
 saves it and a test inspects it.
 
+Against the index the strategy trails by four points, and against the fund it
+could actually have bought instead - the world fund bought once, under the same
+costs, lots and cash - the question is whether that gap means anything. The
+readme suite answers with a paired block bootstrap of the two books, the same
+blocks of ten sessions drawn for both, 2 000 draws, seed 20260926:
+
+```text
+== reference_rotation against the executable control, control_world
+difference      estimate       low      high   level
+mean_return       -0.023    -0.063     0.017     90%
+sharpe            -0.142    -0.445     0.151     90%
+```
+
+Both intervals hold zero. Over 437 sessions the rotation is neither better
+nor worse than keeping the world fund, and no figure of this README says
+otherwise - which is what `research/PROTOCOL.md` is for.
+
 The benchmark is read at the run's own decision instants, so adding data after
 the last session changes none of its figures; a session its venue did not hold
 is marked at the last close that existed and named; and one quoted in another
