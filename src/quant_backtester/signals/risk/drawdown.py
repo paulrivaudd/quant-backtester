@@ -31,7 +31,7 @@ class CurrentDrawdownSignal(Signal):
         ``N``, the number of prices the high is taken over, the latest
         included.
     price_basis : PriceBasis
-        ``TOTAL_RETURN`` or ``RAW``, said explicitly.
+        ``ADJUSTED`` or ``RAW``, said explicitly.
     bar_field : BarField
         Field to read.
     max_age_sessions : int

@@ -410,7 +410,7 @@ class PointInTimeReader:
         -------
         pd.Series
             Indexed by session date, named after the field. Raw, unadjusted
-            values - see :meth:`total_return_history` for an adjusted series.
+            values - see :meth:`adjusted_history` for an adjusted series.
 
         Raises
         ------
@@ -607,7 +607,7 @@ class PointInTimeReader:
         frame = frame.sort_values(["ex_date", "action_type"], kind="stable")
         return frame.reset_index(drop=True)
 
-    def total_return_history(
+    def adjusted_history(
         self, instrument_id: str, start: date | None = None, end: date | None = None
     ) -> pd.Series:
         """Return an adjusted price series, using only known corporate actions.
@@ -623,7 +623,11 @@ class PointInTimeReader:
         -------
         pd.Series
             Adjusted closes, indexed by session date. The level is arbitrary;
-            only the ratios are meaningful.
+            only the ratios are meaningful. A price series with the actions
+            taken out, not a reinvested wealth - see
+            :attr:`quant_backtester.signals.types.PriceBasis.ADJUSTED` for the
+            difference on an ex-date. Named ``total_return_history`` until
+            2026-09-26.
 
         Raises
         ------
@@ -665,7 +669,7 @@ class PointInTimeReader:
         instrument = self._instruments.get(instrument_id)
         if instrument.data_type is not DataType.BAR:
             raise ValueError(
-                f"total_return_history is for BAR instruments; "
+                f"adjusted_history is for BAR instruments; "
                 f"{instrument_id} is a {instrument.data_type.value}"
             )
         closes = self.history(instrument_id, BarField.CLOSE)

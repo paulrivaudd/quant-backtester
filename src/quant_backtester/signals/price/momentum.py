@@ -35,7 +35,7 @@ class MomentumSignal(Signal):
         all the same, and the parameter is here from the start so that turning
         it on later does not silently change what an existing id means.
     price_basis : PriceBasis
-        ``TOTAL_RETURN`` or ``RAW``, said explicitly.
+        ``ADJUSTED`` or ``RAW``, said explicitly.
     bar_field : BarField
         Field to read.
     max_age_sessions : int

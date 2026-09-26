@@ -230,7 +230,7 @@ def test_a_total_return_window_is_available_to_a_strategy(
     view: StrategyMarketView,
 ) -> None:
     """The adjusted series, for a rule that needs one - on the same loader."""
-    window = view.history("ETF_EU", 3, basis=PriceBasis.TOTAL_RETURN)
+    window = view.history("ETF_EU", 3, basis=PriceBasis.ADJUSTED)
 
     assert window.ok
     assert window.observations_used == 3

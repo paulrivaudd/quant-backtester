@@ -44,7 +44,7 @@ class RealizedVolatilitySignal(Signal):
         Degrees of freedom removed from the variance. ``1`` for the sample
         estimate.
     price_basis : PriceBasis
-        ``TOTAL_RETURN`` or ``RAW``, said explicitly.
+        ``ADJUSTED`` or ``RAW``, said explicitly.
     bar_field : BarField
         Field to read.
     max_age_sessions : int

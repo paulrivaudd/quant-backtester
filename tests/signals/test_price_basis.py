@@ -56,7 +56,7 @@ def test_a_distribution_separates_the_two_bases(
     context = make_context(market, evening(sessions[-1]))
 
     raw = signal(PriceBasis.RAW).compute(context, ["ETF_EU"]).value("ETF_EU")
-    total = signal(PriceBasis.TOTAL_RETURN).compute(context, ["ETF_EU"]).value("ETF_EU")
+    total = signal(PriceBasis.ADJUSTED).compute(context, ["ETF_EU"]).value("ETF_EU")
 
     assert raw == pytest.approx(109.0 / 105.0 - 1.0)
     assert total > raw
@@ -79,7 +79,7 @@ def test_an_action_announced_after_the_decision_changes_nothing(
     """
     closes = prices(100.0, 1.0)
     without = make_market({"ETF_EU": make_bars("ETF_EU", xpar, closes)})
-    before = signal(PriceBasis.TOTAL_RETURN).compute(
+    before = signal(PriceBasis.ADJUSTED).compute(
         make_context(without, evening(sessions[-1])), ["ETF_EU"]
     )
 
@@ -97,7 +97,7 @@ def test_an_action_announced_after_the_decision_changes_nothing(
             ]
         ),
     )
-    after = signal(PriceBasis.TOTAL_RETURN).compute(
+    after = signal(PriceBasis.ADJUSTED).compute(
         make_context(with_split, evening(sessions[-1])), ["ETF_EU"]
     )
 
@@ -106,7 +106,7 @@ def test_an_action_announced_after_the_decision_changes_nothing(
 
 def test_the_basis_is_part_of_the_identity() -> None:
     """Two returns differing only by their basis are two different signals."""
-    assert signal(PriceBasis.RAW).fingerprint() != signal(PriceBasis.TOTAL_RETURN).fingerprint()
+    assert signal(PriceBasis.RAW).fingerprint() != signal(PriceBasis.ADJUSTED).fingerprint()
     assert signal(PriceBasis.RAW).definition()["price_basis"] == "RAW"
 
 
@@ -123,18 +123,18 @@ def test_total_return_on_a_field_other_than_the_close_is_refused(
     asking_for_the_open = ReturnSignal(
         signal_id="return_4d_open",
         lookback_sessions=4,
-        price_basis=PriceBasis.TOTAL_RETURN,
+        price_basis=PriceBasis.ADJUSTED,
         bar_field=BarField.OPEN,
     )
 
-    with pytest.raises(ValueError, match="TOTAL_RETURN"):
+    with pytest.raises(ValueError, match="ADJUSTED"):
         asking_for_the_open.compute(context, ["ETF_EU"])
 
 
 def test_both_bases_agree_when_nothing_was_paid(context: SignalContext) -> None:
     """With no action in the window, the adjustment is the identity."""
     raw = signal(PriceBasis.RAW).compute(context, ["ETF_EU"])
-    total = signal(PriceBasis.TOTAL_RETURN).compute(context, ["ETF_EU"])
+    total = signal(PriceBasis.ADJUSTED).compute(context, ["ETF_EU"])
 
     assert total.status("ETF_EU") is SignalStatus.OK
     assert total.value("ETF_EU") == pytest.approx(raw.value("ETF_EU"))

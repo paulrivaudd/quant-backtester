@@ -39,9 +39,19 @@ class PriceBasis(Enum):
     """Quoted prices, as the venue made them. What a moving-average distance is
     about: the level a chart shows, not a reinvested one."""
 
-    TOTAL_RETURN = "TOTAL_RETURN"
-    """Prices adjusted for the corporate actions known at the decision instant.
-    What a momentum is about: an ETF paying 2% a year is not falling 2% a year."""
+    ADJUSTED = "ADJUSTED"
+    """Closes adjusted backwards for the corporate actions known at the decision
+    instant. What a momentum is about: an ETF paying 2% a year is not falling
+    2% a year.
+
+    It is an adjusted *price*, not a total-return wealth: a dividend ``D``
+    multiplies every earlier close by ``1 - D / C_prev``, a factor known at the
+    ex-date's open, so the ex-date's return reads ``C_ex / (C_prev - D) - 1``
+    rather than the ``(C_ex + D) / C_prev - 1`` of a holder reinvesting at the
+    close (audit A08). A signal needs the first - the second waits for a close
+    it has not seen - and a benchmark is valued with the second, by
+    :class:`quant_backtester.analytics.comparison.BenchmarkBasis`. Named
+    ``TOTAL_RETURN`` until 2026-09-26."""
 
 
 class SignalUnit(Enum):

@@ -201,7 +201,7 @@ def test_the_definition_holds_every_parameter_that_changes_the_number() -> None:
     """Two signals with the same fingerprint must compute the same thing."""
     assert signal(4).fingerprint() != signal(5).fingerprint()
     assert signal(4).fingerprint() == signal(4).fingerprint()
-    assert signal(4, price_basis=PriceBasis.TOTAL_RETURN).fingerprint() != signal(4).fingerprint()
+    assert signal(4, price_basis=PriceBasis.ADJUSTED).fingerprint() != signal(4).fingerprint()
     assert signal(4).definition()["unit"] == "FRACTION"
 
 
