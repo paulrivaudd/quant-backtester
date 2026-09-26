@@ -43,6 +43,11 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.uncertainty import (
+    PairedBootstrap,
+    PairedStatistic,
+    paired_block_bootstrap,
+)
 from quant_backtester.backtest.runner import StrategyResult, StrategyRunner
 from quant_backtester.backtest.schedule import DecisionSchedule, EverySession, Monthly
 from quant_backtester.data.calendars import CalendarRegistry
@@ -139,6 +144,24 @@ REFERENCE = Baseline(
     "reference_rotation", MomentumRotation(lookback_sessions=60, top_n=1), EverySession()
 )
 """The README's reference run: the rotation between the two funds, every session."""
+
+CONTROL = Baseline("control_world", BuyAndHold(instruments=("ETF_WORLD",)), EverySession())
+"""The executable control: the world fund bought once, under the same costs, lots and cash."""
+
+BOOTSTRAP_BLOCK, BOOTSTRAP_DRAWS, BOOTSTRAP_SEED, BOOTSTRAP_LEVEL = 10, 2_000, 20260926, 0.90
+"""The paired bootstrap's parameters, declared once: two weeks of sessions a block."""
+
+PAIRED_HEADER = f"{'difference':<14}{'estimate':>10}{'low':>10}{'high':>10}{'level':>8}"
+"""The columns of the paired comparison."""
+
+
+def paired_row(paired: PairedBootstrap) -> str:
+    """Return one line of the paired comparison."""
+    return (
+        f"{paired.statistic.value.lower():<14}{paired.estimate:>10.3f}{paired.low:>10.3f}"
+        f"{paired.high:>10.3f}{paired.level:>8.0%}"
+    )
+
 
 HOLD_AGAINST_REBALANCE: tuple[Baseline, ...] = (
     Baseline("buy_and_hold_both", BuyAndHold(instruments=BOTH_FUNDS), EverySession()),
@@ -296,6 +319,23 @@ def run_readme(runs: StrategyRunner, keeping: Keeping) -> None:
     print(reference.compare().render())
     print(flush=True)
     keeping.keep(reference, f"readme_{REFERENCE.label}_{start}_{end}", REFERENCE.label)
+    control = runs.run(CONTROL.strategy, UNIVERSE, start, end, schedule=CONTROL.schedule)
+    keeping.keep(control, f"readme_{CONTROL.label}_{start}_{end}", "buy_and_hold")
+    print(f"== {REFERENCE.label} against the executable control, {CONTROL.label}")
+    print(PAIRED_HEADER)
+    for statistic in PairedStatistic:
+        paired = paired_block_bootstrap(
+            reference.equity(),
+            control.equity(),
+            statistic=statistic,
+            block=BOOTSTRAP_BLOCK,
+            draws=BOOTSTRAP_DRAWS,
+            seed=BOOTSTRAP_SEED,
+            level=BOOTSTRAP_LEVEL,
+            sessions_per_year=ANALYTICS.sessions_per_year,
+        )
+        print(paired_row(paired))
+    print(flush=True)
     print(f"== buy and hold against a daily equal weight, both funds  {start} {end}")
     print(HEADER)
     for baseline in HOLD_AGAINST_REBALANCE:

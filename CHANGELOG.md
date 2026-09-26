@@ -9,6 +9,14 @@
   The records of every suite are identical byte for byte.
 
 ### Research
+- A kept run (`research.archive`): read back without recomputing, recomputable
+  from a checked copy of the store it read; `run_baselines.py --keep DIR`.
+- Hypotheses written in `research/hypotheses.toml` before their runs; verdicts
+  as events beside the register; a paired block bootstrap of a strategy against
+  its executable control, printed by the readme suite.
+- Paper plans commit to a `contract_id`, log each session's whole economic
+  state, advance only on committed code and only once a session is ready, and
+  their journals are appended under a lock.
 - `quant_backtester.research`: an append-only experiment register that counts
   every variant, rejected ones included, and only accepts committed code; paper
   plans fixed by fingerprint, whose logs are never rewritten.
