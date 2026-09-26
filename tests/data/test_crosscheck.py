@@ -14,6 +14,11 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 
+from quant_backtester.data.conflict_reviews import (
+    REVIEWED_FIELDS,
+    ConflictReview,
+    ConflictReviews,
+)
 from quant_backtester.data.crosscheck import (
     CrossCheckPolicy,
     cross_check_bars,
@@ -416,3 +421,81 @@ def test_policy_from_toml_rejects_a_bad_file(tmp_path: Path, content: str, match
     path.write_text(content, encoding="utf-8")
     with pytest.raises(ValueError, match=match):
         CrossCheckPolicy.from_toml(path)
+
+
+# --- reviewed conflicts (C03) ------------------------------------------------------
+
+
+def _review_of(frames: dict[str, pd.DataFrame], session: date, use: str) -> ConflictReviews:
+    """Return a review of ``session`` recording exactly what each source serves now."""
+    values = {
+        source: {
+            field: float(frame.loc[frame["session_date"] == session, field].iloc[0])
+            for field in REVIEWED_FIELDS
+        }
+        for source, frame in frames.items()
+    }
+    return ConflictReviews(
+        [
+            ConflictReview(
+                instrument_id="ETF_WORLD",
+                session_date=session,
+                use_source=use,
+                values=values,
+                reason="the venue's own bar",
+                reviewed_on=date(2026, 9, 26),
+            )
+        ]
+    )
+
+
+def test_a_reviewed_conflict_is_served_from_the_chosen_source_and_says_so() -> None:
+    """The flat Yahoo bar of 24 October 2025, reviewed: Euronext's bar is served."""
+    yahoo = bars("YAHOO", closes=[100.0, 101.0, 555.0])
+    euronext = bars("EURONEXT")
+    frames = {"YAHOO": yahoo, "EURONEXT": euronext}
+    reviews = _review_of(frames, SESSIONS[2], "EURONEXT")
+
+    checked = cross_check_bars("ETF_WORLD", frames, "YAHOO", POLICY, reviews)
+
+    last = checked.iloc[-1]
+    assert last["check_status"] == "REVIEWED"
+    assert last["source"] == "EURONEXT"
+    assert last["close"] == float(euronext["close"].iloc[-1])
+    assert last["conflicting_fields"] == ""
+
+
+def test_a_review_stops_applying_when_a_source_changes_its_values() -> None:
+    """The review describes data that is no longer there: the session is contested again."""
+    frames = {"YAHOO": bars("YAHOO", closes=[100.0, 101.0, 555.0]), "EURONEXT": bars("EURONEXT")}
+    reviews = _review_of(frames, SESSIONS[2], "EURONEXT")
+    frames["YAHOO"] = bars("YAHOO", closes=[100.0, 101.0, 556.0])
+
+    checked = cross_check_bars("ETF_WORLD", frames, "YAHOO", POLICY, reviews)
+
+    assert checked.iloc[-1]["check_status"] == "CONFLICT"
+
+
+def test_a_review_must_record_the_source_it_chooses() -> None:
+    with pytest.raises(ValueError, match="does not record it"):
+        ConflictReviews(
+            [
+                ConflictReview(
+                    instrument_id="ETF_WORLD",
+                    session_date=SESSIONS[2],
+                    use_source="EURONEXT",
+                    values={"YAHOO": {"close": 1.0}},
+                    reason="why",
+                    reviewed_on=date(2026, 9, 26),
+                )
+            ]
+        )
+
+
+def test_the_committed_reviews_load() -> None:
+    from pathlib import Path
+
+    committed = Path(__file__).resolve().parents[2] / "market_data" / "metadata"
+    reviews = ConflictReviews.from_toml(committed / "conflict_reviews.toml")
+
+    assert len(reviews) >= 1

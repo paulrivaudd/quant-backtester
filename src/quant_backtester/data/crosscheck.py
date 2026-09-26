@@ -23,6 +23,7 @@ from typing import Any
 
 import pandas as pd
 
+from quant_backtester.data.conflict_reviews import ConflictReviews
 from quant_backtester.data.schemas import BARS_SCHEMA, CHECKED_BARS_SCHEMA, CheckStatus
 
 PRICE_FIELDS: tuple[str, ...] = ("open", "high", "low", "close")
@@ -278,6 +279,7 @@ def cross_check_bars(
     frames: Mapping[str, pd.DataFrame],
     reference_source: str,
     policy: CrossCheckPolicy,
+    reviews: ConflictReviews | None = None,
 ) -> pd.DataFrame:
     """Merge several sources' canonical bars into one checked series.
 
@@ -292,6 +294,10 @@ def cross_check_bars(
         instrument's ``primary_source``.
     policy : CrossCheckPolicy
         Declared tolerances.
+    reviews : ConflictReviews | None
+        Committed reviews of contested sessions. A session whose sources still
+        serve exactly the values a review was written for is served from the
+        source it chose and marked ``REVIEWED``; ``None`` reviews nothing.
 
     Returns
     -------
@@ -355,7 +361,18 @@ def cross_check_bars(
             tolerance = policy.price_rel_tolerance if is_price else policy.volume_rel_tolerance
             if difference > tolerance:
                 conflicting.append(field)
-        if conflicting:
+        review = None if reviews is None else reviews.get(instrument_id, session)
+        if (
+            conflicting
+            and review is not None
+            and review.use_source in holders
+            and review.matches({source: by_source[source][session] for source in holders})
+        ):
+            # Settled by a review written for exactly these values: served
+            # from the source it chose, and marked as settled, not agreed.
+            status = CheckStatus.REVIEWED
+            conflicting = []
+        elif conflicting:
             status = CheckStatus.CONFLICT
         elif len(unconfirmed) == len(PRICE_FIELDS) + len(VOLUME_FIELDS):
             status = CheckStatus.SINGLE_SOURCE
@@ -364,7 +381,11 @@ def cross_check_bars(
         # The values come from one source, so a row stays verifiable against a
         # single raw snapshot; a complete one is preferred to the reference's
         # own when the reference served a bar with a price missing.
-        chosen_source = _preferred_source(by_source, holders, reference_source, session)
+        chosen_source = (
+            review.use_source
+            if status is CheckStatus.REVIEWED and review is not None
+            else _preferred_source(by_source, holders, reference_source, session)
+        )
         row = {field: by_source[chosen_source][session][field] for field in BARS_SCHEMA.names}
         row["check_status"] = status.value
         row["checked_sources"] = ",".join(holders)

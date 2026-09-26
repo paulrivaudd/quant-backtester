@@ -1,0 +1,287 @@
+# Reviewed decisions about sessions two sources disagree on - committed
+# configuration, like every decision a result is reproduced from. See
+# quant_backtester.data.conflict_reviews.
+#
+# A review records every source's bar exactly as it was reviewed, and applies
+# only while each source still serves those values: a provider that changes
+# its bar sends the session back to CONFLICT until it is reviewed again. The
+# session is served from the chosen source's whole bar and marked REVIEWED,
+# never CONFIRMED.
+#
+# The choice below is the same for all thirteen: EURONEXT, the venue the two
+# funds are listed on. Its official prices are published the evening of the
+# session, so serving them is serving what a decision taken that evening could
+# know. Reviewed 2026-09-26.
+
+[[review]]
+instrument_id = "ETF_WORLD"
+session_date = 2025-03-26
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (8490) and differ on open 552.5620 against 553.0456; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 552.56201171875
+  high = 553.5972900390625
+  low = 548.14697265625
+  close = 548.6864013671875
+  volume = 8490.0
+
+  [review.values.EURONEXT]
+  open = 553.0456
+  high = 553.5973
+  low = 548.147
+  close = 548.6864
+  volume = 8490.0
+
+[[review]]
+instrument_id = "ETF_WORLD"
+session_date = 2025-06-05
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (4669) and differ on high 548.5774 against 548.8956; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 546.69873046875
+  high = 548.577392578125
+  low = 542.26611328125
+  close = 547.426513671875
+  volume = 4669.0
+
+  [review.values.EURONEXT]
+  open = 546.6987
+  high = 548.8956
+  low = 542.2661
+  close = 547.4265
+  volume = 4669.0
+
+[[review]]
+instrument_id = "ETF_WORLD"
+session_date = 2025-10-24
+use_source = "EURONEXT"
+reason = "Yahoo serves a flat bar at 602.3394 on 24 October 2025 with no volume, a placeholder; Euronext, the venue, serves a real bar with 5663 shares traded."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 602.3394165039062
+  high = 602.3394165039062
+  low = 602.3394165039062
+  close = 602.3394165039062
+  volume = 0.0
+
+  [review.values.EURONEXT]
+  open = 601.0681
+  high = 603.6
+  low = 599.949
+  close = 603.3125
+  volume = 5663.0
+
+[[review]]
+instrument_id = "ETF_WORLD"
+session_date = 2026-03-11
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (6764) and differ on high 615.8000 against 615.8500; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 613.1439208984375
+  high = 615.7999877929688
+  low = 611.5001220703125
+  close = 613.5266723632812
+  volume = 6764.0
+
+  [review.values.EURONEXT]
+  open = 613.1439
+  high = 615.85
+  low = 611.5001
+  close = 613.5267
+  volume = 6764.0
+
+[[review]]
+instrument_id = "ETF_WORLD"
+session_date = 2026-03-30
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (9213) and differ on high 589.6694 against 590.0000; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 584.0540161132812
+  high = 589.6693725585938
+  low = 584.0
+  close = 589.2764892578125
+  volume = 9213.0
+
+  [review.values.EURONEXT]
+  open = 584.054
+  high = 590.0
+  low = 584.0
+  close = 589.2765
+  volume = 9213.0
+
+[[review]]
+instrument_id = "ETF_WORLD"
+session_date = 2026-04-08
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (10591) and differ on low 610.7088 against 610.5510; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 614.192626953125
+  high = 615.9998779296875
+  low = 610.7088012695312
+  close = 612.6047973632812
+  volume = 10591.0
+
+  [review.values.EURONEXT]
+  open = 614.1926
+  high = 615.9999
+  low = 610.551
+  close = 612.6048
+  volume = 10591.0
+
+[[review]]
+instrument_id = "ETF_WORLD"
+session_date = 2026-06-29
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (7184) and differ on low 671.0000 against 670.8000; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 672.969970703125
+  high = 677.260009765625
+  low = 671.0
+  close = 674.3599853515625
+  volume = 7184.0
+
+  [review.values.EURONEXT]
+  open = 672.97
+  high = 677.26
+  low = 670.8
+  close = 674.36
+  volume = 7184.0
+
+[[review]]
+instrument_id = "ETF_WORLD"
+session_date = 2026-07-10
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (7066) and differ on low 684.0000 against 683.6800; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 684.469970703125
+  high = 687.7000122070312
+  low = 684.0
+  close = 686.719970703125
+  volume = 7066.0
+
+  [review.values.EURONEXT]
+  open = 684.47
+  high = 687.7
+  low = 683.68
+  close = 686.72
+  volume = 7066.0
+
+[[review]]
+instrument_id = "ETF_SP500_PEA"
+session_date = 2025-03-26
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (159425) and differ on open 26.8318 against 26.8459; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 26.83180046081543
+  high = 26.93939971923828
+  low = 26.610000610351562
+  close = 26.635000228881836
+  volume = 159425.0
+
+  [review.values.EURONEXT]
+  open = 26.8459
+  high = 26.9394
+  low = 26.61
+  close = 26.635
+  volume = 159425.0
+
+[[review]]
+instrument_id = "ETF_SP500_PEA"
+session_date = 2025-10-24
+use_source = "EURONEXT"
+reason = "Yahoo serves a flat bar at 29.4221 on 24 October 2025 with no volume, a placeholder; Euronext, the venue, serves a real bar with 88358 shares traded."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 29.422100067138672
+  high = 29.422100067138672
+  low = 29.422100067138672
+  close = 29.422100067138672
+  volume = 0.0
+
+  [review.values.EURONEXT]
+  open = 29.3241
+  high = 29.48
+  low = 29.2689
+  close = 29.4645
+  volume = 88358.0
+
+[[review]]
+instrument_id = "ETF_SP500_PEA"
+session_date = 2026-02-09
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (140956) and differ on low 29.2450 against 29.2400; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 29.515499114990234
+  high = 29.559999465942383
+  low = 29.2450008392334
+  close = 29.549299240112305
+  volume = 140956.0
+
+  [review.values.EURONEXT]
+  open = 29.5155
+  high = 29.56
+  low = 29.24
+  close = 29.5493
+  volume = 140956.0
+
+[[review]]
+instrument_id = "ETF_SP500_PEA"
+session_date = 2026-03-11
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (82685) and differ on high 29.6400 against 29.6626; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 29.5
+  high = 29.639999389648438
+  low = 29.440000534057617
+  close = 29.53179931640625
+  volume = 82685.0
+
+  [review.values.EURONEXT]
+  open = 29.5
+  high = 29.6626
+  low = 29.44
+  close = 29.5318
+  volume = 82685.0
+
+[[review]]
+instrument_id = "ETF_SP500_PEA"
+session_date = 2026-04-02
+use_source = "EURONEXT"
+reason = "The two sources report the same volume (147530) and differ on high 28.8899 against 28.8900; the venue's own figure is kept."
+reviewed_on = 2026-09-26
+
+  [review.values.YAHOO]
+  open = 28.4419002532959
+  high = 28.88990020751953
+  low = 28.350000381469727
+  close = 28.759899139404297
+  volume = 147530.0
+
+  [review.values.EURONEXT]
+  open = 28.4419
+  high = 28.89
+  low = 28.35
+  close = 28.7599
+  volume = 147530.0

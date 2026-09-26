@@ -21,6 +21,7 @@ import pytest
 
 from quant_backtester.data.bar_corrections import BarCorrection, BarCorrections, BarDefect
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
+from quant_backtester.data.conflict_reviews import ConflictReviews
 from quant_backtester.data.corporate_actions import ActionCorrection, ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy
 from quant_backtester.data.instruments import (
@@ -433,6 +434,7 @@ def build_updater(
     overlap_sessions: int = 5,
     normalizers: Mapping[str, Normalizer] | None = None,
     known_gaps: KnownGaps | None = None,
+    conflict_reviews: ConflictReviews | None = None,
 ) -> MarketDataUpdater:
     """Wire an updater onto the fakes.
 
@@ -452,6 +454,7 @@ def build_updater(
         bar_corrections=bar_corrections or BarCorrections([]),
         cross_check_policy=POLICY,
         known_gaps=known_gaps or KnownGaps([]),
+        conflict_reviews=conflict_reviews or ConflictReviews([]),
         overlap_sessions=overlap_sessions,
         clock=clock,
     )
@@ -2076,6 +2079,7 @@ def test_a_cross_check_policy_that_moved_is_named_as_such(
         bar_corrections=BarCorrections([]),
         cross_check_policy=CrossCheckPolicy(price_rel_tolerance=1e-3, volume_rel_tolerance=0.0),
         known_gaps=KnownGaps([]),
+        conflict_reviews=ConflictReviews([]),
         clock=clock,
     )
 
