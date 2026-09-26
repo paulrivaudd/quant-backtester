@@ -874,3 +874,24 @@ def test_a_cash_purchase_leaves_room_for_its_commission(
     cut = rejects.loc[rejects["reason"] == "INSUFFICIENT_CASH", "instrument_id"]
     assert "ETF_OTHER" not in set(cut)
     assert result.holdings()["cash"].iloc[-1] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_what_a_caller_does_to_a_benchmark_it_was_handed_changes_nothing_kept(
+    runner: StrategyRunner,
+) -> None:
+    """Audit R06: rewriting the series a result returned rewrote the result."""
+    declared = with_benchmark(runner, "ETF_OTHER")
+    result = declared.run(
+        BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14"
+    )
+    before = result.compare().benchmark.total_return
+
+    handed = result.benchmark().equity
+    handed.iloc[-1] = 99_999.0
+    kept = result.benchmark_curve
+    assert kept is not None
+    through_the_field = kept.equity
+    through_the_field.iloc[-1] = 99_999.0
+
+    assert result.compare().benchmark.total_return == before
+    assert result.benchmark().equity.iloc[-1] != 99_999.0
