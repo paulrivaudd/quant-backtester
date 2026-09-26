@@ -340,6 +340,40 @@ def test_a_vintage_a_provider_rewrote_stops_the_ingestion(
     )
 
 
+def test_a_refused_vintage_is_not_journalled_as_applied_and_does_not_block_a_rebuild(
+    market_root: Path, decision_calendar: CalendarRegistry
+) -> None:
+    """Audit R09: the refused fetch entered the journal, and every rebuild then stopped on it."""
+    first = OneExport(
+        export(GDP_20200131=["21098.827"], GDP_20210630=["21115.309"]),
+        datetime(2022, 1, 3, 12, 0, tzinfo=UTC),
+    )
+    updater = updater_over(market_root, decision_calendar, first)
+    updater.download("US_GDP", FIRST_QUARTER, date(2019, 3, 31))
+    rewritten = OneExport(
+        export(GDP_20200131=["21100.000"], GDP_20210630=["21115.309"]),
+        datetime(2022, 1, 4, 12, 0, tzinfo=UTC),
+    )
+    assert (
+        not updater_over(market_root, decision_calendar, rewritten)
+        .download("US_GDP", FIRST_QUARTER, date(2019, 3, 31))
+        .valid
+    )
+    repository = MarketDataRepository(market_root)
+
+    applied = repository.load_applied_fetches("US_GDP")
+    assert applied == {("ALFRED", make_fetch_id(first.retrieved_at))}
+
+    report = updater.rebuild_clean("US_GDP")
+
+    assert report.valid
+    assert "UNAPPLIED_FETCH_SKIPPED" in [issue.code for issue in report.issues]
+    stored = repository.load_vintages("US_GDP")
+    assert stored.loc[stored["vintage_date"] == JANUARY_2020, "value"].iloc[0] == pytest.approx(
+        21_098.827
+    )
+
+
 def test_a_later_fetch_adds_a_vintage_without_touching_the_others(
     market_root: Path, decision_calendar: CalendarRegistry
 ) -> None:

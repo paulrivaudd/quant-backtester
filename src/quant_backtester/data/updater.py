@@ -1576,7 +1576,7 @@ class MarketDataUpdater:
             # raises inside the transaction, which throws every write away.
             try:
                 with self._repository.transaction():
-                    issues = issues + self._promote(
+                    promoted = self._promote(
                         instrument,
                         frames,
                         actions,
@@ -1585,6 +1585,13 @@ class MarketDataUpdater:
                         requested=requested,
                         log=log,
                     )
+                    # The journal of applied fetches lists promotions that
+                    # held, and nothing else: an error found while promoting
+                    # - a rewritten vintage used to be one - throws every
+                    # write away, the journal entry included (audit R09).
+                    if any(issue.severity is Severity.ERROR for issue in promoted):
+                        raise _PromotionRefused(promoted)
+                    issues = issues + promoted
                     if log:
                         self._repository.mark_fetches_applied(instrument.id, fetches, checked_at)
             except _PromotionRefused as refused:
