@@ -29,6 +29,7 @@ from quant_backtester.strategies.examples import (
     MomentumRotation,
     MomentumSingleAsset,
     MomentumVix,
+    MovingAverageCross,
 )
 
 DecisionBuilder = Callable[..., StrategyContext]
@@ -430,6 +431,7 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
         MomentumSingleAsset(instrument_id="ETF_EU", lookback_sessions=5),
         MomentumRotation(lookback_sessions=5, top_n=1),
         MomentumVix(gauge_id="RATE_US", lookback_sessions=5, gauge_observations=5),
+        MovingAverageCross(instrument_id="ETF_EU", first_sessions=2, second_sessions=5),
     }
     exported = {
         name
@@ -507,3 +509,101 @@ def test_a_kept_line_is_not_bought_again(
 
     with pytest.raises(ValueError, match="held already"):
         held.keep_and_buy({"ETF_EU": 0.1})
+
+
+def test_a_cross_holds_the_fund_while_its_first_average_is_on_top(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """On a rising series the 2-session average is above the 5-session one."""
+    strategy = MovingAverageCross(instrument_id="ETF_EU", first_sessions=2, second_sessions=5)
+
+    allocation = decide_with(strategy, context, make_decision, universe=("ETF_EU",))
+
+    assert dict(allocation.weights) == {"ETF_EU": 1.0}
+
+
+def test_a_cross_the_other_way_round_stands_aside(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """The same series, the averages swapped: the long one is below, so cash."""
+    strategy = MovingAverageCross(instrument_id="ETF_EU", first_sessions=5, second_sessions=2)
+
+    allocation = decide_with(strategy, context, make_decision, universe=("ETF_EU",))
+
+    assert allocation.invested == 0.0
+
+
+def test_a_long_average_above_a_short_one_holds_a_falling_fund(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    make_context: Callable[[MarketDataReader, datetime], SignalContext],
+    make_decision: DecisionBuilder,
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+    evening: Callable[[date], datetime],
+    sessions: tuple[date, ...],
+) -> None:
+    """The guide's rule, 50 over 20 in miniature: it buys what has been falling."""
+    falling = make_market({"ETF_EU": make_bars("ETF_EU", xpar, prices(200.0, -1.0))})
+    context = make_context(falling, evening(sessions[-1]))
+    strategy = MovingAverageCross(instrument_id="ETF_EU", first_sessions=5, second_sessions=2)
+
+    allocation = decide_with(strategy, context, make_decision, universe=("ETF_EU",))
+
+    assert dict(allocation.weights) == {"ETF_EU": 1.0}
+
+
+def test_a_cross_stands_aside_when_it_cannot_be_computed(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """ETF_LATE has four sessions, and the longer average wants five."""
+    strategy = MovingAverageCross(instrument_id="ETF_LATE", first_sessions=5, second_sessions=2)
+
+    allocation = decide_with(strategy, context, make_decision, universe=("ETF_LATE",))
+
+    assert allocation.invested == 0.0
+
+
+def test_a_cross_declares_the_signal_it_reads() -> None:
+    """Named after both lengths, first on top."""
+    declared = MovingAverageCross(instrument_id="ETF_WORLD").required_signals()
+
+    assert [_id_of(item) for item in declared] == ["ma50_over_ma20"]
+
+
+@pytest.mark.parametrize(("first", "second"), [(20, 20), (1, 20), (50, 1)])
+def test_a_cross_that_cannot_compare_two_averages_is_refused(first: int, second: int) -> None:
+    """Refused when it is built, not at the first decision of a run."""
+    with pytest.raises(ValueError, match="sessions"):
+        MovingAverageCross(instrument_id="ETF_EU", first_sessions=first, second_sessions=second)
+
+
+def test_the_cross_written_as_a_function_decides_as_the_class_does(
+    context: SignalContext, make_decision: DecisionBuilder
+) -> None:
+    """The notebook form of the developer guide, checked against the kept class."""
+    from quant_backtester.portfolio.targets import TargetAllocation
+    from quant_backtester.signals.price.trend import MovingAverageCrossSignal
+    from quant_backtester.signals.types import PriceBasis
+    from quant_backtester.strategies.functional import strategy
+
+    ma = MovingAverageCrossSignal(
+        signal_id="ma2_over_ma5",
+        first_sessions=2,
+        second_sessions=5,
+        price_basis=PriceBasis.ADJUSTED,
+    )
+
+    @strategy(strategy_id="ma_cross_notebook", signals=[ma], instrument_id="ETF_EU")
+    def ma_cross(ctx: StrategyContext) -> TargetAllocation:
+        if ctx.signal_status("ma2_over_ma5", "ETF_EU") is not SignalStatus.OK:
+            return ctx.cash()
+        if ctx.signal_value("ma2_over_ma5", "ETF_EU") <= 0.0:
+            return ctx.cash()
+        return ctx.weights({"ETF_EU": 1.0})
+
+    kept = MovingAverageCross(instrument_id="ETF_EU", first_sessions=2, second_sessions=5)
+
+    assert dict(decide_with(ma_cross, context, make_decision, ("ETF_EU",)).weights) == dict(
+        decide_with(kept, context, make_decision, ("ETF_EU",)).weights
+    )

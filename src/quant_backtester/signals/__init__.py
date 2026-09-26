@@ -32,7 +32,10 @@ from quant_backtester.signals.level.zscore import LevelZScoreSignal
 from quant_backtester.signals.price.mean_reversion import MeanReversionSignal
 from quant_backtester.signals.price.momentum import MomentumSignal
 from quant_backtester.signals.price.returns import ReturnSignal
-from quant_backtester.signals.price.trend import MovingAverageTrendSignal
+from quant_backtester.signals.price.trend import (
+    MovingAverageCrossSignal,
+    MovingAverageTrendSignal,
+)
 from quant_backtester.signals.risk.drawdown import CurrentDrawdownSignal
 from quant_backtester.signals.risk.volatility import RealizedVolatilitySignal
 from quant_backtester.signals.snapshot import SignalSnapshot
@@ -51,6 +54,7 @@ __all__ = [
     "LevelZScoreSignal",
     "MeanReversionSignal",
     "MomentumSignal",
+    "MovingAverageCrossSignal",
     "MovingAverageTrendSignal",
     "PriceBasis",
     "RealizedVolatilitySignal",

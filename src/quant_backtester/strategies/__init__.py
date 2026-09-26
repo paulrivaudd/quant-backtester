@@ -32,6 +32,7 @@ from quant_backtester.strategies.examples import (
     MomentumRotation,
     MomentumSingleAsset,
     MomentumVix,
+    MovingAverageCross,
 )
 from quant_backtester.strategies.functional import FunctionalStrategy, strategy
 
@@ -42,6 +43,7 @@ __all__ = [
     "MomentumRotation",
     "MomentumSingleAsset",
     "MomentumVix",
+    "MovingAverageCross",
     "Strategy",
     "strategy",
 ]
