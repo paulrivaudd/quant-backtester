@@ -580,8 +580,9 @@ def value_benchmark(
     ------
     ValueError
         If the run holds no session, if the benchmark has no usable price at
-        the first one - there is nothing to normalise to - or if it is not
-        registered.
+        the first one - there is nothing to normalise to - if it stops being
+        listed during the run, if it is not registered, or on a corporate
+        action :func:`session_growth` refuses.
     BenchmarkCurrencyMismatch
         If it is quoted in another currency than the book.
 
@@ -594,10 +595,13 @@ def value_benchmark(
     valued at today's revision of a price would be measuring the strategy
     against a series that did not exist while it was running.
 
-    A session the benchmark's own venue did not hold is marked at the last
-    close that existed, and named. A European strategy measured against a US
-    index has a handful of those every year, and a curve with a flat day in it
-    should say why rather than look like a day the index did not move.
+    A session the benchmark's own venue did not hold, or whose close is
+    missing, is marked at the last close that existed, and named. A benchmark
+    that is no longer listed is not: the run stops a book holding a delisted
+    line, and its yardstick is held to the same rule (audit A15, decision D7).
+    A European strategy measured against a US index has a handful of closed
+    days every year, and a curve with a flat day in it should say why rather
+    than look like a day the index did not move.
     """
     specification = BenchmarkSpec.of(spec)
     if not result.records:
@@ -615,6 +619,11 @@ def value_benchmark(
         market = reader.at(record.valuation_time)
         row = market.values([instrument.id], BarField.CLOSE).loc[instrument.id]
         status = row["status"]
+        if status is ObservationStatus.NOT_LISTED and last is not None:
+            raise ValueError(
+                f"{instrument.id} stopped trading before {record.session_date}; a benchmark "
+                "is not carried at its last price past its delisting, as the book is not"
+            )
         close = None if pd.isna(row["value"]) else float(row["value"])
         if last is None:
             if close is None:
