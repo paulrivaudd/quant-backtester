@@ -385,6 +385,19 @@ class Instrument:
         self._check_vintages()
         self._check_history_basis()
 
+    def definition(self) -> dict[str, object]:
+        """Return every field of the instrument, in a canonical, serialisable form.
+
+        Returns
+        -------
+        dict[str, object]
+            Each dataclass field, enums by their value, dates and times as ISO
+            strings, nested rules and check sources as mappings. What a run
+            records of the instruments it could read, whether they came from
+            ``instruments.toml`` or were built in memory (audit R07).
+        """
+        return {field.name: _plain(getattr(self, field.name)) for field in fields(self)}
+
     def _check_history_basis(self) -> None:
         """Reject a history basis that contradicts how the series is stored."""
         if (self.history_basis is None) != (self.history_note is None):
@@ -510,6 +523,19 @@ class Instrument:
         after_first = self.first_session is None or on >= self.first_session
         before_last = self.last_session is None or on <= self.last_session
         return after_first and before_last
+
+
+def _plain(value: object) -> object:
+    """Return a field value as built-ins JSON can render."""
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, date | time):
+        return value.isoformat()
+    if isinstance(value, PublicationRule | CheckSource):
+        return {field.name: _plain(getattr(value, field.name)) for field in fields(value)}
+    if isinstance(value, tuple | list):
+        return [_plain(item) for item in value]
+    return value
 
 
 INSTRUMENT_KEYS = frozenset(f.name for f in fields(Instrument))

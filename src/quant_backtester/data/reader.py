@@ -1070,3 +1070,8 @@ class MarketDataReader:
     def reference_calendar_id(self) -> str:
         """Return the calendar staleness is counted on."""
         return self._reference_calendar.calendar_id
+
+    @property
+    def calendars(self) -> CalendarRegistry:
+        """Return the calendars this reader dates observations on."""
+        return self._calendars

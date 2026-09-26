@@ -199,6 +199,31 @@ class TradingCalendar:
         self._covered_from = covered_from
         self._covered_until = covered_until
 
+    def definition(self) -> dict[str, object]:
+        """Return everything the calendar says, in a canonical, serialisable form.
+
+        Returns
+        -------
+        dict[str, object]
+            Its id, timezone, regular hours, holidays and early closes (sorted)
+            and its coverage, as ISO strings. Two calendars with one id and a
+            different holiday have different definitions - which is what lets
+            a run that was handed one in memory be told apart from a run
+            handed the other (audit R07).
+        """
+        return {
+            "calendar_id": self._calendar_id,
+            "timezone": self._timezone,
+            "regular_open": self._regular_open.isoformat(),
+            "regular_close": self._regular_close.isoformat(),
+            "holidays": sorted(day.isoformat() for day in self._holidays),
+            "early_closes": {
+                day.isoformat(): at.isoformat() for day, at in sorted(self._early_closes.items())
+            },
+            "covered_from": self._covered_from.isoformat(),
+            "covered_until": self._covered_until.isoformat(),
+        }
+
     @classmethod
     def from_toml(cls, path: Path) -> TradingCalendar:
         """Load a calendar from a committed TOML file.
