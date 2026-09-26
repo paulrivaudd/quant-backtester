@@ -518,9 +518,38 @@ class MarketDataRepository:
         StoreBusy
             If a writer holds the store. Readers do not exclude each other;
             they exclude writers, which fail at once rather than wait.
+
+        Notes
+        -----
+        A reading starts on a complete generation or not at all (decision
+        D14). The lock keeps a writer out; it does not say the last writer
+        finished. A commit interrupted halfway through its moves leaves its
+        manifest behind, and a repository opened before that - whose own
+        recovery ran too early to see it - used to read one file of the new
+        generation beside one of the old (audit R03). So, holding the shared
+        lock, the reading looks for a committed manifest; if there is one, it
+        takes the exclusive lock, finishes the commit, and starts again. A
+        staging directory without a manifest publishes nothing and is left to
+        the next writer.
         """
-        with self._lock.hold(fcntl.LOCK_SH, "read the store for a run"):
-            yield self.state()
+        while True:
+            with self._lock.hold(fcntl.LOCK_SH, "read the store for a run"):
+                if not self._interrupted_commits():
+                    yield self.state()
+                    return
+            with self._lock.hold(fcntl.LOCK_EX, "finish an interrupted commit before reading"):
+                self._recover()
+
+    def _interrupted_commits(self) -> list[Path]:
+        """Return the staging directories whose manifest says they had committed."""
+        pending = self.root / PENDING
+        if not pending.is_dir():
+            return []
+        return sorted(
+            staging
+            for staging in pending.iterdir()
+            if staging.is_dir() and (staging / COMMIT_MANIFEST).exists()
+        )
 
     def state(self) -> StoreState:
         """Return the digest of every file under :data:`PINNED_TREES`.
