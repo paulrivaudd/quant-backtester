@@ -217,6 +217,7 @@ class ExecutionModel:
         base_currency: str,
         universe: Collection[str],
         hold: bool = False,
+        keep: Collection[str] = (),
     ) -> Execution:
         """Trade the book towards the target weights, at one execution instant.
 
@@ -252,6 +253,10 @@ class ExecutionModel:
             Whether the decision was to keep every position as it is. No order
             is built, whatever the target weights and the overnight moves say:
             they only record what the book was worth when it was decided.
+        keep : Collection[str]
+            Instruments whose positions are left exactly as they are while the
+            others are traded: no order, and no reject, is built for them. Their
+            value still counts in the equity every other order is sized on.
 
         Returns
         -------
@@ -316,7 +321,8 @@ class ExecutionModel:
             return Execution(at=at, state=state, equity=equity)
         sells, buys, rejects = self._plan(
             state,
-            target,
+            {name: weight for name, weight in target.items() if name not in keep},
+            keep=frozenset(keep),
             equity=equity,
             at=at,
             session=session,
@@ -426,12 +432,13 @@ class ExecutionModel:
         instruments: InstrumentRegistry,
         base_currency: str,
         universe: Collection[str],
+        keep: frozenset[str] = frozenset(),
     ) -> tuple[list[_Line], list[_Line], list[ExecutionReject]]:
         """Return the sales, the purchases and the rejects the target calls for."""
         sells: list[_Line] = []
         buys: list[_Line] = []
         rejects: list[ExecutionReject] = []
-        for instrument_id in sorted(set(target) | set(state.holdings)):
+        for instrument_id in sorted((set(target) | set(state.holdings)) - keep):
             weight = target.get(instrument_id, 0.0)
             held = state.quantity(instrument_id)
             if weight == 0.0 and held == 0.0:

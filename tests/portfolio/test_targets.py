@@ -180,3 +180,15 @@ def test_holding_is_said_as_a_boolean(flag: object) -> None:
     """A truthy value is not a decision to hold."""
     with pytest.raises(ValueError, match="hold_positions"):
         TargetAllocation(as_of=AS_OF, weights={}, hold_positions=flag)  # type: ignore[arg-type]
+
+
+def test_a_kept_line_needs_a_weight() -> None:
+    with pytest.raises(ValueError, match="kept and has no weight"):
+        TargetAllocation(as_of=AS_OF, weights={"A": 0.5}, kept=frozenset({"B"}))
+
+
+def test_a_whole_hold_has_no_lines_to_keep_apart() -> None:
+    with pytest.raises(ValueError, match="no lines to keep apart"):
+        TargetAllocation(
+            as_of=AS_OF, weights={"A": 0.5}, hold_positions=True, kept=frozenset({"A"})
+        )

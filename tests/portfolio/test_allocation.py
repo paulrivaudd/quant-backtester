@@ -279,3 +279,20 @@ def test_holding_on_a_constrained_target_is_said_as_a_boolean() -> None:
             accepted_weights={},
             hold_positions=1,  # type: ignore[arg-type]
         )
+
+
+def test_a_limit_that_cuts_a_kept_line_trades_it_and_keeps_the_others(
+    instruments: InstrumentRegistry,
+) -> None:
+    """The partial form of the rule above: the cut line is traded, the other kept."""
+    requested = TargetAllocation(
+        as_of=AS_OF,
+        weights={"ETF_EU": 0.7, "ETF_OTHER": 0.2},
+        kept=frozenset({"ETF_EU", "ETF_OTHER"}),
+    )
+
+    decision = PortfolioModel(PortfolioLimits(max_weight_per_instrument=0.5)).decide(
+        requested, instruments=instruments, universe=UNIVERSE, base_currency="EUR"
+    )
+
+    assert decision.kept == frozenset({"ETF_OTHER"})

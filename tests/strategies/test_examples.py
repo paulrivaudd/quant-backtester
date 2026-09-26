@@ -444,3 +444,66 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
     for strategy in runnable:
         # Declared, not wired: every signal a decision reads comes from here.
         assert isinstance(strategy.required_signals(), tuple)
+
+
+def test_buy_and_hold_completes_its_basket_and_keeps_what_it_has(
+    context: SignalContext,
+    make_decision: DecisionBuilder,
+    make_book: Callable[..., PortfolioState],
+) -> None:
+    """Audit A07: holding one name of two used to switch to holding for good.
+
+    Half the book went into ETF_EU; ETF_OTHER had no opening price. The next
+    decision keeps ETF_EU as it is and puts the cash left into ETF_OTHER.
+    """
+    half = make_decision(
+        context,
+        snapshot_of(context, {"ETF_EU": 0.0, "ETF_OTHER": 0.0}),
+        universe=UNIVERSE,
+        holdings=make_book(5_000.0, {"ETF_EU": 50.0}),
+        prices={"ETF_EU": 100.0},
+    )
+
+    allocation = BuyAndHold(instruments=UNIVERSE).decide(half)
+
+    assert allocation.kept == frozenset({"ETF_EU"})
+    assert not allocation.hold_positions
+    assert dict(allocation.weights) == pytest.approx({"ETF_EU": 0.5, "ETF_OTHER": 0.5})
+
+
+def test_buy_and_hold_splits_the_cash_among_every_missing_name(
+    context: SignalContext,
+    make_decision: DecisionBuilder,
+    make_book: Callable[..., PortfolioState],
+) -> None:
+    three = ("ETF_EU", "ETF_OTHER", "ETF_LATE")
+    decision = make_decision(
+        context,
+        snapshot_of(context, dict.fromkeys(three, 0.0)),
+        universe=three,
+        holdings=make_book(6_000.0, {"ETF_EU": 40.0}),
+        prices={"ETF_EU": 100.0},
+    )
+
+    allocation = BuyAndHold(instruments=three).decide(decision)
+
+    assert dict(allocation.weights) == pytest.approx(
+        {"ETF_EU": 0.4, "ETF_OTHER": 0.3, "ETF_LATE": 0.3}
+    )
+
+
+def test_a_kept_line_is_not_bought_again(
+    context: SignalContext,
+    make_decision: DecisionBuilder,
+    make_book: Callable[..., PortfolioState],
+) -> None:
+    held = make_decision(
+        context,
+        snapshot_of(context, {"ETF_EU": 0.0, "ETF_OTHER": 0.0}),
+        universe=UNIVERSE,
+        holdings=make_book(5_000.0, {"ETF_EU": 50.0}),
+        prices={"ETF_EU": 100.0},
+    )
+
+    with pytest.raises(ValueError, match="held already"):
+        held.keep_and_buy({"ETF_EU": 0.1})

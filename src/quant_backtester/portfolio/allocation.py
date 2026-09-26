@@ -55,6 +55,9 @@ class ConstrainedTarget:
         Whether the book is to be kept exactly as it is, with no order sent.
         True only when the strategy asked to hold and no limit cut anything: a
         limit that binds on a held book is a trade the policy requires.
+    kept : frozenset[str]
+        Instruments whose positions get no order while the rest is traded:
+        those the strategy kept that no limit cut.
 
     Raises
     ------
@@ -78,6 +81,7 @@ class ConstrainedTarget:
         default_factory=lambda: MappingProxyType({})
     )
     hold_positions: bool = False
+    kept: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         """Check the two sides tell one consistent story, and freeze them."""
@@ -121,6 +125,14 @@ class ConstrainedTarget:
                     f"{name}: requested {wanted}, accepted {allowed}, and the adjustments "
                     "do not say why - a weight moves with a reason or not at all"
                 )
+        kept = frozenset(self.kept)
+        if not kept <= set(accepted):
+            raise ValueError(f"{sorted(kept - set(accepted))} is kept and was never requested")
+        if kept & set(adjustments):
+            raise ValueError(
+                f"{sorted(kept & set(adjustments))} is kept and a limit cut it: the cut is a trade"
+            )
+        object.__setattr__(self, "kept", kept)
         object.__setattr__(self, "requested_weights", MappingProxyType(requested))
         object.__setattr__(self, "accepted_weights", MappingProxyType(accepted))
         object.__setattr__(self, "adjustments", MappingProxyType(adjustments))
@@ -192,6 +204,11 @@ class PortfolioDecision:
     def holds_positions(self) -> bool:
         """Return whether the book is to be kept exactly as it is, with no order."""
         return self.constrained.hold_positions
+
+    @property
+    def kept(self) -> frozenset[str]:
+        """Return the lines that get no order while the rest of the book is traded."""
+        return self.constrained.kept
 
     @property
     def considered(self) -> int:
@@ -276,5 +293,7 @@ class PortfolioModel:
                 # A limit that binds overrules a hold: the book is traded down
                 # to the policy, like any other target that breached it.
                 hold_positions=requested.hold_positions and not adjustments,
+                # Likewise for a single kept line: one a limit cut is traded.
+                kept=requested.kept - set(adjustments),
             ),
         )

@@ -521,6 +521,50 @@ class StrategyContext:
             self._require_targetable(instrument_id)
         return replace(self.weights(held, among=among), hold_positions=True)
 
+    def keep_and_buy(
+        self, purchases: Mapping[str, float], among: Selection | None = None
+    ) -> TargetAllocation:
+        """Return the decision to keep every held position and buy new ones.
+
+        Parameters
+        ----------
+        purchases : Mapping[str, float]
+            Fraction of capital per instrument not held yet. Together with the
+            book's own weights they may not exceed the whole book.
+        among : Selection | None
+            What the strategy was choosing among, as for :meth:`cash`.
+
+        Returns
+        -------
+        TargetAllocation
+            The book's weights for what it holds, marked as kept - no order,
+            however the prices move overnight - and the purchases beside them.
+
+        Raises
+        ------
+        ValueError
+            If a purchase names an instrument already held - resizing a kept
+            line is a rebalancing, not a purchase - or if anything held or
+            bought is not targetable, as for :meth:`weights`.
+
+        Notes
+        -----
+        The partial form of :meth:`hold_positions`, for a book still being
+        built: a basket whose first purchase went through for some names and
+        not others completes the rest with the cash left, and the lines it
+        already has are not traded back to equal weights on the way.
+        """
+        held = dict(self.portfolio.weights)
+        again = sorted(set(purchases) & set(held))
+        if again:
+            raise ValueError(
+                f"{', '.join(again)} is held already; a kept line is not bought again, and "
+                "resizing it is a rebalancing"
+            )
+        for instrument_id in held:
+            self._require_targetable(instrument_id)
+        return replace(self.weights({**held, **purchases}, among=among), kept=frozenset(held))
+
     def _require_targetable(self, instrument_id: str) -> None:
         """Raise unless the book may actually hold this instrument."""
         if instrument_id not in self.universe:

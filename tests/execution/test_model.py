@@ -104,6 +104,7 @@ def trade(
     last_known: Mapping[str, float] | None = None,
     universe: Collection[str] = EVERYTHING,
     hold: bool = False,
+    keep: Collection[str] = (),
 ) -> Execution:
     """Rebalance at ``AT``; a bare number is an opening price of the session itself."""
     quotes = {
@@ -121,6 +122,7 @@ def trade(
         base_currency="EUR",
         universe=universe,
         hold=hold,
+        keep=keep,
     )
 
 
@@ -787,3 +789,37 @@ def test_keeping_a_book_still_needs_it_valued() -> None:
     """A position with no price ever is no easier to keep than to trade."""
     with pytest.raises(UnvaluablePosition):
         trade(FREE, book(0.0, W=5.0), {"W": 1.0}, {"W": missing()}, hold=True)
+
+
+def test_a_kept_line_gets_no_order_while_the_rest_is_bought() -> None:
+    """A basket being completed: A is kept as it is, B is bought with the cash.
+
+    Restated in weights, A would be bought back up to last night's weight after
+    an overnight fall; kept, it is not touched, and its value still counts in
+    the equity B is sized on.
+    """
+    state = book(10_000.0, A=100.0)
+    last_nights = {"A": 0.5, "B": 0.5}
+
+    kept = trade(FREE, state, last_nights, {"A": 90.0, "B": 50.0}, keep={"A"})
+    restated = trade(FREE, state, last_nights, {"A": 90.0, "B": 50.0})
+
+    assert [order.instrument_id for order in kept.orders] == ["B"]
+    assert kept.state.quantity("A") == 100.0
+    assert kept.state.quantity("B") == pytest.approx(0.5 * (10_000.0 + 9_000.0) / 50.0)
+    assert "A" in [order.instrument_id for order in restated.orders]
+
+
+def test_a_kept_line_is_never_rejected_either() -> None:
+    """No opening price for a line nobody wanted to trade is not a refusal."""
+    kept = trade(
+        FREE,
+        book(5_000.0, A=50.0),
+        {"A": 0.5, "B": 0.5},
+        {"A": missing(), "B": 100.0},
+        last_known={"A": 100.0},
+        keep={"A"},
+    )
+
+    assert kept.rejects == ()
+    assert [order.instrument_id for order in kept.orders] == ["B"]
