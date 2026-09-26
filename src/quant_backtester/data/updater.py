@@ -89,6 +89,7 @@ from quant_backtester.data.validator import (
     Severity,
     ValidationIssue,
     ValidationReport,
+    bar_row_issues,
     validate_bars,
     validate_corporate_actions,
     validate_levels,
@@ -339,6 +340,75 @@ def _issue(
         message=message,
         context=context or {},
     )
+
+
+class _PromotionRefused(Exception):
+    """Raised inside a promotion's transaction to undo every write it made.
+
+    Carries the issues the report must still show: what the promotion had
+    found before it was refused, and why it was.
+    """
+
+    def __init__(self, issues: Sequence[ValidationIssue]) -> None:
+        super().__init__(f"{len(issues)} issue(s)")
+        self.issues = list(issues)
+
+
+def _merged_bar_errors(
+    instrument: Instrument, source_id: str, merged: pd.DataFrame, incoming: pd.DataFrame
+) -> list[ValidationIssue]:
+    """Return what is wrong with a bar the merge put together from two fetches.
+
+    Parameters
+    ----------
+    instrument : Instrument
+        Instrument concerned.
+    source_id : str
+        Source whose canonical series ``merged`` is.
+    merged : pd.DataFrame
+        That series after the revision policy was applied.
+    incoming : pd.DataFrame
+        What this fetch brought, already validated on its own.
+
+    Returns
+    -------
+    list[ValidationIssue]
+        One ``MERGED_BAR_INVALID`` error per session the fetch touched whose
+        merged bar breaks a row rule, naming the rules it breaks.
+
+    Notes
+    -----
+    The stored bar was valid and so was the incoming one, but the policy takes
+    them field by field: an accepted open of 120 kept beside a stored high of
+    100 is a bar nobody served. Only the sessions this fetch brought can have
+    been assembled that way, so only they are judged.
+    """
+    touched = incoming["session_date"]
+    errors: list[ValidationIssue] = []
+    for row in _records(merged.loc[merged["session_date"].isin(touched)]):
+        broken = [
+            issue for issue in bar_row_issues(instrument, row) if issue.severity is Severity.ERROR
+        ]
+        if broken:
+            day = row["session_date"]
+            errors.append(
+                _issue(
+                    "MERGED_BAR_INVALID",
+                    Severity.ERROR,
+                    instrument.id,
+                    day,
+                    f"{instrument.id} {source_id} bar of {day} would be stored as "
+                    f"{', '.join(issue.code for issue in broken)} once the accepted "
+                    "revisions are applied to it field by field; the promotion is "
+                    "refused rather than store a bar no source served",
+                    {
+                        "source": source_id,
+                        "rules": [issue.code for issue in broken],
+                        **{field: row[field] for field in BAR_VALUE_COLUMNS},
+                    },
+                )
+            )
+    return errors
 
 
 def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
@@ -1278,18 +1348,23 @@ class MarketDataUpdater:
             # produced them are the same statement, and a run interrupted
             # between two of those writes used to leave a store whose verdicts
             # described values that were no longer there.
-            with self._repository.transaction():
-                issues = issues + self._promote(
-                    instrument,
-                    frames,
-                    actions,
-                    fetch_id=fetch_id,
-                    checked_at=checked_at,
-                    requested=requested,
-                    log=log,
-                )
-                if log:
-                    self._repository.mark_fetches_applied(instrument.id, fetches, checked_at)
+            # And a promotion that finds the store it would write invalid
+            # raises inside the transaction, which throws every write away.
+            try:
+                with self._repository.transaction():
+                    issues = issues + self._promote(
+                        instrument,
+                        frames,
+                        actions,
+                        fetch_id=fetch_id,
+                        checked_at=checked_at,
+                        requested=requested,
+                        log=log,
+                    )
+                    if log:
+                        self._repository.mark_fetches_applied(instrument.id, fetches, checked_at)
+            except _PromotionRefused as refused:
+                issues = issues + refused.issues
             report = ValidationReport(instrument_id=instrument.id, issues=issues)
         if log:
             self._repository.append_validation_log([report], checked_at)
@@ -1463,6 +1538,13 @@ class MarketDataUpdater:
         -------
         pd.DataFrame
             The source's canonical series after the merge.
+
+        Raises
+        ------
+        _PromotionRefused
+            If the merge assembled a bar that breaks a row rule. What is
+            validated before promotion is the fetch; what is stored is the
+            merge, and it is judged too.
         """
         primary = source_id == instrument.primary_source
         stored = (
@@ -1493,6 +1575,9 @@ class MarketDataUpdater:
             key_column="session_date",
             value_columns=BAR_VALUE_COLUMNS,
         )
+        broken = _merged_bar_errors(instrument, source_id, merged, incoming)
+        if broken:
+            raise _PromotionRefused(issues + broken)
         if primary:
             self._repository.save_bars(instrument.id, merged)
         else:
