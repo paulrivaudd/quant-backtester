@@ -14,6 +14,8 @@ source_symbol = "^GSPC"
 calendar_id = "XNYS"
 tradable = false
 first_session = 1990-01-02
+history_basis = "ASSUMED_UNREVISED"
+history_note = "An index close is a final print. The levels are Yahoo's as served since 2026-09 and are taken as the levels of their day; no earlier fetch exists to compare them with."
 
 # The second PEA-eligible fund, and the reason the rotation is a rotation: both
 # of these can actually be bought inside a French PEA, in euros, on the same
@@ -46,6 +48,8 @@ quantity_step = 1.0
 first_session = 2014-03-18
 # Capitalising (C) share class, like CW8: an empty dividend feed is expected.
 distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Exchange closes of an accumulating share class with no split: nothing restates them. As served by Yahoo since 2026-09; about the last two years are cross-checked against Euronext, the earlier ones are not."
 
   # Yahoo reports no split for ESE, so its bars are raw (checked 2026-09-20).
   # Euronext serves about two years only: older sessions stay SINGLE_SOURCE.
@@ -78,6 +82,8 @@ first_session = 2018-04-18
 # Accumulating (C) share class: no dividend ever reaches the holder, so an empty
 # action feed is the expected state and not a provider losing them.
 distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Exchange closes of an accumulating share class with no split: nothing restates them. As served by Yahoo since 2026-09; about the last two years are cross-checked against Euronext, the earlier ones are not."
 
   # Yahoo reports no split for CW8, so its bars are raw (checked 2026-09-13).
   # Euronext serves about two years only: older sessions stay SINGLE_SOURCE.
@@ -109,6 +115,8 @@ primary_source = "FRED"
 source_symbol = "VIXCLS"
 tradable = false
 first_session = 1990-01-02
+history_basis = "ASSUMED_UNREVISED"
+history_note = "The official Cboe close, final once published. FRED's latest vintage; ALFRED vintages were compared for the release time (2026-09-18), not for revisions."
 
   [instrument.publication_rule]
   publication_time = "16:15:00"
@@ -124,6 +132,8 @@ primary_source = "FRED"
 source_symbol = "DGS10"
 tradable = false
 first_session = 1990-01-02
+history_basis = "RESTATED"
+history_note = "FRED's latest vintage of DGS10. H.15 values are occasionally corrected after release, so a decision can read a value corrected later. Compare with ALFRED vintages before relying on a level to the basis point."
 
   # H.15 is released at 16:15 New York, but ALFRED vintages show the value for a
   # day D first appearing the next business day: D = 2024-12-19 in the 12-20
@@ -147,6 +157,8 @@ primary_source = "ECB"
 source_symbol = "EXR.D.USD.EUR.SP00.A"
 tradable = false
 first_session = 1999-01-04
+history_basis = "ASSUMED_UNREVISED"
+history_note = "An ECB euro reference rate is published once a day and is not revised."
 
   # Published around 16:00 CET for the same day, so no lag and no calendar.
   [instrument.publication_rule]

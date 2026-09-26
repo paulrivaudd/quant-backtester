@@ -21,6 +21,7 @@ from quant_backtester.data.instruments import (
     CheckSource,
     DataType,
     DistributionPolicy,
+    HistoryBasis,
     Instrument,
     InstrumentRegistry,
     PublicationRule,
@@ -355,6 +356,8 @@ source_symbol = "^GSPC"
 calendar_id = "XNYS"
 tradable = false
 first_session = 1990-01-02
+history_basis = "ASSUMED_UNREVISED"
+history_note = "An index close is a final print."
 
 [[instrument]]
 id = "US10Y"
@@ -366,6 +369,8 @@ primary_source = "FRED"
 source_symbol = "DGS10"
 tradable = false
 first_session = 1990-01-02
+history_basis = "RESTATED"
+history_note = "Today's vintage of a series the Fed corrects."
 
   [instrument.publication_rule]
   publication_time = "16:15:00"
@@ -598,6 +603,8 @@ primary_source = "YAHOO"
 source_symbol = "CW8.PA"
 calendar_id = "XPAR"
 tradable = true
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Exchange closes."
 
   [[instrument.check_sources]]
   source = "EURONEXT"
@@ -877,3 +884,51 @@ def test_a_quantity_step_loads_from_the_config(tmp_path) -> None:
     registry = InstrumentRegistry.from_toml(write_toml(tmp_path, config))
 
     assert registry.get("SP500").quantity_step == 1.0
+
+
+def test_from_toml_requires_what_the_history_is(tmp_path):
+    """Decision D10: no instrument is loaded without saying what its past is."""
+    undeclared = SAMPLE_TOML.replace('history_basis = "RESTATED"\n', "", 1)
+
+    with pytest.raises(ValueError, match="history_basis"):
+        InstrumentRegistry.from_toml(write_toml(tmp_path, undeclared))
+
+
+def test_from_toml_reads_the_history_basis(tmp_path):
+    registry = InstrumentRegistry.from_toml(write_toml(tmp_path, SAMPLE_TOML))
+
+    assert registry.get("US10Y").history_basis is HistoryBasis.RESTATED
+    assert registry.get("SP500").history_note == "An index close is a final print."
+
+
+def test_a_basis_is_declared_with_its_reason() -> None:
+    with pytest.raises(ValueError, match="together"):
+        Instrument(
+            id="SPY",
+            name="SPDR S&P 500",
+            asset_type=AssetType.ETF,
+            data_type=DataType.BAR,
+            currency="USD",
+            primary_source="YAHOO",
+            source_symbol="SPY",
+            tradable=True,
+            calendar_id="XNYS",
+            history_basis=HistoryBasis.ASSUMED_UNREVISED,
+        )
+
+
+def test_archived_vintages_is_what_a_vintage_archive_is_and_nothing_else() -> None:
+    with pytest.raises(ValueError, match="ARCHIVED_VINTAGES"):
+        Instrument(
+            id="SPY",
+            name="SPDR S&P 500",
+            asset_type=AssetType.ETF,
+            data_type=DataType.BAR,
+            currency="USD",
+            primary_source="YAHOO",
+            source_symbol="SPY",
+            tradable=True,
+            calendar_id="XNYS",
+            history_basis=HistoryBasis.ARCHIVED_VINTAGES,
+            history_note="claimed without vintages",
+        )

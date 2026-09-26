@@ -154,13 +154,23 @@ series), ALFRED (the same series as it stood on a declared day), the ECB
 reference rates, and the Euronext historical export as a second opinion on
 Paris prices.
 
-FRED serves the latest vintage of every observation, which is harmless for a
-daily market rate and is look-ahead bias for a revised aggregate: US GDP for
+FRED serves the latest vintage of every observation. For a daily market print
+that is an assumption rather than a fact - a correction after release would be
+read by decisions taken before it - and for a revised aggregate it is look-ahead
+bias outright: US GDP for
 the first quarter of 2019 is 21 098.827 to a reader in January 2020 and
 21 115.309 to one in June 2021. An instrument served by ALFRED declares the
 vintages it wants and how they are read, in committed configuration, so the
 same code and the same config fetch the same numbers for ever — and the adapter
 refuses to fetch without them.
+
+So every instrument declares, in `instruments.toml`, what its stored history
+is: `ARCHIVED_VINTAGES` (each value as it was published - only a vintage
+archive), `ASSUMED_UNREVISED` (today's telling, taken as the telling of the
+time because values of this kind are not restated) or `RESTATED` (today's
+telling of a series known to be revised), with a `history_note` giving the
+reason. None is a default, and the loader refuses an instrument that does not
+say. US10Y is declared `RESTATED`: H.15 values are occasionally corrected.
 
 There are two honest ways to read such a series, and which one a run used
 changes what it saw, so it is declared rather than inferred. `PINNED` reads one
