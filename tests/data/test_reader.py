@@ -35,6 +35,7 @@ from quant_backtester.data.reader import (
 )
 from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.schemas import (
+    AVAILABILITY_COLUMN,
     CHECKED_BARS_SCHEMA,
     CORPORATE_ACTIONS_SCHEMA,
     LEVELS_SCHEMA,
@@ -1083,3 +1084,75 @@ def test_the_vectorised_mask_handles_the_stored_string_dtype() -> None:
     stored = pd.Series(["", "close", "low,open"], dtype="str")
 
     assert list(_contested(stored, BarField.LOW)) == [False, False, True]
+
+
+# --- a series prepared once per file version (lot 6) ------------------------------
+
+
+def _naive_history(
+    repository: MarketDataRepository,
+    instrument_id: str,
+    field: BarField,
+    as_of: datetime,
+    start: date | None,
+    end: date | None,
+) -> list[tuple[date, float]]:
+    """Return what the reader must serve, computed row by row with no cache at all."""
+    rows = []
+    for row in repository.load_checked_bars(instrument_id).to_dict("records"):
+        day = row["session_date"]
+        if (start is not None and day < start) or (end is not None and day > end):
+            continue
+        if field.value in str(row["conflicting_fields"]).split(","):
+            continue
+        value = row[field.value]
+        available = row[AVAILABILITY_COLUMN[field]]
+        if value != value or available > as_of:
+            continue
+        rows.append((day, float(value)))
+    return sorted(rows, key=lambda item: item[0])
+
+
+@pytest.mark.parametrize("field", [BarField.OPEN, BarField.CLOSE])
+def test_the_prepared_series_serves_what_a_row_by_row_reading_would(
+    reader: MarketDataReader,
+    repository: MarketDataRepository,
+    xnys: TradingCalendar,
+    field: BarField,
+) -> None:
+    """Every instant, every bound, contested fields and a missing value included."""
+    closes = [(MONDAY, 100.0), (TUESDAY, 101.0), (WEDNESDAY, 102.0), (THURSDAY, 103.0)]
+    repository.save_checked_bars(
+        "EQ_US",
+        checked_bars(
+            "EQ_US",
+            xnys,
+            closes,
+            opens={TUESDAY: float("nan")},
+            conflicts={WEDNESDAY: (BarField.CLOSE,)},
+        ),
+    )
+    instants = [
+        paris(day, hour) for day in (MONDAY, TUESDAY, WEDNESDAY, THURSDAY) for hour in (10, 23)
+    ]
+    bounds = [(None, None), (TUESDAY, None), (None, WEDNESDAY), (TUESDAY, WEDNESDAY)]
+    for as_of in instants:
+        for start, end in bounds:
+            served = reader.at(as_of).history("EQ_US", field, start=start, end=end)
+            expected = _naive_history(repository, "EQ_US", field, as_of, start, end)
+            assert list(zip(served.index, served, strict=True)) == expected, (as_of, start, end)
+
+
+def test_a_new_version_of_the_file_is_read_again(
+    reader: MarketDataReader, repository: MarketDataRepository, xnys: TradingCalendar
+) -> None:
+    """The cache is keyed on the file's version: a promotion is never served stale."""
+    repository.save_checked_bars("EQ_US", checked_bars("EQ_US", xnys, [(MONDAY, 100.0)]))
+    evening = paris(TUESDAY, 23)
+    assert list(reader.at(evening).history("EQ_US")) == [100.0]
+
+    repository.save_checked_bars(
+        "EQ_US", checked_bars("EQ_US", xnys, [(MONDAY, 100.0), (TUESDAY, 150.0)])
+    )
+
+    assert list(reader.at(evening).history("EQ_US")) == [100.0, 150.0]
