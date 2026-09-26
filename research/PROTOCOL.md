@@ -23,12 +23,19 @@ Two paper plans are committed before their start, `2026-10-01`, in
 | `ROTATION_2_MOMENTUM_60` | `MomentumRotation(lookback_sessions=60, top_n=1)`, every session | The README's reference rule |
 | `ROTATION_2_BUY_AND_HOLD` | `BuyAndHold(ETF_WORLD)` | The control it has to beat after costs |
 
-Each is fixed by the strategy's fingerprint. `scripts/paper_trade.py` runs
-both from their start to the last stored session and appends every new
-session to the plan's log. It refuses to run a strategy whose fingerprint
-changed, and refuses to go on if a session already logged comes out
-differently: a revised price the plan already acted on is reviewed, never
-absorbed. A rule changed after the start is a new plan, with a new start.
+Each is fixed by a `contract_id`: the strategy's fingerprint and every
+condition it is run under - costs, starting cash, schedule, timetable,
+universe, limits, lot sizes, benchmark. `scripts/paper_trade.py` runs both
+from their start to the last ready session - its 23:00 Paris decision instant
+passed, and a close of that session for every instrument traded - and appends
+every new session to the plan's log, with the commit that produced it. The log
+holds what was done, not a summary: the decision, the orders, the fills with
+their prices and costs, the rejects, the book and the cash. It refuses
+uncommitted code and a run under another contract, and stops if a session
+already logged comes out differently in any of those: a revised price the
+plan already acted on is reviewed, never absorbed. Running it twice changes
+nothing. A rule or a condition changed after the start is a new plan, with a
+new start.
 
 **Reading the result.** No verdict before 12 months of sessions (about 255):
 below that, the difference between two funds' returns is mostly one fund's

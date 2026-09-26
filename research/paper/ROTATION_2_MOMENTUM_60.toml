@@ -2,8 +2,11 @@
 name = "ROTATION_2_MOMENTUM_60"
 start = 2026-10-01
 universe = "ROTATION_2"
-# MomentumRotation(lookback_sessions=60, top_n=1), decided every session.
-strategy_fingerprint = "e39e51e878ce26f7490ec3581141b49511dede109ccf114cdce4deca615f8a68"
+# MomentumRotation(lookback_sessions=60, top_n=1), decided every session, under the runner of
+# scripts/run_baselines.py: its costs, cash, timetable, limits and lot sizes.
+# The id hashes the strategy's fingerprint and every one of those conditions
+# (quant_backtester.research.paper.CONTRACT_KEYS).
+contract_id = "a46427da31f6f15bd794bb33ea8e7ba18ffcd444b91c1cde11476afb70c256eb"
 note = """The README's reference rotation, run forward on sessions nobody has \
 seen. It is judged against ROTATION_2_BUY_AND_HOLD after 12 months, net of \
 costs, with exposure, turnover and drawdown beside the return."""
