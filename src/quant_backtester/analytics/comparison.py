@@ -25,13 +25,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from enum import Enum
 
 import pandas as pd
 
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.curves import elapsed_years
 from quant_backtester.analytics.performance import PerformanceStats
-from quant_backtester.signals.types import PriceBasis, require_identifier
+from quant_backtester.signals.types import require_identifier
 
 
 class BenchmarkCurrencyMismatch(ValueError):
@@ -41,6 +42,26 @@ class BenchmarkCurrencyMismatch(ValueError):
     plausible number: everything lines up, the curves are drawn, and the
     difference between them is an exchange rate.
     """
+
+
+class BenchmarkBasis(Enum):
+    """What holding the benchmark is taken to have earned.
+
+    Both are a wealth index: one share held, its worth chained session by
+    session from raw closes and the corporate actions known at each valuation
+    instant. They differ only in what a distribution does.
+    """
+
+    PRICE_RETURN = "PRICE_RETURN"
+    """A split multiplies the shares held; a distribution is not counted. What
+    an index's price level measures."""
+
+    TOTAL_RETURN = "TOTAL_RETURN"
+    """As ``PRICE_RETURN``, and a dividend is received at its ex-date and
+    reinvested at that session's close: a session earns
+    ``(shares x close + dividends) / previous close``. What a holder who
+    reinvests earns, and what a strategy that reinvests is fairly measured
+    against."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,16 +74,18 @@ class BenchmarkSpec:
         The instrument to hold instead. It need not be tradable: an index is a
         legitimate yardstick even when nobody can buy it, as long as the report
         does not pretend the comparison is executable.
-    price_basis : PriceBasis
+    basis : BenchmarkBasis
         ``TOTAL_RETURN`` counts the distributions the holder would have
-        received, which is what makes a fund comparable with a strategy that
-        reinvests. ``RAW`` compares the quoted prices alone.
+        received and reinvested, which is what makes a fund comparable with a
+        strategy that reinvests; ``PRICE_RETURN`` leaves them out. Neither
+        is the adjusted series a signal reads: gluing the last point of each
+        day's adjusted history together is not a wealth (audit A01).
     label : str | None
         What to call it in a report; the instrument's own id by default.
     """
 
     instrument_id: str
-    price_basis: PriceBasis = PriceBasis.TOTAL_RETURN
+    basis: BenchmarkBasis = BenchmarkBasis.TOTAL_RETURN
     label: str | None = None
 
     def __post_init__(self) -> None:
@@ -85,7 +108,7 @@ class BenchmarkSpec:
         """Return the benchmark as it is recorded with a run."""
         return {
             "instrument_id": self.instrument_id,
-            "price_basis": self.price_basis.value,
+            "basis": self.basis.value,
             "label": self.label,
         }
 
