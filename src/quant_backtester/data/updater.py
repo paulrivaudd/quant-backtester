@@ -2015,6 +2015,20 @@ class MarketDataUpdater:
                         )
                     )
         new_rows = incoming.loc[additions] if additions else incoming.iloc[0:0]
+        # What is judged is the instrument's table as it would be stored, not
+        # this fetch's rows: a split in one fetch and a dividend on its ex-date
+        # in the next each passed, and the stored pair did not (audit R08).
+        final = [frame for frame in (mine, new_rows) if not frame.empty]
+        if final:
+            refused = [
+                issue
+                for issue in validate_corporate_actions(
+                    instrument, pd.concat(final, ignore_index=True)
+                ).issues
+                if issue.severity is Severity.ERROR
+            ]
+            if refused:
+                raise _PromotionRefused(issues + refused)
         pieces = [frame for frame in (others, mine, new_rows) if not frame.empty]
         table = pd.concat(pieces, ignore_index=True) if pieces else stored_all.iloc[0:0]
         table = table.sort_values(
