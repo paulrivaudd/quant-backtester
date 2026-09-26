@@ -96,14 +96,21 @@ class Strategy(Protocol):
 
 
 class StrategyMutated(RuntimeError):
-    """Raised when a strategy was not the same object at the end of its run.
+    """Raised when a strategy's declared definition changed during its run.
 
     A strategy is meant to hold no state between decisions: everything
     path-dependent - what is held, what it is worth, how the market moved -
-    comes from the context. A strategy that kept a counter or rebuilt its
-    parameters as it went would be recorded under a definition that describes
-    its last decision rather than all of them, and the experiment could not be
-    reproduced from its own result.
+    comes from the context. A strategy that rebuilt its parameters as it went
+    would be recorded under a definition that describes its last decision
+    rather than all of them, and the experiment could not be reproduced from
+    its own result.
+
+    What this guards is the *declared* definition, compared before and after
+    the run - and nothing more. A counter in a closure, a module global, a
+    file read inside ``decide`` leave the definition as it was and are not
+    seen: no fingerprint of Python code proves a function pure (audit A14).
+    The contract is the author's to keep, and the way to check it is to run
+    the same strategy twice, on a fresh object each time, and compare.
     """
 
 

@@ -30,6 +30,7 @@ from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.provenance import SourceState, SourceStatus
 from quant_backtester.strategies.examples import BuyAndHold, MomentumSingleAsset
+from quant_backtester.strategies.functional import FunctionalStrategy
 
 PARIS = BacktestTimetable(
     decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)
@@ -700,3 +701,33 @@ def test_a_kept_line_must_be_recorded_at_the_book_weight(runner: StrategyRunner)
 
     with pytest.raises(ValueError, match="not the book's"):
         runner.run(liar, ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+
+def _counter_strategy() -> FunctionalStrategy:
+    """Return a strategy that breaks the contract: it invests on every third call."""
+    calls = [0]
+
+    def every_third(ctx: StrategyContext) -> TargetAllocation:
+        calls[0] += 1
+        return ctx.equal_weight(["ETF_EU"]) if calls[0] % 3 == 0 else ctx.cash()
+
+    return FunctionalStrategy(strategy_id="every_third", decision=every_third)
+
+
+def test_the_mutation_guard_sees_the_definition_and_not_a_closure(
+    runner: StrategyRunner,
+) -> None:
+    """Audit A14: what the guard does not prove, written down as a test.
+
+    The same object run twice decides differently - its closure counted - and
+    the fingerprint and the guard see nothing. A fresh object per run is what
+    brings the runs back together, which is the check the contract asks for.
+    """
+    reused = _counter_strategy()
+    first = runner.run(reused, ["ETF_EU"], "2026-09-07", "2026-09-11")
+    second = runner.run(reused, ["ETF_EU"], "2026-09-07", "2026-09-11")
+    fresh = runner.run(_counter_strategy(), ["ETF_EU"], "2026-09-07", "2026-09-11")
+
+    assert first.fingerprint == second.fingerprint
+    assert not first.holdings().equals(second.holdings())
+    assert first.holdings().equals(fresh.holdings())
