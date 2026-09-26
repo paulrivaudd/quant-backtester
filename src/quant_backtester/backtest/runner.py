@@ -504,10 +504,7 @@ class StrategyRunner:
                 **result.configuration,
                 "requested_start": first.isoformat(),
                 "requested_end": last.isoformat(),
-                "analytics": {
-                    "sessions_per_year": self.analytics.sessions_per_year,
-                    "risk_free_rate": self.analytics.risk_free_rate,
-                },
+                "analytics": self.analytics.definition(),
                 "benchmark": benchmark.definition() if benchmark is not None else None,
                 "source": result.source.definition(),
             },

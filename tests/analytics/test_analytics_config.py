@@ -53,3 +53,21 @@ def test_the_floor_is_a_count_of_sessions_too() -> None:
     """A floor of one session would let a fortnight be compounded into a year."""
     with pytest.raises(ValueError, match="minimum_sessions"):
         AnalyticsConfig(sessions_per_year=252, risk_free_rate=0.0, minimum_sessions=1)
+
+
+def test_the_definition_holds_every_field_of_the_convention() -> None:
+    config = AnalyticsConfig(sessions_per_year=252, risk_free_rate=0.02, minimum_sessions=20)
+
+    assert config.definition() == {
+        "sessions_per_year": 252,
+        "risk_free_rate": 0.02,
+        "minimum_sessions": 20,
+    }
+
+
+def test_two_conventions_that_report_differently_are_recorded_differently() -> None:
+    """Audit A13: a threshold that decides whether a Sharpe exists is part of the run."""
+    short = AnalyticsConfig(sessions_per_year=252, risk_free_rate=0.0, minimum_sessions=2)
+    long = AnalyticsConfig(sessions_per_year=252, risk_free_rate=0.0, minimum_sessions=60)
+
+    assert short.definition() != long.definition()

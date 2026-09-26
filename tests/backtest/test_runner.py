@@ -193,7 +193,11 @@ def test_the_result_records_what_the_numbers_depend_on(runner: StrategyRunner) -
         "field": "open",
         "session_offset": 1,
     }
-    assert configuration["analytics"]["sessions_per_year"] == 255  # type: ignore[index]
+    assert configuration["analytics"] == {
+        "sessions_per_year": 255,
+        "risk_free_rate": runner.analytics.risk_free_rate,
+        "minimum_sessions": runner.analytics.minimum_sessions,
+    }
     assert configuration["portfolio"]["limits"]["long_only"] is True  # type: ignore[index]
     assert configuration["quantity_steps"] == {"ETF_EU": None}
     assert configuration["requested_start"] == "2026-09-09"
