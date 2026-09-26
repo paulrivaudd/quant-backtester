@@ -418,13 +418,22 @@ class MarketDataRepository:
         self._decoded: dict[Path, tuple[tuple[int, int, int, int], pd.DataFrame]] = {}
         self._doomed = False
         self._lock = _StoreLock(root / LOCK_FILE)
-        try:
-            with self._lock.hold(fcntl.LOCK_EX, "recover interrupted transactions"):
-                self._recover()
-        except StoreBusy:
-            # Someone is writing: what is pending is theirs, or will be
-            # recovered by the next writer, which always recovers first.
-            pass
+        # The exclusive lock only when there is something to recover: taken
+        # on every opening, it made a reader starting at that instant in
+        # another thread or process fail with StoreBusy, for nothing.
+        if self._has_pending():
+            try:
+                with self._lock.hold(fcntl.LOCK_EX, "recover interrupted transactions"):
+                    self._recover()
+            except StoreBusy:
+                # Someone is writing: what is pending is theirs, or will be
+                # recovered by the next writer, which always recovers first.
+                pass
+
+    def _has_pending(self) -> bool:
+        """Return whether any staging directory is left under ``.pending/``."""
+        pending = self.root / PENDING
+        return pending.is_dir() and any(path.is_dir() for path in pending.iterdir())
 
     def _forget(self, staging: Path) -> None:
         """Drop the decoded copies of a transaction's staged files.
