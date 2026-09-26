@@ -126,14 +126,14 @@ def _calendar_key(definition: Mapping[str, object]) -> str:
     return str(definition["calendar_id"])
 
 
-def _plain(value: object) -> object:
+def plain_configuration(value: object) -> object:
     """Return a frozen configuration as built-ins JSON can render."""
     if isinstance(value, Mapping):
-        return {str(key): _plain(item) for key, item in value.items()}
+        return {str(key): plain_configuration(item) for key, item in value.items()}
     if isinstance(value, tuple | list):
-        return [_plain(item) for item in value]
+        return [plain_configuration(item) for item in value]
     if isinstance(value, Enum):
-        return _plain(value.value)
+        return plain_configuration(value.value)
     if isinstance(value, date):
         return value.isoformat()
     return value
@@ -211,7 +211,10 @@ class StrategyResult:
             question asked of other data, or by other code, is another run.
         """
         canonical = json.dumps(
-            {"configuration": _plain(self.configuration), "fingerprint": self.fingerprint},
+            {
+                "configuration": plain_configuration(self.configuration),
+                "fingerprint": self.fingerprint,
+            },
             sort_keys=True,
             separators=(",", ":"),
         )
