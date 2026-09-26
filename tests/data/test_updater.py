@@ -1269,6 +1269,45 @@ def test_a_rebuild_whose_replay_is_refused_is_abandoned_whole(
     assert _clean_bytes(repository, "ETF_EU") == before
 
 
+def test_a_rebuild_replays_a_promotion_that_landed_just_before_it_took_the_lock(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Audit R04: the rebuild read the journal, then took the lock.
+
+    Another process promoted Thursday and Friday in between. The rebuild
+    replayed the journal it had read before, published Monday to Wednesday
+    only, and called the result valid while the journal named both fetches.
+    """
+    sources = {"YAHOO": yahoo, "FRED": fred}
+    rebuilding = build_updater(repository, instruments, calendars, sources, clock)
+    rebuilding.download("ETF_EU", MONDAY, WEDNESDAY)
+    other = build_updater(
+        MarketDataRepository(repository.root), instruments, calendars, sources, clock
+    )
+    real_transaction = repository.transaction
+    raced: list[bool] = []
+
+    def another_process_goes_first():  # noqa: ANN202 - a context manager, as the original
+        if not raced:
+            raced.append(True)
+            assert other.update("ETF_EU").valid
+        return real_transaction()
+
+    monkeypatch.setattr(repository, "transaction", another_process_goes_first)
+
+    report = rebuilding.rebuild_clean("ETF_EU")
+
+    assert raced
+    assert report.valid
+    assert list(repository.load_bars("ETF_EU")["session_date"]) == list(SESSIONS)
+
+
 def test_rebuild_replays_the_policy_not_the_last_fetch(
     updater: MarketDataUpdater, repository: MarketDataRepository, yahoo: FakeSource
 ) -> None:

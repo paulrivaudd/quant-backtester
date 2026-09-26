@@ -1053,18 +1053,23 @@ class MarketDataUpdater:
         replay rule of its own.
         """
         instrument = self._instruments.get(instrument_id)
-        applied = self._repository.load_applied_fetches(instrument.id)
-        archived = self._archived_fetches(instrument)
-        lost = sorted(applied - {(source_id, fetch_id) for fetch_id, source_id in archived})
-        if lost:
-            raise FileNotFoundError(
-                f"{instrument.id}: {len(lost)} fetch(es) shaped the clean layer and are no "
-                f"longer in raw/: {', '.join(f'{source}:{fetch}' for source, fetch in lost)}. "
-                "Nothing was rebuilt; the clean layer is as it was."
-            )
         issues: list[ValidationIssue] = []
         try:
             with self._repository.transaction():
+                # Read under the lock, not before it: a promotion landing
+                # between the two used to be missing from what was replayed,
+                # and the rebuild published a store without it while the
+                # journal still named it (audit R04).
+                applied = self._repository.load_applied_fetches(instrument.id)
+                archived = self._archived_fetches(instrument)
+                lost = sorted(applied - {(source_id, fetch_id) for fetch_id, source_id in archived})
+                if lost:
+                    raise FileNotFoundError(
+                        f"{instrument.id}: {len(lost)} fetch(es) shaped the clean layer and "
+                        "are no longer in raw/: "
+                        f"{', '.join(f'{source}:{fetch}' for source, fetch in lost)}. "
+                        "Nothing was rebuilt; the clean layer is as it was."
+                    )
                 self._replay(instrument, applied, archived, issues)
                 if any(issue.severity is Severity.ERROR for issue in issues):
                     raise _PromotionRefused([])
