@@ -8,6 +8,7 @@ sequence gives a different number.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Collection, Mapping
 from datetime import UTC, date, datetime, timedelta
 
@@ -903,3 +904,129 @@ def test_the_sizing_is_named_where_the_run_records_it() -> None:
 def test_decision_sizing_without_the_decision_closes_is_a_wiring_mistake() -> None:
     with pytest.raises(ValueError, match="decision's closes"):
         trade(AT_DECISION, book(10_000.0), {"A": 1.0}, {"A": 100.0})
+
+
+# -- a cash share is a budget at the price paid (audit of archive 10) --------------
+
+
+def overnight(**costs: float) -> ExecutionModel:
+    return ExecutionModel(costs=CostModel(**costs), sizing=Sizing.AT_DECISION)
+
+
+def debit(done: Execution) -> float:
+    return math.fsum(-fill.cash_flow for fill in done.fills)
+
+
+def test_a_higher_open_does_not_spend_more_than_the_share() -> None:
+    """Close 1, open 2: 50 asked for at the decision, 25 bought, 50 spent, 50 kept."""
+    done = trade(
+        overnight(),
+        book(100.0),
+        {"A": 0.5},
+        {"A": 2.0},
+        cash_shares={"A": 0.5},
+        decision_closes={"A": 1.0},
+    )
+
+    assert done.orders[0].quantity == pytest.approx(50.0)
+    assert done.state.quantity("A") == pytest.approx(25.0)
+    assert debit(done) == pytest.approx(50.0)
+    assert done.state.cash == pytest.approx(50.0)
+    assert reasons(done) == {"A": ExecutionRejectReason.CASH_SHARE_BUDGET}
+
+
+def test_a_lower_open_does_not_buy_more_than_was_decided() -> None:
+    done = trade(
+        overnight(),
+        book(100.0),
+        {"A": 0.5},
+        {"A": 0.8},
+        cash_shares={"A": 0.5},
+        decision_closes={"A": 1.0},
+    )
+
+    assert done.state.quantity("A") == pytest.approx(50.0)
+    assert debit(done) == pytest.approx(40.0)
+    assert done.state.cash == pytest.approx(60.0)
+
+
+def test_the_budget_holds_with_a_minimum_commission() -> None:
+    """40 asked for at the decision (50 less the floor of 10); 20 bought at 2, 50 spent."""
+    done = trade(
+        overnight(minimum_commission=10.0),
+        book(100.0),
+        {"A": 0.5},
+        {"A": 2.0},
+        cash_shares={"A": 0.5},
+        decision_closes={"A": 1.0},
+    )
+
+    assert done.orders[0].quantity == pytest.approx(40.0)
+    assert done.state.quantity("A") == pytest.approx(20.0)
+    assert debit(done) == pytest.approx(50.0)
+    assert done.state.cash == pytest.approx(50.0)
+
+
+def test_the_budget_holds_with_every_cost() -> None:
+    done = trade(
+        overnight(
+            commission_rate=0.01,
+            minimum_commission=1.0,
+            half_spread_rate=0.002,
+            slippage_rate=0.001,
+        ),
+        book(100.0),
+        {"A": 0.5},
+        {"A": 1.7},
+        cash_shares={"A": 0.5},
+        decision_closes={"A": 1.0},
+    )
+
+    assert 0.0 < debit(done) <= 50.0
+    assert done.state.cash >= 50.0
+
+
+def test_a_budget_cut_below_the_minimum_trade_is_not_sent() -> None:
+    model = ExecutionModel(costs=CostModel(), minimum_trade_value=45.0, sizing=Sizing.AT_DECISION)
+
+    done = trade(
+        model,
+        book(100.0),
+        {"W": 0.5},
+        {"W": 20.0},
+        cash_shares={"W": 0.5},
+        decision_closes={"W": 1.0},
+    )
+
+    assert done.fills == ()
+    assert reasons(done) == {"W": ExecutionRejectReason.BELOW_MINIMUM_TRADE}
+
+
+def test_whole_lots_are_rounded_down_under_the_budget() -> None:
+    done = trade(
+        overnight(),
+        book(100.0),
+        {"W": 0.5},
+        {"W": 3.0},
+        cash_shares={"W": 0.5},
+        decision_closes={"W": 1.0},
+    )
+
+    assert done.state.quantity("W") == pytest.approx(16.0)
+    assert debit(done) <= 50.0
+
+
+def test_two_budgets_each_hold_under_different_gaps() -> None:
+    done = trade(
+        overnight(),
+        book(100.0),
+        {"A": 0.25, "B": 0.25},
+        {"A": 2.0, "B": 1.5},
+        cash_shares={"A": 0.25, "B": 0.25},
+        decision_closes={"A": 1.0, "B": 1.0},
+    )
+
+    spent = {fill.instrument_id: -fill.cash_flow for fill in done.fills}
+    assert spent["A"] <= 25.0 + 1e-9
+    assert spent["B"] <= 25.0 + 1e-9
+    assert done.state.cash >= 50.0 - 1e-9

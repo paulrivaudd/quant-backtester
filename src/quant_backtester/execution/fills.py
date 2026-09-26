@@ -225,6 +225,12 @@ class ExecutionRejectReason(Enum):
     the portfolio layer first; this is the last guard, as for
     ``NON_TRADABLE``."""
 
+    CASH_SHARE_BUDGET = "CASH_SHARE_BUDGET"
+    """A purchase bought with a share of the cash, cut to what that share pays
+    for at the price it is filled at, costs included. Quantities fixed at the
+    decision's close would otherwise spend more than the share when the open
+    prints higher, and the cash the strategy meant to keep would be gone."""
+
     NO_DECISION_PRICE = "NO_DECISION_PRICE"
     """Quantities are fixed at the decision's close, and the instrument had no
     close then to fix them on. Not guessed from the open: that would be the
