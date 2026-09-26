@@ -115,6 +115,9 @@ def test_a_run_kept_with_its_store_recomputes_to_the_same_economics(
 
     assert same_economics(kept, again)
     assert again.configuration["data_state"] == result.configuration["data_state"]
+    # Replaying from the kept store left its lock there; the run still reads back.
+    assert (kept_at / "store" / ".lock").exists()
+    assert read_back(kept_at).run_id == result.run_id
 
 
 def test_a_store_that_moved_on_is_not_kept_as_the_run_s_inputs(
@@ -131,3 +134,27 @@ def test_a_store_that_moved_on_is_not_kept_as_the_run_s_inputs(
     with pytest.raises(StoreChanged):
         keep(result, tmp_path / "run", store=repository)
     assert not (tmp_path / "run").exists()
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    ["missing_store_file", "changed_configuration", "extra_file", "other_lock"],
+)
+def test_a_kept_run_still_refuses_everything_but_the_store_lock(
+    research_runner: StrategyRunner, repository: MarketDataRepository, tmp_path: Path, tamper: str
+) -> None:
+    """Audit of archive 10: store/.lock is tolerated, and nothing else is."""
+    kept_at = keep(a_run(research_runner), tmp_path / "run", store=repository)
+    stored = sorted((kept_at / "store").rglob("*.parquet"))
+    if tamper == "missing_store_file":
+        stored[0].unlink()
+    elif tamper == "changed_configuration":
+        configuration = kept_at / "configuration.json"
+        configuration.write_text(configuration.read_text(encoding="utf-8") + " ")
+    elif tamper == "extra_file":
+        (kept_at / "notes.txt").write_text("added later", encoding="utf-8")
+    else:
+        (kept_at / "store" / "clean" / ".lock").write_text("", encoding="utf-8")
+
+    with pytest.raises(ArchiveError):
+        read_back(kept_at)
