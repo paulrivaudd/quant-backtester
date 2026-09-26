@@ -77,7 +77,7 @@ class SignalContext:
             Instrument to read.
         bar_field : BarField
             Field to read; ignored for a published series, and refused with
-            ``TOTAL_RETURN``, which is a closing series by construction.
+            ``ADJUSTED``, which is a closing series by construction.
         basis : PriceBasis
             Raw quoted prices, or prices adjusted for the actions known now.
 
@@ -90,17 +90,17 @@ class SignalContext:
         Raises
         ------
         ValueError
-            If ``TOTAL_RETURN`` is asked for a field other than the close.
+            If ``ADJUSTED`` is asked for a field other than the close.
             A configuration mistake, not a data problem, so it stops the run.
         """
-        if basis is PriceBasis.TOTAL_RETURN and bar_field is not BarField.CLOSE:
-            raise ValueError(f"TOTAL_RETURN adjusts a closing series; it has no {bar_field.value}")
+        if basis is PriceBasis.ADJUSTED and bar_field is not BarField.CLOSE:
+            raise ValueError(f"ADJUSTED adjusts a closing series; it has no {bar_field.value}")
         key: SeriesKey = (instrument_id, bar_field.value, basis)
         cached = self._series.get(key)
         if cached is None:
             cached = (
-                self.market.total_return_history(instrument_id)
-                if basis is PriceBasis.TOTAL_RETURN
+                self.market.adjusted_history(instrument_id)
+                if basis is PriceBasis.ADJUSTED
                 else self.market.history(instrument_id, bar_field)
             )
             self._series[key] = cached

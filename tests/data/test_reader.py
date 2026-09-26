@@ -798,7 +798,7 @@ def test_adjusted_series_is_flat_across_a_split(
     No return jump on the ex-date. If one appears, the adjustment factor is
     applied on the wrong side of the boundary.
     """
-    adjusted = reader.at(paris(THURSDAY, 23, 0)).total_return_history("EQ_US")
+    adjusted = reader.at(paris(THURSDAY, 23, 0)).adjusted_history("EQ_US")
     assert list(adjusted) == [25.0, 25.0, 25.0, 25.0]
     assert adjusted.name == "adjusted_close"
     assert list(adjusted.index) == [MONDAY, TUESDAY, WEDNESDAY, THURSDAY]
@@ -821,7 +821,7 @@ def test_future_data_does_not_change_the_past(
     past series retroactively, and the reason ``adj_close`` is not stored.
     """
     as_of = paris(TUESDAY, 23, 0)
-    before = reader.at(as_of).total_return_history("EQ_US")
+    before = reader.at(as_of).adjusted_history("EQ_US")
     # The split of Wednesday is already stored, and already invisible here.
     assert list(before) == [100.0, 100.0]
 
@@ -859,7 +859,7 @@ def test_future_data_does_not_change_the_past(
             ]
         )
     )
-    after = reader.at(as_of).total_return_history("EQ_US")
+    after = reader.at(as_of).adjusted_history("EQ_US")
     pd.testing.assert_series_equal(before, after)
 
 
@@ -884,8 +884,40 @@ def test_a_dividend_adjusts_earlier_prices_only(
             ]
         )
     )
-    adjusted = reader.at(paris(WEDNESDAY, 23, 0)).total_return_history("EQ_US")
+    adjusted = reader.at(paris(WEDNESDAY, 23, 0)).adjusted_history("EQ_US")
     assert list(adjusted) == [98.0, 98.0, 98.0]
+
+
+def test_the_adjusted_series_is_a_price_not_a_reinvested_wealth(
+    reader: MarketDataReader, repository: MarketDataRepository, xnys: TradingCalendar
+) -> None:
+    """The convention of audit A08, written down so nobody takes it for another.
+
+    100 then 110 with a 10 dividend: the adjusted series earns 110 / 90 - 1,
+    because its factor ``1 - D / C_prev`` is known at the ex-date's open. A
+    holder reinvesting at the close earns (110 + 10) / 100 - 1 = 20%; that is
+    the benchmark's TOTAL_RETURN, not this.
+    """
+    repository.save_checked_bars(
+        "EQ_US", checked_bars("EQ_US", xnys, [(MONDAY, 100.0), (TUESDAY, 110.0)])
+    )
+    repository.save_corporate_actions(
+        corporate_actions(
+            [
+                (
+                    "EQ_US",
+                    ActionType.DIVIDEND,
+                    TUESDAY,
+                    10.0,
+                    datetime(2026, 3, 10, 9, 30, tzinfo=NEW_YORK),
+                )
+            ]
+        )
+    )
+    adjusted = reader.at(paris(TUESDAY, 23, 0)).adjusted_history("EQ_US")
+
+    assert adjusted.iloc[1] / adjusted.iloc[0] - 1 == pytest.approx(110.0 / 90.0 - 1)
+    assert adjusted.iloc[1] / adjusted.iloc[0] - 1 != pytest.approx(0.20)
 
 
 def test_no_fake_gap_between_the_adjusted_close_and_the_ex_date_open(
@@ -902,7 +934,7 @@ def test_no_fake_gap_between_the_adjusted_close_and_the_ex_date_open(
     execution = reader.at(datetime(2026, 3, 11, 9, 31, tzinfo=NEW_YORK))
 
     assert list(execution.corporate_actions("EQ_US")["ex_date"]) == [WEDNESDAY]
-    adjusted = execution.total_return_history("EQ_US")
+    adjusted = execution.adjusted_history("EQ_US")
     assert list(adjusted.index) == [MONDAY, TUESDAY]
     assert list(adjusted) == [25.0, 25.0]
     open_price = execution.history("EQ_US", BarField.OPEN).iloc[-1]
@@ -912,7 +944,7 @@ def test_no_fake_gap_between_the_adjusted_close_and_the_ex_date_open(
     # The evening before, neither the action nor the adjustment exists yet.
     decision = reader.at(paris(TUESDAY, 23, 0))
     assert decision.corporate_actions("EQ_US").empty
-    assert list(decision.total_return_history("EQ_US")) == [100.0, 100.0]
+    assert list(decision.adjusted_history("EQ_US")) == [100.0, 100.0]
 
 
 def test_adjustment_happens_before_the_window_is_cut(
@@ -920,15 +952,15 @@ def test_adjustment_happens_before_the_window_is_cut(
 ) -> None:
     """Asking for one session does not change what the factors were built from."""
     pit = reader.at(paris(THURSDAY, 23, 0))
-    windowed = pit.total_return_history("EQ_US", start=MONDAY, end=TUESDAY)
+    windowed = pit.adjusted_history("EQ_US", start=MONDAY, end=TUESDAY)
     assert list(windowed.index) == [MONDAY, TUESDAY]
     assert list(windowed) == [25.0, 25.0]
 
 
-def test_total_return_history_refuses_a_level(reader: MarketDataReader, stocked: None) -> None:
+def test_adjusted_history_refuses_a_level(reader: MarketDataReader, stocked: None) -> None:
     """Adjusting a published rate for corporate actions is meaningless."""
     with pytest.raises(ValueError, match="BAR"):
-        reader.at(paris(TUESDAY, 23, 0)).total_return_history("RATE_US")
+        reader.at(paris(TUESDAY, 23, 0)).adjusted_history("RATE_US")
 
 
 def test_a_dividend_larger_than_the_close_is_refused(
@@ -952,7 +984,7 @@ def test_a_dividend_larger_than_the_close_is_refused(
         )
     )
     with pytest.raises(ValueError, match="not smaller than"):
-        reader.at(paris(TUESDAY, 23, 0)).total_return_history("EQ_US")
+        reader.at(paris(TUESDAY, 23, 0)).adjusted_history("EQ_US")
 
 
 def test_a_non_positive_split_ratio_is_refused(
@@ -976,7 +1008,7 @@ def test_a_non_positive_split_ratio_is_refused(
         )
     )
     with pytest.raises(ValueError, match="strictly positive"):
-        reader.at(paris(TUESDAY, 23, 0)).total_return_history("EQ_US")
+        reader.at(paris(TUESDAY, 23, 0)).adjusted_history("EQ_US")
 
 
 # ---------------------------------------------------------------------------

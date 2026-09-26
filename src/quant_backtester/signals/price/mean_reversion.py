@@ -32,7 +32,7 @@ class MeanReversionSignal(Signal):
         this signal bets on lives over days, where a momentum lives over
         months, and the two are the same arithmetic pointing opposite ways.
     price_basis : PriceBasis
-        ``TOTAL_RETURN`` or ``RAW``, said explicitly.
+        ``ADJUSTED`` or ``RAW``, said explicitly.
     bar_field : BarField
         Field to read.
     max_age_sessions : int

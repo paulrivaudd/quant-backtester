@@ -104,7 +104,7 @@ class MomentumVix(Strategy):
         momentum = MomentumSignal(
             signal_id=f"momentum_{self.lookback_sessions}d",
             lookback_sessions=self.lookback_sessions,
-            price_basis=PriceBasis.TOTAL_RETURN,
+            price_basis=PriceBasis.ADJUSTED,
         )
         return (
             momentum,

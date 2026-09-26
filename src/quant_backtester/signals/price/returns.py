@@ -33,7 +33,8 @@ class ReturnSignal(Signal):
     bar_field : BarField
         Field to read.
     price_basis : PriceBasis
-        ``TOTAL_RETURN`` counts distributions as reinvested, ``RAW`` does not.
+        ``ADJUSTED`` takes distributions and splits out of the price,
+        ``RAW`` does not.
         There is no default: an ETF paying 2% a year is not falling 2% a year,
         and which of the two is meant has to be said.
     max_age_sessions : int

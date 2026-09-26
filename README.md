@@ -269,7 +269,7 @@ snapshot = SignalEngine().compute(
         MomentumSignal(
             signal_id="momentum_60d",
             lookback_sessions=60,
-            price_basis=PriceBasis.TOTAL_RETURN,
+            price_basis=PriceBasis.ADJUSTED,
         )
     ],
     ["ETF_WORLD", "ETF_SP500_PEA"],
@@ -515,7 +515,7 @@ class MomentumVix(Strategy):
 
     def required_signals(self):
         momentum = MomentumSignal(
-            signal_id="mom60", lookback_sessions=60, price_basis=PriceBasis.TOTAL_RETURN
+            signal_id="mom60", lookback_sessions=60, price_basis=PriceBasis.ADJUSTED
         )
         return (
             momentum,

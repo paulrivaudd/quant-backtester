@@ -44,8 +44,8 @@ class MomentumSingleAsset(Strategy):
 
     Notes
     -----
-    The momentum is computed on total-return prices, so a dividend paid during
-    the window is a return the holder got rather than a fall in the series.
+    The momentum is computed on adjusted prices, so a dividend paid during
+    the window is not read as a fall in the series.
 
     What it does when the momentum cannot be computed - too little history, a
     session missing, a value too old - is to hold nothing. That is a decision,
@@ -79,7 +79,7 @@ class MomentumSingleAsset(Strategy):
             MomentumSignal(
                 signal_id=self.signal_id,
                 lookback_sessions=self.lookback_sessions,
-                price_basis=PriceBasis.TOTAL_RETURN,
+                price_basis=PriceBasis.ADJUSTED,
             ),
         )
 
