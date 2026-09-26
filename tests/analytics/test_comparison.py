@@ -520,3 +520,81 @@ def test_a_dividend_on_a_session_the_run_does_not_hold_is_reinvested_at_its_own_
     assert curve.equity.iloc[-1] / curve.equity.iloc[0] == pytest.approx(
         (90.0 + 10.0) / 100.0 * 100.0 / 90.0 * 110.0 / 100.0
     )
+
+
+def _in_cash(ctx):  # noqa: ANN202 - a decision, as FunctionalStrategy calls it
+    """Hold nothing."""
+    return ctx.cash()
+
+
+@pytest.mark.parametrize(
+    ("known_on", "expected"),
+    [
+        (date(2026, 4, 2), (90.0 + 10.0) / 100.0 * 100.0 / 90.0 * 110.0 / 100.0),
+        (date(2026, 4, 7), 90.0 / 100.0 * 100.0 / 90.0 * (110.0 + 10.0) / 100.0),
+    ],
+    ids=["known_before_the_ex_date", "known_four_days_after"],
+)
+def test_the_benchmark_is_the_same_whatever_calendar_reads_it(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    make_bars: Callable[..., pd.DataFrame],
+    make_actions: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+    xnys: TradingCalendar,
+    known_on: date,
+    expected: float,
+) -> None:
+    """Audit N01: a dividend known late was reinvested back-dated when sessions were skipped.
+
+    New York holds 2, 3, 6 and 7 April; Paris only 2 and 7. Read on either
+    calendar, the index's wealth on the 7th is the same: reinvested at the
+    ex-date close when the dividend was known by then, at the first close
+    after it was known otherwise - never at a close from before it was known.
+    """
+    from quant_backtester.strategies.functional import FunctionalStrategy
+
+    thursday, friday, monday, tuesday = (date(2026, 4, day) for day in (2, 3, 6, 7))
+    repository.save_checked_bars(
+        "IDX_US",
+        make_bars("IDX_US", xnys, {thursday: 100.0, friday: 90.0, monday: 100.0, tuesday: 110.0}),
+    )
+    repository.save_corporate_actions(
+        make_actions(
+            [
+                (
+                    "IDX_US",
+                    ActionType.DIVIDEND,
+                    friday,
+                    10.0,
+                    datetime.combine(known_on, time(9), ZoneInfo("UTC")),
+                )
+            ]
+        )
+    )
+    cash = FunctionalStrategy(strategy_id="cash", decision=_in_cash)
+    finals = []
+    for calendar_id in ("XPAR", "XNYS"):
+        reader = MarketDataReader(
+            repository=repository,
+            instruments=instruments,
+            calendars=calendars,
+            reference_calendar_id=calendar_id,
+        )
+        runner = StrategyRunner(
+            reader=reader,
+            calendars=calendars,
+            reference_calendar_id=calendar_id,
+            base_currency="EUR",
+            analytics=CONFIG,
+            execution=FREE,
+            initial_cash=10_000.0,
+            timetable=PARIS,
+        )
+        result = runner.run(cash, [], thursday, tuesday)
+        curve = value_benchmark(result.backtest, reader, BenchmarkSpec("IDX_US"))
+        finals.append(curve.equity.iloc[-1] / curve.equity.iloc[0])
+
+    assert finals[0] == pytest.approx(expected)
+    assert finals[1] == pytest.approx(expected)
