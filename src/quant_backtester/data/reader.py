@@ -840,10 +840,14 @@ class PointInTimeReader:
         drops anything whose release had not happened either, so a revision
         published this morning is invisible to a decision taken last night.
 
-        A later vintage that *dropped* an observation does not resurrect the
+        A later vintage that *withdrew* an observation does not resurrect the
         earlier value: the question asked is "what did the series say that
-        day", and the answer for each observation is its latest known telling,
-        which is what taking the maximum vintage per observation gives.
+        day", and the answer for each observation is its latest known telling.
+        The latest vintage per observation is taken first, withdrawals
+        included, and an observation whose latest telling is a withdrawal is
+        then left out. Dropping the withdrawals first - which is what a
+        normalizer that threw the ``.`` cells away amounted to - served the
+        earlier value (audit A09).
         """
         stored = self._repository.load_vintages(instrument.id)
         if stored.empty:
@@ -858,6 +862,7 @@ class PointInTimeReader:
         latest = knowable.sort_values(
             ["observation_date", "vintage_date"], kind="stable"
         ).drop_duplicates("observation_date", keep="last")
+        latest = latest.loc[~latest["withdrawn"].astype(bool)]
         return latest.reset_index(drop=True)
 
     def _observe(self, instrument_id: str, field: BarField, reference: Session) -> _Observation:

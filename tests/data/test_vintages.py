@@ -81,6 +81,7 @@ def archive() -> pd.DataFrame:
             "observation_date": [row[0] for row in rows],
             "vintage_date": [row[1] for row in rows],
             "value": [row[2] for row in rows],
+            "withdrawn": [False] * len(rows),
             "available_at_utc": [available_at(row[1]) for row in rows],
             "source": ["ALFRED"] * len(rows),
             "source_fetch_id": ["20260920T210311Z"] * len(rows),
@@ -376,3 +377,120 @@ def test_a_rebuild_reproduces_the_archive_from_the_raw_alone(
     updater.rebuild_clean("US_GDP")
 
     pd.testing.assert_frame_equal(MarketDataRepository(market_root).load_vintages("US_GDP"), live)
+
+
+# --- a withdrawal is a fact of its vintage (audit A09) ------------------------------
+
+DECEMBER_2021 = date(2021, 12, 31)
+
+
+def test_a_withdrawn_observation_is_not_served_from_an_older_vintage(
+    market_root: Path, decision_calendar: CalendarRegistry
+) -> None:
+    """Published, withdrawn, published again: each decision reads its own day's telling.
+
+    The June 2021 vintage withdrew the quarter. Without a row saying so, the
+    reader took the latest vintage that *held* the quarter and served the
+    January 2020 number to every decision after the withdrawal.
+    """
+    rows = archive()
+    rows.loc[1, ["value", "withdrawn"]] = [float("nan"), True]
+    again = rows.iloc[[0]].copy()
+    again[["vintage_date", "value", "available_at_utc"]] = [
+        DECEMBER_2021,
+        21_200.0,
+        available_at(DECEMBER_2021),
+    ]
+    repository = MarketDataRepository(market_root)
+    repository.save_vintages("US_GDP", pd.concat([rows, again], ignore_index=True))
+    reader = MarketDataReader(
+        repository=repository,
+        instruments=InstrumentRegistry([gdp()]),
+        calendars=decision_calendar,
+        reference_calendar_id="XPAR",
+    )
+
+    def read(year: int, month: int) -> pd.Series:
+        return reader.at(datetime(year, month, 15, 12, 0, tzinfo=UTC)).values(["US_GDP"]).iloc[0]
+
+    assert read(2020, 6)["value"] == pytest.approx(21_098.827)
+    assert read(2021, 9)["status"] is ObservationStatus.MISSING
+    assert bool(pd.isna(read(2021, 9)["value"]))
+    assert reader.at(datetime(2021, 9, 15, 12, 0, tzinfo=UTC)).history("US_GDP").empty
+    assert read(2022, 1)["value"] == pytest.approx(21_200.0)
+
+
+def test_a_withdrawal_is_ingested_as_a_row_and_refetched_without_a_rewrite(
+    market_root: Path, decision_calendar: CalendarRegistry
+) -> None:
+    """The ``.`` of a vintage column becomes a withdrawal; the same export again changes nothing."""
+    body = export(GDP_20200131=["21098.827"], GDP_20210630=["."])
+    first = OneExport(body, datetime(2022, 1, 3, 12, 0, tzinfo=UTC))
+    assert (
+        updater_over(market_root, decision_calendar, first)
+        .download("US_GDP", FIRST_QUARTER, date(2019, 3, 31))
+        .valid
+    )
+
+    stored = MarketDataRepository(market_root).load_vintages("US_GDP")
+    assert list(stored["withdrawn"]) == [False, True]
+    assert pd.isna(stored["value"].iloc[1])
+
+    again = OneExport(body, datetime(2022, 1, 5, 12, 0, tzinfo=UTC))
+    report = updater_over(market_root, decision_calendar, again).download(
+        "US_GDP", FIRST_QUARTER, date(2019, 3, 31)
+    )
+    assert report.valid
+    assert "VINTAGE_REWRITTEN" not in [issue.code for issue in report.issues]
+
+
+def test_a_missing_cell_after_the_vintage_date_is_not_a_withdrawal() -> None:
+    """A vintage of January 2020 cannot hold the second quarter of 2020; its ``.`` says nothing."""
+    later_quarter = pd.DataFrame(
+        {
+            "observation_date": ["2019-01-01", "2020-04-01"],
+            "GDP_20200131": ["21098.827", "."],
+            "GDP_20210630": ["21115.309", "19520.114"],
+        },
+        dtype=str,
+    )
+    download = RawDownload(
+        instrument_id="US_GDP",
+        source="ALFRED",
+        fetch_id="20220103T120000Z",
+        retrieved_at_utc=datetime(2022, 1, 3, 12, 0, tzinfo=UTC),
+        frame=later_quarter,
+        request={},
+    )
+
+    vintages = AlfredNormalizer().normalize(gdp(), download).vintages
+
+    assert vintages is not None
+    assert not bool(vintages["withdrawn"].any())
+    assert len(vintages) == 3
+
+
+def test_an_observation_outside_the_request_is_not_withdrawn(
+    market_root: Path, decision_calendar: CalendarRegistry
+) -> None:
+    """A shorter range is not a withdrawal of what it did not ask about."""
+    first = OneExport(
+        export(GDP_20200131=["21098.827"], GDP_20210630=["21115.309"]),
+        datetime(2022, 1, 3, 12, 0, tzinfo=UTC),
+    )
+    updater_over(market_root, decision_calendar, first).download(
+        "US_GDP", FIRST_QUARTER, date(2019, 3, 31)
+    )
+    other_quarter = pd.DataFrame(
+        {"observation_date": ["2019-04-01"], "GDP_20200131": ["21200.0"], "GDP_20210630": ["."]},
+        dtype=str,
+    )
+    later = OneExport(other_quarter, datetime(2022, 1, 5, 12, 0, tzinfo=UTC))
+    updater_over(market_root, decision_calendar, later).download(
+        "US_GDP", date(2019, 4, 1), date(2019, 6, 30)
+    )
+
+    stored = MarketDataRepository(market_root).load_vintages("US_GDP")
+    first_quarter = stored.loc[stored["observation_date"] == FIRST_QUARTER]
+    assert not bool(first_quarter["withdrawn"].any())
+    assert len(first_quarter) == 2

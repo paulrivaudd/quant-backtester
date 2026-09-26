@@ -109,7 +109,8 @@ VINTAGES_SCHEMA: Final = pa.schema(
         pa.field("instrument_id", pa.string(), nullable=False),
         pa.field("observation_date", pa.date32(), nullable=False),
         pa.field("vintage_date", pa.date32(), nullable=False),
-        pa.field("value", pa.float64(), nullable=False),
+        pa.field("value", pa.float64(), nullable=True),
+        pa.field("withdrawn", pa.bool_(), nullable=False),
         pa.field("available_at_utc", TIMESTAMP_UTC, nullable=False),
         pa.field("source", pa.string(), nullable=False),
         pa.field("source_fetch_id", pa.string(), nullable=False),
@@ -132,6 +133,14 @@ provider rewriting history, and is refused rather than merged.
 ``available_at_utc`` is the later of the observation's own release instant and
 the vintage's: a number restated in June 2021 was not knowable in 2019, whatever
 the observation it describes.
+
+A vintage can also *withdraw* an observation an earlier one published - ALFRED
+marks it ``.`` in that vintage's column. That is a row too, with
+``withdrawn = True`` and no value: without it, the reader, taking the latest
+vintage that holds each observation, would serve the older value as if the
+withdrawal had never happened (audit A09). Only a cell the download actually
+served becomes one - an observation outside the requested range is not
+withdrawn, it was not asked about.
 """
 
 CORPORATE_ACTIONS_SCHEMA: Final = pa.schema(

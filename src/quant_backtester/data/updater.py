@@ -194,6 +194,32 @@ def _vintage_availability(
     return available_at
 
 
+def _vintage_cell(row: Mapping[str, Any]) -> float | None:
+    """Return a vintage row's value, or ``None`` for a withdrawal."""
+    return None if bool(row["withdrawn"]) else float(row["value"])
+
+
+def _withdrawal_issues(instrument: Instrument, frame: pd.DataFrame) -> list[ValidationIssue]:
+    """Return an error for every vintage row whose value and withdrawal disagree.
+
+    A withdrawal carries no value, and a row that is not one carries a value
+    (the level rules check that it is a finite one).
+    """
+    withdrawn = frame["withdrawn"].astype(bool)
+    contradictory = frame.loc[withdrawn & frame["value"].notna()]
+    return [
+        _issue(
+            "WITHDRAWAL_WITH_VALUE",
+            Severity.ERROR,
+            instrument.id,
+            row["observation_date"],
+            f"{instrument.id} {row['observation_date']} is withdrawn in the vintage of "
+            f"{row['vintage_date']} and still carries {row['value']}",
+        )
+        for row in _records(contradictory)
+    ]
+
+
 def _canonical_frame(instrument: Instrument, data: NormalizedData) -> pd.DataFrame | None:
     """Return the frame an instrument's own kind of series is stored as.
 
@@ -1501,13 +1527,18 @@ class MarketDataUpdater:
                 rule = instrument.publication_rule
                 if rule is None:  # pragma: no cover - a LEVEL always has one
                     raise ValueError(f"{instrument.id} is a LEVEL with no publication rule")
+                issues += _withdrawal_issues(instrument, frame)
                 for vintage in sorted(set(frame["vintage_date"])):
-                    slice_ = frame.loc[frame["vintage_date"] == vintage]
+                    slice_ = frame.loc[
+                        (frame["vintage_date"] == vintage) & ~frame["withdrawn"].astype(bool)
+                    ]
                     vintage_at = rule.available_at(vintage, calendar)
                     issues += list(
                         validate_levels(
                             instrument,
-                            slice_.drop(columns=["vintage_date"]).reset_index(drop=True),
+                            slice_.drop(columns=["vintage_date", "withdrawn"]).reset_index(
+                                drop=True
+                            ),
                             calendar,
                             available_at=_vintage_availability(rule, calendar, vintage_at),
                         ).issues
@@ -1769,7 +1800,7 @@ class MarketDataUpdater:
             return []
         stored = self._repository.load_vintages(instrument.id)
         known = {
-            (row["observation_date"], row["vintage_date"]): row["value"]
+            (row["observation_date"], row["vintage_date"]): _vintage_cell(row)
             for row in stored.to_dict("records")
         }
         issues: list[ValidationIssue] = []
@@ -1777,7 +1808,9 @@ class MarketDataUpdater:
         for record in incoming.to_dict("records"):
             key = (record["observation_date"], record["vintage_date"])
             if key in known:
-                if known[key] != record["value"]:
+                # A withdrawal is compared as one, never as a NaN: NaN != NaN
+                # would call every refetched withdrawal a rewrite.
+                if known[key] != _vintage_cell(record):
                     issues.append(
                         _issue(
                             "VINTAGE_REWRITTEN",
@@ -1785,9 +1818,9 @@ class MarketDataUpdater:
                             instrument.id,
                             record["observation_date"],
                             f"the vintage of {record['vintage_date']} gave "
-                            f"{known[key]} for {record['observation_date']} and now gives "
-                            f"{record['value']}; an archive of what was known on a day "
-                            "cannot change",
+                            f"{known[key] or 'a withdrawal'} for {record['observation_date']} "
+                            f"and now gives {_vintage_cell(record) or 'a withdrawal'}; an "
+                            "archive of what was known on a day cannot change",
                         )
                     )
                 continue
