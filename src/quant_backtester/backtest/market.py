@@ -283,18 +283,20 @@ class StrategyMarketView:
         self.__context.instruments.get(instrument_id)
         frame = self.__context.market.values([instrument_id], field)
         row = frame.iloc[0]
-        value = float(row["value"])
+        value = row["value"]
         age = row["age_sessions"]
         published = row["available_at_utc"]
+        # The reader spells "there is none" as NaN, pd.NA or NaT depending on
+        # the column's dtype; pd.isna is the one test that answers for all of
+        # them - ``age != age`` on a nullable integer raised (audit A04). A
+        # strategy is handed None, never a missing marker to compare.
         return MarketObservation(
             instrument_id=instrument_id,
-            # A NaN is how the reader spells "there is none"; a strategy should
-            # not have to know that, and should never be handed one to compare.
-            value=None if value != value else value,
+            value=None if pd.isna(value) else float(value),
             status=row["status"],
-            observation_date=row["observation_date"],
+            observation_date=None if pd.isna(row["observation_date"]) else row["observation_date"],
             available_at=None if pd.isna(published) else published.to_pydatetime(),
-            age_sessions=None if age is None or age != age else int(age),
+            age_sessions=None if pd.isna(age) else int(age),
         )
 
     def history(
