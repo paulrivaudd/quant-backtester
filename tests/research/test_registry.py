@@ -111,3 +111,32 @@ def test_the_same_run_or_the_same_name_is_not_registered_twice(
     with pytest.raises(UnrecordableRun, match="the run a already registered"):
         registry.register(record_of(result, experiment_id="b", hypothesis="h", recorded_at=AT))
     assert len(registry.records()) == 1
+
+
+def test_two_writers_at_once_register_a_run_once(
+    research_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    """Audit N07: both read before either wrote, and variants() counted the run twice."""
+    import threading
+
+    record = record_of(a_run(research_runner), experiment_id="same", hypothesis="h", recorded_at=AT)
+    start = threading.Barrier(4)
+    refused: list[UnrecordableRun] = []
+
+    def write() -> None:
+        start.wait()
+        try:
+            ExperimentRegistry(tmp_path / "registry.jsonl").register(record)
+        except UnrecordableRun as error:
+            refused.append(error)
+
+    writers = [threading.Thread(target=write) for _ in range(4)]
+    for writer in writers:
+        writer.start()
+    for writer in writers:
+        writer.join()
+
+    registry = ExperimentRegistry(tmp_path / "registry.jsonl")
+    assert len(registry.records()) == 1
+    assert registry.variants() == {"h": 1}
+    assert len(refused) == 3
