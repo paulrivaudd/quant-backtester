@@ -255,24 +255,26 @@ def test_sessions_held_by_one_source_only_are_single_source() -> None:
     assert math.isnan(checked["max_volume_rel_diff"].tolist()[0])
 
 
-def test_a_session_missing_from_the_reference_takes_the_other_source() -> None:
+def test_a_session_missing_from_the_reference_is_not_served_from_the_other_source() -> None:
+    """A check source confirms the reference; it does not add days to it.
+
+    Filling the hole from the check source made the checked series cover a
+    session the reference's own series did not, and the updater refuses a
+    store in that state before the next update (audit A06, decision D8).
+    """
     yahoo = bars("YAHOO", sessions=SESSIONS[:2])
     euronext = bars("EURONEXT", sessions=SESSIONS, closes=[100.0, 101.0, 555.0])
     checked = check({"YAHOO": yahoo, "EURONEXT": euronext})
-    last = checked.iloc[-1]
-    assert (last["check_status"], last["source"], last["close"]) == (
-        "SINGLE_SOURCE",
-        "EURONEXT",
-        555.0,
-    )
+    assert checked["session_date"].tolist() == SESSIONS[:2]
+    assert checked["check_status"].tolist() == ["CONFIRMED", "CONFIRMED"]
 
 
-def test_rows_are_sorted_by_session_across_interleaved_sources() -> None:
-    yahoo = bars("YAHOO", sessions=[SESSIONS[0], SESSIONS[2]])
+def test_rows_are_sorted_by_session_whatever_order_the_reference_came_in() -> None:
+    yahoo = bars("YAHOO").iloc[::-1].reset_index(drop=True)
     euronext = bars("EURONEXT", sessions=[SESSIONS[1]])
     checked = check({"YAHOO": yahoo, "EURONEXT": euronext})
     assert checked["session_date"].tolist() == SESSIONS
-    assert checked["source"].tolist() == ["YAHOO", "EURONEXT", "YAHOO"]
+    assert checked["check_status"].tolist() == ["SINGLE_SOURCE", "CONFIRMED", "SINGLE_SOURCE"]
 
 
 def test_a_single_source_marks_every_session_single_source() -> None:
