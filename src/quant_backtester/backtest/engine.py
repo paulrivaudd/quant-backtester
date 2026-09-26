@@ -46,7 +46,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
-from typing import Protocol
+from typing import Protocol, cast
 
 from quant_backtester.backtest.config import BacktestConfig
 from quant_backtester.backtest.context import StrategyContext
@@ -270,6 +270,7 @@ class BacktestEngine:
         definition = self._strategy_definition()
         fingerprint = self.strategy.fingerprint()
         configuration = self._configuration(sessions)
+        read: set[str] = set()
         # Asked of the calendar only where it can answer: a run ending on the
         # last covered session is a legitimate run, and every-session
         # decisions do not need the session after it (audit R10).
@@ -311,7 +312,7 @@ class BacktestEngine:
             if session_date in deciding:
                 decision_at = timetable.decision_instant(session_date)
                 decision = self._decide(
-                    signal_engine, session_date, decision_at, state, valuation, declared
+                    signal_engine, session_date, decision_at, state, valuation, declared, read
                 )
                 standing = decision.constrained.invested
             records.append(
@@ -345,6 +346,14 @@ class BacktestEngine:
                 "changed while it was deciding. A strategy holds no state between decisions - "
                 "what is path-dependent comes from the context."
             )
+        # What the strategy read through ctx.market joins the universe and the
+        # declared signals, so the report names the history of every series
+        # a decision rested on (audit N08, decision D23).
+        bases = dict(cast(Mapping[str, object], configuration["history_basis"]))
+        for name in sorted(read - set(bases)):
+            basis = self.instruments.get(name).history_basis
+            bases[name] = None if basis is None else basis.value
+        configuration["history_basis"] = dict(sorted(bases.items()))
         return BacktestResult(
             records=tuple(records),
             config=config,
@@ -475,6 +484,7 @@ class BacktestEngine:
         state: PortfolioState,
         valuation: ValuationResult,
         declared: Sequence[Signal | SignalRequest],
+        read: set[str],
     ) -> PortfolioDecision:
         """Compute the signals, ask the strategy, and hold its answer to the portfolio's rules.
 
@@ -492,6 +502,9 @@ class BacktestEngine:
             What it was just valued at.
         declared : Sequence[Signal | SignalRequest]
             The signals of the run, resolved once at its start.
+        read : set[str]
+            Every instrument the strategy has asked the market view about so
+            far in the run; added to.
 
         Returns
         -------
@@ -524,7 +537,7 @@ class BacktestEngine:
         ctx = StrategyContext(
             as_of=context.as_of,
             signals=snapshot,
-            market=StrategyMarketView(context),
+            market=StrategyMarketView(context, read),
             portfolio=PortfolioView.of(state, valuation.prices, context.as_of),
             universe=members,
             instruments=self.instruments,
