@@ -173,10 +173,17 @@ def number(value: float | None) -> str:
 
 HEADER = (
     f"{'strategy':<20}{'period':<25}{'net':>9}{'gross':>9}{'a year':>9}"
-    f"{'sharpe':>8}{'max dd':>9}{'costs':>10}{'trades':>8}{'rejects':>9}"
+    f"{'sharpe':>8}{'max dd':>9}{'costs':>10}{'rebal.':>8}{'fills':>7}{'rejects':>9}"
     f"{'est.':>6}{'vs world':>10}"
 )
-"""The columns of the table, laid out for a terminal."""
+"""The columns of the table, laid out for a terminal.
+
+``rebal.`` counts the sessions on which something was bought or sold and
+``fills`` the orders done on them: one session can fill two orders, so neither
+is "trades" (audit A17). ``rejects`` is every refused or cut order, broken down
+by reason on the line below - a ``BELOW_MINIMUM_TRADE`` is the declared policy
+at work, not a failure.
+"""
 
 
 def row(label: str, result: StrategyResult) -> str:
@@ -189,7 +196,7 @@ def row(label: str, result: StrategyResult) -> str:
         f"{percent(net.total_return):>9}{percent(report.gross.total_return):>9}"
         f"{percent(net.annualised_return):>9}{number(net.sharpe_ratio):>8}"
         f"{percent(net.drawdown.depth):>9}{report.costs.total:>10,.0f}"
-        f"{report.costs.rebalancings:>8}{report.quality.rejects:>9}"
+        f"{report.costs.rebalancings:>8}{report.quality.fills:>7}{report.quality.rejects:>9}"
         f"{report.quality.estimated_valuations:>6}{percent(comparison.excess_return):>10}"
     )
     reasons = ", ".join(
