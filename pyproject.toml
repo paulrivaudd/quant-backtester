@@ -1,6 +1,6 @@
 [project]
 name = "quant-backtester"
-version = "0.1.0"
+version = "0.2.0"
 description = "A daily-frequency, look-ahead-safe backtesting framework for systematic strategies."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

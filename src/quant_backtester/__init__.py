@@ -8,4 +8,4 @@ Layers, in dependency order:
 Each layer depends only on the ones before it.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
