@@ -103,18 +103,29 @@ def coverage_line(coverage: HistoryCoverage) -> str:
         if coverage.stored_from is not None
         else "nothing stored"
     )
-    if coverage.complete:
-        gaps = "complete"
+    ends = [
+        f"{label} {window[0]} -> {window[1]}"
+        for label, window in (
+            ("before", coverage.missing_head),
+            ("after", coverage.missing_tail),
+        )
+        if window is not None
+    ]
+    if coverage.missing_sessions is None:
+        # A published series: only its ends can be checked, and the line says so.
+        gaps = "ends covered (inside not checked)" if not ends else "MISSING " + ", ".join(ends)
     else:
-        missing = [
-            f"{label} {window[0]} -> {window[1]}"
-            for label, window in (
-                ("before", coverage.missing_head),
-                ("after", coverage.missing_tail),
-            )
-            if window is not None
+        inside = [
+            day
+            for day in coverage.missing_sessions
+            if coverage.stored_from is not None
+            and coverage.stored_until is not None
+            and coverage.stored_from < day < coverage.stored_until
         ]
-        gaps = "MISSING " + ", ".join(missing) if missing else "incomplete"
+        parts = ends + ([f"{len(inside)} session(s) inside"] if inside else [])
+        gaps = "complete" if not parts else "MISSING " + ", ".join(parts)
+        if coverage.contested_sessions:
+            gaps += f", {len(coverage.contested_sessions)} contested"
     return f"{coverage.instrument_id:<14} {span:<26} {coverage.raw_fetches:>3} fetch(es)  {gaps}"
 
 

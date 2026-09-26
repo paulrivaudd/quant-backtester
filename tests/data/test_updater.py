@@ -2311,6 +2311,49 @@ def test_coverage_names_the_head_a_partial_store_is_missing(
     assert coverage.raw_fetches > 0
 
 
+def test_coverage_sees_a_hole_between_two_stored_ends(
+    updater: MarketDataUpdater, yahoo: FakeSource
+) -> None:
+    """Audit A12: Monday and Friday stored, nothing between, used to read ``complete``."""
+    week = yahoo.rows["ETF_EU"]
+    yahoo.rows["ETF_EU"] = week.loc[week["date"].isin([MONDAY, FRIDAY])].reset_index(drop=True)
+    updater.archive_history("ETF_EU")
+
+    coverage = updater.history_coverage("ETF_EU")
+
+    assert coverage.spans_declared_window
+    assert not coverage.complete
+    assert coverage.missing_sessions == (TUESDAY, WEDNESDAY, THURSDAY)
+
+
+def test_coverage_names_the_contested_sessions_apart(
+    updater: MarketDataUpdater, repository: MarketDataRepository
+) -> None:
+    """Stored, and served as a hole: not missing, and not to be forgotten either."""
+    updater.archive_history("ETF_EU")
+    checked = repository.load_checked_bars("ETF_EU")
+    checked.loc[checked["session_date"] == WEDNESDAY, "check_status"] = "CONFLICT"
+    repository.save_checked_bars("ETF_EU", checked)
+
+    coverage = updater.history_coverage("ETF_EU")
+
+    assert coverage.complete
+    assert coverage.contested_sessions == (WEDNESDAY,)
+
+
+def test_coverage_of_a_published_series_checks_its_ends_only_and_says_so(
+    updater: MarketDataUpdater,
+) -> None:
+    """No venue calendar to count a release series against, so none is invented."""
+    updater.archive_history("RATE_US")
+
+    coverage = updater.history_coverage("RATE_US")
+
+    assert coverage.missing_sessions is None
+    assert coverage.contested_sessions is None
+    assert coverage.complete == coverage.spans_declared_window
+
+
 def delisted(instruments: InstrumentRegistry, last: date) -> InstrumentRegistry:
     """Return the registry with the Paris ETF delisted on ``last``."""
     return InstrumentRegistry(
