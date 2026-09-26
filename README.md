@@ -720,10 +720,13 @@ blocks of ten sessions drawn for both, 2 000 draws, seed 20260926:
 == reference_rotation against the executable control, control_world
 difference      estimate       low      high   level
 mean_return       -0.019    -0.034     0.002     90%
-sharpe            -0.149    -0.286    -0.010     90%
+sharpe            -0.146    -0.281    -0.007     90%
 ```
 
 The mean-return interval only just holds zero; the Sharpe interval does not.
+Both Sharpe ratios are the report's own - excess returns over the risk-free
+rate, divided by their own spread - since a common rate does not cancel in a
+difference of ratios with different spreads.
 Over 437 sessions the rotation took on more risk than keeping the world fund
 for no more return, and at this level its Sharpe ratio is the lower of the
 two. Nothing in this README says it is the better strategy - which is what
