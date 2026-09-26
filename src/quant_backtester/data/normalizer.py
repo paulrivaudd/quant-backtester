@@ -578,7 +578,7 @@ def _vintages_frame(
     instrument: Instrument,
     download: RawDownload,
     rule: PublicationRule,
-    by_vintage: Mapping[date, Mapping[date, float]],
+    by_vintage: Mapping[date, Mapping[date, float | None]],
     calendar: TradingCalendar | None = None,
 ) -> tuple[pd.DataFrame, RejectedRows]:
     """Assemble a vintage archive: one row per observation and per vintage.
@@ -591,8 +591,11 @@ def _vintages_frame(
         Download they come from, for the lineage columns.
     rule : PublicationRule
         When an observation, and a vintage, became public.
-    by_vintage : Mapping[date, Mapping[date, float]]
-        Published value per observation date, per vintage date.
+    by_vintage : Mapping[date, Mapping[date, float | None]]
+        Published value per observation date, per vintage date; ``None`` for a
+        cell the vintage served as missing. Such a cell, for an observation no
+        later than the vintage, is a withdrawal and becomes a row with
+        ``withdrawn = True``.
     calendar : TradingCalendar | None
         Calendar the rule counts its lag on.
 
@@ -615,20 +618,26 @@ def _vintages_frame(
     A vintage that did not exist when the fetch ran is refused by the adapter,
     so nothing here has to guess at one.
     """
-    rows: list[tuple[date, date, float, datetime]] = []
+    rows: list[tuple[date, date, float | None, datetime]] = []
     unlisted: set[date] = set()
     unpublished: set[date] = set()
     for vintage in sorted(by_vintage):
         vintage_at = rule.available_at(vintage, calendar)
         for day in sorted(by_vintage[vintage]):
+            value = by_vintage[vintage][day]
+            if value is None and day > vintage:
+                # Not withdrawn: a vintage cannot hold what happened after it.
+                continue
             if not instrument.is_listed(day):
-                unlisted.add(day)
+                if value is not None:
+                    unlisted.add(day)
                 continue
             available_at = max(rule.available_at(day, calendar), vintage_at)
             if available_at > download.retrieved_at_utc:
-                unpublished.add(day)
+                if value is not None:
+                    unpublished.add(day)
                 continue
-            rows.append((day, vintage, by_vintage[vintage][day], available_at))
+            rows.append((day, vintage, value, available_at))
     rejected = RejectedRows(
         unlisted=tuple(sorted(unlisted)), unpublished=tuple(sorted(unpublished))
     )
@@ -639,7 +648,8 @@ def _vintages_frame(
         "instrument_id": [instrument.id] * len(rows),
         "observation_date": [row[0] for row in rows],
         "vintage_date": [row[1] for row in rows],
-        "value": [row[2] for row in rows],
+        "value": [float("nan") if row[2] is None else row[2] for row in rows],
+        "withdrawn": [row[2] is None for row in rows],
         "available_at_utc": [row[3] for row in rows],
         "source": [download.source] * len(rows),
         "source_fetch_id": [download.fetch_id] * len(rows),
@@ -1043,10 +1053,10 @@ class EuronextNormalizer:
         return NormalizedData(bars=bars, rejected=rejected)
 
 
-def _fred_style_observations(
+def _fred_style_cells(
     raw: pd.DataFrame, instrument: Instrument, value_column: str, what: str
-) -> dict[date, float]:
-    """Return the observations of a St. Louis Fed graph CSV.
+) -> dict[date, float | None]:
+    """Return every cell of a St. Louis Fed graph CSV, missing ones included.
 
     Parameters
     ----------
@@ -1062,10 +1072,11 @@ def _fred_style_observations(
 
     Returns
     -------
-    dict[date, float]
-        One entry per published observation. An empty field (and the ``"."``
-        of older exports) becomes an absent row rather than a ``NaN``: a
-        missing observation does not exist, it does not equal "unknown".
+    dict[date, float | None]
+        One entry per row of the frame: the number, or ``None`` for an empty
+        field or the ``"."`` of older exports. What a missing cell means is the
+        caller's to say - on FRED no observation, in an ALFRED vintage a
+        withdrawal.
 
     Raises
     ------
@@ -1079,7 +1090,7 @@ def _fred_style_observations(
     if missing:
         raise ValueError(f"{what} series of {instrument.id} lacks column(s): {', '.join(missing)}")
     seen: set[date] = set()
-    observations: dict[date, float] = {}
+    observations: dict[date, float | None] = {}
     for text_date, text_value in zip(
         raw[FRED_DATE_COLUMN].astype(str), raw[value_column].astype(str), strict=True
     ):
@@ -1089,11 +1100,44 @@ def _fred_style_observations(
         seen.add(observation)
         text = text_value.strip()
         if text in FRED_MISSING_MARKERS:
+            observations[observation] = None
             continue
         observations[observation] = _finite_number(
             text, f"{what} {value_column} of {instrument.id} on {observation}"
         )
     return observations
+
+
+def _fred_style_observations(
+    raw: pd.DataFrame, instrument: Instrument, value_column: str, what: str
+) -> dict[date, float]:
+    """Return the observations of a St. Louis Fed graph CSV.
+
+    Parameters
+    ----------
+    raw : pd.DataFrame
+        The provider frame, every cell a string.
+    instrument : Instrument
+        Instrument the frame belongs to, quoted in the messages.
+    value_column : str
+        Column holding the values.
+    what : str
+        How to name the source in an error message.
+
+    Returns
+    -------
+    dict[date, float]
+        One entry per published observation. A missing cell becomes an absent
+        row rather than a ``NaN``: a missing observation does not exist, it
+        does not equal "unknown".
+
+    Raises
+    ------
+    ValueError
+        As :func:`_fred_style_cells`.
+    """
+    cells = _fred_style_cells(raw, instrument, value_column, what)
+    return {day: value for day, value in cells.items() if value is not None}
 
 
 class FredNormalizer:
@@ -1215,7 +1259,7 @@ class AlfredNormalizer:
             levels, rejected = _levels_frame(instrument, download, rule, observations, calendar)
             return NormalizedData(levels=levels, rejected=rejected)
         by_vintage = {
-            vintage: _fred_style_observations(
+            vintage: _fred_style_cells(
                 download.frame,
                 instrument,
                 vintage_column(instrument.source_symbol, vintage),
