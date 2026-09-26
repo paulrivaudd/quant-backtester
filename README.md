@@ -736,9 +736,9 @@ momentum_vix        2024-01-02 2026-09-17       37.65%   47.78%   12.53%    0.96
 
 Over eight years the simplest things win. Half and half, rebalanced monthly,
 beats everything; the rotation earns, gross, what the equal weight keeps net,
-and hands twenty-three points of it to 86 switches. The VIX gate does what it
+and hands twenty-three points of it to 86 sessions of switching. The VIX gate does what it
 says - its worst fall is a third smaller over the whole history, and its
-Sharpe ratio is the best of 2019-2021 - and pays for it twice: 214 trades, and
+Sharpe ratio is the best of 2019-2021 - and pays for it twice: 214 sessions of trading, and
 the rebounds it sits out. In 2022-2023 both rotations lose money net, the gated
 one even before costs. None of this is a verdict on momentum: two funds are
 the thinnest universe a ranking can have, and over these years the S&P 500

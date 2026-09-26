@@ -731,3 +731,20 @@ def test_the_mutation_guard_sees_the_definition_and_not_a_closure(
     assert first.fingerprint == second.fingerprint
     assert not first.holdings().equals(second.holdings())
     assert first.holdings().equals(fresh.holdings())
+
+
+def test_two_fills_on_one_session_are_one_rebalancing_and_two_fills(
+    runner: StrategyRunner,
+) -> None:
+    """Audit A17: the table's ``trades`` counted sessions, and a session can fill two orders."""
+    result = runner.run(
+        BuyAndHold(instruments=("ETF_EU", "ETF_OTHER")),
+        ["ETF_EU", "ETF_OTHER"],
+        "2026-09-09",
+        "2026-09-14",
+    )
+    report = result.report()
+
+    assert len(result.fills()) == 2
+    assert report.quality.fills == 2
+    assert report.costs.rebalancings == 1
