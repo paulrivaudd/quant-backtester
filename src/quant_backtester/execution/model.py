@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Collection, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from enum import Enum
 from typing import Final
@@ -191,11 +191,18 @@ class Execution:
 
 @dataclass(frozen=True, slots=True)
 class _Line:
-    """An order with what it takes to fill it."""
+    """An order with what it takes to fill it.
+
+    ``executable`` is the most of the order that may be filled: the order's own
+    quantity, or less for a purchase whose cash-share budget pays for less at
+    the fill price. The order keeps the quantity asked for, so the record says
+    both what was asked and what the budget allowed.
+    """
 
     order: Order
     market_price: float
     step: float | None
+    executable: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -304,7 +311,11 @@ class ExecutionModel:
             (decision D21): with 100 of cash, a share of 0.5 and a minimum
             commission of 10, the line buys 40 and pays 10, and 50 is left.
             Taking the commission off the whole cash before the share left 45
-            (audit N06).
+            (audit N06). The budget holds at the price actually paid: a
+            quantity fixed at the decision's close is cut to what the share
+            pays for at the open, costs included, and the cut is recorded as
+            ``CASH_SHARE_BUDGET``; a lower open never buys more than was
+            decided (audit of archive 10).
         decision_closes : Mapping[str, float] | None
             The closes knowable at the decision, for every instrument held or
             targeted that had one. Required with ``Sizing.AT_DECISION``, which
@@ -408,7 +419,17 @@ class ExecutionModel:
         scale = self._affordable_scale(buys, book.cash)
         for line in buys:
             quantity = self._scaled(line, scale)
-            cut = line.order.quantity - quantity if quantity > 0.0 else line.order.quantity
+            capped = line.order.quantity - line.executable
+            if capped > LOT_TOLERANCE * line.order.quantity:
+                rejects.append(
+                    ExecutionReject(
+                        line.order.instrument_id,
+                        ExecutionRejectReason.CASH_SHARE_BUDGET,
+                        Side.BUY,
+                        capped,
+                    )
+                )
+            cut = line.executable - quantity if quantity > 0.0 else line.executable
             if quantity > 0.0:
                 fill = self._fill(line, quantity)
                 book = book.bought(fill.instrument_id, fill.quantity, -fill.cash_flow, at)
@@ -558,6 +579,13 @@ class ExecutionModel:
                         at=at,
                         in_universe=instrument_id in universe,
                     )
+                    if line is not None and line.order.side is Side.BUY and instrument_id in shares:
+                        line, refusal = self._within_budget(
+                            line, state.cash * shares[instrument_id]
+                        )
+                        if refusal is not None:
+                            side, quantity = Side.BUY, line.order.quantity
+                            line = None
                     if line is not None:
                         (buys if line.order.side is Side.BUY else sells).append(line)
             if refusal is not None:
@@ -591,13 +619,55 @@ class ExecutionModel:
                 return None, ExecutionRejectReason.OUTSIDE_TRADING_UNIVERSE, Side.BUY, buy
             if buy * self.costs.fill_price(Side.BUY, price) < self.minimum_trade_value:
                 return None, ExecutionRejectReason.BELOW_MINIMUM_TRADE, Side.BUY, buy
-            return _Line(Order(instrument_id, Side.BUY, buy, at), price, step), None, None, None
+            line = _Line(Order(instrument_id, Side.BUY, buy, at), price, step, buy)
+            return line, None, None, None
         sell = _units_to_sell(value, sizing_price, held, step)
         if sell > 0.0:
             if sell * self.costs.fill_price(Side.SELL, price) < self.minimum_trade_value:
                 return None, ExecutionRejectReason.BELOW_MINIMUM_TRADE, Side.SELL, sell
-            return _Line(Order(instrument_id, Side.SELL, sell, at), price, step), None, None, None
+            line = _Line(Order(instrument_id, Side.SELL, sell, at), price, step, sell)
+            return line, None, None, None
         return None, None, None, None
+
+    def _within_budget(
+        self, line: _Line, budget: float
+    ) -> tuple[_Line, ExecutionRejectReason | None]:
+        """Cap a cash-share purchase at what its budget pays for at the fill price.
+
+        Parameters
+        ----------
+        line : _Line
+            The purchase, sized on the decision's close or the auction's price.
+        budget : float
+            Its share of the cash held before any trade, costs included.
+
+        Returns
+        -------
+        tuple[_Line, ExecutionRejectReason | None]
+            The line with ``executable`` cut to the whole lots the budget pays
+            for at the opening price, commission, spread and slippage included
+            - never above the quantity asked for, so a lower open does not buy
+            more than was decided - and ``BELOW_MINIMUM_TRADE`` when what is
+            left is under the minimum trade value.
+
+        Notes
+        -----
+        Checked with the fill itself: if rounding leaves the booked debit of
+        the capped quantity above the budget, one lot less is taken (audit of
+        archive 10).
+        """
+        price = self.costs.fill_price(Side.BUY, line.market_price)
+        affordable = _units_to_buy(self._spendable(budget), price, 0.0, line.step)
+        executable = min(line.order.quantity, affordable)
+        for _ in range(64):
+            if executable <= 0.0 or -self._fill(line, executable).cash_flow <= budget:
+                break
+            # One lot less, or - without lots - a hair less: the overshoot is
+            # the last bit of a division, never a whole unit.
+            executable = max(0.0, executable - (line.step or executable * 1e-12))
+        if executable * price < self.minimum_trade_value:
+            return line, ExecutionRejectReason.BELOW_MINIMUM_TRADE
+        return replace(line, executable=executable), None
 
     def _fill(self, line: _Line, quantity: float) -> Fill:
         """Return the fill of ``quantity`` units of a line's order."""
@@ -615,7 +685,7 @@ class ExecutionModel:
         is worth less than the minimum trade value - an order cut below the
         threshold is exactly the order the threshold exists to stop.
         """
-        wanted = line.order.quantity
+        wanted = line.executable
         if scale >= 1.0:
             return wanted
         if line.step is None:

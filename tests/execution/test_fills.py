@@ -158,4 +158,5 @@ def test_the_reasons_are_the_ones_the_specification_lists() -> None:
         "OUTSIDE_TRADING_UNIVERSE",
         "CURRENCY_MISMATCH",
         "NO_DECISION_PRICE",
+        "CASH_SHARE_BUDGET",
     }
