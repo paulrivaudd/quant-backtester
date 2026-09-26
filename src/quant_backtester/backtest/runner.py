@@ -681,6 +681,13 @@ def value_benchmark(
     valued at today's revision of a price would be measuring the strategy
     against a series that did not exist while it was running.
 
+    The wealth is chained over the benchmark's own sessions - every close
+    knowable at the valuation instant since the last one counted - and read at
+    the run's valuation instants: a run on another calendar reads the same
+    wealth on the days both hold (decision D13). A close the store does not
+    have is not invented: the dividend of that session is reinvested at the
+    next close there is.
+
     A session the benchmark's own venue did not hold, or whose close is
     missing, is marked at the last close that existed, and named. A benchmark
     that is no longer listed is not: the run stops a book holding a delisted
@@ -721,25 +728,39 @@ def value_benchmark(
             last = (row["observation_date"], close)
             first_observed = row["observation_date"]
         elif close is not None and row["observation_date"] > last[0]:
-            # Every action known now, not yet counted, whose ex-date falls
-            # after the first close and by this one: an action announced late
-            # is counted on the first session it is known, never back-dated.
+            # Walk the benchmark's own closes since the last one counted, not
+            # just the one of this valuation: a dividend whose ex-date is a
+            # session the run's calendar does not hold is reinvested at its own
+            # close, as the convention says, and not at the next close the run
+            # happens to look at (audit R02, decision D13). Only closes
+            # knowable now are walked.
             actions = market.corporate_actions(instrument.id)
             keys = list(zip(actions["ex_date"], actions["action_type"], strict=True))
-            due = [
-                key not in counted and first_observed < key[0] <= row["observation_date"]
-                for key in keys
+            since: date = last[0]
+            until: date = row["observation_date"]
+            closes = market.history(instrument.id, BarField.CLOSE, start=since)
+            days: list[date] = list(closes.index)
+            steps = [
+                (day, float(price))
+                for day, price in zip(days, closes, strict=True)
+                if since < day <= until
             ]
-            events = actions.loc[due]
-            wealth *= session_growth(
-                instrument.id,
-                previous_close=last[1],
-                close=close,
-                events=events,
-                basis=specification.basis,
-            )
-            counted.update(key for key, take in zip(keys, due, strict=True) if take)
-            last = (row["observation_date"], close)
+            steps_from = last[1]
+            for day, price in steps:
+                # Each action is counted on the step whose close is the first
+                # on or after its ex-date; one announced late is counted on the
+                # first step after it is known, never back-dated.
+                due = [key not in counted and first_observed < key[0] <= day for key in keys]
+                wealth *= session_growth(
+                    instrument.id,
+                    previous_close=steps_from,
+                    close=price,
+                    events=actions.loc[due],
+                    basis=specification.basis,
+                )
+                counted.update(key for key, take in zip(keys, due, strict=True) if take)
+                steps_from = price
+            last = (until, steps_from)
         if status is not ObservationStatus.OK:
             stale.append(record.session_date)
         path.append(wealth)

@@ -463,3 +463,60 @@ def test_a_benchmark_is_not_carried_past_its_delisting(
 
     with pytest.raises(ValueError, match="stopped trading"):
         value_benchmark(result.backtest, market, "ETF_OTHER")
+
+
+def test_a_dividend_on_a_session_the_run_does_not_hold_is_reinvested_at_its_own_close(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    make_actions: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+    xnys: TradingCalendar,
+) -> None:
+    """Audit R02: the run's calendar skipped the ex-date, and the chain skipped it too.
+
+    Paris is shut on Good Friday and Easter Monday; New York is not. The index
+    goes 100, 90 (ex-dividend 10), 100, 110. Reinvested at the ex-date's close,
+    as TOTAL_RETURN says, one unit becomes (90 + 10) / 100 x 100 / 90 x 110 / 100
+    = 1.2222; chained only over the run's two sessions it was (110 + 10) / 100.
+    """
+    thursday, friday, monday, tuesday = (date(2026, 4, day) for day in (2, 3, 6, 7))
+    market = make_market(
+        {
+            "ETF_EU": make_bars("ETF_EU", xpar, {thursday: 100.0, tuesday: 100.0}),
+            "IDX_US": make_bars(
+                "IDX_US", xnys, {thursday: 100.0, friday: 90.0, monday: 100.0, tuesday: 110.0}
+            ),
+        },
+        actions=make_actions(
+            [
+                (
+                    "IDX_US",
+                    ActionType.DIVIDEND,
+                    friday,
+                    10.0,
+                    datetime(2026, 4, 3, 13, 30, tzinfo=ZoneInfo("UTC")),
+                )
+            ]
+        ),
+    )
+    runner = StrategyRunner(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        base_currency="EUR",
+        analytics=CONFIG,
+        execution=FREE,
+        initial_cash=10_000.0,
+        timetable=PARIS,
+    )
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], thursday, tuesday)
+
+    curve = value_benchmark(
+        result.backtest, market, BenchmarkSpec("IDX_US", basis=BenchmarkBasis.TOTAL_RETURN)
+    )
+
+    assert [record.session_date for record in result.records()] == [thursday, tuesday]
+    assert curve.equity.iloc[-1] / curve.equity.iloc[0] == pytest.approx(
+        (90.0 + 10.0) / 100.0 * 100.0 / 90.0 * 110.0 / 100.0
+    )
