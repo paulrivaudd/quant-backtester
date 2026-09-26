@@ -1033,3 +1033,22 @@ def test_the_environment_is_part_of_the_run_id(runner: StrategyRunner, tmp_path:
     assert environment["python"].startswith("3.12")  # type: ignore[index]
     assert environment["pandas"]  # type: ignore[index]
     assert first.run_id != other.run_id
+
+
+def test_a_run_can_fix_its_quantities_at_the_decision(runner: StrategyRunner) -> None:
+    """C04: the other sizing model runs through the engine, and says which one it is."""
+    from dataclasses import replace as replaced
+
+    from quant_backtester.execution.model import Sizing
+
+    overnight = replaced(
+        runner, execution=ExecutionModel(costs=CostModel(), sizing=Sizing.AT_DECISION)
+    )
+
+    result = overnight.run(
+        BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14"
+    )
+
+    assert result.configuration["execution"]["fill_model"] == "DECISION_CLOSE_QUANTITIES"  # type: ignore[index]
+    assert len(result.fills()) == 1
+    assert "DECISION_CLOSE_QUANTITIES" in result.report().render()

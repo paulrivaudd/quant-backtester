@@ -225,6 +225,11 @@ class ExecutionRejectReason(Enum):
     the portfolio layer first; this is the last guard, as for
     ``NON_TRADABLE``."""
 
+    NO_DECISION_PRICE = "NO_DECISION_PRICE"
+    """Quantities are fixed at the decision's close, and the instrument had no
+    close then to fix them on. Not guessed from the open: that would be the
+    other sizing model."""
+
 
 @dataclass(frozen=True, slots=True)
 class ExecutionReject:

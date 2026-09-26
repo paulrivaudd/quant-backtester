@@ -38,6 +38,8 @@ import math
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from enum import Enum
+from typing import Final
 
 from quant_backtester.data.instruments import InstrumentRegistry
 from quant_backtester.data.reader import Observation, ObservationStatus
@@ -53,6 +55,28 @@ from quant_backtester.execution.rounding import LOT_TOLERANCE, is_whole_lots, wh
 from quant_backtester.numbers import require_finite_non_negative, require_unit_fraction
 from quant_backtester.portfolio.state import PortfolioState, UnvaluablePosition
 from quant_backtester.portfolio.targets import WEIGHT_SUM_TOLERANCE
+
+
+class Sizing(Enum):
+    """Which prices and which book an order's quantity is fixed on."""
+
+    AT_AUCTION = "AT_AUCTION"
+    """The opening auction's prices and the book valued at them: an allocation
+    in notional at a price already known. ``OPEN_AUCTION_NOTIONAL``."""
+
+    AT_DECISION = "AT_DECISION"
+    """The decision's closes and the book valued at them: quantities fixed the
+    evening before, filled at the open whatever it prints, and cut to the cash
+    there is. ``DECISION_CLOSE_QUANTITIES``. What an account placing its
+    orders overnight does; the measure of how much the first model idealises
+    (audit of archive 9, C04)."""
+
+
+FILL_MODELS: Final[dict[Sizing, str]] = {
+    Sizing.AT_AUCTION: "OPEN_AUCTION_NOTIONAL",
+    Sizing.AT_DECISION: "DECISION_CLOSE_QUANTITIES",
+}
+"""The name each sizing is recorded and reported under."""
 
 FILL_MODEL = "OPEN_AUCTION_NOTIONAL"
 """The name of the one fill model here, recorded with every run.
@@ -200,6 +224,7 @@ class ExecutionModel:
 
     costs: CostModel
     minimum_trade_value: float = 0.0
+    sizing: Sizing = Sizing.AT_AUCTION
 
     def __post_init__(self) -> None:
         """Reject a threshold that is not a value, or a cost model that is not one."""
@@ -210,7 +235,7 @@ class ExecutionModel:
     def definition(self) -> dict[str, object]:
         """Return the model as it is recorded with a run."""
         return {
-            "fill_model": FILL_MODEL,
+            "fill_model": FILL_MODELS[self.sizing],
             "fill": "market order at the opening auction, sized at its price",
             "costs": self.costs.definition(),
             "minimum_trade_value": self.minimum_trade_value,
@@ -231,6 +256,7 @@ class ExecutionModel:
         hold: bool = False,
         keep: Collection[str] = (),
         cash_shares: Mapping[str, float] | None = None,
+        decision_closes: Mapping[str, float] | None = None,
     ) -> Execution:
         """Trade the book towards the target weights, at one execution instant.
 
@@ -279,6 +305,11 @@ class ExecutionModel:
             commission of 10, the line buys 40 and pays 10, and 50 is left.
             Taking the commission off the whole cash before the share left 45
             (audit N06).
+        decision_closes : Mapping[str, float] | None
+            The closes knowable at the decision, for every instrument held or
+            targeted that had one. Required with ``Sizing.AT_DECISION``, which
+            fixes each quantity on them and on the book valued at them; the
+            order is still filled at the open, and cut to the cash there is.
 
         Returns
         -------
@@ -346,6 +377,7 @@ class ExecutionModel:
             {name: weight for name, weight in target.items() if name not in keep},
             keep=frozenset(keep),
             cash_shares=cash_shares or {},
+            decision_closes=decision_closes,
             equity=equity,
             at=at,
             session=session,
@@ -469,9 +501,19 @@ class ExecutionModel:
         universe: Collection[str],
         keep: frozenset[str] = frozenset(),
         cash_shares: Mapping[str, float] | None = None,
+        decision_closes: Mapping[str, float] | None = None,
     ) -> tuple[list[_Line], list[_Line], list[ExecutionReject]]:
         """Return the sales, the purchases and the rejects the target calls for."""
         shares = cash_shares or {}
+        at_decision = self.sizing is Sizing.AT_DECISION
+        if at_decision and decision_closes is None:
+            raise ValueError("quantities fixed at the decision need the decision's closes")
+        closes = decision_closes or {}
+        if at_decision:
+            # The book as the decision valued it: held lines at their closes.
+            equity = state.cash + math.fsum(
+                holding.quantity * closes.get(name, 0.0) for name, holding in state.holdings.items()
+            )
         sells: list[_Line] = []
         buys: list[_Line] = []
         rejects: list[ExecutionReject] = []
@@ -499,10 +541,13 @@ class ExecutionModel:
                         if quote.value is None
                         else ExecutionRejectReason.STALE_EXECUTION_PRICE
                     )
+                elif at_decision and instrument_id not in closes:
+                    refusal = ExecutionRejectReason.NO_DECISION_PRICE
                 else:
                     line, refusal, side, quantity = self._line(
                         instrument_id,
                         price=price,
+                        sizing_price=closes[instrument_id] if at_decision else price,
                         value=(
                             self._spendable(state.cash * shares[instrument_id])
                             if instrument_id in shares
@@ -524,6 +569,7 @@ class ExecutionModel:
         instrument_id: str,
         *,
         price: float,
+        sizing_price: float,
         value: float,
         held: float,
         step: float | None,
@@ -539,14 +585,14 @@ class ExecutionModel:
             side and the quantity refused. All four are ``None`` when the line
             is already at its target, to within a lot.
         """
-        buy = _units_to_buy(value, self.costs.fill_price(Side.BUY, price), held, step)
+        buy = _units_to_buy(value, self.costs.fill_price(Side.BUY, sizing_price), held, step)
         if buy > 0.0:
             if not in_universe:
                 return None, ExecutionRejectReason.OUTSIDE_TRADING_UNIVERSE, Side.BUY, buy
             if buy * self.costs.fill_price(Side.BUY, price) < self.minimum_trade_value:
                 return None, ExecutionRejectReason.BELOW_MINIMUM_TRADE, Side.BUY, buy
             return _Line(Order(instrument_id, Side.BUY, buy, at), price, step), None, None, None
-        sell = _units_to_sell(value, price, held, step)
+        sell = _units_to_sell(value, sizing_price, held, step)
         if sell > 0.0:
             if sell * self.costs.fill_price(Side.SELL, price) < self.minimum_trade_value:
                 return None, ExecutionRejectReason.BELOW_MINIMUM_TRADE, Side.SELL, sell
