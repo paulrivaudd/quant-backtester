@@ -990,3 +990,23 @@ def test_a_run_may_end_on_the_last_session_its_calendar_covers(
         date(2026, 12, 30),
         date(2026, 12, 31),
     ]
+
+
+def _reads_a_rate(ctx: StrategyContext) -> TargetAllocation:
+    """Invest in ETF_EU when a rate the strategy reads directly is positive."""
+    rate = ctx.market.value("RATE_US")
+    if rate.value is not None and rate.value > 0.0:
+        return ctx.weights({"ETF_EU": 0.5})
+    return ctx.cash()
+
+
+def test_a_series_read_through_the_market_view_is_named_in_the_report(
+    runner: StrategyRunner,
+) -> None:
+    """Audit N08: a rate read by ctx.market decided the book and was absent from the report."""
+    reading = FunctionalStrategy(strategy_id="rate_reader", decision=_reads_a_rate)
+
+    result = runner.run(reading, ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    assert "RATE_US" in result.configuration["history_basis"]  # type: ignore[operator]
+    assert "RATE_US" in result.report().render()

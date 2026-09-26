@@ -243,10 +243,14 @@ class StrategyMarketView:
     closes are read once per decision whether a signal or a strategy asks.
     """
 
-    __slots__ = ("__context",)
+    __slots__ = ("__context", "__read")
 
-    def __init__(self, context: SignalContext) -> None:
+    def __init__(self, context: SignalContext, read: set[str] | None = None) -> None:
         self.__context = context
+        # Every instrument this view is asked about is noted, so a run can
+        # say what the history of each series it read is - including those
+        # no signal declared (audit N08, decision D23).
+        self.__read: set[str] = set() if read is None else read
 
     def __repr__(self) -> str:
         """Return a representation that names the instant and nothing else."""
@@ -281,6 +285,7 @@ class StrategyMarketView:
             configuration mistake, not an empty reading.
         """
         self.__context.instruments.get(instrument_id)
+        self.__read.add(instrument_id)
         frame = self.__context.market.values([instrument_id], field)
         row = frame.iloc[0]
         value = row["value"]
@@ -351,6 +356,7 @@ class StrategyMarketView:
         not the window anybody asking for twenty sessions meant.
         """
         require_positive_int(observations, "observations")
+        self.__read.add(instrument_id)
         loaded = load_window(
             self.__context,
             instrument_id,
