@@ -82,16 +82,49 @@ def test_requiring_a_stale_value_refuses_rather_than_returning_it(
         observation.require()
 
 
-def test_a_value_nobody_published_is_not_a_nan(view: StrategyMarketView) -> None:
-    """``None`` rather than a NaN: every comparison against a NaN is false."""
-    observation = view.value("ETF_LATE", BarField.OPEN)
-    listed = view.value("ETF_EU")
+def test_an_instrument_not_yet_listed_is_a_typed_absence(
+    market: MarketDataReader,
+    make_context: Callable[[MarketDataReader, datetime], SignalContext],
+    evening: Callable[[date], datetime],
+) -> None:
+    """Audit A04: ``pd.NA`` for the age used to raise inside the view.
 
-    assert listed.value is not None
-    if observation.value is None:
-        assert not observation.usable()
-        with pytest.raises(UnavailableMarketData):
-            observation.require()
+    ``ETF_LATE`` lists on 9 September; asked on the 1st, the answer is that
+    there is nothing, said with a status - not a pandas error, not a NaN.
+    """
+    before_listing = StrategyMarketView(make_context(market, evening(date(2026, 9, 1))))
+
+    observation = before_listing.value("ETF_LATE", BarField.OPEN)
+
+    assert observation.status is ObservationStatus.NOT_LISTED
+    assert observation.value is None
+    assert observation.age_sessions is None
+    assert not observation.usable()
+    with pytest.raises(UnavailableMarketData):
+        observation.require()
+
+
+def test_a_session_with_no_usable_value_is_a_typed_absence(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    make_context: Callable[[MarketDataReader, datetime], SignalContext],
+    evening: Callable[[date], datetime],
+    xpar: TradingCalendar,
+    sessions: tuple[date, ...],
+) -> None:
+    """A contested close is a hole, and the view says ``MISSING`` without failing."""
+    day = sessions[0]
+    market = make_market(
+        {"ETF_EU": make_bars("ETF_EU", xpar, {day: 100.0}, contested={day: (BarField.CLOSE,)})}
+    )
+    view = StrategyMarketView(make_context(market, evening(day)))
+
+    observation = view.value("ETF_EU")
+
+    assert observation.status is ObservationStatus.MISSING
+    assert observation.value is None
+    assert observation.age_sessions is None
+    assert not observation.usable()
 
 
 def test_an_instrument_nobody_declared_is_a_wiring_mistake(
