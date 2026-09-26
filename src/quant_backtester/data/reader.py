@@ -50,11 +50,12 @@ comparable, which is what a strategy actually needs to decide.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from enum import Enum
-from typing import Final
+from typing import Final, cast
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -242,6 +243,18 @@ def _is_contested(conflicting_fields: object, field: BarField) -> bool:
     """
     listed = str(conflicting_fields)
     return bool(listed) and field.value in listed.split(",")
+
+
+def _contested(conflicting_fields: pd.Series, field: BarField) -> pd.Series:
+    """Return, row by row, whether the cross-check found this field contested.
+
+    The vectorised form of :func:`_is_contested`, and held to it by a test that
+    compares the two cell by cell: ``field`` must be one of the comma-separated
+    names of the cell, whole - ``close`` is not contested by ``closed``, nor by
+    ``low, close`` written with a space. A missing cell contests nothing.
+    """
+    pattern = rf"(?:^|,){re.escape(field.value)}(?:,|$)"
+    return conflicting_fields.astype("string").str.contains(pattern, regex=True, na=False)
 
 
 def _field_availability(session: Session, field: BarField) -> datetime:
@@ -766,9 +779,7 @@ class PointInTimeReader:
         """
         if instrument.data_type is DataType.BAR:
             stored = self._repository.load_checked_bars(instrument.id, start=start, end=end)
-            stored = stored.loc[
-                [not _is_contested(cell, field) for cell in stored["conflicting_fields"]]
-            ]
+            stored = stored.loc[~_contested(cast(pd.Series, stored["conflicting_fields"]), field)]
             observation_date = stored["session_date"]
             value = stored[field.value]
             available_at = stored[AVAILABILITY_COLUMN[field]]
@@ -782,11 +793,13 @@ class PointInTimeReader:
             observation_date = stored["observation_date"]
             value = stored["value"]
             available_at = stored["available_at_utc"]
+        # The instants stay a datetime array end to end: turned into Python
+        # objects and inferred back, they cost more than everything else here.
         rows = pd.DataFrame(
             {
                 "observation_date": observation_date.to_numpy(),
                 "value": value.to_numpy(dtype="float64"),
-                "available_at_utc": available_at.to_numpy(),
+                "available_at_utc": available_at.array,
             }
         )
         rows = rows.loc[rows["available_at_utc"] <= self._as_of]
