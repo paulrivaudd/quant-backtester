@@ -601,7 +601,27 @@ class BacktestEngine:
             # only. An order refused there is not carried: the next decision
             # replaces it, and on a monthly schedule that is a month away.
             "decision_lifetime": "one execution",
+            # What each instrument the run reads is, as a record of the past:
+            # a RESTATED series read by a signal is look-ahead the report has
+            # to name (audit, section 7.3).
+            "history_basis": {
+                name: (basis.value if (basis := self.instruments.get(name).history_basis) else None)
+                for name in sorted(set(members) | self._requested_names(sessions))
+            },
         }
+
+    def _requested_names(self, sessions: Sequence[date]) -> set[str]:
+        """Return every instrument a declared signal names on any session of the run."""
+        names: set[str] = set()
+        for item in self._declared_signals():
+            if not isinstance(item, SignalRequest):
+                continue
+            for session in sessions:
+                resolved = item.resolved(session).names()
+                if resolved is None:
+                    break
+                names.update(resolved)
+        return names
 
 
 def _canonical(item: Signal | SignalRequest, session_date: date) -> Signal | SignalRequest:

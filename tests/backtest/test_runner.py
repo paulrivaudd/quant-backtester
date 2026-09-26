@@ -895,3 +895,79 @@ def test_what_a_caller_does_to_a_benchmark_it_was_handed_changes_nothing_kept(
 
     assert result.compare().benchmark.total_return == before
     assert result.benchmark().equity.iloc[-1] != 99_999.0
+
+
+def test_a_calendar_handed_over_in_memory_is_part_of_the_run_id(
+    runner: StrategyRunner, xpar: TradingCalendar, xnys: TradingCalendar
+) -> None:
+    """Audit R07: one id, ``XPAR``, and one more holiday made no difference to ``run_id``.
+
+    The holiday added here is outside the run, so the records are the same and
+    the calendars are not: the identity follows the inputs, not the outputs.
+    """
+    from dataclasses import replace as replaced
+    from datetime import time as clock
+
+    stated = xpar.definition()
+    holidays = [date.fromisoformat(str(day)) for day in stated["holidays"]]  # type: ignore[union-attr]
+    early = stated["early_closes"]
+    assert isinstance(early, dict)
+    shifted = TradingCalendar(
+        calendar_id="XPAR",
+        timezone=str(stated["timezone"]),
+        regular_open=clock.fromisoformat(str(stated["regular_open"])),
+        regular_close=clock.fromisoformat(str(stated["regular_close"])),
+        holidays=frozenset({*holidays, date(2026, 11, 11)}),
+        early_closes={
+            date.fromisoformat(day): clock.fromisoformat(at) for day, at in early.items()
+        },
+        covered_from=xpar.covered_from,
+        covered_until=xpar.covered_until,
+    )
+    other = replaced(runner, calendars=CalendarRegistry([xnys, shifted]))
+    strategy = BuyAndHold(instruments=("ETF_EU",))
+
+    first = runner.run(strategy, ["ETF_EU"], "2026-09-09", "2026-09-14")
+    second = other.run(strategy, ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    pd.testing.assert_frame_equal(first.frame(), second.frame())
+    assert first.run_id != second.run_id
+    assert first.configuration["inputs"] != second.configuration["inputs"]
+
+
+def test_an_instrument_edited_in_memory_is_part_of_the_run_id(
+    runner: StrategyRunner, repository: MarketDataRepository
+) -> None:
+    from dataclasses import replace as replaced
+
+    from quant_backtester.data.instruments import InstrumentRegistry
+
+    registry = runner.reader.instruments
+    edited = InstrumentRegistry(
+        [
+            replaced(instrument, name=instrument.name + " (edited)")
+            if instrument.id == "ETF_OTHER"
+            else instrument
+            for instrument in registry
+        ]
+    )
+    reader = MarketDataReader(
+        repository=repository,
+        instruments=edited,
+        calendars=runner.reader.calendars,
+        reference_calendar_id="XPAR",
+    )
+    strategy = BuyAndHold(instruments=("ETF_EU",))
+
+    first = runner.run(strategy, ["ETF_EU"], "2026-09-09", "2026-09-14")
+    second = replaced(runner, reader=reader).run(strategy, ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    assert first.run_id != second.run_id
+
+
+def test_a_report_names_the_history_basis_of_what_the_run_read(runner: StrategyRunner) -> None:
+    """Section 7.3: a RESTATED series read by a signal is a look-ahead to name, not to bury."""
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    assert result.configuration["history_basis"] == {"ETF_EU": None}
+    assert "history read: UNDECLARED ETF_EU" in result.report().render()

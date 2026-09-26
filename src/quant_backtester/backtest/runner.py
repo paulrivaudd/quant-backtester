@@ -93,6 +93,39 @@ class StoreChanged(RuntimeError):
     """
 
 
+def _digest(value: object) -> str:
+    """Return the SHA-256 of a value rendered as canonical JSON."""
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _inputs_digest(reader: MarketDataReader, calendars: CalendarRegistry) -> dict[str, str]:
+    """Return the digests of the registries a run was handed, whatever made them.
+
+    The store's digest covers ``metadata/`` as files; a registry built in
+    memory, or edited after it was loaded, is covered by nothing there. Two
+    calendars sharing the id ``XPAR`` and differing by one holiday gave one
+    configuration and one ``run_id`` for two different runs (audit R07,
+    decision D15). Every calendar and every instrument a run could have read
+    is hashed as it was handed over - a superset of what it did read, which
+    errs towards telling runs apart.
+    """
+    return {
+        "calendars": _digest(sorted((c.definition() for c in calendars), key=_calendar_key)),
+        "reader_calendars": _digest(
+            sorted((c.definition() for c in reader.calendars), key=_calendar_key)
+        ),
+        "instruments": _digest(
+            sorted((i.definition() for i in reader.instruments), key=lambda d: str(d["id"]))
+        ),
+    }
+
+
+def _calendar_key(definition: Mapping[str, object]) -> str:
+    """Return the id a calendar definition is sorted by."""
+    return str(definition["calendar_id"])
+
+
 def _plain(value: object) -> object:
     """Return a frozen configuration as built-ins JSON can render."""
     if isinstance(value, Mapping):
@@ -592,6 +625,7 @@ class StrategyRunner:
                 "benchmark": benchmark.definition() if benchmark is not None else None,
                 "source": result.source.definition(),
                 "data_state": state.digest,
+                "inputs": _inputs_digest(self.reader, self.calendars),
             },
             reader=self.reader,
             data_state=state,

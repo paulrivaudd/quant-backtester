@@ -240,12 +240,21 @@ def _assumptions(result: BacktestResult) -> tuple[str, ...]:
     limits = portfolio.get("limits") if isinstance(portfolio, Mapping) else None
     applies_to = limits.get("applies_to") if isinstance(limits, Mapping) else None
     lifetime = configuration.get("decision_lifetime")
+    bases = configuration.get("history_basis")
+    by_basis: dict[str, list[str]] = {}
+    if isinstance(bases, Mapping):
+        for name, basis in bases.items():
+            by_basis.setdefault(str(basis or "UNDECLARED"), []).append(str(name))
+    history = "; ".join(
+        f"{basis} {', '.join(sorted(names))}" for basis, names in sorted(by_basis.items())
+    )
     return (
         f"fills: {fill_model or 'not recorded'} - sized and filled at the next opening price",
         "gross: the same fills with no cost taken out - not a separate cost-free run",
         "cash: earns nothing; the risk-free rate is used by the Sharpe ratio only",
         f"limits: cap {applies_to or 'not recorded'}",
         f"a decision lives: {lifetime or 'not recorded'}; a refused order is not retried",
+        f"history read: {history or 'not recorded'}",
     )
 
 
