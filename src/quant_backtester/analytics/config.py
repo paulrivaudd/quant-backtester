@@ -11,7 +11,7 @@ committed code plus committed configuration.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +66,20 @@ class AnalyticsConfig:
             raise ValueError(
                 f"risk_free_rate is an annual fraction above -1, got {self.risk_free_rate}"
             )
+
+    def definition(self) -> dict[str, object]:
+        """Return every field of the convention, as it is recorded with a run.
+
+        Returns
+        -------
+        dict[str, object]
+            One entry per dataclass field, read from the fields themselves: a
+            convention added later is recorded without anyone remembering to.
+            Leaving ``minimum_sessions`` out made two runs whose annualised
+            return was ``0.0`` in one and ``None`` in the other record the same
+            configuration (audit A13).
+        """
+        return {field.name: getattr(self, field.name) for field in fields(self)}
 
     @property
     def risk_free_per_session(self) -> float:
