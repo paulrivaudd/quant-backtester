@@ -271,10 +271,14 @@ class ExecutionModel:
             others are traded: no order, and no reject, is built for them. Their
             value still counts in the equity every other order is sized on.
         cash_shares : Mapping[str, float] | None
-            Lines sized on a share of the cash the book holds at ``at``, net of
-            the commission the purchase will pay, instead of a share of the
-            equity: a basket completed with the cash left buys with that cash,
-            whatever the lines already held did overnight (decision D12).
+            Lines sized on a share of the cash the book holds at ``at``,
+            instead of a share of the equity: a basket completed with the cash
+            left buys with that cash, whatever the lines already held did
+            overnight (decision D12). A share is a budget, commission included
+            (decision D21): with 100 of cash, a share of 0.5 and a minimum
+            commission of 10, the line buys 40 and pays 10, and 50 is left.
+            Taking the commission off the whole cash before the share left 45
+            (audit N06).
 
         Returns
         -------
@@ -500,7 +504,7 @@ class ExecutionModel:
                         instrument_id,
                         price=price,
                         value=(
-                            self._spendable(state.cash) * shares[instrument_id]
+                            self._spendable(state.cash * shares[instrument_id])
                             if instrument_id in shares
                             else equity * weight
                         ),

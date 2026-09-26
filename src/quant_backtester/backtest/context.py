@@ -530,10 +530,11 @@ class StrategyContext:
         ----------
         purchases : Mapping[str, float]
             Share of the book's cash to spend on each instrument not held yet,
-            together at most one. The cash is the cash at the execution
-            instant, net of the commission: the lines already held can move
-            overnight, and a share of equity fixed at the close would then buy
-            more or less than the cash there is (audit R05, decision D12).
+            together at most one, commission included: what is not shared out
+            is kept (decision D21). The cash is the cash at the execution
+            instant: the lines already held can move overnight, and a share of
+            equity fixed at the close would then buy more or less than the
+            cash there is (audit R05, decision D12).
         among : Selection | None
             What the strategy was choosing among, as for :meth:`cash`.
 

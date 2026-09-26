@@ -105,6 +105,7 @@ def trade(
     universe: Collection[str] = EVERYTHING,
     hold: bool = False,
     keep: Collection[str] = (),
+    cash_shares: Mapping[str, float] | None = None,
 ) -> Execution:
     """Rebalance at ``AT``; a bare number is an opening price of the session itself."""
     quotes = {
@@ -123,6 +124,7 @@ def trade(
         universe=universe,
         hold=hold,
         keep=keep,
+        cash_shares=cash_shares,
     )
 
 
@@ -823,3 +825,36 @@ def test_a_kept_line_is_never_rejected_either() -> None:
 
     assert kept.rejects == ()
     assert [order.instrument_id for order in kept.orders] == ["B"]
+
+
+@pytest.mark.parametrize(
+    ("share", "bought", "left"),
+    [(0.5, 40.0, 50.0), (1.0, 90.0, 0.0)],
+    ids=["half", "all"],
+)
+def test_a_cash_share_is_a_budget_commission_included(
+    share: float, bought: float, left: float
+) -> None:
+    """Audit N06: a share of 0.5 of 100 spent 55 once a minimum commission of 10 was paid."""
+    floor = ExecutionModel(costs=CostModel(minimum_commission=10.0))
+
+    done = trade(floor, book(100.0), {"A": share}, {"A": 1.0}, cash_shares={"A": share})
+
+    assert done.state.quantity("A") == pytest.approx(bought)
+    assert done.state.cash == pytest.approx(left)
+
+
+def test_two_cash_shares_each_pay_their_own_commission() -> None:
+    floor = ExecutionModel(costs=CostModel(minimum_commission=10.0))
+
+    done = trade(
+        floor,
+        book(100.0),
+        {"A": 0.5, "B": 0.5},
+        {"A": 1.0, "B": 1.0},
+        cash_shares={"A": 0.5, "B": 0.5},
+    )
+
+    assert done.state.quantity("A") == pytest.approx(40.0)
+    assert done.state.quantity("B") == pytest.approx(40.0)
+    assert done.state.cash == pytest.approx(0.0)
