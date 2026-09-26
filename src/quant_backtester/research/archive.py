@@ -54,6 +54,10 @@ MANIFEST = "manifest.json"
 """The file that makes a kept run complete: written last, and naming every other one."""
 
 
+STORE_LOCK = "store/.lock"
+"""The lock file a repository opened on the kept store creates; not part of the run."""
+
+
 class ArchiveError(ValueError):
     """Raised when a kept run cannot be trusted: another format, or a file that changed."""
 
@@ -238,11 +242,19 @@ def read_back(directory: Path) -> KeptRun:
     present = {
         path.relative_to(directory).as_posix()
         for path in directory.rglob("*")
-        if path.is_file() and path.name != MANIFEST
+        if path.is_file() and path.relative_to(directory).as_posix() != MANIFEST
     }
-    if present != set(files):
+    missing = sorted(set(files) - present)
+    # The one file a kept run may gain: the lock a repository opened on the
+    # kept store creates to read it. Replaying the run from its own store is
+    # what the copy is for, and doing it must not make the run unreadable
+    # (audit of archive 10). Only that exact path, and only when the manifest
+    # does not name it; every file it names is still checked below.
+    unexpected = sorted(present - set(files) - {STORE_LOCK})
+    if missing or unexpected:
         raise ArchiveError(
-            f"{directory} holds {sorted(present ^ set(files))} its manifest does not agree on"
+            f"{directory} does not hold what its manifest names: missing {missing}, "
+            f"unexpected {unexpected}"
         )
     for relative, digest in files.items():
         if _sha256(directory / relative) != digest:
