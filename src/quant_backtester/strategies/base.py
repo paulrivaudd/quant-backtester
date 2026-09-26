@@ -14,7 +14,10 @@ the recommended form is a frozen dataclass whose fields *are* the parameters.
 
 A strategy holds no mutable state between decisions. Anything path-dependent -
 what is held, what it is worth, how the market has moved - comes from the
-context, which is the only thing that knows which day it is.
+context, which is the only thing that knows which day it is. The engine checks
+that the declared definition did not change during a run; it cannot check that
+nothing else did - a closure, a global, a file - so that part of the contract
+rests on the author (audit A14).
 """
 
 from __future__ import annotations

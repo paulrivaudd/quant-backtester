@@ -57,7 +57,11 @@ class FunctionalStrategy(Strategy):
     -----
     Frozen, like every strategy: the function is called once per session and
     must not accumulate anything between calls. What is path-dependent comes
-    from the context, which is the only thing that knows which day it is.
+    from the context, which is the only thing that knows which day it is. The
+    fingerprint records the function's module and name and the declared
+    parameters, not what the function closes over: a counter kept in a
+    closure changes the decisions and neither the fingerprint nor the
+    engine's check sees it (audit A14).
 
     ``frozen=True`` on its own only stops the fields being reassigned. A
     mapping passed in stays the caller's object, so mutating it afterwards
