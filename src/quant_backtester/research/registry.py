@@ -26,6 +26,7 @@ from pathlib import Path
 
 from quant_backtester.backtest.runner import StrategyResult
 from quant_backtester.provenance import SourceStatus
+from quant_backtester.research.journal import exclusive
 from quant_backtester.signals.types import require_identifier
 
 
@@ -214,16 +215,19 @@ class ExperimentRegistry:
             is: the same run registered twice would be counted twice, and an
             experiment renamed would be counted as a new idea.
         """
-        for known in self.records():
-            if known.experiment_id == record.experiment_id:
-                raise UnrecordableRun(f"{record.experiment_id} is already registered")
-            if known.run_id == record.run_id:
-                raise UnrecordableRun(
-                    f"{record.experiment_id} is the run {known.experiment_id} already registered"
-                )
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(record.as_json() + "\n")
+        # Checked and appended under one lock: two writers that both read
+        # before either wrote registered the same run twice (audit N07).
+        with exclusive(self.path):
+            for known in self.records():
+                if known.experiment_id == record.experiment_id:
+                    raise UnrecordableRun(f"{record.experiment_id} is already registered")
+                if known.run_id == record.run_id:
+                    raise UnrecordableRun(
+                        f"{record.experiment_id} is the run {known.experiment_id} already "
+                        "registered"
+                    )
+            with self.path.open("a", encoding="utf-8") as handle:
+                handle.write(record.as_json() + "\n")
 
     def variants(self) -> Mapping[str, int]:
         """Return how many experiments each hypothesis took, rejected ones included."""
