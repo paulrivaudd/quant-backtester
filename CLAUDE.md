@@ -37,13 +37,15 @@ src/quant_backtester/
     backtest/     the event loop that advances time
     analytics/    performance, risk, attribution, reporting
     strategies/   concrete strategies composed from the layers above
+    research/     the experiment register and the paper-trading plans
 tests/            mirrors the package layout
 market_data/      metadata/ is committed; raw/, clean/ and validation/ are not
 ```
 
 Dependencies flow one way: `data -> signals -> portfolio -> execution ->
-backtest -> analytics`. A lower layer must never import a higher one. If a
-layer needs something from above, the dependency is wrong - pass it in.
+backtest -> analytics`, with `research` on top of everything. A lower layer
+must never import a higher one. If a layer needs something from above, the
+dependency is wrong - pass it in.
 
 ## Design principles
 

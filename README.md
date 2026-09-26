@@ -726,10 +726,10 @@ this README - five basis points of commission with a one-euro floor, two of
 half spread, one of slippage, no order under five hundred euros - and 100,000
 euros each time. Every line is a `StrategyResult` carrying its configuration,
 its fingerprint and the state of the code, followed by its refused orders by
-reason; the table takes about five minutes. `--suite readme` prints every
-other figure of this README, and `--records DIR` writes each run's sessions,
-orders, fills, rejects and holdings so that two versions of the code can be
-compared run for run.
+reason; `--suite all` takes a little over two minutes. `--suite readme` prints
+every other figure of this README, and `--records DIR` writes each run's
+sessions, orders, fills, rejects and holdings so that two versions of the code
+can be compared run for run.
 
 ```text
 strategy            period                         net    gross   a year  sharpe   max dd     costs  rebal.  fills  rejects  est.  vs world
@@ -783,6 +783,25 @@ cash a switch leaves once the sale has paid its costs, and buy and hold has
 none at all - it keeps its positions and sends nothing. `est.` counts the
 sessions a position was valued on an older close: the contested bar of
 24 October 2025.
+
+## Research: what is left to test, and how
+
+Every session of 2018 to 2026 on `ROTATION_2` has been looked at, and those
+results shaped choices, so none of that history is out of sample any more. The
+test left is the future. [`research/PROTOCOL.md`](research/PROTOCOL.md) writes
+the rules down before any experiment they govern:
+
+- two paper plans, committed before their start on 2026-10-01 and fixed by the
+  strategy's fingerprint - the reference rotation, and buy and hold of the
+  world fund as its control. `scripts/paper_trade.py` runs them forward and
+  appends each new session to a log that is never rewritten; a changed rule, or
+  a logged session that comes out differently, stops it;
+- every research backtest appended to `research/registry.jsonl`, rejected ones
+  included and only from committed code, so a result is always read with the
+  number of variants it took (`run_baselines.py --register` registers the
+  suites' runs);
+- neighbourhoods rather than points, rolling start dates, twice the costs, and
+  an executable baseline over the same sessions before any variant is kept.
 
 ## What a strategy may not do
 

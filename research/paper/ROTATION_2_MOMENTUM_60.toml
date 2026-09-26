@@ -1,0 +1,9 @@
+# Committed on 2026-09-26, before its start. See research/PROTOCOL.md.
+name = "ROTATION_2_MOMENTUM_60"
+start = 2026-10-01
+universe = "ROTATION_2"
+# MomentumRotation(lookback_sessions=60, top_n=1), decided every session.
+strategy_fingerprint = "e39e51e878ce26f7490ec3581141b49511dede109ccf114cdce4deca615f8a68"
+note = """The README's reference rotation, run forward on sessions nobody has \
+seen. It is judged against ROTATION_2_BUY_AND_HOLD after 12 months, net of \
+costs, with exposure, turnover and drawdown beside the return."""
