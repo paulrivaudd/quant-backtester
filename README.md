@@ -636,16 +636,29 @@ sixty-session momentum run from January reads the previous October, because the
 reader has always been allowed to look back and never forward. A bound that is
 not a session moves inwards to one that is. And the result carries what the
 numbers depend on — period, universe, calendar, rebalancing schedule, starting
-cash, limits, costs, fill timetable, annualisation — beside the strategy's own
-definition and fingerprint, because a Sharpe ratio without them is not a
-result. All of it frozen: a record of an experiment that can be edited
-afterwards is a record of nothing.
+cash, limits, costs, fill model and timetable, annualisation convention — beside
+the strategy's own definition and fingerprint, because a Sharpe ratio without
+them is not a result. All of it frozen: a record of an experiment that can be
+edited afterwards is a record of nothing.
+
+The data is part of it too. A run holds the store for reading from its first
+session to its last - an ingestion started meanwhile is refused, not
+interleaved - and records the SHA-256 of every file under `clean/` and
+`metadata/`. The declared benchmark is valued inside that hold and kept; any
+other benchmark asked for later is valued only if the store still has the same
+digest, and `StoreChanged` is raised otherwise, since a revised close would
+otherwise move the conclusion of a finished run. `run_id` hashes the whole
+record: the same question asked of other data is another run.
 
 A fingerprint hashes a *configuration*, never the source that read it, so two
 runs of an edited `decide` share one. What tells them apart is the state of the
 code - the commit, and whether the tree had changes nobody committed - given
 to the runner and recorded as given, `UNRECORDED` when nobody said. Scripts get
-it from `git_source_state`; the library never guesses it.
+it from `git_source_state`; the library never guesses it. Nor does a
+fingerprint see what a function closes over: the engine checks that the
+declared definition did not change during a run, and a counter kept in a
+closure changes the decisions without changing it. Build a fresh strategy per
+run.
 
 The rebalancing calendar is declared per run rather than inside the strategy,
 so one rule can be tested at several frequencies without being written twice:
