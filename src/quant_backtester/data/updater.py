@@ -68,6 +68,7 @@ from quant_backtester.data.instruments import (
     PublicationRule,
     VintagePolicy,
 )
+from quant_backtester.data.known_gaps import GapKind, KnownGaps
 from quant_backtester.data.normalizer import NormalizedData, Normalizer
 from quant_backtester.data.repository import MarketDataRepository, TransactionDoomed
 from quant_backtester.data.revisions import (
@@ -150,6 +151,9 @@ class HistoryCoverage:
         For a ``BAR``, the stored sessions the cross-check marked
         ``CONFLICT``: present on disk, and served as holes. ``None`` for a
         published series.
+    known_gaps : tuple[date, ...]
+        The sessions of ``metadata/known_gaps.toml`` for this instrument:
+        missing, and reviewed as such.
     """
 
     instrument_id: str
@@ -160,6 +164,14 @@ class HistoryCoverage:
     raw_fetches: int
     missing_sessions: tuple[date, ...] | None = None
     contested_sessions: tuple[date, ...] | None = None
+    known_gaps: tuple[date, ...] = ()
+
+    @property
+    def unexplained_sessions(self) -> tuple[date, ...] | None:
+        """Return the missing sessions nobody has reviewed, ``None`` for a published series."""
+        if self.missing_sessions is None:
+            return None
+        return tuple(day for day in self.missing_sessions if day not in self.known_gaps)
 
     @property
     def spans_declared_window(self) -> bool:
@@ -181,16 +193,17 @@ class HistoryCoverage:
         Returns
         -------
         bool
-            For a ``BAR``: the span reaches both ends and no session inside it
-            is missing. Contested sessions do not make it incomplete - they are
-            stored - and are reported beside it. For a published series, only
-            :attr:`spans_declared_window` can be said, and that is what this
-            returns; :attr:`missing_sessions` being ``None`` is how a reader
-            knows the inside was not checked.
+            For a ``BAR``: the span reaches both ends and every session inside
+            it is either stored or a reviewed gap. Contested sessions do not
+            make it incomplete - they are stored - and are reported beside it.
+            For a published series, only :attr:`spans_declared_window` can be
+            said, and that is what this returns; :attr:`missing_sessions`
+            being ``None`` is how a reader knows the inside was not checked.
         """
         if not self.spans_declared_window:
             return False
-        return self.missing_sessions is None or not self.missing_sessions
+        unexplained = self.unexplained_sessions
+        return unexplained is None or not unexplained
 
     @property
     def missing_head(self) -> tuple[date, date] | None:
@@ -644,6 +657,10 @@ class MarketDataUpdater:
         ``metadata/crosscheck.toml``. Required, and passed in like the accepted
         revisions: it decides which bars a strategy is allowed to see, so it is
         committed configuration rather than a default living in code.
+    known_gaps : KnownGaps
+        Sessions reviewed as missing, declared in ``metadata/known_gaps.toml``.
+        Coverage tells them apart from gaps nobody has looked at, and a fetch
+        that starts serving one is refused until it is reviewed again.
     overlap_sessions : int
         How far back an update re-fetches, to detect provider revisions.
     clock : Callable[[], datetime]
@@ -653,7 +670,8 @@ class MarketDataUpdater:
     Raises
     ------
     ValueError
-        If ``overlap_sessions`` is negative.
+        If ``overlap_sessions`` is negative, or a gap reviewed as a dropped
+        bar has no bar correction dropping it.
     """
 
     def __init__(
@@ -667,11 +685,20 @@ class MarketDataUpdater:
         action_corrections: ActionCorrections,
         bar_corrections: BarCorrections,
         cross_check_policy: CrossCheckPolicy,
+        known_gaps: KnownGaps,
         overlap_sessions: int = 5,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         if overlap_sessions < 0:
             raise ValueError(f"overlap_sessions must be zero or more, got {overlap_sessions}")
+        for gap in known_gaps:
+            if gap.kind is GapKind.BAR_DROPPED and gap.session_date not in (
+                bar_corrections.sessions(gap.instrument_id)
+            ):
+                raise ValueError(
+                    f"{gap.instrument_id} {gap.session_date} is reviewed as a dropped bar and "
+                    "no bar correction drops it"
+                )
         self._repository = repository
         self._instruments = instruments
         self._calendars = calendars
@@ -681,6 +708,7 @@ class MarketDataUpdater:
         self._action_corrections = action_corrections
         self._bar_corrections = bar_corrections
         self._cross_check_policy = cross_check_policy
+        self._known_gaps = known_gaps
         self._overlap_sessions = overlap_sessions
         self._clock = clock
 
@@ -944,6 +972,7 @@ class MarketDataUpdater:
             raw_fetches=fetches,
             missing_sessions=missing,
             contested_sessions=contested,
+            known_gaps=tuple(sorted(self._known_gaps.sessions(instrument.id))),
         )
 
     def update_all(self) -> dict[str, ValidationReport]:
@@ -1609,9 +1638,23 @@ class MarketDataUpdater:
     ) -> list[ValidationIssue]:
         """Run the validator on every frame of one fetch."""
         issues: list[ValidationIssue] = []
-        for _, frame in sorted(frames.items()):
+        for source_id, frame in sorted(frames.items()):
             if instrument.data_type is DataType.BAR:
                 issues += list(validate_bars(instrument, frame, self._venue_of(instrument)).issues)
+                if source_id == instrument.primary_source:
+                    issues += [
+                        _issue(
+                            "KNOWN_GAP_SERVED",
+                            Severity.ERROR,
+                            instrument.id,
+                            gap.session_date,
+                            f"{instrument.id} {gap.session_date} is reviewed as a session "
+                            f"{source_id} serves no bar for ({gap.hypothesis}), and it now "
+                            "serves one: review the gap before this fetch is promoted",
+                            {"reviewed_on": gap.reviewed_on.isoformat()},
+                        )
+                        for gap in self._known_gaps.served_anyway(instrument.id, frame)
+                    ]
             elif instrument.vintage_policy is VintagePolicy.AS_OF_DECISION:
                 # One vintage at a time: inside one, the rules about a
                 # published series are exactly the level rules, and across

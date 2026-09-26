@@ -252,6 +252,14 @@ class BarCorrections:
         kept = frame.drop(frame.index[drop]).reset_index(drop=True)
         return kept, tuple(applied)
 
+    def sessions(self, instrument_id: str) -> frozenset[date]:
+        """Return the sessions of an instrument some source's bar is dropped on."""
+        return frozenset(
+            correction.session_date
+            for correction in self._corrections
+            if correction.instrument_id == instrument_id
+        )
+
     def __len__(self) -> int:
         """Return how many decisions were reviewed."""
         return len(self._corrections)

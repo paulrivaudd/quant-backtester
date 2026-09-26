@@ -32,6 +32,7 @@ from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.corporate_actions import ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy
 from quant_backtester.data.instruments import InstrumentRegistry
+from quant_backtester.data.known_gaps import KnownGaps
 from quant_backtester.data.normalizer import NORMALIZERS
 from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.revisions import AcceptedRevisions
@@ -85,6 +86,7 @@ def build_updater(root: Path) -> MarketDataUpdater:
         action_corrections=ActionCorrections.from_toml(metadata / "corporate_actions.toml"),
         bar_corrections=BarCorrections.from_toml(metadata / "bar_corrections.toml"),
         cross_check_policy=CrossCheckPolicy.from_toml(metadata / "crosscheck.toml"),
+        known_gaps=KnownGaps.from_toml(metadata / "known_gaps.toml"),
     )
 
 
@@ -117,13 +119,15 @@ def coverage_line(coverage: HistoryCoverage) -> str:
     else:
         inside = [
             day
-            for day in coverage.missing_sessions
+            for day in coverage.unexplained_sessions or ()
             if coverage.stored_from is not None
             and coverage.stored_until is not None
             and coverage.stored_from < day < coverage.stored_until
         ]
-        parts = ends + ([f"{len(inside)} session(s) inside"] if inside else [])
+        parts = ends + ([f"{len(inside)} unreviewed session(s) inside"] if inside else [])
         gaps = "complete" if not parts else "MISSING " + ", ".join(parts)
+        if coverage.known_gaps:
+            gaps += f", {len(coverage.known_gaps)} reviewed gap(s)"
         if coverage.contested_sessions:
             gaps += f", {len(coverage.contested_sessions)} contested"
     return f"{coverage.instrument_id:<14} {span:<26} {coverage.raw_fetches:>3} fetch(es)  {gaps}"
