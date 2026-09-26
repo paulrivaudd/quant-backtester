@@ -53,6 +53,7 @@ from quant_backtester.data.universes import UniverseRegistry
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.provenance import git_source_state
+from quant_backtester.research.archive import keep
 from quant_backtester.research.registry import ExperimentRegistry, record_of
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
@@ -237,6 +238,10 @@ class Keeping:
     ----------
     records : Path | None
         Directory for each run's CSVs, or ``None``.
+    kept : Path | None
+        Directory each run is kept in whole - sessions, curves, report, and a
+        copy of the store it read - so it reads back and recomputes without
+        the live store; or ``None``.
     registry : ExperimentRegistry | None
         The experiment register each run is appended to, or ``None``. Every
         run is registered under its label as the hypothesis, so the register
@@ -245,11 +250,14 @@ class Keeping:
 
     records: Path | None = None
     registry: ExperimentRegistry | None = None
+    kept: Path | None = None
 
     def keep(self, result: StrategyResult, name: str, hypothesis: str) -> None:
-        """Write a run's records and register it, as asked."""
+        """Write a run's records, keep it whole, and register it, as asked."""
         if self.records is not None:
             write_records(result, self.records, name)
+        if self.kept is not None:
+            keep(result, self.kept / name, store=MarketDataRepository(STORE))
         if self.registry is not None:
             self.registry.register(
                 record_of(
@@ -329,6 +337,12 @@ def main() -> None:
         help="write every run's sessions, orders, fills, rejects and holdings there",
     )
     parser.add_argument(
+        "--keep",
+        type=Path,
+        metavar="DIR",
+        help="keep every run whole there, with a copy of the store it read",
+    )
+    parser.add_argument(
         "--register",
         action="store_true",
         help="append every run to research/registry.jsonl (committed code only)",
@@ -337,6 +351,7 @@ def main() -> None:
     keeping = Keeping(
         records=arguments.records,
         registry=ExperimentRegistry(REGISTRY) if arguments.register else None,
+        kept=arguments.keep,
     )
     periods = [parse_period(item) for item in arguments.period or []] or list(PERIODS)
     runs = runner()
