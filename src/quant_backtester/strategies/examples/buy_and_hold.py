@@ -40,13 +40,19 @@ class BuyAndHold(Strategy):
     nothing is done about it. That is what "hold" means, and it is why this
     strategy pays for exactly one rebalancing over a run of any length.
 
-    How it knows it has already bought: the book. Nothing is held on the first
-    session of a run, so the target is the purchase; from the moment a position
-    exists, the decision is to keep the positions as they are, and no order is
-    sent - not the weights of the close restated at the next open, which would
-    trade the overnight drift every morning. If that first order could not be
-    sent - no opening price, not enough cash - nothing is held, and the
-    purchase is simply attempted again at the next decision.
+    How it knows what it has bought: the book. Nothing is held on the first
+    session of a run, so the target is the purchase in equal parts. Once every
+    name is held, the decision is to keep the positions as they are, and no
+    order is sent - not the weights of the close restated at the next open,
+    which would trade the overnight drift every morning.
+
+    Between the two, the basket is completed (decision D5 of the 2026-09-26
+    audit). A name whose first purchase could not go through - no opening
+    price, too little cash, a lot too large for its share - is bought at the
+    next decision with the cash the book still has, split equally among the
+    names still missing; the names already held are kept, and never traded
+    back to equal weights. It used to switch to holding as soon as one name
+    was held, and a basket of two could stay half in cash for good.
     """
 
     instruments: tuple[str, ...]
@@ -67,7 +73,13 @@ class BuyAndHold(Strategy):
             )
 
     def decide(self, ctx: StrategyContext) -> TargetAllocation:
-        """Buy while the book is empty, then keep what is there without trading."""
-        if not ctx.portfolio.quantities:
+        """Buy the basket, complete it with the cash left, then keep it untouched."""
+        held = ctx.portfolio.quantities
+        missing = [name for name in self.instruments if name not in held]
+        if len(missing) == len(self.instruments):
             return ctx.equal_weight(self.instruments)
-        return ctx.hold_positions()
+        if not missing:
+            return ctx.hold_positions()
+        book = ctx.portfolio
+        cash = book.cash / book.equity if book.equity > 0.0 else 0.0
+        return ctx.keep_and_buy({name: cash / len(missing) for name in missing})

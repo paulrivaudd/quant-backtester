@@ -441,6 +441,7 @@ class BacktestEngine:
             base_currency=self.config.base_currency,
             universe=self._members(session_date),
             hold=decision.holds_positions,
+            keep=decision.kept,
         )
 
     def _value(
@@ -526,6 +527,15 @@ class BacktestEngine:
             raise ValueError(
                 "a decision to keep the positions must record the book as it is: it asked "
                 f"for {dict(requested.weights)} and the book was {dict(ctx.portfolio.weights)}"
+            )
+        book = dict(ctx.portfolio.weights)
+        misrecorded = sorted(
+            name for name in requested.kept if requested.weights[name] != book.get(name)
+        )
+        if misrecorded:
+            raise ValueError(
+                f"{', '.join(misrecorded)} is kept at a weight that is not the book's: a kept "
+                "line is recorded as it is"
             )
         return self.portfolio.decide(
             requested,

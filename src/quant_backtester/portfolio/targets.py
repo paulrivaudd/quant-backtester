@@ -68,6 +68,12 @@ class TargetAllocation:
         checked to be exactly that by the engine. A risk limit still overrules
         it: a held book that breaches a limit is traded down to the limit, like
         any other target.
+    kept : frozenset[str]
+        Instruments whose positions are kept exactly as they are while the
+        rest of the book is traded - a hold of some lines rather than of all.
+        Their weights are the book's own, checked by the engine; they get no
+        order however far their prices move overnight. Empty when
+        ``hold_positions`` is set, which already keeps everything.
 
     Raises
     ------
@@ -76,7 +82,8 @@ class TargetAllocation:
         not a finite fraction of ``[0, 1]``, weights adding up to more than
         the whole book, a selection that does not match the weights, a count
         of instruments considered below the number chosen, a reason that is
-        not a :class:`SignalStatus`, or a naive ``as_of``.
+        not a :class:`SignalStatus`, a kept instrument without a weight, a
+        partial keep beside a whole hold, or a naive ``as_of``.
 
     Notes
     -----
@@ -110,6 +117,7 @@ class TargetAllocation:
     considered: int = 0
     skipped: Mapping[str, SignalStatus] = field(default_factory=lambda: MappingProxyType({}))
     hold_positions: bool = False
+    kept: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         """Check the decision is one a portfolio could hold, then freeze it."""
@@ -153,6 +161,16 @@ class TargetAllocation:
         both = sorted(set(skipped) & set(selected))
         if both:
             raise ValueError(f"{', '.join(both)} is both selected and skipped")
+        kept = frozenset(self.kept)
+        unweighted = sorted(kept - set(weights))
+        if unweighted:
+            raise ValueError(
+                f"{', '.join(unweighted)} is kept and has no weight: a kept line is one the "
+                "book holds, recorded at the weight it has"
+            )
+        if kept and self.hold_positions:
+            raise ValueError("a decision holding every position has no lines to keep apart")
+        object.__setattr__(self, "kept", kept)
         object.__setattr__(self, "weights", MappingProxyType(weights))
         object.__setattr__(self, "selected", selected)
         object.__setattr__(self, "considered", considered)

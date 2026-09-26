@@ -630,3 +630,73 @@ def test_nothing_is_promoted_while_a_run_reads_the_store(
 
     with pytest.raises(StoreBusy):
         runner.run(writer, ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+
+def test_a_basket_whose_first_purchase_was_partial_is_completed_then_kept(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+) -> None:
+    """Audit A07, end to end.
+
+    ETF_OTHER has no opening price on 10 September, so the first execution
+    buys ETF_EU alone. The next one buys ETF_OTHER with the cash left; after
+    that nothing is traded, and ETF_EU was never touched again.
+    """
+    from quant_backtester.data.schemas import BarField
+
+    market = make_market(
+        {
+            "ETF_EU": make_bars("ETF_EU", xpar, prices(100.0, 1.0)),
+            "ETF_OTHER": make_bars(
+                "ETF_OTHER",
+                xpar,
+                prices(200.0, 3.0),
+                contested={date(2026, 9, 10): (BarField.OPEN,)},
+            ),
+        }
+    )
+    free = StrategyRunner(
+        reader=market,
+        calendars=calendars,
+        reference_calendar_id="XPAR",
+        base_currency="EUR",
+        analytics=CONFIG,
+        initial_cash=10_000.0,
+        execution=ExecutionModel(costs=CostModel()),
+        timetable=PARIS,
+    )
+
+    result = free.run(
+        BuyAndHold(instruments=("ETF_EU", "ETF_OTHER")),
+        ["ETF_EU", "ETF_OTHER"],
+        "2026-09-09",
+        "2026-09-14",
+    )
+
+    fills = result.fills()
+    assert list(zip(fills["session_date"], fills["instrument_id"], strict=True)) == [
+        (date(2026, 9, 10), "ETF_EU"),
+        (date(2026, 9, 11), "ETF_OTHER"),
+    ]
+    holdings = result.holdings()
+    assert holdings["ETF_EU"].tolist()[1:] == [holdings["ETF_EU"].iloc[1]] * 3
+    assert holdings["ETF_OTHER"].tolist() == [0.0, 0.0] + [holdings["ETF_OTHER"].iloc[2]] * 2
+    assert holdings["cash"].iloc[-1] < 0.01 * result.equity().iloc[-1]
+
+
+def _keeps_what_it_does_not_hold(ctx: StrategyContext) -> TargetAllocation:
+    """Claim to keep a line the book does not have."""
+    return TargetAllocation(as_of=ctx.as_of, weights={"ETF_EU": 0.3}, kept=frozenset({"ETF_EU"}))
+
+
+def test_a_kept_line_must_be_recorded_at_the_book_weight(runner: StrategyRunner) -> None:
+    """Keeping is a statement about the book, and the engine checks it."""
+    from quant_backtester.strategies.functional import FunctionalStrategy
+
+    liar = FunctionalStrategy(strategy_id="liar", decision=_keeps_what_it_does_not_hold)
+
+    with pytest.raises(ValueError, match="not the book's"):
+        runner.run(liar, ["ETF_EU"], "2026-09-09", "2026-09-14")
