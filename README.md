@@ -427,6 +427,7 @@ assumptions
   cash: earns nothing; the risk-free rate is used by the Sharpe ratio only
   limits: cap target weights, before costs
   a decision lives: one execution; a refused order is not retried
+  history read: ASSUMED_UNREVISED ETF_SP500_PEA, ETF_WORLD
 ```
 
 Three points of return went to execution — **a sixth of everything the idea
