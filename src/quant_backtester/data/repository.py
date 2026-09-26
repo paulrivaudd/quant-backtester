@@ -39,9 +39,23 @@ the fetch instant. That is what answers "what did Yahoo actually give us on
 
 ``clean/`` is entirely derived and disposable: it is a pure function of the raw
 snapshots, the accepted revisions, the calendars and the normalizer version.
+
+POSIX only (decision D11 of the 2026-09-26 audit of the corrections): the lock
+is an ``flock``, which has the shared mode a reading run needs, and native
+Windows has no equivalent in the standard library. Importing this module there
+fails at once with a message saying so, rather than with ``No module named
+'fcntl'``.
 """
 
 from __future__ import annotations
+
+import sys
+
+if sys.platform == "win32":  # pragma: no cover - exercised in a subprocess by the tests
+    raise ImportError(
+        "quant-backtester runs on POSIX systems (Linux, macOS, WSL): the market data store "
+        "is locked with flock, which native Windows does not provide. Run it under WSL."
+    )
 
 import fcntl
 import functools

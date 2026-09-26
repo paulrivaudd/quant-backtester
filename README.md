@@ -292,7 +292,10 @@ snapshot.result("momentum_60d").ok()  # the rows a strategy may use
 
 ## Getting started
 
-Requires [uv](https://docs.astral.sh/uv/) and Python 3.12.
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.12, on a POSIX system -
+Linux, macOS or WSL. The market data store is locked with `flock`, which has
+the shared mode a reading run needs and which native Windows does not
+provide; importing the store there fails with a message saying so.
 
 ```bash
 uv sync                          # create the environment from uv.lock
