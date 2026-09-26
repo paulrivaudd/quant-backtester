@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import date, time
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -17,11 +18,12 @@ import pytest
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.curves import Book
 from quant_backtester.backtest.context import StrategyContext
-from quant_backtester.backtest.runner import StrategyRunner
+from quant_backtester.backtest.runner import StoreChanged, StrategyRunner
 from quant_backtester.backtest.schedule import EveryNSessions
 from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.data.repository import MarketDataRepository, StoreBusy
 from quant_backtester.data.universes import Membership, StaticUniverse, Universe
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
@@ -543,3 +545,88 @@ def test_the_result_hands_back_every_view_of_the_run(runner: StrategyRunner) -> 
     assert list(result.weights().columns) == ["ETF_EU"]
     assert list(result.target_weights().columns) == ["ETF_EU"]
     assert result.costs()["total_cost"].sum() == pytest.approx(result.backtest.total_cost)
+
+
+# --- a finished run does not move when the store does (audit A05) ------------------
+
+
+def test_a_revision_after_the_run_changes_neither_its_benchmark_nor_its_records(
+    runner: StrategyRunner,
+    repository: MarketDataRepository,
+    make_bars: Callable[..., pd.DataFrame],
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+    sessions: tuple[date, ...],
+) -> None:
+    """A close revised from 227 to 999 used to move a finished run's comparison.
+
+    The declared benchmark was valued during the run and is kept. Any other
+    benchmark would have to be read now, from a store that is no longer the
+    one the run read, and is refused.
+    """
+    declared = with_benchmark(runner, "ETF_OTHER")
+    result = declared.run(
+        BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], sessions[0], sessions[-1]
+    )
+    curve = list(result.benchmark().equity)
+    compared = result.compare().benchmark.total_return
+    records = result.frame()
+
+    revised = prices(200.0, 3.0)
+    revised[sessions[-1]] = 999.0
+    repository.save_checked_bars("ETF_OTHER", make_bars("ETF_OTHER", xpar, revised))
+
+    assert list(result.benchmark().equity) == curve
+    assert result.compare().benchmark.total_return == compared
+    pd.testing.assert_frame_equal(result.frame(), records)
+    with pytest.raises(StoreChanged, match="no longer holds"):
+        result.benchmark("ETF_EU")
+
+
+def test_another_benchmark_is_valued_while_the_store_is_unchanged(runner: StrategyRunner) -> None:
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    assert len(result.benchmark("ETF_OTHER").equity) == len(result.records())
+
+
+def test_the_run_id_names_the_data_as_well_as_the_question(
+    runner: StrategyRunner,
+    repository: MarketDataRepository,
+    make_bars: Callable[..., pd.DataFrame],
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+) -> None:
+    """Same strategy, same code, other data: same fingerprint, another run."""
+    strategy = BuyAndHold(instruments=("ETF_EU",))
+    first = runner.run(strategy, ["ETF_EU"], "2026-09-09", "2026-09-14")
+    again = runner.run(strategy, ["ETF_EU"], "2026-09-09", "2026-09-14")
+    repository.save_checked_bars("ETF_OTHER", make_bars("ETF_OTHER", xpar, prices(300.0, 1.0)))
+    later = runner.run(strategy, ["ETF_EU"], "2026-09-09", "2026-09-14")
+
+    assert first.run_id == again.run_id
+    assert first.fingerprint == later.fingerprint
+    assert first.run_id != later.run_id
+    assert first.configuration["data_state"] != later.configuration["data_state"]
+    assert first.data_state.files != later.data_state.files
+
+
+def _writes_while_deciding(ctx: StrategyContext) -> TargetAllocation:
+    """Try to promote data mid-run, standing for another process."""
+    MarketDataRepository(_STORE[0]).append_revisions(pd.DataFrame())
+    return ctx.cash()
+
+
+_STORE: list[Path] = []
+
+
+def test_nothing_is_promoted_while_a_run_reads_the_store(
+    runner: StrategyRunner, repository: MarketDataRepository
+) -> None:
+    """The run holds the store: a writer during it is refused, not interleaved."""
+    from quant_backtester.strategies.functional import FunctionalStrategy
+
+    _STORE[:] = [repository.root]
+    writer = FunctionalStrategy(strategy_id="writer", decision=_writes_while_deciding)
+
+    with pytest.raises(StoreBusy):
+        runner.run(writer, ["ETF_EU"], "2026-09-09", "2026-09-14")

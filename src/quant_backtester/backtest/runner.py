@@ -35,9 +35,12 @@ does not.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
+from enum import Enum
 
 import pandas as pd
 from matplotlib.figure import Figure
@@ -62,6 +65,7 @@ from quant_backtester.backtest.schedule import DecisionSchedule, EverySession
 from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus
+from quant_backtester.data.repository import StoreState
 from quant_backtester.data.schemas import ActionType, BarField
 from quant_backtester.data.universes import StaticUniverse, UniverseRegistry, UniverseSource
 from quant_backtester.execution.model import ExecutionModel
@@ -77,6 +81,29 @@ __all__ = ["Period", "StrategyMutated", "StrategyResult", "StrategyRunner", "val
 
 Period = date | str
 """A bound of a run: a date, or an ISO string for the convenience of a notebook."""
+
+
+class StoreChanged(RuntimeError):
+    """Raised when a finished run is asked for a figure the store can no longer give.
+
+    The run's records are its own and never change. A benchmark it did not
+    value while running has to be read from the store afterwards, and that is
+    only the same experiment if the store still holds exactly what the run
+    read.
+    """
+
+
+def _plain(value: object) -> object:
+    """Return a frozen configuration as built-ins JSON can render."""
+    if isinstance(value, Mapping):
+        return {str(key): _plain(item) for key, item in value.items()}
+    if isinstance(value, tuple | list):
+        return [_plain(item) for item in value]
+    if isinstance(value, Enum):
+        return _plain(value.value)
+    if isinstance(value, date):
+        return value.isoformat()
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,16 +125,21 @@ class StrategyResult:
         timetable - plus the bounds the caller asked for, the analytics
         convention, the declared benchmark and the state of the code.
     reader : MarketDataReader
-        The store the run read, kept so that a benchmark can be valued over the
-        same sessions afterwards. Ex-post only: a decision never sees it, and
-        every reading the comparison takes is at a valuation instant inside the
-        period, so data arriving after the run changes none of its figures.
+        The store the run read, kept so that another benchmark can be valued
+        over the same sessions afterwards - and only while the store still
+        holds exactly what the run read (see ``data_state``).
+    data_state : StoreState
+        The digest of every file of ``clean/`` and ``metadata/`` while the run
+        held the store: no writer could change them during it.
     analytics_config : AnalyticsConfig
         The convention every annualised figure was computed under, applied to a
         benchmark as well so that the two sides are comparable.
     benchmark_spec : BenchmarkSpec | None
         What the run is measured against by default, when the runner declared
         it.
+    benchmark_curve : BenchmarkCurve | None
+        That benchmark, valued inside the run from the same state of the
+        store: kept, never recomputed.
 
     Notes
     -----
@@ -120,8 +152,10 @@ class StrategyResult:
     analytics: PerformanceReport
     configuration: Mapping[str, object]
     reader: MarketDataReader
+    data_state: StoreState
     analytics_config: AnalyticsConfig
     benchmark_spec: BenchmarkSpec | None = None
+    benchmark_curve: BenchmarkCurve | None = None
 
     def __post_init__(self) -> None:
         """Freeze the configuration, all the way down."""
@@ -130,6 +164,25 @@ class StrategyResult:
         object.__setattr__(self, "configuration", frozen)
 
     # -- what the run was -----------------------------------------------------
+
+    @property
+    def run_id(self) -> str:
+        """Return the identity of the whole experiment.
+
+        Returns
+        -------
+        str
+            SHA-256 of the configuration - which records the code's state and
+            the store's digest - and of the strategy's fingerprint. The
+            fingerprint names the question; this names the run: the same
+            question asked of other data, or by other code, is another run.
+        """
+        canonical = json.dumps(
+            {"configuration": _plain(self.configuration), "fingerprint": self.fingerprint},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     @property
     def strategy_id(self) -> str:
@@ -244,20 +297,40 @@ class StrategyResult:
         Returns
         -------
         BenchmarkCurve
-            Its worth, normalised to this run's starting value.
+            Its worth, normalised to this run's starting value. The declared
+            benchmark is the curve valued during the run.
 
         Raises
         ------
         ValueError
             If no benchmark is given and none was declared.
+        StoreChanged
+            If another benchmark is asked for and the store no longer holds
+            what the run read. A revised close would otherwise change the
+            conclusion of a finished run (audit A05).
         BenchmarkCurrencyMismatch
             If it is quoted in another currency than the book. Without an FX
             conversion, the difference between the two curves is an exchange
             rate with a strategy's name on it.
         """
-        return value_benchmark(
-            self.backtest, self.reader, self._benchmark(benchmark), base_currency=self.base_currency
-        )
+        wanted = self._benchmark(benchmark)
+        if self.benchmark_curve is not None and wanted == self.benchmark_spec:
+            return self.benchmark_curve
+        with self.reader.pinned() as now:
+            if now.digest != self.data_state.digest:
+                changed = sorted(
+                    path
+                    for path in set(now.files) | set(self.data_state.files)
+                    if now.files.get(path) != self.data_state.files.get(path)
+                )
+                raise StoreChanged(
+                    f"the store no longer holds what this run read ({len(changed)} file(s) "
+                    f"differ, e.g. {changed[0]}); a benchmark valued now would describe "
+                    "another experiment. Run it again."
+                )
+            return value_benchmark(
+                self.backtest, self.reader, wanted, base_currency=self.base_currency
+            )
 
     def compare(
         self, benchmark: BenchmarkSpec | str | None = None, book: Book = Book.NET
@@ -496,8 +569,18 @@ class StrategyRunner:
             portfolio=PortfolioModel(self.limits),
             source=self.source,
         )
-        result = engine.run()
         benchmark = self.benchmark if isinstance(self.benchmark, BenchmarkSpec) else None
+        # Every read of the run, the benchmark's included, happens while the
+        # store is held: no promotion can land between two of them.
+        with self.reader.pinned() as state:
+            result = engine.run()
+            curve = (
+                None
+                if benchmark is None
+                else value_benchmark(
+                    result, self.reader, benchmark, base_currency=self.base_currency
+                )
+            )
         return StrategyResult(
             backtest=result,
             analytics=PerformanceReport.of(result, self.analytics),
@@ -508,10 +591,13 @@ class StrategyRunner:
                 "analytics": self.analytics.definition(),
                 "benchmark": benchmark.definition() if benchmark is not None else None,
                 "source": result.source.definition(),
+                "data_state": state.digest,
             },
             reader=self.reader,
+            data_state=state,
             analytics_config=self.analytics,
             benchmark_spec=benchmark,
+            benchmark_curve=curve,
         )
 
     def _bounds(self, start: Period, end: Period) -> tuple[date, date]:

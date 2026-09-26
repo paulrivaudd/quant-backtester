@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from enum import Enum
@@ -72,7 +73,7 @@ from quant_backtester.data.instruments import (
     InstrumentRegistry,
     VintagePolicy,
 )
-from quant_backtester.data.repository import MarketDataRepository
+from quant_backtester.data.repository import MarketDataRepository, StoreState
 from quant_backtester.data.schemas import (
     AVAILABILITY_COLUMN,
     ActionType,
@@ -1023,6 +1024,18 @@ class MarketDataReader:
             as_of,
             self._reference_calendar.calendar_id,
         )
+
+    def pinned(self) -> AbstractContextManager[StoreState]:
+        """Hold the store for reading for the block, and return what it holds.
+
+        Returns
+        -------
+        AbstractContextManager[StoreState]
+            Entered, it holds the store against every writer and yields the
+            digest of every file a result can depend on. A run does its
+            reading inside it, so that nothing it read changes under it.
+        """
+        return self._repository.reading()
 
     def latest(self) -> PointInTimeReader:
         """Return a reader frozen at the current wall-clock instant.

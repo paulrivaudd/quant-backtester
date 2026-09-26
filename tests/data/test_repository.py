@@ -1328,3 +1328,42 @@ def test_a_transaction_leaves_no_decoded_copy_of_its_staged_files(market_root: P
         assert any(".pending" in str(path) for path in repository._decoded)
 
     assert not any(".pending" in str(path) for path in repository._decoded)
+
+
+def test_readers_share_the_store_and_exclude_writers(market_root):
+    """A run holds the store for reading: another run may too, a promotion may not."""
+    first = MarketDataRepository(market_root)
+    second = MarketDataRepository(market_root)
+    writer = MarketDataRepository(market_root)
+
+    with first.reading(), second.reading(), pytest.raises(StoreBusy):
+        writer.save_bars("SPY", make_bars())
+
+    writer.save_bars("SPY", make_bars())
+
+
+def test_a_repository_holding_the_store_for_reading_cannot_write_inside_it(market_root):
+    repository = MarketDataRepository(market_root)
+
+    with repository.reading(), pytest.raises(StoreBusy, match="for reading"):
+        repository.save_bars("SPY", make_bars())
+
+
+def test_the_state_names_every_clean_and_metadata_file_and_changes_with_one(market_root):
+    repository = MarketDataRepository(market_root)
+    (market_root / "metadata").mkdir(exist_ok=True)
+    (market_root / "metadata" / "instruments.toml").write_text("# none\n", encoding="utf-8")
+    repository.save_bars("SPY", make_bars())
+
+    with repository.reading() as before:
+        pass
+    changed = make_bars()
+    changed["close"] = changed["close"] + 1.0
+    repository.save_bars("SPY", changed)
+    after = repository.state()
+
+    assert set(before.files) == {"clean/bars/SPY.parquet", "metadata/instruments.toml"}
+    assert before.files["metadata/instruments.toml"] == after.files["metadata/instruments.toml"]
+    assert before.files["clean/bars/SPY.parquet"] != after.files["clean/bars/SPY.parquet"]
+    assert before.digest != after.digest
+    assert repository.state().digest == after.digest
