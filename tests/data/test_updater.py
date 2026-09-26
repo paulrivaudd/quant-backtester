@@ -31,6 +31,7 @@ from quant_backtester.data.instruments import (
     InstrumentRegistry,
     PublicationRule,
 )
+from quant_backtester.data.known_gaps import GapKind, KnownGap, KnownGaps
 from quant_backtester.data.normalizer import (
     NormalizedData,
     Normalizer,
@@ -431,6 +432,7 @@ def build_updater(
     bar_corrections: BarCorrections | None = None,
     overlap_sessions: int = 5,
     normalizers: Mapping[str, Normalizer] | None = None,
+    known_gaps: KnownGaps | None = None,
 ) -> MarketDataUpdater:
     """Wire an updater onto the fakes.
 
@@ -449,6 +451,7 @@ def build_updater(
         action_corrections=corrections or ActionCorrections([]),
         bar_corrections=bar_corrections or BarCorrections([]),
         cross_check_policy=POLICY,
+        known_gaps=known_gaps or KnownGaps([]),
         overlap_sessions=overlap_sessions,
         clock=clock,
     )
@@ -2072,6 +2075,7 @@ def test_a_cross_check_policy_that_moved_is_named_as_such(
         action_corrections=ActionCorrections([]),
         bar_corrections=BarCorrections([]),
         cross_check_policy=CrossCheckPolicy(price_rel_tolerance=1e-3, volume_rel_tolerance=0.0),
+        known_gaps=KnownGaps([]),
         clock=clock,
     )
 
@@ -2492,3 +2496,93 @@ def test_a_split_and_a_dividend_on_one_ex_date_are_refused_however_they_arrive(
 
     assert not report.valid
     assert "SPLIT_WITH_DISTRIBUTION" in [issue.code for issue in report.errors]
+
+
+def reviewed_gap(session: date, kind: GapKind = GapKind.NO_BAR_SERVED) -> KnownGaps:
+    """Return a register holding one reviewed gap of ETF_EU."""
+    return KnownGaps(
+        [
+            KnownGap(
+                instrument_id="ETF_EU",
+                session_date=session,
+                kind=kind,
+                hypothesis="no trade",
+                evidence="synthetic",
+                reviewed_on=date(2026, 9, 26),
+            )
+        ]
+    )
+
+
+def test_a_reviewed_gap_makes_the_coverage_complete_and_is_named(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    """A hole someone looked at is not a hole nobody has seen."""
+    week = yahoo.rows["ETF_EU"]
+    yahoo.rows["ETF_EU"] = week.loc[week["date"] != WEDNESDAY].reset_index(drop=True)
+    updater = build_updater(
+        repository,
+        instruments,
+        calendars,
+        {"YAHOO": yahoo, "FRED": fred},
+        clock,
+        known_gaps=reviewed_gap(WEDNESDAY),
+    )
+    updater.archive_history("ETF_EU")
+
+    coverage = updater.history_coverage("ETF_EU")
+
+    assert coverage.missing_sessions == (WEDNESDAY,)
+    assert coverage.unexplained_sessions == ()
+    assert coverage.known_gaps == (WEDNESDAY,)
+    assert coverage.complete
+
+
+def test_a_provider_serving_a_reviewed_gap_stops_the_ingestion(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    """The review no longer describes the data: someone has to look again."""
+    updater = build_updater(
+        repository,
+        instruments,
+        calendars,
+        {"YAHOO": yahoo, "FRED": fred},
+        clock,
+        known_gaps=reviewed_gap(WEDNESDAY),
+    )
+
+    report = updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert not report.valid
+    assert [issue.observation_date for issue in report.errors] == [WEDNESDAY]
+    assert report.errors[0].code == "KNOWN_GAP_SERVED"
+    assert repository.load_bars("ETF_EU").empty
+
+
+def test_a_dropped_bar_gap_needs_the_correction_that_drops_it(
+    repository: MarketDataRepository,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    yahoo: FakeSource,
+    fred: FakeSource,
+    clock: Clock,
+) -> None:
+    with pytest.raises(ValueError, match="no bar correction"):
+        build_updater(
+            repository,
+            instruments,
+            calendars,
+            {"YAHOO": yahoo, "FRED": fred},
+            clock,
+            known_gaps=reviewed_gap(WEDNESDAY, GapKind.BAR_DROPPED),
+        )

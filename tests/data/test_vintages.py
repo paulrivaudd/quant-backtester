@@ -27,6 +27,7 @@ from quant_backtester.data.instruments import (
     PublicationRule,
     VintagePolicy,
 )
+from quant_backtester.data.known_gaps import KnownGaps
 from quant_backtester.data.normalizer import AlfredNormalizer
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus
 from quant_backtester.data.repository import MarketDataRepository
@@ -284,6 +285,7 @@ def updater_over(
         action_corrections=ActionCorrections([]),
         bar_corrections=BarCorrections([]),
         cross_check_policy=CrossCheckPolicy(price_rel_tolerance=1e-6, volume_rel_tolerance=0.0),
+        known_gaps=KnownGaps([]),
         clock=lambda: datetime(2022, 1, 3, 12, 0, tzinfo=UTC),
     )
 

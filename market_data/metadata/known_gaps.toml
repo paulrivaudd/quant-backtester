@@ -1,0 +1,63 @@
+# Sessions reviewed as missing from a series - committed configuration, like
+# every other decision a result is reproduced from.
+#
+# A gap is never filled: no last price carried over, no interpolation, no bar
+# from another venue. The reader serves it as MISSING. What this file changes
+# is that coverage tells a reviewed gap from one nobody has looked at, and that
+# a provider starting to serve a bar for a NO_BAR_SERVED gap stops the
+# ingestion until the gap is reviewed again. A BAR_DROPPED gap is the trace of
+# an entry in bar_corrections.toml and must have one.
+#
+# No committed run reads these sessions: every run starts on or after
+# 2018-07-16, its warm-up reaching back to April 2018 at most. ESE before
+# 2018-04-18 is not a research history in any case - it traded a few thousand
+# shares, some 25 000 EUR, a day.
+
+[[gap]]
+instrument_id = "ETF_SP500_PEA"
+session_date = 2014-12-24
+kind = "NO_BAR_SERVED"
+hypothesis = "no trade on a half day: Euronext closed at 14:05 and New York early"
+evidence = """Yahoo serves 2014-12-23 (1 356 shares) and 2014-12-29 (1 440); the \
+fund traded a median 3 372 shares a day in 2014-2015. No second source reaches \
+2014 (Euronext serves about two years). Reviewed 2026-09-26."""
+reviewed_on = 2026-09-26
+
+[[gap]]
+instrument_id = "ETF_SP500_PEA"
+session_date = 2015-05-25
+kind = "NO_BAR_SERVED"
+hypothesis = "no trade: Whit Monday is a Paris session and Memorial Day shut New York"
+evidence = """Yahoo serves 2015-05-22 (18 828 shares) and 2015-05-26 (11 784). A \
+fund replicating the S&P 500 has no underlying price to quote against on a US \
+holiday. No second source reaches 2015. Reviewed 2026-09-26."""
+reviewed_on = 2026-09-26
+
+[[gap]]
+instrument_id = "ETF_SP500_PEA"
+session_date = 2015-12-24
+kind = "NO_BAR_SERVED"
+hypothesis = "no trade on a half day: Euronext closed at 14:05 and New York early"
+evidence = """Yahoo serves 2015-12-23 (170 880 shares) and 2015-12-28 (171 432). \
+No second source reaches 2015. Reviewed 2026-09-26."""
+reviewed_on = 2026-09-26
+
+[[gap]]
+instrument_id = "ETF_SP500_PEA"
+session_date = 2015-12-31
+kind = "NO_BAR_SERVED"
+hypothesis = "no trade on a half day: Euronext closed at 14:05"
+evidence = """Yahoo serves 2015-12-30 (71 352 shares) and 2016-01-04 (276). No \
+second source reaches 2015. Reviewed 2026-09-26."""
+reviewed_on = 2026-09-26
+
+[[gap]]
+instrument_id = "ETF_SP500_PEA"
+session_date = 2017-09-07
+kind = "BAR_DROPPED"
+hypothesis = "a malformed provider bar: open 9.22583 above high 9.20667"
+evidence = """Dropped by the entry of bar_corrections.toml. The next session, \
+2017-09-08, traded 267 840 shares against 2 000 to 7 000 around it, which is \
+consistent with something unusual on the day and settles nothing about its \
+prices. Reviewed 2026-09-26."""
+reviewed_on = 2026-09-26
