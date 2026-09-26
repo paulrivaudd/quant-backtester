@@ -1281,6 +1281,65 @@ def test_an_incomplete_primary_bar_is_replaced_by_the_complete_one(
     assert values.loc["ETF_EU", "status"] is ObservationStatus.OK
 
 
+def test_a_session_only_the_check_source_holds_keeps_the_store_consistent(
+    repository: MarketDataRepository,
+    calendars: CalendarRegistry,
+    clock: Clock,
+) -> None:
+    """Ingestion, the consistency guard, an update and a rebuild agree (audit A06).
+
+    Yahoo skips Tuesday, Euronext serves it. The checked series used to take
+    Tuesday from Euronext while the primary series had no Tuesday, a store the
+    guard in front of the next update then refused - a state the pipeline had
+    written itself, and a rebuild would write again.
+    """
+    instrument = Instrument(
+        id="ETF_EU",
+        name="Paris ETF",
+        asset_type=AssetType.ETF,
+        data_type=DataType.BAR,
+        currency="EUR",
+        primary_source="YAHOO",
+        source_symbol="CW8.PA",
+        tradable=True,
+        calendar_id="XPAR",
+        first_session=MONDAY,
+        check_sources=(CheckSource(source="EURONEXT", source_symbol="LU-XPAR"),),
+    )
+    week = raw_bars([(day, 100.0 + index) for index, day in enumerate(SESSIONS)])
+    holed = week.loc[week["date"] != TUESDAY].reset_index(drop=True)
+    registry = InstrumentRegistry([instrument])
+    updater = build_updater(
+        repository,
+        registry,
+        calendars,
+        {
+            "YAHOO": FakeSource("YAHOO", clock, rows={"ETF_EU": holed}),
+            "EURONEXT": FakeSource("EURONEXT", clock, rows={"ETF_EU": week}),
+        },
+        clock,
+    )
+
+    report = updater.download("ETF_EU", MONDAY, FRIDAY)
+
+    assert report.valid
+    only = [issue for issue in report.issues if issue.code == "SECONDARY_ONLY_SESSION"]
+    assert [issue.observation_date for issue in only] == [TUESDAY]
+    served = [day for day in SESSIONS if day != TUESDAY]
+    assert repository.load_bars("ETF_EU")["session_date"].tolist() == served
+    checked = repository.load_checked_bars("ETF_EU")
+    assert checked["session_date"].tolist() == served
+    assert TUESDAY in set(repository.load_check_bars("ETF_EU", "EURONEXT")["session_date"])
+
+    assert updater.update("ETF_EU").valid  # the guard in front of it passes
+    after_update = repository.load_checked_bars("ETF_EU")
+    assert after_update["session_date"].tolist() == served
+
+    rebuilt = updater.rebuild_clean("ETF_EU")
+    assert rebuilt.valid
+    pd.testing.assert_frame_equal(repository.load_checked_bars("ETF_EU"), after_update)
+
+
 def test_an_unavailable_check_source_does_not_lose_the_instrument(
     repository: MarketDataRepository,
     calendars: CalendarRegistry,

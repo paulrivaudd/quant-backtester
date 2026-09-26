@@ -256,9 +256,8 @@ def _preferred_source(
     str
         The reference source when it holds the session with a complete row;
         otherwise the first other holder whose row is complete; otherwise the
-        reference source, or the first holder when it does not hold the session
-        at all. A row that is missing a price everywhere is stored as it is,
-        with the gap visible.
+        reference source. A row that is missing a price everywhere is stored as
+        it is, with the gap visible.
 
     Notes
     -----
@@ -271,9 +270,7 @@ def _preferred_source(
         return reference_source
     if complete:
         return complete[0]
-    if reference_source in holders:
-        return reference_source
-    return holders[0]
+    return reference_source
 
 
 def cross_check_bars(
@@ -299,8 +296,12 @@ def cross_check_bars(
     Returns
     -------
     pd.DataFrame
-        One row per session held by any source, sorted by ``session_date``,
-        columns in ``CHECKED_BARS_SCHEMA`` order. Values come from the reference
+        One row per session the reference source holds, sorted by
+        ``session_date``, columns in ``CHECKED_BARS_SCHEMA`` order. A session
+        only another source holds is not in it: a check source confirms or
+        contradicts the reference, it does not add sessions to it, so the
+        checked series and the reference's series always cover the same days -
+        the invariant the updater checks before every update. Values come from the reference
         source when it holds the session with a complete row, and otherwise from
         the first other source that does - see :func:`_preferred_source`.
 
@@ -329,7 +330,7 @@ def cross_check_bars(
     by_source = {
         source: _bars_by_session(instrument_id, source, frames[source]) for source in sorted(frames)
     }
-    sessions = sorted({session for bars in by_source.values() for session in bars})
+    sessions = sorted(by_source[reference_source])
     rows: list[dict[str, Any]] = []
     for session in sessions:
         holders = [source for source in by_source if session in by_source[source]]

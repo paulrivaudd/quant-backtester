@@ -411,6 +411,56 @@ def _merged_bar_errors(
     return errors
 
 
+def _secondary_only_sessions(
+    instrument: Instrument, primary: pd.DataFrame, frames: Mapping[str, pd.DataFrame]
+) -> list[ValidationIssue]:
+    """Report the sessions a check source brought that the primary does not hold.
+
+    Parameters
+    ----------
+    instrument : Instrument
+        Instrument concerned.
+    primary : pd.DataFrame
+        The primary source's canonical series after this fetch was merged.
+    frames : Mapping[str, pd.DataFrame]
+        What this fetch brought, per source.
+
+    Returns
+    -------
+    list[ValidationIssue]
+        One ``SECONDARY_ONLY_SESSION`` warning per such session, naming the
+        check sources that hold it, in date order.
+
+    Notes
+    -----
+    Such a session is kept in the check source's own series and is not served:
+    the checked series covers the primary's sessions and no others (decision
+    D8 of the 2026-09-26 audit). It is reported only when a fetch brings it, so
+    a hole is said once and not at every update.
+    """
+    held = set(primary["session_date"])
+    only: dict[date, list[str]] = {}
+    for check in instrument.check_sources:
+        frame = frames.get(check.source)
+        if frame is None:
+            continue
+        for day in sorted(set(frame["session_date"]) - held):
+            only.setdefault(day, []).append(check.source)
+    return [
+        _issue(
+            "SECONDARY_ONLY_SESSION",
+            Severity.WARNING,
+            instrument.id,
+            day,
+            f"{instrument.id} session {day} is held by {', '.join(sources)} and not by the "
+            f"primary source {instrument.primary_source}; it is stored as a second opinion "
+            "and not served",
+            {"sources": sources},
+        )
+        for day, sources in sorted(only.items())
+    ]
+
+
 def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     """Return a frame as plain dictionaries, with string keys."""
     return [
@@ -1468,7 +1518,9 @@ class MarketDataUpdater:
         Returns
         -------
         list[ValidationIssue]
-            One ``VALUE_REVISED`` warning per changed field, plus the
+            One ``VALUE_REVISED`` warning per changed field, one
+            ``SECONDARY_ONLY_SESSION`` warning per session this fetch brought
+            from a check source and not from the primary, plus the
             cross-check's own issues.
 
         Notes
@@ -1500,6 +1552,7 @@ class MarketDataUpdater:
                 log=log,
                 issues=issues,
             )
+        issues += _secondary_only_sessions(instrument, merged, frames)
         checked, checked_issues = self._checked_series(instrument, canonical, frames)
         self._repository.save_checked_bars(instrument.id, checked)
         return issues + checked_issues
