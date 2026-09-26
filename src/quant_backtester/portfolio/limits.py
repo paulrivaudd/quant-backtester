@@ -93,6 +93,10 @@ class PortfolioLimits:
             "max_weight_per_instrument": self.max_weight_per_instrument,
             "max_gross": self.max_gross,
             "long_only": self.long_only,
+            # Decision D6: a cap on what is asked for. After costs, lots and a
+            # night's moves a held weight can sit above it; RunQuality says by
+            # how much, and nothing trades it back unless a target is restated.
+            "applies_to": "target weights, before costs",
         }
 
     def apply(

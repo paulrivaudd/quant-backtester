@@ -209,6 +209,14 @@ class Comparison:
             label = str(name).replace("_", " ")
             lines.append(f"{label:<24}{_number(left, percent):>12}{_number(right, percent):>14}")
         lines.append(f"{'excess return':<24}{_number(self.excess_return):>12}")
+        lines.extend(
+            (
+                "",
+                f"{self.label} is a yardstick, not an alternative that was traded: one share",
+                "held from the first close, with no cost, no lot and no cash left over. The",
+                "strategy starts in cash and trades at the next open on its own schedule.",
+            )
+        )
         return "\n".join(lines)
 
 
