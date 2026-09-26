@@ -52,8 +52,10 @@ import shutil
 import tempfile
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from types import MappingProxyType
 from typing import BinaryIO, Concatenate
 
 import pandas as pd
@@ -248,6 +250,46 @@ def _writes[**P, R](
             return method(self, *args, **kwargs)
 
     return write
+
+
+PINNED_TREES: tuple[str, ...] = ("clean", "metadata")
+"""The parts of the store a run's result depends on, and so pins.
+
+``clean/`` is what the reader serves; ``metadata/`` is the configuration it
+was derived under. ``raw/`` is left out on purpose: a new fetch archived
+there changes no result until it is promoted, and promoting it changes
+``clean/``.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class StoreState:
+    """What the store held when a run read it: one digest per file.
+
+    Attributes
+    ----------
+    files : Mapping[str, str]
+        SHA-256 of every file under :data:`PINNED_TREES`, by path relative to
+        the market data root, sorted.
+
+    Notes
+    -----
+    Two states are equal when every byte a run could have read is equal. That
+    is the test a result applies before valuing anything after the run: the
+    same state, the same answer; another state, another experiment.
+    """
+
+    files: Mapping[str, str]
+
+    def __post_init__(self) -> None:
+        """Keep the files sorted and read-only."""
+        object.__setattr__(self, "files", MappingProxyType(dict(sorted(self.files.items()))))
+
+    @property
+    def digest(self) -> str:
+        """Return one SHA-256 over every path and its digest."""
+        canonical = json.dumps(dict(self.files), sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 PENDING = ".pending"
@@ -446,6 +488,44 @@ class MarketDataRepository:
                     "a block joined to this transaction failed; nothing it staged is published"
                 )
             self._commit(staging, staged)
+
+    @contextmanager
+    def reading(self) -> Iterator[StoreState]:
+        """Hold the store for reading, and say what it holds.
+
+        Yields
+        ------
+        StoreState
+            The digests of every pinned file, taken once the lock is held: no
+            writer can change them until the block ends.
+
+        Raises
+        ------
+        StoreBusy
+            If a writer holds the store. Readers do not exclude each other;
+            they exclude writers, which fail at once rather than wait.
+        """
+        with self._lock.hold(fcntl.LOCK_SH, "read the store for a run"):
+            yield self.state()
+
+    def state(self) -> StoreState:
+        """Return the digest of every file under :data:`PINNED_TREES`.
+
+        Returns
+        -------
+        StoreState
+            One entry per file; a temporary file of a write in progress is not
+            one, and there is none while :meth:`reading` holds the store.
+        """
+        files: dict[str, str] = {}
+        for tree in PINNED_TREES:
+            base = self.root / tree
+            if not base.is_dir():
+                continue
+            for path in sorted(base.rglob("*")):
+                if path.is_file() and path.suffix != ".tmp":
+                    files[path.relative_to(self.root).as_posix()] = _sha256(path)
+        return StoreState(files)
 
     def recover(self) -> list[Path]:
         """Finish or discard the transactions a previous run left behind.
