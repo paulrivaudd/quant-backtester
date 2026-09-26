@@ -8,12 +8,14 @@ could have seen, and a currency mismatch refused rather than drawn.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date, time
+from datetime import date, datetime, time
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
 
 from quant_backtester.analytics.comparison import (
+    BenchmarkBasis,
     BenchmarkCurrencyMismatch,
     BenchmarkSpec,
     common_period,
@@ -25,9 +27,9 @@ from quant_backtester.backtest.runner import StrategyRunner, value_benchmark
 from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.data.schemas import ActionType
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
-from quant_backtester.signals.types import PriceBasis
 from quant_backtester.strategies.examples import BuyAndHold
 
 PARIS = BacktestTimetable(
@@ -158,11 +160,13 @@ def test_a_comparison_reads_as_a_frame_and_as_a_block(runner: StrategyRunner) ->
     assert "ETF_OTHER" in comparison.render()
 
 
-def test_a_benchmark_can_be_compared_on_raw_prices(runner: StrategyRunner) -> None:
-    """Total return by default; the quoted series when a report wants it."""
+def test_a_benchmark_can_be_compared_on_its_price_return(runner: StrategyRunner) -> None:
+    """Total return by default; the price return when a report wants it."""
     result = a_run(runner)
 
-    raw = result.benchmark(BenchmarkSpec("ETF_OTHER", price_basis=PriceBasis.RAW, label="raw"))
+    raw = result.benchmark(
+        BenchmarkSpec("ETF_OTHER", basis=BenchmarkBasis.PRICE_RETURN, label="raw")
+    )
 
     assert raw.spec.name == "raw"
     assert len(raw.equity) == len(result.backtest.records)
@@ -264,3 +268,148 @@ def test_a_benchmark_needs_a_name() -> None:
     """A blank id is a comparison against nothing."""
     with pytest.raises(ValueError, match="instrument_id"):
         BenchmarkSpec("   ")
+
+
+# --- a benchmark is a wealth, not a glued adjusted series (audit A01) -------------
+
+
+PARIS_TZ = ZoneInfo("Europe/Paris")
+
+Event = tuple[ActionType, int, float]
+"""An action on ETF_OTHER: its type, the index of its ex-date in SESSIONS, its value."""
+
+
+@pytest.fixture
+def wealth(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    make_actions: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+    sessions: tuple[date, ...],
+) -> Callable[..., list[float]]:
+    """Return a builder of ETF_OTHER's benchmark over a run, as growth of one unit.
+
+    ``known_on`` moves the instant an action becomes known: by default the
+    morning of its ex-date, as a provider announcing it in advance would have.
+    """
+
+    def build(
+        closes: list[float],
+        events: list[Event],
+        basis: BenchmarkBasis = BenchmarkBasis.TOTAL_RETURN,
+        known_on: int | None = None,
+    ) -> list[float]:
+        days = sessions[: len(closes)]
+        actions = make_actions(
+            [
+                (
+                    "ETF_OTHER",
+                    kind,
+                    sessions[index],
+                    value,
+                    datetime.combine(
+                        sessions[index if known_on is None else known_on], time(9), PARIS_TZ
+                    ),
+                )
+                for kind, index, value in events
+            ]
+        )
+        market = make_market(
+            {
+                "ETF_EU": make_bars("ETF_EU", xpar, dict.fromkeys(days, 100.0)),
+                "ETF_OTHER": make_bars("ETF_OTHER", xpar, dict(zip(days, closes, strict=True))),
+            },
+            actions=actions,
+        )
+        runner = StrategyRunner(
+            reader=market,
+            calendars=calendars,
+            reference_calendar_id="XPAR",
+            base_currency="EUR",
+            analytics=CONFIG,
+            execution=FREE,
+            initial_cash=10_000.0,
+            timetable=PARIS,
+        )
+        result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], days[0], days[-1])
+        curve = value_benchmark(result.backtest, market, BenchmarkSpec("ETF_OTHER", basis=basis))
+        return [value / curve.equity.iloc[0] for value in curve.equity]
+
+    return build
+
+
+def test_a_split_leaves_the_holder_as_rich_as_before(wealth: Callable[..., list[float]]) -> None:
+    """2-for-1, the price halves, nothing else moves: the audit's curve fell to half."""
+    curve = wealth([100.0, 50.0, 50.0, 50.0], [(ActionType.SPLIT, 1, 2.0)])
+
+    assert curve == pytest.approx([1.0, 1.0, 1.0, 1.0])
+
+
+def test_a_dividend_the_price_drop_pays_for_leaves_total_return_flat(
+    wealth: Callable[..., list[float]],
+) -> None:
+    curve = wealth([100.0, 90.0, 90.0], [(ActionType.DIVIDEND, 1, 10.0)])
+
+    assert curve == pytest.approx([1.0, 1.0, 1.0])
+
+
+def test_the_price_return_leaves_the_dividend_out(wealth: Callable[..., list[float]]) -> None:
+    curve = wealth(
+        [100.0, 90.0, 90.0], [(ActionType.DIVIDEND, 1, 10.0)], basis=BenchmarkBasis.PRICE_RETURN
+    )
+
+    assert curve == pytest.approx([1.0, 0.9, 0.9])
+
+
+def test_a_dividend_on_a_rising_day_is_received_and_reinvested_at_the_close(
+    wealth: Callable[..., list[float]],
+) -> None:
+    """(110 + 10) / 100: twenty percent, where the adjusted series said 22.2 (audit A08)."""
+    curve = wealth([100.0, 110.0, 121.0], [(ActionType.DIVIDEND, 1, 10.0)])
+
+    # The cash buys 10/110 of a share at the close, which then earns the 10%.
+    assert curve == pytest.approx([1.0, 1.2, 1.2 * 1.1])
+
+
+def test_several_actions_compound_on_the_shares_held(wealth: Callable[..., list[float]]) -> None:
+    """A dividend after a split is paid on the shares the split created."""
+    curve = wealth(
+        [100.0, 50.0, 50.0, 45.0],
+        [(ActionType.SPLIT, 1, 2.0), (ActionType.DIVIDEND, 3, 5.0)],
+    )
+
+    assert curve == pytest.approx([1.0, 1.0, 1.0, 1.0])
+
+
+def test_an_action_before_the_first_close_is_already_in_it(
+    wealth: Callable[..., list[float]],
+) -> None:
+    """The run starts from a price that has already moved; counting it again is wrong."""
+    curve = wealth([50.0, 50.0, 55.0], [(ActionType.SPLIT, 0, 2.0)])
+
+    assert curve == pytest.approx([1.0, 1.0, 1.1])
+
+
+def test_an_action_known_late_is_counted_when_known_and_not_back_dated(
+    wealth: Callable[..., list[float]],
+) -> None:
+    """At the ex-date nobody knew of the split, so the curve shows the drop; then it catches up."""
+    curve = wealth([100.0, 50.0, 50.0, 50.0], [(ActionType.SPLIT, 1, 2.0)], known_on=3)
+
+    assert curve == pytest.approx([1.0, 0.5, 0.5, 1.0])
+
+
+def test_a_spin_off_is_refused_rather_than_valued_as_a_split(
+    wealth: Callable[..., list[float]],
+) -> None:
+    with pytest.raises(ValueError, match="spin-off"):
+        wealth([100.0, 80.0, 80.0], [(ActionType.SPIN_OFF, 1, 1.25)])
+
+
+def test_a_split_and_a_dividend_on_one_day_are_refused(
+    wealth: Callable[..., list[float]],
+) -> None:
+    """Per share before or after the split? Unsaid, and the answers differ by the ratio."""
+    with pytest.raises(ValueError, match="split and a distribution"):
+        wealth([100.0, 50.0, 50.0], [(ActionType.SPLIT, 1, 2.0), (ActionType.DIVIDEND, 1, 5.0)])

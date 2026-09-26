@@ -43,6 +43,7 @@ import pandas as pd
 from matplotlib.figure import Figure
 
 from quant_backtester.analytics.comparison import (
+    BenchmarkBasis,
     BenchmarkCurrencyMismatch,
     BenchmarkCurve,
     BenchmarkSpec,
@@ -61,7 +62,7 @@ from quant_backtester.backtest.schedule import DecisionSchedule, EverySession
 from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.reader import MarketDataReader, ObservationStatus
-from quant_backtester.data.schemas import BarField
+from quant_backtester.data.schemas import ActionType, BarField
 from quant_backtester.data.universes import StaticUniverse, UniverseRegistry, UniverseSource
 from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.numbers import require_finite_positive
@@ -69,7 +70,7 @@ from quant_backtester.portfolio.allocation import PortfolioModel
 from quant_backtester.portfolio.limits import PortfolioLimits
 from quant_backtester.provenance import SourceState
 from quant_backtester.signals.base import freeze
-from quant_backtester.signals.types import PriceBasis, require_identifier
+from quant_backtester.signals.types import require_identifier
 from quant_backtester.strategies.base import Strategy
 
 __all__ = ["Period", "StrategyMutated", "StrategyResult", "StrategyRunner", "value_benchmark"]
@@ -604,33 +605,52 @@ def value_benchmark(
     instrument = reader.instruments.get(specification.instrument_id)
     if base_currency is not None:
         _require_same_currency(reader, specification, base_currency)
-    prices: list[float] = []
+    wealth = 1.0
+    path: list[float] = []
     stale: list[date] = []
-    last: float | None = None
+    last: tuple[date, float] | None = None
+    first_observed: date | None = None
+    counted: set[tuple[date, str]] = set()
     for record in result.records:
         market = reader.at(record.valuation_time)
-        series = (
-            market.total_return_history(instrument.id)
-            if specification.price_basis is PriceBasis.TOTAL_RETURN
-            else market.history(instrument.id, BarField.CLOSE)
-        )
-        status = market.values([instrument.id], BarField.CLOSE).iloc[0]["status"]
-        value = float(series.iloc[-1]) if len(series) else float("nan")
-        if value != value:
-            if last is None:
+        row = market.values([instrument.id], BarField.CLOSE).loc[instrument.id]
+        status = row["status"]
+        close = None if pd.isna(row["value"]) else float(row["value"])
+        if last is None:
+            if close is None:
                 raise ValueError(
                     f"{instrument.id} has no price at {record.valuation_time}, so there is "
                     "nothing to normalise the benchmark to"
                 )
-            value = last
+            require_finite_positive(close, f"the first price of {instrument.id}")
+            last = (row["observation_date"], close)
+            first_observed = row["observation_date"]
+        elif close is not None and row["observation_date"] > last[0]:
+            # Every action known now, not yet counted, whose ex-date falls
+            # after the first close and by this one: an action announced late
+            # is counted on the first session it is known, never back-dated.
+            actions = market.corporate_actions(instrument.id)
+            keys = list(zip(actions["ex_date"], actions["action_type"], strict=True))
+            due = [
+                key not in counted and first_observed < key[0] <= row["observation_date"]
+                for key in keys
+            ]
+            events = actions.loc[due]
+            wealth *= session_growth(
+                instrument.id,
+                previous_close=last[1],
+                close=close,
+                events=events,
+                basis=specification.basis,
+            )
+            counted.update(key for key, take in zip(keys, due, strict=True) if take)
+            last = (row["observation_date"], close)
         if status is not ObservationStatus.OK:
             stale.append(record.session_date)
-        prices.append(value)
-        last = value
-    require_finite_positive(prices[0], f"the first price of {instrument.id}")
+        path.append(wealth)
     start = float(equity_curve(result, book).iloc[0])
     values = pd.Series(
-        [start * price / prices[0] for price in prices],
+        [start * growth for growth in path],
         index=pd.Index(
             [record.session_date for record in result.records],
             dtype="object",
@@ -639,6 +659,76 @@ def value_benchmark(
         name=specification.name,
     )
     return BenchmarkCurve(spec=specification, equity=values, marked_from_earlier=tuple(stale))
+
+
+def session_growth(
+    instrument_id: str,
+    *,
+    previous_close: float,
+    close: float,
+    events: pd.DataFrame,
+    basis: BenchmarkBasis,
+) -> float:
+    """Return what one share held from one close to the next has become.
+
+    Parameters
+    ----------
+    instrument_id : str
+        Instrument, quoted in errors.
+    previous_close, close : float
+        Raw closes at the two ends.
+    events : pd.DataFrame
+        The corporate actions to count between them, with the columns of
+        :meth:`PointInTimeReader.corporate_actions`, in ex-date order.
+    basis : BenchmarkBasis
+        Whether a distribution is counted.
+
+    Returns
+    -------
+    float
+        ``(shares x close + cash received) / previous close``, where a split
+        multiplies the shares and, under ``TOTAL_RETURN``, a dividend - ordinary
+        or special - pays its amount on every share held on its ex-date.
+        Multiplying the wealth by it reinvests that cash at the close.
+
+    Raises
+    ------
+    ValueError
+        On a spin-off, which is not a split whatever ratio names it and has no
+        value here to be counted (decision D3), and on a split and a
+        distribution sharing an ex-date: nothing says whether the amount is per
+        share before or after the split (decision D2), and the two readings
+        differ by the ratio.
+
+    Notes
+    -----
+    The raw closes are what a holder's worth is made of. The adjusted history
+    a signal reads is rebased every time an action becomes known, so its last
+    point on one day and its last point on the next are not on the same base
+    (audit A01): a 2-for-1 split read that way halved the benchmark.
+    """
+    kinds_by_day: dict[date, set[ActionType]] = {}
+    for ex_date, kind in zip(events["ex_date"], events["action_type"], strict=True):
+        kinds_by_day.setdefault(ex_date, set()).add(ActionType(kind))
+    for ex_date, kinds in kinds_by_day.items():
+        if ActionType.SPIN_OFF in kinds:
+            raise ValueError(
+                f"{instrument_id} has a spin-off on {ex_date}; a benchmark cannot value what "
+                "was distributed, and does not treat it as a split"
+            )
+        if ActionType.SPLIT in kinds and len(kinds) > 1:
+            raise ValueError(
+                f"{instrument_id} has a split and a distribution on {ex_date}; whether the "
+                "amount is per share before or after the split is not declared"
+            )
+    shares = 1.0
+    cash = 0.0
+    for kind, value in zip(events["action_type"], events["value"], strict=True):
+        if ActionType(kind) is ActionType.SPLIT:
+            shares *= float(value)
+        elif basis is BenchmarkBasis.TOTAL_RETURN:
+            cash += shares * float(value)
+    return (shares * close + cash) / previous_close
 
 
 def _require_same_currency(

@@ -498,7 +498,7 @@ def test_a_declared_benchmark_is_recorded_and_used_by_default(runner: StrategyRu
 
     assert result.configuration["benchmark"] == {
         "instrument_id": "ETF_OTHER",
-        "price_basis": "TOTAL_RETURN",
+        "basis": "TOTAL_RETURN",
         "label": None,
     }
     assert result.compare().label == "ETF_OTHER"
