@@ -220,15 +220,54 @@ def _number(value: object) -> float | None:
     Returns
     -------
     float | None
-        ``None`` for ``None``, ``NaN`` or ``pd.NA``. Prices are nullable, and a
-        comparison with ``NaN`` is silently ``False``, so one must never reach it.
+        ``None`` for ``None``, ``NaN``, ``pd.NA`` or an infinity. Prices are
+        nullable, and a comparison with ``NaN`` is silently ``False``, so one
+        must never reach it. An infinity is no number either - ``inf >= inf``
+        passes every order rule - and :func:`_non_finite` reports it as the
+        error it is, so the rules that read this never see one.
     """
     if value is None or value is pd.NA:
         return None
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     number = float(value)
-    return None if math.isnan(number) else number
+    return number if math.isfinite(number) else None
+
+
+def _non_finite(values: Mapping[str, object]) -> dict[str, float]:
+    """Return the fields holding an infinity.
+
+    Parameters
+    ----------
+    values : Mapping[str, object]
+        Cells of one row, by field.
+
+    Returns
+    -------
+    dict[str, float]
+        Each field whose cell is ``+inf`` or ``-inf``. A missing value is not
+        in it: absence has its own rule, an infinity is a number no rule can
+        compare and must stop a row from reaching the clean layer.
+    """
+    return {
+        field: float(value)
+        for field, value in values.items()
+        if isinstance(value, int | float) and not isinstance(value, bool) and math.isinf(value)
+    }
+
+
+def _non_finite_issue(
+    instrument: Instrument, on: date, what: str, infinite: Mapping[str, float]
+) -> ValidationIssue:
+    """Build the ``NON_FINITE_VALUE`` error for the infinite fields of one row."""
+    return _issue(
+        "NON_FINITE_VALUE",
+        Severity.ERROR,
+        instrument,
+        on,
+        f"{what} of {on} holds an infinite {', '.join(sorted(infinite))}",
+        dict(infinite),
+    )
 
 
 def _check_order(instrument: Instrument, dates: list[date]) -> list[ValidationIssue]:
@@ -342,6 +381,8 @@ def bar_row_issues(instrument: Instrument, row: Mapping[str, Any]) -> list[Valid
     list[ValidationIssue]
         At most one of each. ``ERROR``: ``OHLC_ORDER`` (``low <= open <= high``,
         ``low <= close <= high``, compared only between prices present),
+        ``NON_FINITE_VALUE`` (a price or the volume is infinite; the other
+        rules then treat that field as absent),
         ``NON_POSITIVE_PRICE`` (only for :data:`POSITIVE_PRICE_ASSET_TYPES`),
         ``NEGATIVE_VOLUME`` and ``AVAILABILITY_ORDER`` (the open must become
         available strictly before the close). ``WARNING``: ``MISSING_PRICE``.
@@ -368,7 +409,11 @@ def bar_row_issues(instrument: Instrument, row: Mapping[str, Any]) -> list[Valid
     prices = {field: _number(row[field]) for field in BAR_PRICE_FIELDS}
     issues: list[ValidationIssue] = []
 
-    absent = [field for field, value in prices.items() if value is None]
+    infinite = _non_finite({field: row[field] for field in (*BAR_PRICE_FIELDS, "volume")})
+    if infinite:
+        issues.append(_non_finite_issue(instrument, day, "Bar", infinite))
+
+    absent = [field for field, value in prices.items() if value is None and field not in infinite]
     if absent:
         issues.append(
             _issue(
@@ -895,8 +940,8 @@ def validate_levels(
     ValidationReport
         Issues found, sorted by date, all ``ERROR``: ``MISSING_COLUMN`` (alone:
         nothing else can be checked), ``DATES_UNSORTED`` / ``DATE_DUPLICATE``,
-        ``MISSING_VALUE``, ``MISSING_AVAILABILITY``, ``AVAILABILITY_NOT_UTC``,
-        ``AVAILABILITY_BEFORE_OBSERVATION`` (published, in the publication
+        ``NON_FINITE_VALUE``, ``MISSING_VALUE``, ``MISSING_AVAILABILITY``,
+        ``AVAILABILITY_NOT_UTC``, ``AVAILABILITY_BEFORE_OBSERVATION`` (published, in the publication
         timezone, before the day it describes) and ``AVAILABILITY_MISMATCH``
         (not the instant the instrument's publication rule gives). ``frame`` is
         never modified.
@@ -933,7 +978,10 @@ def validate_levels(
     issues = _check_order(instrument, [row["observation_date"] for row in rows])
     for row in rows:
         day: date = row["observation_date"]
-        if _number(row["value"]) is None:
+        infinite = _non_finite({"value": row["value"]})
+        if infinite:
+            issues.append(_non_finite_issue(instrument, day, "Level", infinite))
+        elif _number(row["value"]) is None:
             issues.append(
                 _issue(
                     "MISSING_VALUE",
@@ -1015,6 +1063,7 @@ def validate_corporate_actions(instrument: Instrument, frame: pd.DataFrame) -> V
     ValidationReport
         Issues found, sorted by ex-date, all ``ERROR``: ``MISSING_COLUMN`` (alone),
         ``DUPLICATE_ACTION`` (same type twice on one ex-date),
+        ``NON_FINITE_VALUE`` (then no other check of the value),
         ``UNKNOWN_ACTION_TYPE``, ``INVALID_SPLIT_RATIO`` (a split ratio must be
         positive and not 1; below 1 is a reverse split, and valid),
         ``NON_POSITIVE_DIVIDEND`` (ordinary or special),
@@ -1069,7 +1118,10 @@ def validate_corporate_actions(instrument: Instrument, frame: pd.DataFrame) -> V
         action_type = str(row["action_type"])
         value = _number(row["value"])
         context: dict[str, object] = {"action_type": action_type, "value": row["value"]}
-        if action_type not in known_types:
+        infinite = _non_finite({"value": row["value"]})
+        if infinite:
+            issues.append(_non_finite_issue(instrument, ex_date, action_type, infinite))
+        elif action_type not in known_types:
             issues.append(
                 _issue(
                     "UNKNOWN_ACTION_TYPE",

@@ -175,6 +175,39 @@ def test_negative_volume_is_an_error(xnys: TradingCalendar) -> None:
     assert codes(report) == ["NEGATIVE_VOLUME"]
 
 
+@pytest.mark.parametrize("infinity", [math.inf, -math.inf], ids=["plus", "minus"])
+def test_an_infinite_bar_is_refused_and_not_ordered(xnys: TradingCalendar, infinity: float) -> None:
+    """``inf >= inf`` passes every order rule, so an infinite bar used to be valid."""
+    report = validate_bars(
+        make_instrument(),
+        frame(bar(TUE, open_=infinity, high=infinity, low=infinity, close=infinity)),
+        xnys,
+    )
+    assert codes(report) == ["NON_FINITE_VALUE"]
+    assert report.issues[0].context == {
+        field: infinity for field in ("close", "high", "low", "open")
+    }
+    assert not report.valid
+
+
+@pytest.mark.parametrize("field", ["open", "high", "low", "close", "volume"])
+def test_one_infinite_field_is_named_and_is_not_also_reported_missing(
+    xnys: TradingCalendar, field: str
+) -> None:
+    row = bar(TUE)
+    row[field] = math.inf
+    report = validate_bars(make_instrument(), frame(row), xnys)
+    assert codes(report) == ["NON_FINITE_VALUE"]
+    assert report.issues[0].context == {field: math.inf}
+
+
+def test_finite_nan_and_missing_prices_are_not_non_finite_errors(xnys: TradingCalendar) -> None:
+    missing = bar(TUE, close=math.nan)
+    missing["open"] = pd.NA
+    report = validate_bars(make_instrument(), frame(missing, bar(WED)), xnys)
+    assert codes(report) == ["MISSING_PRICE"]
+
+
 def test_open_available_after_the_close_is_an_error(xnys: TradingCalendar) -> None:
     swapped = bar(TUE)
     swapped["open_available_at_utc"], swapped["close_available_at_utc"] = (
@@ -455,6 +488,14 @@ def test_a_level_without_value_is_an_error() -> None:
     assert report.issues[0].observation_date == TUE_L
 
 
+@pytest.mark.parametrize("infinity", [math.inf, -math.inf], ids=["plus", "minus"])
+def test_an_infinite_level_is_refused(infinity: float) -> None:
+    report = validate_levels(level_instrument(), levels([(MON, 0.5), (TUE_L, infinity)]))
+    assert codes(report) == ["NON_FINITE_VALUE"]
+    assert report.issues[0].observation_date == TUE_L
+    assert not report.valid
+
+
 def test_a_level_without_availability_is_an_error() -> None:
     candidate = levels([(MON, 0.5), (TUE_L, 0.6)])
     candidate["available_at_utc"] = [pd.NaT, candidate["available_at_utc"].iloc[1]]
@@ -601,6 +642,15 @@ def test_clean_actions_have_no_issue() -> None:
 def test_a_split_and_a_dividend_on_the_same_ex_date_are_valid() -> None:
     same_day = actions([("SPLIT", date(2020, 8, 31), 4.0), ("DIVIDEND", date(2020, 8, 31), 0.2)])
     assert validate_corporate_actions(make_instrument(), same_day).issues == []
+
+
+@pytest.mark.parametrize("action_type", ["SPLIT", "DIVIDEND", "SPIN_OFF"])
+def test_an_infinite_action_value_is_refused(action_type: str) -> None:
+    report = validate_corporate_actions(
+        make_instrument(), actions([(action_type, date(2020, 8, 31), math.inf)])
+    )
+    assert codes(report) == ["NON_FINITE_VALUE"]
+    assert not report.valid
 
 
 def test_a_reverse_split_is_valid() -> None:
