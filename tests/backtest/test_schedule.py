@@ -44,15 +44,18 @@ SEPTEMBER = [
 ]
 """Ten Paris sessions, two weekends inside them."""
 
+TUESDAY_15 = date(2026, 9, 15)
+"""The Paris session after them, in the same week and month as the last one."""
+
 
 def test_every_session_asks_on_all_of_them() -> None:
     """The default, and the most expensive."""
-    assert EverySession().decision_sessions(SEPTEMBER) == frozenset(SEPTEMBER)
+    assert EverySession().decision_sessions(SEPTEMBER, following=TUESDAY_15) == frozenset(SEPTEMBER)
 
 
 def test_every_n_sessions_counts_from_the_start_of_the_run() -> None:
     """A fortnightly rebalancing is ten sessions apart, not fourteen days."""
-    chosen = EveryNSessions(3).decision_sessions(SEPTEMBER)
+    chosen = EveryNSessions(3).decision_sessions(SEPTEMBER, following=TUESDAY_15)
 
     assert sorted(chosen) == [
         date(2026, 9, 1),
@@ -70,27 +73,49 @@ def test_a_period_of_no_sessions_is_refused() -> None:
 
 def test_weekly_takes_the_last_session_of_each_week() -> None:
     """The last session that exists, not Friday: a holiday must not skip a week."""
-    chosen = Weekly().decision_sessions(SEPTEMBER)
+    chosen = Weekly().decision_sessions(SEPTEMBER, following=TUESDAY_15)
 
-    assert sorted(chosen) == [date(2026, 9, 4), date(2026, 9, 11), date(2026, 9, 14)]
+    assert sorted(chosen) == [date(2026, 9, 4), date(2026, 9, 11)]
 
 
 def test_monthly_takes_the_last_session_of_each_month() -> None:
-    """Two months, two decisions, whatever the calendar days are."""
+    """Two months, and the one the run reaches the end of is the one decided."""
     august = [date(2026, 8, 28), date(2026, 8, 31)]
 
-    chosen = Monthly().decision_sessions([*august, *SEPTEMBER])
+    chosen = Monthly().decision_sessions([*august, *SEPTEMBER], following=TUESDAY_15)
 
-    assert sorted(chosen) == [date(2026, 8, 31), date(2026, 9, 14)]
+    assert sorted(chosen) == [date(2026, 8, 31)]
 
 
 def test_a_holiday_does_not_move_a_weekly_decision_off_the_calendar() -> None:
     """The schedule is a function of the sessions, never of the days."""
     without_friday = [day for day in SEPTEMBER if day != date(2026, 9, 4)]
 
-    chosen = Weekly().decision_sessions(without_friday)
+    chosen = Weekly().decision_sessions(without_friday, following=TUESDAY_15)
 
     assert date(2026, 9, 3) in chosen
+
+
+def test_the_end_of_a_run_is_not_the_end_of_a_period() -> None:
+    """Audit A18: stopped on a Wednesday or on the 4th, the run's last day is neither."""
+    assert Monthly().decision_sessions(SEPTEMBER[:4], following=SEPTEMBER[4]) == frozenset()
+    assert Weekly().decision_sessions(SEPTEMBER[:2], following=SEPTEMBER[2]) == frozenset()
+
+
+def test_a_run_that_does_reach_a_period_end_decides_on_it() -> None:
+    """Stopped on Friday 4 September, with Monday next: that week has ended."""
+    assert Weekly().decision_sessions(SEPTEMBER[:4], following=SEPTEMBER[4]) == frozenset(
+        {date(2026, 9, 4)}
+    )
+
+
+@pytest.mark.parametrize("schedule", [Weekly(), Monthly()], ids=["weekly", "monthly"])
+def test_a_short_run_decides_a_prefix_of_what_a_long_one_does(schedule: Weekly | Monthly) -> None:
+    """Where a run stops changes nothing it decided before stopping."""
+    long = schedule.decision_sessions(SEPTEMBER, following=TUESDAY_15)
+    for end in range(1, len(SEPTEMBER)):
+        short = schedule.decision_sessions(SEPTEMBER[:end], following=SEPTEMBER[end])
+        assert short == {day for day in long if day <= SEPTEMBER[end - 1]}
 
 
 @dataclass(frozen=True, slots=True)
