@@ -1478,3 +1478,60 @@ def test_a_clean_file_in_an_older_format_is_named_with_what_to_do(market_root):
         MarketDataRepository(market_root).load_vintages("US_GDP")
 
     assert "--rebuild" in str(raised.value)
+
+
+def test_a_repository_held_by_one_thread_refuses_another(market_root):
+    """Audit N04: B entered A's reading as if nested, and a writer got in once A left."""
+    import threading
+
+    repository = MarketDataRepository(market_root)
+    repository.save_bars("SPY", make_bars())
+    inside = threading.Event()
+    leave = threading.Event()
+    refused: list[Exception] = []
+
+    def hold_it() -> None:
+        with repository.reading():
+            inside.set()
+            leave.wait()
+
+    def join_it() -> None:
+        try:
+            with repository.reading():
+                pass
+        except StoreBusy as error:
+            refused.append(error)
+
+    holder = threading.Thread(target=hold_it)
+    holder.start()
+    inside.wait()
+    other = threading.Thread(target=join_it)
+    other.start()
+    other.join()
+    leave.set()
+    holder.join()
+
+    assert len(refused) == 1
+    assert "one thread at a time" in str(refused[0])
+    with repository.reading():
+        assert len(repository.load_bars("SPY")) == len(SESSIONS)
+
+
+def test_each_thread_with_its_own_repository_reads_side_by_side(market_root):
+    import threading
+
+    MarketDataRepository(market_root).save_bars("SPY", make_bars())
+    counts: list[int] = []
+
+    def read() -> None:
+        own = MarketDataRepository(market_root)
+        with own.reading():
+            counts.append(len(own.load_bars("SPY")))
+
+    readers = [threading.Thread(target=read) for _ in range(4)]
+    for reader in readers:
+        reader.start()
+    for reader in readers:
+        reader.join()
+
+    assert counts == [len(SESSIONS)] * 4

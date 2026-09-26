@@ -43,3 +43,6 @@ market_data/.lock
 .DS_Store
 .idea/
 .vscode/
+
+# The lock a research journal is appended under: a runtime file, never committed.
+*.jsonl.lock
