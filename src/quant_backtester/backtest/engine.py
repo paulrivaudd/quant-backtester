@@ -263,7 +263,9 @@ class BacktestEngine:
         definition = self._strategy_definition()
         fingerprint = self.strategy.fingerprint()
         configuration = self._configuration(sessions)
-        deciding = config.schedule.decision_sessions(sessions)
+        deciding = config.schedule.decision_sessions(
+            sessions, following=calendar.next_session(sessions[-1]).session_date
+        )
         signal_engine = SignalEngine()
 
         state = PortfolioState.opening(
