@@ -31,6 +31,7 @@ market_data/clean/
 market_data/validation/
 # A transaction mid-flight, or one a crash left behind: never committed.
 market_data/.pending/
+market_data/.lock
 
 # No data file is committed anywhere. Revisit the day a test needs a binary
 # fixture: it would have to be force-added, which is the right amount of

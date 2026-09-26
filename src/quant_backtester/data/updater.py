@@ -11,16 +11,15 @@ The pipeline for one instrument::
              -> merge under the revision policy
              -> repository.save_clean (atomic)
 
-One writer at a time. An update rewrites several files - the bars, each check
-source's series, the checked series, the actions - and each write is atomic on
-its own, but the set of them is not. Nothing here takes a lock: reading the
-clean layer while an update runs, or running two updates at once, is outside
-what this module supports. A crash between two writes leaves the checked series
-behind the bars; :meth:`MarketDataUpdater.update` notices that at the next run
-and says so rather than building on it, and :meth:`rebuild_clean` repairs it
-from the archive. A staging directory and a version pointer would make the set
-atomic, and would be worth it the day something schedules this or reads it
-concurrently - not for one process run by hand.
+One writer at a time, enforced: every write the repository makes holds the
+store's lock, and a second writer is refused with ``StoreBusy``. A promotion
+rewrites several files - the bars, each check source's series, the checked
+series, the actions, the journal of applied fetches - and does so as one
+repository transaction, so the set is published whole or not at all, and a
+promotion that finds its own result invalid throws every write away.
+:meth:`MarketDataUpdater.update` still checks that the checked series matches
+the bars before building on them, and :meth:`rebuild_clean` repairs a series
+from the archive.
 
 Three rules decide what this module may and may not do to stored history.
 

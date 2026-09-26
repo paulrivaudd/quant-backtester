@@ -6,6 +6,7 @@ wall clock, no shared state between tests.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from datetime import UTC, date, datetime, time, timedelta, timezone
@@ -16,7 +17,12 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
-from quant_backtester.data.repository import MarketDataRepository, write_parquet_atomic
+from quant_backtester.data.repository import (
+    MarketDataRepository,
+    StoreBusy,
+    TransactionDoomed,
+    write_parquet_atomic,
+)
 from quant_backtester.data.schemas import (
     BARS_SCHEMA,
     CHECKED_BARS_SCHEMA,
@@ -1099,8 +1105,10 @@ def test_a_commit_interrupted_while_moving_files_is_finished_on_the_next_open(ma
     staged = staging / "clean" / "bars" / "SPY.parquet"
     staged.parent.mkdir(parents=True)
     os.replace(target, staged)
+    digest = hashlib.sha256(staged.read_bytes()).hexdigest()
     (staging / "COMMIT.json").write_text(
-        json.dumps({"clean/bars/SPY.parquet": str(staged)}), encoding="utf-8"
+        json.dumps({"clean/bars/SPY.parquet": {"source": str(staged), "sha256": digest}}),
+        encoding="utf-8",
     )
 
     reopened = MarketDataRepository(market_root)
@@ -1109,16 +1117,90 @@ def test_a_commit_interrupted_while_moving_files_is_finished_on_the_next_open(ma
     assert not staging.exists()
 
 
-def test_a_transaction_cannot_be_opened_inside_another(market_root):
-    """The inner commit would publish the outer one's work halfway through."""
+def test_a_transaction_opened_inside_another_joins_it(market_root):
+    """The inner block commits nothing of its own: the outer one publishes both."""
+    repository = MarketDataRepository(market_root)
+    target = market_root / "clean" / "bars" / "SPY.parquet"
+
+    with repository.transaction():
+        with repository.transaction():
+            repository.save_bars("SPY", make_bars())
+        assert not target.exists()
+        repository.save_bars("OTHER", make_bars(instrument_id="OTHER"))
+
+    assert target.exists()
+    assert (market_root / "clean" / "bars" / "OTHER.parquet").exists()
+
+
+def test_a_joined_block_that_failed_dooms_the_transaction_even_when_caught(market_root):
+    """What the failed block staged cannot be told apart from the rest, so nothing goes."""
     repository = MarketDataRepository(market_root)
 
-    def open_another() -> None:
-        with repository.transaction():
+    with pytest.raises(TransactionDoomed), repository.transaction():
+        repository.save_bars("SPY", make_bars())
+        try:
+            with repository.transaction():
+                repository.save_bars("OTHER", make_bars(instrument_id="OTHER"))
+                raise ValueError("a promotion refused")
+        except ValueError:
             pass
 
-    with repository.transaction(), pytest.raises(RuntimeError, match="already open"):
-        open_another()
+    assert repository.load_bars("SPY").empty
+    assert repository.load_bars("OTHER").empty
+    assert list((market_root / ".pending").iterdir()) == []
+
+
+def test_opening_the_store_does_not_delete_a_transaction_in_progress(market_root):
+    """Audit A02: a second repository opened mid-transaction used to wipe its staging.
+
+    The writer then committed nothing, without an error, and the closes stayed
+    at their old value.
+    """
+    writer = MarketDataRepository(market_root)
+    writer.save_bars("SPY", make_bars())
+    moved = make_bars()
+    moved["close"] = moved["close"] * 2
+
+    with writer.transaction():
+        writer.save_bars("SPY", moved)
+        MarketDataRepository(market_root)  # someone opens the store to read it
+
+    assert writer.load_bars("SPY")["close"].tolist() == moved["close"].tolist()
+
+
+def test_a_second_writer_is_refused_while_a_transaction_is_open(market_root):
+    writer = MarketDataRepository(market_root)
+    other = MarketDataRepository(market_root)
+
+    with writer.transaction():
+        with pytest.raises(StoreBusy):
+            other.save_bars("OTHER", make_bars(instrument_id="OTHER"))
+        with pytest.raises(StoreBusy):
+            other.recover()
+
+    other.save_bars("OTHER", make_bars(instrument_id="OTHER"))
+    assert len(other.load_bars("OTHER")) == len(SESSIONS)
+
+
+def test_a_committed_file_that_vanished_is_an_error_not_a_success(market_root):
+    """A missing staged file is "already moved" only if its target proves it."""
+    repository = MarketDataRepository(market_root)
+    staging = market_root / ".pending" / "vanished"
+    staging.mkdir(parents=True)
+    (staging / "COMMIT.json").write_text(
+        json.dumps(
+            {
+                "clean/bars/SPY.parquet": {
+                    "source": str(staging / "clean" / "bars" / "SPY.parquet"),
+                    "sha256": "0" * 64,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="cannot be completed"):
+        repository.recover()
 
 
 def test_two_appends_to_one_log_in_a_transaction_do_not_undo_each_other(market_root):

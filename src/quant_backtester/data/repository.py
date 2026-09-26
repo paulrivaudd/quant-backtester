@@ -18,12 +18,20 @@ Layout under the market data root::
     clean/revisions.parquet
     validation/validation_log.parquet
     .pending/<id>/...                                 a transaction mid-flight
+    .lock                                             who may write, and when
 
 One promotion writes several of those files, and a series whose verdicts no
 longer describe its values is worse than one that is a day out of date. So a
 set of writes is made through :meth:`MarketDataRepository.transaction`: staged
-under ``.pending/``, published together, and finished or discarded when the
-repository is next opened.
+under ``.pending/``, published together, and finished or discarded by the next
+writer - never by someone who merely opened the store.
+
+Every write holds ``.lock`` exclusively, through a transaction: a write made
+outside one is a transaction of its own. A second writer - another process, or
+another repository object on the same root - is refused with
+:class:`StoreBusy` rather than made to wait or allowed to interleave. The lock
+is an advisory ``flock``: it binds every process that goes through this
+module, on a local filesystem, and nothing else.
 
 ``raw/`` is written once and never touched again: one file per fetch, named by
 the fetch instant. That is what answers "what did Yahoo actually give us on
@@ -35,6 +43,9 @@ snapshots, the accepted revisions, the calendars and the normalizer version.
 
 from __future__ import annotations
 
+import fcntl
+import functools
+import hashlib
 import json
 import os
 import shutil
@@ -43,7 +54,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, Concatenate
 
 import pandas as pd
 import pyarrow as pa
@@ -131,6 +142,114 @@ def write_parquet_atomic(frame: pd.DataFrame, path: Path, schema: pa.Schema) -> 
     _atomic_write(path, lambda handle: pq.write_table(table, handle))
 
 
+LOCK_FILE = ".lock"
+"""File, under the root, whose ``flock`` says who may write the store."""
+
+
+class StoreBusy(RuntimeError):
+    """Raised when the store is locked by someone else.
+
+    A writer is refused while another writer holds the store - or, once runs
+    hold it for reading, while one does. Failing is the point: an ingestion
+    that waited behind a five-minute backtest, or a backtest that read half of
+    an ingestion, are both worse than an error that says who holds the store.
+    """
+
+
+class TransactionDoomed(RuntimeError):
+    """Raised when a transaction ends after a block joined to it failed.
+
+    A caller may catch what a joined block raised and carry on, but the
+    transaction it joined had staged part of that block's work, which nothing
+    can now separate from the rest. So the whole transaction is discarded.
+    """
+
+
+class _StoreLock:
+    """The ``flock`` a repository holds on ``.lock``, reentrant within it.
+
+    Parameters
+    ----------
+    path : Path
+        The lock file; created on first use.
+
+    Notes
+    -----
+    A lock belongs to an open file description, so two repository objects in
+    one process exclude each other exactly as two processes do: that is what
+    makes the second object of a test the same hazard as a second process.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._descriptor: int | None = None
+        self._mode: int | None = None
+
+    @contextmanager
+    def hold(self, mode: int, what: str) -> Iterator[None]:
+        """Hold the lock in ``mode`` for the block, or raise :class:`StoreBusy`.
+
+        Parameters
+        ----------
+        mode : int
+            ``fcntl.LOCK_EX`` to write, ``fcntl.LOCK_SH`` to read.
+        what : str
+            What is being attempted, for the error.
+
+        Raises
+        ------
+        StoreBusy
+            If another holder excludes ``mode``, or if this object holds the
+            lock for reading and asks to write inside that.
+        """
+        if self._descriptor is not None:
+            if mode == fcntl.LOCK_EX and self._mode != fcntl.LOCK_EX:
+                raise StoreBusy(f"cannot {what} while this repository holds the store for reading")
+            yield
+            return
+        descriptor = os.open(self._path, os.O_RDWR | os.O_CREAT, 0o644)
+        try:
+            fcntl.flock(descriptor, mode | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(descriptor)
+            holder = "reading or writing it" if mode == fcntl.LOCK_EX else "writing it"
+            raise StoreBusy(
+                f"cannot {what}: {self._path.parent} is held by another process or "
+                f"repository {holder}"
+            ) from None
+        self._descriptor = descriptor
+        self._mode = mode
+        try:
+            yield
+        finally:
+            self._descriptor = None
+            self._mode = None
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            os.close(descriptor)
+
+
+def _sha256(path: Path) -> str:
+    """Return the hex SHA-256 of a file's bytes."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _writes[**P, R](
+    method: Callable[Concatenate[MarketDataRepository, P], R],
+) -> Callable[Concatenate[MarketDataRepository, P], R]:
+    """Make a write method a transaction of its own unless it is inside one."""
+
+    @functools.wraps(method)
+    def write(self: MarketDataRepository, *args: P.args, **kwargs: P.kwargs) -> R:
+        with self.transaction():
+            return method(self, *args, **kwargs)
+
+    return write
+
+
 PENDING = ".pending"
 """Directory, under the root, where a transaction stages its files.
 
@@ -161,8 +280,12 @@ class MarketDataRepository:
     Notes
     -----
     Opening a repository finishes or discards whatever a previous run left
-    behind - see :meth:`transaction`. It is the one side effect a constructor
-    here has, and it is the price of a store that can be interrupted.
+    behind - see :meth:`transaction` - but only when no one else holds the
+    store: a staging directory without a manifest is exactly what a writer
+    still at work looks like, and opening the store to read it used to delete
+    that writer's work under it (audit A02). It is the one side effect a
+    constructor here has, and it is the price of a store that can be
+    interrupted.
 
     A file of the clean layer is decoded once per *version* of it and kept:
     a backtest reads the same few files thousands of times, and decoding them
@@ -181,7 +304,15 @@ class MarketDataRepository:
         self._staged: dict[Path, Path] | None = None
         self._staging: Path | None = None
         self._decoded: dict[Path, tuple[tuple[int, int, int, int], pd.DataFrame]] = {}
-        self.recover()
+        self._doomed = False
+        self._lock = _StoreLock(root / LOCK_FILE)
+        try:
+            with self._lock.hold(fcntl.LOCK_EX, "recover interrupted transactions"):
+                self._recover()
+        except StoreBusy:
+            # Someone is writing: what is pending is theirs, or will be
+            # recovered by the next writer, which always recovers first.
+            pass
 
     def _forget(self, staging: Path) -> None:
         """Drop the decoded copies of a transaction's staged files.
@@ -243,10 +374,11 @@ class MarketDataRepository:
 
         Raises
         ------
-        RuntimeError
-            If a transaction is already open. Nesting them would make the
-            inner block's commit a lie: it would publish the outer one's work
-            halfway through.
+        StoreBusy
+            If another process or repository holds the store.
+        TransactionDoomed
+            If a block joined to this transaction raised, whether or not the
+            exception was caught on its way out.
 
         Notes
         -----
@@ -266,29 +398,54 @@ class MarketDataRepository:
         absent, the whole staging directory is discarded. There is no state in
         between, because the manifest appears in one filesystem operation.
 
+        The store is held exclusively from the first staged write to the last
+        move, and a transaction starts by recovering what a crashed writer left:
+        holding the lock is what makes a manifest-less staging directory
+        abandoned rather than in progress.
+
+        A transaction opened inside another **joins** it: its writes are staged
+        with the outer ones and published with them, and it commits nothing of
+        its own. If a joined block raises, the outer transaction is doomed and
+        publishes nothing - a rebuild is one change, not one per fetch.
+
         What this does not claim is a database. A reader that opens two files
         while the commit is moving them can still see one old and one new - the
         window is microseconds rather than the seconds an ingestion takes, and
         closing it entirely needs a snapshot the filesystem does not offer.
         """
         if self._staged is not None:
-            raise RuntimeError("a transaction is already open on this repository")
-        staging = Path(tempfile.mkdtemp(dir=self._pending_root()))
-        self._staged = {}
-        self._staging = staging
-        try:
-            yield
-        except BaseException:
+            try:
+                yield
+            except BaseException:
+                self._doomed = True
+                raise
+            return
+        with self._lock.hold(fcntl.LOCK_EX, "write the store"):
+            self._recover()
+            staging = Path(tempfile.mkdtemp(dir=self._pending_root()))
+            self._staged = {}
+            self._staging = staging
+            self._doomed = False
+            try:
+                yield
+            except BaseException:
+                self._staged = None
+                self._staging = None
+                self._forget(staging)
+                shutil.rmtree(staging, ignore_errors=True)
+                raise
+            staged = self._staged
+            doomed = self._doomed
             self._staged = None
             self._staging = None
+            self._doomed = False
             self._forget(staging)
-            shutil.rmtree(staging, ignore_errors=True)
-            raise
-        staged = self._staged
-        self._staged = None
-        self._staging = None
-        self._forget(staging)
-        self._commit(staging, staged)
+            if doomed:
+                shutil.rmtree(staging, ignore_errors=True)
+                raise TransactionDoomed(
+                    "a block joined to this transaction failed; nothing it staged is published"
+                )
+            self._commit(staging, staged)
 
     def recover(self) -> list[Path]:
         """Finish or discard the transactions a previous run left behind.
@@ -298,13 +455,28 @@ class MarketDataRepository:
         list[Path]
             The staging directories that were dealt with, in name order.
 
+        Raises
+        ------
+        StoreBusy
+            If someone else holds the store: its pending work may be alive.
+        RuntimeError
+            If a committed transaction's staged file is gone and its target
+            does not hold what was staged - a publication that cannot be proved.
+
         Notes
         -----
-        Called when a repository is opened. A staging directory holding a
-        manifest had decided to commit, so its moves are replayed; one without
-        had not, so it is removed. Replaying is safe to repeat: a file already
-        moved is no longer in the staging directory.
+        Done when a repository is opened and before every transaction, always
+        under the exclusive lock. A staging directory holding a manifest had
+        decided to commit, so its moves are replayed; one without had not, so
+        it is removed. Replaying is safe to repeat: a file already moved is no
+        longer in the staging directory, and its target carries the digest the
+        manifest recorded for it.
         """
+        with self._lock.hold(fcntl.LOCK_EX, "recover interrupted transactions"):
+            return self._recover()
+
+    def _recover(self) -> list[Path]:
+        """Recover pending transactions; the caller holds the exclusive lock."""
         pending = self.root / PENDING
         if not pending.is_dir():
             return []
@@ -319,7 +491,11 @@ class MarketDataRepository:
                 continue
             moves = json.loads(manifest.read_text(encoding="utf-8"))
             self._apply(
-                staging, {self.root / target: Path(source) for target, source in moves.items()}
+                staging,
+                {
+                    self.root / target: (Path(move["source"]), str(move["sha256"]))
+                    for target, move in moves.items()
+                },
             )
         return handled
 
@@ -334,21 +510,36 @@ class MarketDataRepository:
         if not staged:
             shutil.rmtree(staging, ignore_errors=True)
             return
+        moves = {target: (source, _sha256(source)) for target, source in staged.items()}
         manifest = {
-            str(target.relative_to(self.root)): str(source) for target, source in staged.items()
+            str(target.relative_to(self.root)): {"source": str(source), "sha256": digest}
+            for target, (source, digest) in moves.items()
         }
         _atomic_write(
             staging / COMMIT_MANIFEST,
             lambda handle: handle.write(json.dumps(manifest, indent=2).encode("utf-8")),
         )
-        self._apply(staging, staged)
+        self._apply(staging, moves)
 
-    def _apply(self, staging: Path, staged: Mapping[Path, Path]) -> None:
-        """Move every staged file onto its target, then drop the staging directory."""
-        for target, source in sorted(staged.items()):
-            if not Path(source).exists():
-                # Already moved by an earlier pass of the same commit.
-                continue
+    def _apply(self, staging: Path, moves: Mapping[Path, tuple[Path, str]]) -> None:
+        """Move every staged file onto its target, then drop the staging directory.
+
+        Raises
+        ------
+        RuntimeError
+            If a staged file is gone and its target does not carry its digest.
+            An absent source used to be taken as "already moved" on trust, and
+            a staging directory deleted under a live transaction then committed
+            nothing without a word.
+        """
+        for target, (source, digest) in sorted(moves.items()):
+            if not source.exists():
+                if target.exists() and _sha256(target) == digest:
+                    continue  # moved by an earlier pass of the same commit
+                raise RuntimeError(
+                    f"{target.relative_to(self.root)} was staged and is neither in "
+                    f"{staging.name} nor published; this commit cannot be completed"
+                )
             target.parent.mkdir(parents=True, exist_ok=True)
             os.replace(source, target)
         shutil.rmtree(staging, ignore_errors=True)
@@ -413,6 +604,7 @@ class MarketDataRepository:
         """Return ``raw/<source>/<instrument_id>/<fetch_id>.parquet``."""
         return self.root / "raw" / source / instrument_id / f"{fetch_id}.parquet"
 
+    @_writes
     def save_raw(self, download: RawDownload) -> Path:
         """Persist one provider response, immutably.
 
@@ -537,6 +729,7 @@ class MarketDataRepository:
                 fetches.append(entry.stem)
         return sorted(fetches)
 
+    @_writes
     def save_bars(self, instrument_id: str, frame: pd.DataFrame) -> None:
         """Replace an instrument's clean bars.
 
@@ -605,6 +798,7 @@ class MarketDataRepository:
             frame = frame.loc[frame["session_date"] <= end]
         return frame.reset_index(drop=True)
 
+    @_writes
     def save_checked_bars(self, instrument_id: str, frame: pd.DataFrame) -> None:
         """Replace an instrument's cross-checked bars.
 
@@ -641,6 +835,7 @@ class MarketDataRepository:
         path = self.root / "clean" / "checked_bars" / f"{instrument_id}.parquet"
         write_parquet_atomic(frame, self._target(path), CHECKED_BARS_SCHEMA)
 
+    @_writes
     def save_check_bars(self, instrument_id: str, source_id: str, frame: pd.DataFrame) -> None:
         """Replace one check source's canonical bars for an instrument.
 
@@ -736,6 +931,7 @@ class MarketDataRepository:
             frame = frame.loc[frame["session_date"] <= end]
         return frame.reset_index(drop=True)
 
+    @_writes
     def save_levels(self, instrument_id: str, frame: pd.DataFrame) -> None:
         """Replace an instrument's clean levels.
 
@@ -768,6 +964,7 @@ class MarketDataRepository:
         replace_path = self.root / "clean" / "levels" / f"{instrument_id}.parquet"
         write_parquet_atomic(frame, self._target(replace_path), LEVELS_SCHEMA)
 
+    @_writes
     def save_vintages(self, instrument_id: str, frame: pd.DataFrame) -> None:
         """Replace an instrument's vintage archive.
 
@@ -846,6 +1043,7 @@ class MarketDataRepository:
             frame = frame.loc[frame["observation_date"] <= end]
         return frame.reset_index(drop=True)
 
+    @_writes
     def save_corporate_actions(self, frame: pd.DataFrame) -> None:
         """Replace the corporate actions table.
 
@@ -888,6 +1086,7 @@ class MarketDataRepository:
         path = self._current(self.root / "clean" / "corporate_actions.parquet")
         return _only_instrument(self._load(path, CORPORATE_ACTIONS_SCHEMA), instrument_id)
 
+    @_writes
     def append_revisions(self, frame: pd.DataFrame) -> None:
         """Append detected revisions to the detection log.
 
@@ -909,6 +1108,7 @@ class MarketDataRepository:
         """
         self._append_rows(frame, self.root / "clean" / "revisions.parquet", REVISIONS_SCHEMA)
 
+    @_writes
     def mark_fetches_applied(
         self, instrument_id: str, fetches: Sequence[tuple[str, str]], applied_at_utc: datetime
     ) -> None:
@@ -990,6 +1190,7 @@ class MarketDataRepository:
         path = self._current(self.root / "clean" / "revisions.parquet")
         return _only_instrument(self._load(path, REVISIONS_SCHEMA), instrument_id)
 
+    @_writes
     def append_validation_log(
         self, reports: Sequence[ValidationReport], checked_at_utc: datetime
     ) -> None:
