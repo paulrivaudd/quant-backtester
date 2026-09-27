@@ -18,11 +18,6 @@ dist/
 # Research output
 results/
 
-# The scaffold's local cache, kept as empty directories.
-data/**
-!data/**/
-!data/**/.gitkeep
-
 # The market data tree: metadata/ is committed configuration and MUST stay
 # tracked - it determines past results. Everything the pipeline writes is
 # derived from raw/ plus that configuration, and is never committed.
