@@ -35,7 +35,9 @@ SIGNALS: tuple[Signal, ...] = (
         signal_id="momentum_4d", lookback_sessions=4, skip_recent_sessions=1, price_basis=RAW
     ),
     MovingAverageTrendSignal(signal_id="trend_ma5", window_sessions=5, price_basis=RAW),
-    RealizedVolatilitySignal(signal_id="volatility_4d", window_returns=4, price_basis=RAW),
+    RealizedVolatilitySignal(
+        signal_id="volatility_4d", window_returns=4, price_basis=RAW, annualization=252
+    ),
     CurrentDrawdownSignal(signal_id="drawdown_5d", window_sessions=5, price_basis=RAW),
     MeanReversionSignal(signal_id="reversion_4d", lookback_sessions=4, price_basis=RAW),
 )

@@ -47,7 +47,9 @@ def three_signals() -> list[Signal]:
         MomentumSignal(
             signal_id="momentum_5d", lookback_sessions=5, skip_recent_sessions=1, price_basis=RAW
         ),
-        RealizedVolatilitySignal(signal_id="volatility_4d", window_returns=4, price_basis=RAW),
+        RealizedVolatilitySignal(
+            signal_id="volatility_4d", window_returns=4, price_basis=RAW, annualization=252
+        ),
     ]
 
 

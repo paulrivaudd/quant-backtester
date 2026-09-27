@@ -35,8 +35,9 @@ class RealizedVolatilitySignal(Signal):
         computed on nineteen returns.
     annualization : int
         Periods per year the daily figure is scaled by, as
-        ``sqrt(annualization)``. Usually 252, and a parameter because it is a
-        convention rather than a fact.
+        ``sqrt(annualization)``: roughly 252 for XNYS, 255 for XPAR. Declared,
+        never defaulted - it is a research convention, and a default of 252
+        silently disagreed with the 255 the Paris reports are annualised by.
     logarithmic : bool
         ``True`` for ``ln(P_t / P_{t-1})``, which is the usual choice and makes
         the returns additive.
@@ -60,7 +61,7 @@ class RealizedVolatilitySignal(Signal):
     signal_id: str
     window_returns: int
     price_basis: PriceBasis
-    annualization: int = 252
+    annualization: int
     logarithmic: bool = True
     ddof: int = 1
     bar_field: BarField = BarField.CLOSE

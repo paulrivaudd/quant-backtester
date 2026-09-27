@@ -13,11 +13,12 @@ from quant_backtester.signals.types import PriceBasis, SignalStatus
 
 
 def signal(returns: int = 4, **overrides: object) -> RealizedVolatilitySignal:
-    """Build a volatility signal with the usual defaults."""
+    """Build a volatility signal annualised over 252 sessions, unless overridden."""
     parameters: dict[str, object] = {
         "signal_id": f"volatility_{returns}d",
         "window_returns": returns,
         "price_basis": PriceBasis.RAW,
+        "annualization": 252,
     }
     parameters.update(overrides)
     return RealizedVolatilitySignal(**parameters)  # type: ignore[arg-type]
@@ -127,3 +128,11 @@ def test_an_impossible_configuration_stops_the_run(
     parameters.update(overrides)
     with pytest.raises(ValueError, match=match):
         signal(**parameters)  # type: ignore[arg-type]
+
+
+def test_the_annualisation_is_declared_never_defaulted() -> None:
+    """A research convention has no default: 252 and 255 are both in use."""
+    with pytest.raises(TypeError, match="annualization"):
+        RealizedVolatilitySignal(  # type: ignore[call-arg]
+            signal_id="volatility_4d", window_returns=4, price_basis=PriceBasis.RAW
+        )
