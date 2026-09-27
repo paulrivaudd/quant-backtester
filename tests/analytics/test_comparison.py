@@ -7,6 +7,7 @@ could have seen, and a currency mismatch refused rather than drawn.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import date, datetime, time
@@ -18,12 +19,15 @@ import pytest
 from quant_backtester.analytics.comparison import (
     BenchmarkBasis,
     BenchmarkCurrencyMismatch,
+    BenchmarkCurve,
     BenchmarkSpec,
+    Comparison,
     common_period,
     compare,
 )
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.curves import Book, equity_curve
+from quant_backtester.analytics.report import PerformanceReport
 from quant_backtester.backtest.runner import StrategyRunner, value_benchmark
 from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
@@ -598,3 +602,120 @@ def test_the_benchmark_is_the_same_whatever_calendar_reads_it(
 
     assert finals[0] == pytest.approx(expected)
     assert finals[1] == pytest.approx(expected)
+
+
+# --- relative figures -------------------------------------------------------------
+
+SHORT = AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.0, minimum_sessions=3)
+"""A threshold low enough for a handful of synthetic sessions to be estimated."""
+
+DAYS = [date(2026, 9, 7), date(2026, 9, 8), date(2026, 9, 9), date(2026, 9, 10), date(2026, 9, 11)]
+
+
+def series(values: list[float], days: list[date] | None = None) -> pd.Series:
+    """Return a curve on ``days``, the first sessions of ``DAYS`` by default."""
+    index = pd.Index(days if days is not None else DAYS[: len(values)], dtype="object")
+    return pd.Series(values, index=index, dtype="float64")
+
+
+def benchmark_of(values: list[float], days: list[date] | None = None) -> BenchmarkCurve:
+    """Return a benchmark curve of ``FUND`` on ``days``."""
+    return BenchmarkCurve(BenchmarkSpec("FUND"), series(values, days))
+
+
+def test_compare_always_carries_the_relative_figures_and_their_provenance() -> None:
+    comparison = compare(
+        series([100.0, 102.0, 101.0, 104.0, 103.0]),
+        benchmark_of([100.0, 101.0, 100.5, 102.0, 101.0]),
+        SHORT,
+        book=Book.GROSS,
+    )
+    assert comparison.relative is not None
+    assert comparison.relative.beta is not None
+    assert comparison.benchmark_spec == BenchmarkSpec("FUND")
+    assert comparison.book is Book.GROSS
+    assert list(comparison.relative_frame().index) == list(comparison.relative.as_frame().index)
+
+
+def test_compare_under_the_default_threshold_still_sets_relative_with_a_reason(
+    runner: StrategyRunner,
+) -> None:
+    relative = (
+        runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-01", "2026-09-14")
+        .compare(benchmark="ETF_OTHER")
+        .relative
+    )
+    assert relative is not None
+    assert relative.beta is None
+    assert relative.diagnostics == ("insufficient_observations",)
+
+
+def test_compare_refuses_a_hole_inside_the_period_instead_of_bridging_it() -> None:
+    with pytest.raises(ValueError, match="do not hold the same sessions"):
+        compare(
+            series([100.0, 102.0, 101.0, 104.0, 103.0]),
+            benchmark_of([100.0, 101.0, 102.0, 101.0], [DAYS[0], DAYS[1], DAYS[3], DAYS[4]]),
+            SHORT,
+        )
+
+
+def test_compare_refuses_a_book_that_is_not_one() -> None:
+    with pytest.raises(ValueError, match="book"):
+        compare(series([100.0, 101.0]), benchmark_of([100.0, 101.0], DAYS[:2]), SHORT, book="NET")  # type: ignore[arg-type]
+
+
+def test_a_comparison_built_by_hand_says_its_relative_figures_were_not_computed() -> None:
+    old = compare(series([100.0, 101.0]), benchmark_of([100.0, 101.0], DAYS[:2]), SHORT)
+    manual = Comparison(
+        label="FUND", strategy=old.strategy, benchmark=old.benchmark, sessions=old.sessions
+    )
+    assert manual.relative is None
+    assert bool(manual.relative_frame()["value"].isna().all())
+    assert "relative figures not computed" in manual.render()
+    assert list(manual.as_frame().columns) == ["strategy", "FUND"]
+
+
+def test_the_relative_block_prints_percentages_numbers_and_reasons() -> None:
+    flat = compare(
+        series([100.0, 101.0, 102.01, 103.0301, 104.060401]),
+        benchmark_of([100.0, 100.0, 100.0, 100.0, 100.0]),
+        SHORT,
+        book=Book.NET,
+    )
+    text = flat.render()
+    assert "relative to FUND (TOTAL_RETURN), 2026-09-07 to 2026-09-11" in text
+    assert "5 valuations, 4 returns, 255 sessions/year" in text
+    assert "the benchmark's returns do not vary" in text
+    assert not re.search(r"\b(nan|inf)\b", text)
+    moving = compare(
+        series([100.0, 102.0, 101.0, 104.0, 103.0]),
+        benchmark_of([100.0, 101.0, 100.5, 102.0, 101.0]),
+        SHORT,
+    ).render()
+    beta_line = next(line for line in moving.splitlines() if line.startswith("beta"))
+    assert "%" not in beta_line and len(beta_line.split()[-1].split(".")[-1]) == 3
+    alpha_line = next(line for line in moving.splitlines() if line.startswith("regression alpha"))
+    assert alpha_line.endswith("%")
+
+
+def test_i09_a_benchmark_marked_on_an_earlier_close_keeps_the_session_and_says_so(
+    runner: StrategyRunner,
+) -> None:
+    """New York was shut on 7 September: the session stays, and the report counts it."""
+    result = a_run(runner)
+    curve = value_benchmark(result.backtest, runner.reader, "IDX_US")
+    report = PerformanceReport.of(result.backtest, SHORT, benchmark=curve)
+    assert report.net_comparison is not None
+    assert date(2026, 9, 7) in report.net_comparison.marked_from_earlier
+    assert report.net_comparison.sessions == len(result.records())
+    assert "1 benchmark valuation(s) on an earlier close" in report.render()
+
+
+def test_a_report_refuses_a_benchmark_that_does_not_cover_the_whole_run(
+    runner: StrategyRunner,
+) -> None:
+    result = a_run(runner)
+    curve = value_benchmark(result.backtest, runner.reader, "ETF_OTHER")
+    partial = BenchmarkCurve(curve.spec, curve.equity.iloc[1:])
+    with pytest.raises(ValueError, match="does not cover exactly"):
+        PerformanceReport.of(result.backtest, SHORT, benchmark=partial)

@@ -23,6 +23,7 @@ index is the euro-dollar rate with a strategy's name on it.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
@@ -30,8 +31,9 @@ from enum import Enum
 import pandas as pd
 
 from quant_backtester.analytics.config import AnalyticsConfig
-from quant_backtester.analytics.curves import elapsed_years
+from quant_backtester.analytics.curves import Book, aligned_equity_curves, elapsed_years
 from quant_backtester.analytics.performance import PerformanceStats
+from quant_backtester.analytics.relative import STATISTICS, RelativePerformanceStats
 from quant_backtester.signals.types import require_identifier
 
 
@@ -180,7 +182,18 @@ class Comparison:
     sessions : int
         Sessions both curves cover.
     marked_from_earlier : tuple[date, ...]
-        Sessions the benchmark had to be valued at an earlier close on.
+        Sessions the benchmark had to be valued at an earlier close on. Kept
+        in the sample - dropping them would move the return intervals - and
+        counted in the rendering: the benchmark may react a session late.
+    relative : RelativePerformanceStats | None
+        Alpha, beta, tracking error and information ratio over the same
+        sessions. Always set by :func:`compare`; ``None`` only on a comparison
+        built by hand, and then rendered as not computed.
+    benchmark_spec : BenchmarkSpec | None
+        What the benchmark was, basis included.
+    book : Book | None
+        Which of the run's books the strategy side is. A label of provenance:
+        it does not turn a gross curve into a net one.
 
     Notes
     -----
@@ -194,6 +207,14 @@ class Comparison:
     benchmark: PerformanceStats
     sessions: int
     marked_from_earlier: tuple[date, ...] = ()
+    relative: RelativePerformanceStats | None = None
+    benchmark_spec: BenchmarkSpec | None = None
+    book: Book | None = None
+
+    def __post_init__(self) -> None:
+        """Refuse a book that is not a :class:`Book`."""
+        if self.book is not None and not isinstance(self.book, Book):
+            raise ValueError(f"book must be a Book or None, got {self.book!r}")
 
     @property
     def excess_return(self) -> float:
@@ -220,12 +241,30 @@ class Comparison:
             index=pd.Index(list(rows), dtype="object", name="statistic"),
         )
 
+    def relative_frame(self) -> pd.DataFrame:
+        """Return the seven relative figures as a one-column frame.
+
+        Returns
+        -------
+        pd.DataFrame
+            :meth:`RelativePerformanceStats.as_frame`, or the same rows with
+            no value on a comparison built without them.
+        """
+        if self.relative is not None:
+            return self.relative.as_frame()
+        return pd.DataFrame(
+            {"value": [None] * len(STATISTICS)},
+            index=pd.Index(list(STATISTICS), dtype="object", name="statistic"),
+            dtype="float64",
+        )
+
     def render(self) -> str:
         """Return the comparison laid out for a terminal.
 
         Percentages where the figure is one, and a plain number where it is
         not: a Sharpe ratio printed as ``54%`` is the kind of unit slip that
-        makes a report unreadable and, read quickly, flattering.
+        makes a report unreadable and, read quickly, flattering. Beta and the
+        information ratio are numbers too.
         """
         lines = [
             f"{self.sessions} sessions, strategy against {self.label}",
@@ -239,6 +278,7 @@ class Comparison:
             label = str(name).replace("_", " ")
             lines.append(f"{label:<24}{_number(left, percent):>12}{_number(right, percent):>14}")
         lines.append(f"{'excess return':<24}{_number(self.excess_return):>12}")
+        lines.extend(("", *self._relative_block()))
         lines.extend(
             (
                 "",
@@ -249,51 +289,157 @@ class Comparison:
         )
         return "\n".join(lines)
 
+    def _relative_block(self) -> list[str]:
+        """Return the lines of the relative figures, or why there are none."""
+        if self.relative is None:
+            return ["relative figures not computed"]
+        relative = self.relative
+        book = self.book.value.lower() if self.book is not None else "unlabelled"
+        lines = [
+            *relative_context(relative, self.label, self.benchmark_spec),
+            f"{'book':<28}{book:>12}",
+        ]
+        lines.extend(
+            f"{relative_label(name):<28}{relative_value(name, getattr(relative, name)):>12}"
+            for name in RENDERED_STATISTICS
+        )
+        lines.extend(relative_notes(relative.diagnostics, len(self.marked_from_earlier)))
+        return lines
+
 
 def compare(
     equity: pd.Series,  # type: ignore[type-arg]
     curve: BenchmarkCurve,
     config: AnalyticsConfig,
+    *,
+    book: Book | None = None,
 ) -> Comparison:
-    """Measure a curve against a benchmark over the days they share.
+    """Measure a curve against a benchmark over one period with no hole in it.
 
     Parameters
     ----------
     equity : pd.Series
-        The strategy's own worth, session by session.
+        The strategy's own worth, session by session, in the benchmark's
+        currency.
     curve : BenchmarkCurve
         What was held instead, already valued over the same sessions.
     config : AnalyticsConfig
         The annualisation convention, applied to both sides.
+    book : Book | None
+        Which book ``equity`` is, recorded with the comparison. The caller
+        passes the matching curve: this labels it and converts nothing.
 
     Returns
     -------
     Comparison
-        The same statistics for both, over the same sessions.
+        The same absolute statistics for both sides and the relative ones,
+        all over the same sessions.
 
     Raises
     ------
     ValueError
-        If the two curves share no session.
+        If the curves are invalid, share no session, or one lacks a session
+        the other holds inside their shared span (see
+        :func:`~quant_backtester.analytics.curves.aligned_equity_curves`), or
+        if ``book`` is not a :class:`Book`.
 
     Notes
     -----
-    Both sides are measured on the intersection of their dates. Comparing a
-    strategy's Sharpe ratio over one period with a benchmark's over another is
-    how a comparison becomes a sales document.
+    The period runs from the first to the last session both curves hold, and
+    inside it both must hold every session: an intersection would bridge a
+    missing Tuesday with a Monday-to-Wednesday return counted as one session.
     """
-    common = equity.index.intersection(curve.equity.index)
-    if len(common) == 0:
-        raise ValueError("the strategy and the benchmark share no session")
-    strategy = equity.loc[common]
-    other = curve.equity.loc[common]
+    if book is not None and not isinstance(book, Book):
+        raise ValueError(f"book must be a Book or None, got {book!r}")
+    strategy, other = aligned_equity_curves(equity, curve.equity)
+    kept = set(strategy.index)
     return Comparison(
         label=curve.spec.name,
         strategy=PerformanceStats.from_equity(strategy, config),
         benchmark=PerformanceStats.from_equity(other, config),
-        sessions=len(common),
-        marked_from_earlier=tuple(day for day in curve.marked_from_earlier if day in set(common)),
+        sessions=len(strategy),
+        marked_from_earlier=tuple(day for day in curve.marked_from_earlier if day in kept),
+        relative=RelativePerformanceStats.from_equity(strategy, other, config),
+        benchmark_spec=curve.spec,
+        book=book,
     )
+
+
+RENDERED_STATISTICS: tuple[str, ...] = tuple(
+    name for name in STATISTICS if name != "alpha_per_session"
+)
+"""The relative figures a report prints; the alpha per session stays in the frames."""
+
+_RELATIVE_LABELS: dict[str, str] = {
+    "alpha_per_session": "alpha per session",
+    "alpha_annualised": "regression alpha, a year",
+    "beta": "beta",
+    "active_return_annualised": "active return, a year",
+    "tracking_error_annualised": "tracking error, a year",
+    "information_ratio": "information ratio",
+    "r_squared": "r squared",
+}
+
+_DIAGNOSTIC_NOTES: dict[str, str] = {
+    "insufficient_observations": "too few sessions for the declared minimum: nothing is estimated",
+    "zero_benchmark_variance": "the benchmark's returns do not vary: no alpha, beta or r squared",
+    "zero_strategy_variance": "the strategy's returns do not vary: no r squared",
+    "zero_tracking_error": "the active return does not vary: no information ratio",
+}
+
+
+def relative_label(name: str) -> str:
+    """Return how a report labels one relative figure."""
+    return _RELATIVE_LABELS[name]
+
+
+def relative_value(name: str, value: float | None) -> str:
+    """Return one relative figure as a report prints it.
+
+    Alpha, active return, tracking error and alpha per session are fractions
+    a year (or a session) and print as percentages; r squared prints as a
+    percentage to one decimal; beta and the information ratio are plain
+    numbers to three decimals. A missing figure is a dash.
+    """
+    if value is None or not math.isfinite(value):
+        return "-"
+    if name == "alpha_per_session":
+        return f"{value:.4%}"
+    if name == "r_squared":
+        return f"{value:.1%}"
+    if name in ("beta", "information_ratio"):
+        return f"{value:.3f}"
+    return f"{value:.2%}"
+
+
+def relative_context(
+    relative: RelativePerformanceStats, label: str, spec: BenchmarkSpec | None
+) -> list[str]:
+    """Return the lines that say what the relative figures are measured on."""
+    basis = spec.basis.value if spec is not None else "basis not recorded"
+    config = relative.config
+    lines = [
+        f"relative to {label} ({basis}), {relative.sample_start} to {relative.sample_end}",
+        f"  {relative.sessions} valuations, {relative.observations} returns, "
+        f"{config.sessions_per_year} sessions/year, risk-free {config.risk_free_rate:.2%}",
+    ]
+    if spec is not None and spec.basis is BenchmarkBasis.PRICE_RETURN:
+        lines.append("  price return: the benchmark's distributions are left out")
+    return lines
+
+
+def relative_notes(diagnostics: tuple[str, ...], marked_from_earlier: int) -> list[str]:
+    """Return the caveats of the relative figures, one line each."""
+    lines = [f"  unavailable: {_DIAGNOSTIC_NOTES.get(code, code)}" for code in diagnostics]
+    if marked_from_earlier:
+        lines.append(
+            f"  {marked_from_earlier} benchmark valuation(s) on an earlier close: "
+            "it may react a session late"
+        )
+    lines.append(
+        "  alpha is A x the intercept, not a compounded return; the ratios scale by sqrt(A)"
+    )
+    return lines
 
 
 def common_period(first: pd.Series, second: pd.Series) -> pd.Index:  # type: ignore[type-arg]
@@ -315,13 +461,19 @@ def common_period(first: pd.Series, second: pd.Series) -> pd.Index:  # type: ign
 
 
 def _number(value: float | None, as_percent: bool = True) -> str:
-    """Return a figure as a report prints it, or a dash when there is none."""
-    if value is None:
+    """Return a figure as a report prints it, or a dash when there is none.
+
+    A frame stores a missing figure as ``NaN``; it is printed as the absence it
+    is, never as ``nan``.
+    """
+    if value is None or not math.isfinite(value):
         return "-"
     return f"{value:.2%}" if as_percent else f"{value:.2f}"
 
 
 __all__ = [
+    "RENDERED_STATISTICS",
+    "BenchmarkBasis",
     "BenchmarkCurrencyMismatch",
     "BenchmarkCurve",
     "BenchmarkSpec",

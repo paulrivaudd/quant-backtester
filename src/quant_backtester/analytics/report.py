@@ -18,10 +18,22 @@ from dataclasses import dataclass
 import pandas as pd
 
 from quant_backtester.analytics.attribution import CostAttribution, RunQuality
+from quant_backtester.analytics.comparison import (
+    RENDERED_STATISTICS,
+    BenchmarkBasis,
+    BenchmarkCurve,
+    Comparison,
+    compare,
+    relative_context,
+    relative_label,
+    relative_notes,
+    relative_value,
+)
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.contribution import InstrumentAttribution
 from quant_backtester.analytics.curves import Book, equity_curve
 from quant_backtester.analytics.performance import PerformanceStats
+from quant_backtester.analytics.relative import STATISTICS
 from quant_backtester.backtest.result import BacktestResult
 
 _NOT_AVAILABLE = "-"
@@ -59,6 +71,11 @@ class PerformanceReport:
         caps and how long a decision lives. Read from the run's configuration,
         so a report states the model it was produced under rather than leaving
         a reader to assume a stronger one (audit, section 5).
+    gross_comparison, net_comparison : Comparison | None
+        Each book against the benchmark, absolute and relative figures - alpha,
+        beta, tracking error, information ratio - over every session of the
+        run. ``None`` when no benchmark was given; the net one is the figure to
+        read first.
     """
 
     gross: PerformanceStats
@@ -68,9 +85,17 @@ class PerformanceReport:
     instruments: InstrumentAttribution
     config: AnalyticsConfig
     assumptions: tuple[str, ...] = ()
+    gross_comparison: Comparison | None = None
+    net_comparison: Comparison | None = None
 
     @classmethod
-    def of(cls, result: BacktestResult, config: AnalyticsConfig) -> PerformanceReport:
+    def of(
+        cls,
+        result: BacktestResult,
+        config: AnalyticsConfig,
+        *,
+        benchmark: BenchmarkCurve | None = None,
+    ) -> PerformanceReport:
         """Build the report of a finished run.
 
         Parameters
@@ -80,21 +105,71 @@ class PerformanceReport:
             data or touches the run's records.
         config : AnalyticsConfig
             The annualisation convention and the rate to compare against.
+        benchmark : BenchmarkCurve | None
+            The benchmark already valued over the run, in the book's currency.
+            Nothing is read to build it here.
 
         Returns
         -------
         PerformanceReport
-            Gross and net, the costs between them, and what the run had to make
-            do on.
+            Gross and net, the costs between them, what the run had to make do
+            on, and - with a benchmark - both books measured against it.
+
+        Raises
+        ------
+        ValueError
+            If the benchmark does not cover exactly the run's sessions. A
+            comparison over part of a run is :func:`compare`'s to make, under
+            its own name; it does not slip into the report of the whole run.
         """
+        gross_curve = equity_curve(result, Book.GROSS)
+        net_curve = equity_curve(result, Book.NET)
+        gross_comparison: Comparison | None = None
+        net_comparison: Comparison | None = None
+        if benchmark is not None:
+            sessions = tuple(record.session_date for record in result.records)
+            if benchmark.sessions != sessions:
+                raise ValueError(
+                    f"the benchmark {benchmark.spec.name} does not cover exactly the run's "
+                    f"{len(sessions)} sessions ({len(benchmark.sessions)} valued); a partial "
+                    "comparison is compare()'s to make, not the report's"
+                )
+            gross_comparison = compare(gross_curve, benchmark, config, book=Book.GROSS)
+            net_comparison = compare(net_curve, benchmark, config, book=Book.NET)
         return cls(
-            gross=PerformanceStats.from_equity(equity_curve(result, Book.GROSS), config),
-            net=PerformanceStats.from_equity(equity_curve(result, Book.NET), config),
+            gross=PerformanceStats.from_equity(gross_curve, config),
+            net=PerformanceStats.from_equity(net_curve, config),
             costs=CostAttribution.of(result),
             quality=RunQuality.of(result),
             instruments=InstrumentAttribution.of(result),
             config=config,
             assumptions=_assumptions(result),
+            gross_comparison=gross_comparison,
+            net_comparison=net_comparison,
+        )
+
+    def relative_frame(self) -> pd.DataFrame:
+        """Return the relative figures of both books against the benchmark.
+
+        Returns
+        -------
+        pd.DataFrame
+            Indexed by ``statistic`` - the seven figures of
+            :class:`~quant_backtester.analytics.relative.RelativePerformanceStats`
+            in order - with a ``gross`` and a ``net`` column. ``NaN`` where a
+            figure is not defined, and throughout when there is no benchmark.
+        """
+        columns = {}
+        for name, comparison in (("gross", self.gross_comparison), ("net", self.net_comparison)):
+            relative = comparison.relative if comparison is not None else None
+            columns[name] = [
+                getattr(relative, statistic) if relative is not None else None
+                for statistic in STATISTICS
+            ]
+        return pd.DataFrame(
+            columns,
+            index=pd.Index(list(STATISTICS), dtype="object", name="statistic"),
+            dtype="float64",
         )
 
     def as_frame(self) -> pd.DataFrame:
@@ -161,11 +236,37 @@ class PerformanceReport:
             f"{'sharpe ratio':<24}{_number(self.gross.sharpe_ratio):>12}"
             f"{_number(self.net.sharpe_ratio):>12}"
         )
+        lines.extend(("", self._relative_block()))
         lines.extend(
             ("", self._cost_block(), "", self._instrument_block(), "", self._quality_block())
         )
         if self.assumptions:
             lines.extend(("", "assumptions", *(f"  {line}" for line in self.assumptions)))
+        return "\n".join(lines)
+
+    def _relative_block(self) -> str:
+        """Return the relative figures of both books, or why there are none."""
+        gross, net = self.gross_comparison, self.net_comparison
+        if gross is None or net is None or gross.relative is None or net.relative is None:
+            return "relative to a benchmark: none configured"
+        lines = relative_context(net.relative, net.label, net.benchmark_spec)
+        lines.append(f"{'':<28}{'gross':>12}{'net':>12}")
+        lines.extend(
+            f"{relative_label(name):<28}"
+            f"{relative_value(name, getattr(gross.relative, name)):>12}"
+            f"{relative_value(name, getattr(net.relative, name)):>12}"
+            for name in RENDERED_STATISTICS
+        )
+        diagnostics = tuple(dict.fromkeys((*gross.relative.diagnostics, *net.relative.diagnostics)))
+        lines.extend(relative_notes(diagnostics, len(net.marked_from_earlier)))
+        reinvested = (
+            net.benchmark_spec is not None
+            and net.benchmark_spec.basis is BenchmarkBasis.TOTAL_RETURN
+        )
+        lines.append(
+            f"  {net.label} is held without costs, lots or cash left over"
+            + (", distributions reinvested at the close" if reinvested else "")
+        )
         return "\n".join(lines)
 
     def _instrument_block(self) -> str:
