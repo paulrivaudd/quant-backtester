@@ -98,11 +98,18 @@ src/quant_backtester/
     backtest/    the event loop                                (V1 done)
     analytics/   performance, risk, comparison, plots           (V1 done)
     strategies/  the contract, and strategies written on it     (V1 done)
+    research/    hypotheses, experiment register, archives, paper plans
+    demo.py      an invented market for a first, offline backtest
 tests/           mirrors the package layout
+scripts/         command-line entry points (see docs/ARCHITECTURE.md §13)
+docs/            architecture, data layer, formulas, corporate actions, glossary (French)
 market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
 ```
 
 Dependencies flow one way, left to right; a lower layer never imports a higher one.
+The one exception is `backtest/runner.py`, the composition facade that runs a
+strategy and hands back its report: it imports `strategies.base` and
+`analytics`, and the layering test names it as the only module allowed to.
 
 ```text
 MarketDataReader.at(decision) ──┬──> SignalContext ──> SignalEngine ──> SignalSnapshot ──┐
@@ -306,8 +313,35 @@ uv run ruff check . && uv run ruff format --check .
 uv run pyright
 ```
 
-Fetch the committed instruments into the local store, then read it at a decision
-instant:
+A first backtest needs no download. `scripts/demo.py` writes two invented
+funds, drawn from a fixed seed, to a temporary store, and runs a momentum
+rotation and a buy-and-hold over them with the project's own reader, engine,
+execution model and report (`quant_backtester.demo`). The prices are not market
+data; the machinery is the real one:
+
+```bash
+uv run python scripts/demo.py                      # both reports, a few seconds
+uv run python scripts/demo.py --figures demo_output  # and the equity and drawdown figures
+```
+
+```python
+from pathlib import Path
+
+from quant_backtester.demo import demo_runner
+from quant_backtester.strategies.examples import MomentumRotation
+
+runner = demo_runner(Path("demo_store"), seed=20240101)  # a new, empty directory
+result = runner.run(
+    MomentumRotation(lookback_sessions=60, top_n=1),
+    ("FUND_A", "FUND_B"),
+    "2025-01-02",
+    "2025-12-31",
+)
+print(result.report().render())
+```
+
+For real data, fetch the committed instruments into the local store, then read
+it at a decision instant:
 
 ```bash
 uv run python scripts/update_market_data.py              # extend every series

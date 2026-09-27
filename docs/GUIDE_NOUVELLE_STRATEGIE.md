@@ -11,6 +11,43 @@ développement dans [CLAUDE.md](../CLAUDE.md).
 > la MM20 au-dessus de la MM50. Les deux s'écrivent avec le même code en
 > inversant les paramètres, et le registre les compte comme deux variantes.
 
+## Premier run, sans données réelles
+
+Avant de télécharger quoi que ce soit, on peut lancer un vrai backtest sur un
+marché inventé :
+
+```bash
+uv run python scripts/demo.py --figures demo_output
+```
+
+`quant_backtester.demo` tire deux fonds fictifs, `FUND_A` et `FUND_B`, d'une
+graine fixe (la même graine donne les mêmes prix au bit près). Il les écrit
+dans un store temporaire sur un calendrier `DEMO`, qui recopie les fériés
+Euronext de 2024-2025, puis construit un `StrategyRunner` dont toutes les
+hypothèses sont déclarées : coûts, lots entiers, 10 000 EUR, benchmark
+`FUND_A`. Le lecteur, le moteur, l'exécution et le rapport sont ceux du projet.
+Seuls les prix sont faux. On peut y essayer une stratégie en cours d'écriture :
+
+```python
+from pathlib import Path
+
+from quant_backtester.demo import demo_runner
+from quant_backtester.strategies import MovingAverageCross
+
+runner = demo_runner(Path("demo_store"), seed=20240101)  # un dossier neuf et vide
+result = runner.run(
+    MovingAverageCross(instrument_id="FUND_A", first_sessions=20, second_sessions=50),
+    ("FUND_A", "FUND_B"),
+    "2025-01-02",
+    "2025-12-31",
+)
+print(result.report().render())
+```
+
+2024 sert de warm-up aux signaux, et 2025 est la période mesurée. Un chiffre
+obtenu sur la démo ne dit rien d'une règle. Il montre comment le moteur
+fonctionne, rien de plus.
+
 ## 0. Avant d'écrire du code : l'hypothèse
 
 Écrivez l'hypothèse dans `research/hypotheses.toml` **avant le premier run**,

@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Breaking
+- `RealizedVolatilitySignal.annualization` has no default any more: it is a
+  research convention (252 for XNYS, 255 for XPAR), and the default of 252
+  disagreed with the 255 the Paris reports are annualised by. No committed
+  strategy or suite builds one, so no record and no `run_id` moves.
+- `quant_backtester.data.normalizer.bars_frame` (was `_bars_frame`) is public:
+  it is the step every bar normalizer ends in, a new source's included.
+
+### Added
+- `quant_backtester.demo` and `scripts/demo.py`: two funds drawn from a seed on
+  a synthetic calendar, written to a temporary store and run through the real
+  reader, engine, execution model and report - a first backtest with nothing
+  downloaded.
+- `docs/DONNEES.md` (the data layer, adding an instrument or a source),
+  `docs/FORMULES.md` (every formula of the code), `docs/OPERATIONS_SUR_TITRES.md`
+  (what is and is not done with a corporate action), `docs/GLOSSAIRE.md`.
+
+### Documentation
+- `docs/ARCHITECTURE.md`: `backtest/runner.py` named as the one composition
+  facade allowed to import upwards; `portfolio` works in weights and
+  `execution` in quantities and lots; the ten reject reasons; the corporate
+  action check before each open; every module, the delivered strategies, the
+  scripts, the POSIX requirement and `pydoc` as the API reference.
+
+### Removed
+- The empty `data/raw/` and `data/processed/` of the first scaffold; the store
+  lives under `market_data/`.
+
 ### Performance
 - The reader prepares each series once per file version - contested sessions
   and missing values removed, sorted - and each instant only slices and
