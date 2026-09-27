@@ -1052,3 +1052,36 @@ def test_a_run_can_fix_its_quantities_at_the_decision(runner: StrategyRunner) ->
     assert result.configuration["execution"]["fill_model"] == "DECISION_CLOSE_QUANTITIES"  # type: ignore[index]
     assert len(result.fills()) == 1
     assert "DECISION_CLOSE_QUANTITIES" in result.report().render()
+
+
+def test_an_exploratory_report_keeps_the_currency_check(runner: StrategyRunner) -> None:
+    """I06: a report against a dollar index from a euro book is refused, not drawn."""
+    from quant_backtester.analytics.comparison import BenchmarkCurrencyMismatch
+
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], "2026-09-09", "2026-09-14")
+    with pytest.raises(BenchmarkCurrencyMismatch):
+        result.report(benchmark="IDX_US")
+
+
+def test_an_exploratory_report_reuses_the_kept_benchmark_and_guards_any_other(
+    runner: StrategyRunner,
+    repository: MarketDataRepository,
+    make_bars: Callable[..., pd.DataFrame],
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+    sessions: tuple[date, ...],
+) -> None:
+    """I07: the declared benchmark is the kept curve; another is read only from the same store."""
+    declared = with_benchmark(runner, "ETF_OTHER")
+    result = declared.run(
+        BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], sessions[0], sessions[-1]
+    )
+    revised = prices(200.0, 3.0)
+    revised[sessions[-1]] = 999.0
+    repository.save_checked_bars("ETF_OTHER", make_bars("ETF_OTHER", xpar, revised))
+
+    again = result.report(benchmark="ETF_OTHER")
+    assert again.net_comparison is not None and result.analytics.net_comparison is not None
+    assert again.net_comparison.relative == result.analytics.net_comparison.relative
+    with pytest.raises(StoreChanged, match="no longer holds"):
+        result.report(benchmark="ETF_EU")

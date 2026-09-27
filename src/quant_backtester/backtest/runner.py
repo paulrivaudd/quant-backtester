@@ -57,6 +57,7 @@ from quant_backtester.analytics.comparison import (
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.curves import Book, drawdown_curve, equity_curve
 from quant_backtester.analytics.plots import drawdown_figure, equity_figure
+from quant_backtester.analytics.relative import RETURN_STD_TOLERANCE, STATISTICS
 from quant_backtester.analytics.report import PerformanceReport
 from quant_backtester.backtest.config import BacktestConfig
 from quant_backtester.backtest.engine import BacktestEngine, StrategyMutated
@@ -258,9 +259,109 @@ class StrategyResult:
 
     # -- what it did ------------------------------------------------------------
 
-    def report(self) -> PerformanceReport:
-        """Return the performance report of the run."""
-        return self.analytics
+    def report(self, *, benchmark: BenchmarkSpec | str | None = None) -> PerformanceReport:
+        """Return the performance report of the run.
+
+        Parameters
+        ----------
+        benchmark : BenchmarkSpec | str | None
+            Left out, the report kept with the run, measured against the
+            declared benchmark if there is one. Given, a new report measured
+            against that benchmark instead - an exploratory comparison, under
+            its own name: the kept report, the configuration and the
+            ``run_id`` are untouched.
+
+        Returns
+        -------
+        PerformanceReport
+            Gross and net, costs, instruments, caveats, and both books against
+            the benchmark.
+
+        Raises
+        ------
+        StoreChanged
+            If another benchmark is asked for and the store no longer holds
+            what the run read.
+        BenchmarkCurrencyMismatch
+            If that benchmark is quoted in another currency than the book.
+        """
+        if benchmark is None:
+            return self.analytics
+        return PerformanceReport.of(
+            self.backtest, self.analytics_config, benchmark=self.benchmark(benchmark)
+        )
+
+    def relative_records(self) -> pd.DataFrame:
+        """Return the run's relative figures, gross and net, as an export reads them.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per figure of
+            :class:`~quant_backtester.analytics.relative.RelativePerformanceStats`,
+            with ``gross`` and ``net`` columns and, on every row, what they are
+            read with: ``run_id``, ``base_currency``, the benchmark and its
+            basis, the sample bounds, ``sessions`` and ``observations``, the
+            annualisation, the risk-free rate, the constant-series tolerance,
+            the count of benchmark valuations on an earlier close, and each
+            book's diagnostics as a JSON list. Measured against the declared
+            benchmark; with none, the figures are missing and the diagnostics
+            say ``benchmark_not_configured``. Full precision: percentages are
+            for the rendered report only.
+        """
+        gross = self.analytics.gross_comparison
+        net = self.analytics.net_comparison
+        config = self.analytics_config
+        shared: dict[str, object] = {
+            "run_id": self.run_id,
+            "base_currency": self.base_currency,
+            "benchmark_id": None,
+            "benchmark_basis": None,
+            "sample_start": None,
+            "sample_end": None,
+            "sessions": None,
+            "observations": None,
+            "sessions_per_year": config.sessions_per_year,
+            "risk_free_rate": config.risk_free_rate,
+            "return_std_tolerance": RETURN_STD_TOLERANCE,
+            "marked_from_earlier_count": None,
+            "gross_diagnostics": json.dumps(["benchmark_not_configured"]),
+            "net_diagnostics": json.dumps(["benchmark_not_configured"]),
+        }
+        values: dict[str, list[float | None]] = {
+            "gross": [None] * len(STATISTICS),
+            "net": [None] * len(STATISTICS),
+        }
+        if (
+            gross is not None
+            and net is not None
+            and gross.relative is not None
+            and net.relative is not None
+        ):
+            relative = net.relative
+            shared.update(
+                benchmark_id=net.benchmark_spec.instrument_id if net.benchmark_spec else None,
+                benchmark_basis=net.benchmark_spec.basis.value if net.benchmark_spec else None,
+                sample_start=relative.sample_start.isoformat(),
+                sample_end=relative.sample_end.isoformat(),
+                sessions=relative.sessions,
+                observations=relative.observations,
+                marked_from_earlier_count=len(net.marked_from_earlier),
+                gross_diagnostics=json.dumps(list(gross.relative.diagnostics)),
+                net_diagnostics=json.dumps(list(relative.diagnostics)),
+            )
+            values["gross"] = [getattr(gross.relative, name) for name in STATISTICS]
+            values["net"] = [getattr(relative, name) for name in STATISTICS]
+        frame = pd.DataFrame(
+            {
+                "statistic": list(STATISTICS),
+                "gross": pd.array(values["gross"], dtype="float64"),
+                "net": pd.array(values["net"], dtype="float64"),
+            }
+        )
+        for column, value in shared.items():
+            frame[column] = [value] * len(STATISTICS)
+        return frame
 
     def records(self) -> tuple[BacktestRecord, ...]:
         """Return the records of the run: the source of truth every view is built from."""
@@ -384,9 +485,13 @@ class StrategyResult:
         Returns
         -------
         Comparison
-            The same statistics for both sides, over the same sessions.
+            The same statistics for both sides over the same sessions, with
+            alpha, beta, tracking error and information ratio, labelled with
+            the book compared.
         """
-        return compare(self.equity(book), self.benchmark(benchmark), self.analytics_config)
+        return compare(
+            self.equity(book), self.benchmark(benchmark), self.analytics_config, book=book
+        )
 
     def plot(
         self,
@@ -626,7 +731,7 @@ class StrategyRunner:
             )
         return StrategyResult(
             backtest=result,
-            analytics=PerformanceReport.of(result, self.analytics),
+            analytics=PerformanceReport.of(result, self.analytics, benchmark=curve),
             configuration={
                 **result.configuration,
                 "requested_start": first.isoformat(),
