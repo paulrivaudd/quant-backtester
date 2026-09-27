@@ -16,7 +16,9 @@ from __future__ import annotations
 
 from datetime import date
 from enum import Enum
+from itertools import pairwise
 
+import numpy as np
 import pandas as pd
 
 from quant_backtester.backtest.result import BacktestResult
@@ -100,6 +102,96 @@ def session_returns(equity: pd.Series) -> pd.Series:
     if (equity <= 0).any():
         raise ValueError("an equity curve at or below zero cannot be turned into returns")
     return (equity / equity.shift(1) - 1.0).iloc[1:].rename("return")
+
+
+def aligned_equity_curves(
+    strategy: pd.Series,  # type: ignore[type-arg]
+    benchmark: pd.Series,  # type: ignore[type-arg]
+) -> tuple[pd.Series, pd.Series]:  # type: ignore[type-arg]
+    """Return two curves on one period, with no session missing on either side.
+
+    Parameters
+    ----------
+    strategy, benchmark : pd.Series
+        Equity curves in one currency, indexed by session date. Every value is
+        checked, including those outside the period kept: an invalid value is
+        refused wherever it sits rather than hidden by a restriction.
+
+    Returns
+    -------
+    tuple[pd.Series, pd.Series]
+        Copies of both curves restricted to the span from the first to the
+        last date they share, bounds included. Inside that span both hold
+        exactly the same sessions, in the same order. Nothing is sorted,
+        interpolated, filled or dropped.
+
+    Raises
+    ------
+    ValueError
+        If a curve is not a numeric series, holds a boolean, a value that is
+        not finite or not strictly positive; if its index holds anything but
+        ``datetime.date`` (a ``datetime`` or a ``Timestamp`` included: the
+        caller converts explicitly), a duplicate, or dates out of order; if
+        the two share no date; or if, inside the shared span, a session is on
+        one side only.
+
+    Notes
+    -----
+    An intersection of the two indexes is not enough. A curve without Tuesday
+    intersected with one that has it yields a Monday-to-Wednesday return,
+    counted and annualised as one session. Trimming the ends is allowed - a
+    Monday-to-Friday curve and a Tuesday-to-Friday one are compared from
+    Tuesday - and a hole inside is refused.
+
+    Two curves missing the very same session cannot be told apart from two
+    curves on a calendar without it: that check needs the run's own sessions,
+    and :meth:`PerformanceReport.of` makes it. A caller passing bare series
+    promises that each holds every session of its calendar.
+    """
+    for name, curve in (("strategy", strategy), ("benchmark", benchmark)):
+        _require_equity_curve(curve, name)
+    shared = set(strategy.index) & set(benchmark.index)
+    if not shared:
+        raise ValueError("the strategy and the benchmark share no session")
+    first, last = min(shared), max(shared)
+    left = [day for day in strategy.index if first <= day <= last]
+    right = [day for day in benchmark.index if first <= day <= last]
+    if left != right:
+        only_left = [day for day in left if day not in shared][:3]
+        only_right = [day for day in right if day not in shared][:3]
+        raise ValueError(
+            f"between {first} and {last} the two curves do not hold the same sessions: "
+            f"strategy only {[str(day) for day in only_left]}, "
+            f"benchmark only {[str(day) for day in only_right]}. A return across a missing "
+            "session would be counted as one session."
+        )
+    keep_left = [first <= day <= last for day in strategy.index]
+    keep_right = [first <= day <= last for day in benchmark.index]
+    return strategy.loc[keep_left].copy(), benchmark.loc[keep_right].copy()
+
+
+def _require_equity_curve(curve: object, name: str) -> None:
+    """Raise unless ``curve`` is a valid equity curve indexed by session dates."""
+    if not isinstance(curve, pd.Series):
+        raise ValueError(f"the {name} curve must be a pandas Series, got {type(curve).__name__}")
+    if pd.api.types.is_bool_dtype(curve.dtype) or not pd.api.types.is_numeric_dtype(curve.dtype):
+        raise ValueError(f"the {name} curve must hold numbers, got dtype {curve.dtype}")
+    values = curve.to_numpy(dtype="float64")
+    if not np.isfinite(values).all():
+        raise ValueError(f"the {name} curve holds a value that is not finite")
+    if (values <= 0.0).any():
+        raise ValueError(f"the {name} curve holds a value at or below zero")
+    days = list(curve.index)
+    for day in days:
+        if type(day) is not date:
+            raise ValueError(
+                f"the {name} curve is indexed by datetime.date, got {type(day).__name__} {day!r}"
+            )
+    for before, after in pairwise(days):
+        if after == before:
+            raise ValueError(f"the {name} curve holds {after} twice")
+        if after < before:
+            raise ValueError(f"the {name} curve is out of order: {after} after {before}")
 
 
 def drawdown_curve(equity: pd.Series) -> pd.Series:

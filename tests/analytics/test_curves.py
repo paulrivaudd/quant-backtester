@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 import pytest
 
 from quant_backtester.analytics.curves import (
     Book,
+    aligned_equity_curves,
     drawdown_curve,
     elapsed_years,
     equity_curve,
@@ -119,3 +120,105 @@ def test_the_years_a_run_covers_are_calendar_years() -> None:
     assert elapsed_years(sessions) == pytest.approx(366 / 365.25)
     assert elapsed_years(pd.Index([date(2024, 1, 1)])) == 0.0
     assert elapsed_years(pd.Index([])) == 0.0
+
+
+# --- aligned_equity_curves -------------------------------------------------------
+
+WEEK = [date(2026, 9, 7), date(2026, 9, 8), date(2026, 9, 9), date(2026, 9, 10), date(2026, 9, 11)]
+"""Monday to Friday of one week."""
+
+
+def curve(values: list[float], days: list[date] | None = None) -> pd.Series:
+    """Return an equity curve on ``days``, the week by default."""
+    index = pd.Index(days if days is not None else WEEK[: len(values)], dtype="object")
+    return pd.Series(values, index=index, dtype="float64")
+
+
+def test_two_curves_on_the_same_sessions_come_back_unchanged() -> None:
+    left, right = curve([100.0, 101.0, 102.0]), curve([50.0, 49.0, 51.0])
+    aligned_left, aligned_right = aligned_equity_curves(left, right)
+    assert aligned_left.equals(left) and aligned_right.equals(right)
+    assert aligned_left is not left and aligned_right is not right
+
+
+def test_only_the_ends_are_trimmed_to_the_shared_span() -> None:
+    monday_to_friday = curve([100.0, 101.0, 102.0, 103.0, 104.0])
+    tuesday_to_friday = curve([50.0, 51.0, 52.0, 53.0], WEEK[1:])
+    left, right = aligned_equity_curves(monday_to_friday, tuesday_to_friday)
+    assert list(left.index) == list(right.index) == WEEK[1:]
+    assert list(left) == [101.0, 102.0, 103.0, 104.0]
+
+
+def test_a_single_shared_date_gives_one_session_and_no_return() -> None:
+    left, right = aligned_equity_curves(curve([100.0, 101.0]), curve([50.0], WEEK[1:2]))
+    assert list(left.index) == list(right.index) == [WEEK[1]]
+
+
+def test_curves_that_share_no_session_are_refused() -> None:
+    with pytest.raises(ValueError, match="share no session"):
+        aligned_equity_curves(curve([100.0, 101.0]), curve([50.0, 51.0], WEEK[3:5]))
+    with pytest.raises(ValueError, match="share no session"):
+        aligned_equity_curves(curve([]), curve([50.0]))
+
+
+def test_a_session_missing_on_one_side_inside_the_span_is_refused() -> None:
+    """Otherwise Monday to Wednesday would be counted as one session."""
+    full = curve([100.0, 101.0, 102.0])
+    without_tuesday = curve([50.0, 52.0], [WEEK[0], WEEK[2]])
+    with pytest.raises(ValueError, match="strategy only \\['2026-09-08'\\]"):
+        aligned_equity_curves(full, without_tuesday)
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        [100.0, float("nan"), 102.0],
+        [100.0, float("inf"), 102.0],
+        [100.0, 0.0, 102.0],
+        [100.0, -1.0, 102.0],
+    ],
+    ids=["nan", "inf", "zero", "negative"],
+)
+def test_an_invalid_value_is_refused_even_outside_the_shared_span(bad: list[float]) -> None:
+    # The shared span is Thursday-Friday; the bad value sits on Tuesday.
+    strategy = curve([*bad, 103.0, 104.0])
+    benchmark = curve([50.0, 51.0], WEEK[3:5])
+    with pytest.raises(ValueError, match=r"not finite|at or below zero"):
+        aligned_equity_curves(strategy, benchmark)
+
+
+def test_booleans_and_text_are_not_equity() -> None:
+    booleans = pd.Series([True, True], index=pd.Index(WEEK[:2], dtype="object"))
+    text = pd.Series(["100", "101"], index=pd.Index(WEEK[:2], dtype="object"))
+    for bad in (booleans, text):
+        with pytest.raises(ValueError, match="must hold numbers"):
+            aligned_equity_curves(bad, curve([50.0, 51.0]))
+    with pytest.raises(ValueError, match="pandas Series"):
+        aligned_equity_curves([100.0, 101.0], curve([50.0, 51.0]))  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("days", "message"),
+    [
+        ([WEEK[0], WEEK[0]], "twice"),
+        ([WEEK[1], WEEK[0]], "out of order"),
+        (["2026-09-07", "2026-09-08"], "datetime.date"),
+        ([datetime(2026, 9, 7), datetime(2026, 9, 8)], "datetime.date"),
+        ([pd.Timestamp("2026-09-07"), pd.Timestamp("2026-09-08")], "datetime.date"),
+    ],
+    ids=["duplicate", "disorder", "string", "datetime", "timestamp"],
+)
+def test_an_index_that_is_not_ordered_session_dates_is_refused(
+    days: list[object], message: str
+) -> None:
+    bad = pd.Series([100.0, 101.0], index=pd.Index(days, dtype="object"))
+    with pytest.raises(ValueError, match=message):
+        aligned_equity_curves(bad, curve([50.0, 51.0]))
+
+
+def test_the_inputs_are_never_modified() -> None:
+    left, right = curve([100.0, 101.0, 102.0]), curve([50.0, 51.0], WEEK[1:3])
+    before_left, before_right = left.copy(), right.copy()
+    aligned_left, _ = aligned_equity_curves(left, right)
+    aligned_left.iloc[0] = 1.0
+    assert left.equals(before_left) and right.equals(before_right)
