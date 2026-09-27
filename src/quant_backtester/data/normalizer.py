@@ -416,7 +416,7 @@ def _requested_date(download: RawDownload, key: str) -> date:
     return _iso_date(value, f"Request {key!r} of fetch {download.fetch_id}")
 
 
-def _bars_frame(
+def bars_frame(
     instrument: Instrument,
     download: RawDownload,
     calendar: TradingCalendar,
@@ -424,6 +424,11 @@ def _bars_frame(
     values: Mapping[str, list[float]],
 ) -> tuple[pd.DataFrame, RejectedRows]:
     """Assemble canonical bars once a provider's columns are mapped to fields.
+
+    Every bar normalizer ends here, and a new source's normalizer should too:
+    the adapter only maps its columns, dates and units to the five fields, and
+    this function stamps availability, drops what cannot be stored and names
+    why. See ``docs/DONNEES.md``, "Ajouter une source".
 
     Parameters
     ----------
@@ -697,7 +702,7 @@ def _normalize_yahoo_bars(
         field: raw[column].to_numpy(dtype="float64").tolist()
         for column, field in YAHOO_BAR_COLUMNS.items()
     }
-    return _bars_frame(instrument, download, calendar, session_dates, values)
+    return bars_frame(instrument, download, calendar, session_dates, values)
 
 
 def _later_split_factor(position: int, ex_dates: Sequence[date], splits: Sequence[float]) -> float:
@@ -909,7 +914,7 @@ def _normalize_euronext_bars(
     parsed.sort(key=lambda row: row[0])
     session_dates = [session for session, _ in parsed]
     values = {field: [fields[field] for _, fields in parsed] for field in BAR_VALUE_FIELDS}
-    return _bars_frame(instrument, download, calendar, session_dates, values)
+    return bars_frame(instrument, download, calendar, session_dates, values)
 
 
 class Normalizer(Protocol):

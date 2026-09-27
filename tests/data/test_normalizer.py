@@ -35,6 +35,7 @@ from quant_backtester.data.normalizer import (
     NormalizedData,
     YahooNormalizer,
     bar_availability,
+    bars_frame,
     get_normalizer,
 )
 from quant_backtester.data.schemas import BARS_SCHEMA, CORPORATE_ACTIONS_SCHEMA, LEVELS_SCHEMA
@@ -1574,3 +1575,67 @@ def test_alfred_levels_of_an_empty_vintage_are_empty(gdp: Instrument) -> None:
     levels = levels_of(ALFRED_NORMALIZER.normalize(gdp, download))
 
     assert levels.empty
+
+
+# --- bars_frame: the helper every bar normalizer ends in ----------------------
+
+
+def local_download(frame: pd.DataFrame, retrieved_at: datetime) -> RawDownload:
+    """Return a download from a local source, as a new adapter would make one."""
+    return RawDownload(
+        instrument_id="US_SPY",
+        source="LOCAL_CSV",
+        fetch_id=FETCH_ID,
+        retrieved_at_utc=retrieved_at,
+        frame=frame,
+        request={"path": "US_SPY.csv"},
+    )
+
+
+def test_bars_frame_stamps_each_field_and_carries_the_lineage(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    days = [date(2026, 9, 8), date(2026, 9, 9)]
+    values = {
+        "open": [100.0, 101.0],
+        "high": [102.0, 103.0],
+        "low": [99.0, 100.0],
+        "close": [101.0, 102.0],
+        "volume": [1_000.0, 2_000.0],
+    }
+    download = local_download(pd.DataFrame(), utc(2026, 9, 10, 12, 0))
+    bars, rejected = bars_frame(spy_etf, download, xnys, days, values)
+    assert not rejected
+    assert list(bars["session_date"]) == days
+    assert list(bars["close"]) == [101.0, 102.0]
+    # 09:30 and 16:00 New York, summer time.
+    assert bars["open_available_at_utc"].iloc[0] == pd.Timestamp(utc(2026, 9, 8, 13, 30))
+    assert bars["close_available_at_utc"].iloc[0] == pd.Timestamp(utc(2026, 9, 8, 20, 0))
+    assert set(bars["source"]) == {"LOCAL_CSV"}
+    assert set(bars["source_fetch_id"]) == {FETCH_ID}
+
+
+def test_bars_frame_names_a_weekend_and_a_bar_fetched_before_its_close(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    days = [date(2026, 9, 5), date(2026, 9, 8), date(2026, 9, 9)]
+    values = {field: [100.0, 100.0, 100.0] for field in ("open", "high", "low", "close")}
+    values["volume"] = [1.0, 1.0, 1.0]
+    # Fetched at noon New York on the 9th: that session's close is not final.
+    download = local_download(pd.DataFrame(), utc(2026, 9, 9, 16, 0))
+    bars, rejected = bars_frame(spy_etf, download, xnys, days, values)
+    assert list(bars["session_date"]) == [date(2026, 9, 8)]
+    assert rejected.non_session == (date(2026, 9, 5),)
+    assert rejected.unpublished == (date(2026, 9, 9),)
+
+
+def test_bars_frame_refuses_a_missing_field_and_a_repeated_session(
+    spy_etf: Instrument, xnys: TradingCalendar
+) -> None:
+    download = local_download(pd.DataFrame(), utc(2026, 9, 10, 12, 0))
+    closes_only = {"close": [100.0]}
+    with pytest.raises(ValueError, match="exactly"):
+        bars_frame(spy_etf, download, xnys, [date(2026, 9, 8)], closes_only)
+    twice = {field: [100.0, 100.0] for field in ("open", "high", "low", "close", "volume")}
+    with pytest.raises(ValueError, match="repeat"):
+        bars_frame(spy_etf, download, xnys, [date(2026, 9, 8), date(2026, 9, 8)], twice)
