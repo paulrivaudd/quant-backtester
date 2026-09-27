@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Analytics: alpha, beta and information ratio
+- `analytics.relative.RelativePerformanceStats`: regression alpha against the
+  benchmark (per session and times `sessions_per_year`), beta, annualised
+  active return, tracking error, information ratio and R squared, on simple
+  per-session returns; `None` with a stable diagnostic code when the sample
+  cannot identify a figure, never a zero or an infinity.
+- `analytics.curves.aligned_equity_curves`: two curves on one period, ends
+  trimmed, a session missing on one side inside it refused. `compare()` uses it
+  instead of an intersection, which bridged a missing session with a
+  multi-session return counted as one.
+- `Comparison` gains `relative`, `benchmark_spec`, `book` and `relative_frame()`;
+  `compare(..., book=)`; `PerformanceReport` gains `gross_comparison`,
+  `net_comparison` and `relative_frame()`, and `of(..., benchmark=)` refuses a
+  benchmark that does not cover the whole run. The runner passes the benchmark
+  it already valued; `StrategyResult.report(benchmark=...)` builds an
+  exploratory report without touching the kept one;
+  `StrategyResult.relative_records()` exports the figures with their provenance.
+- `run_baselines.py` prints a relative table (net book, against `ETF_WORLD`)
+  after each table and writes `<run>_relative.csv` with `--records`; `vs world`
+  keeps its meaning.
+- A missing absolute figure in a comparison prints as a dash, not `nan`.
+- No record changes: the 20 records of the readme suite are identical byte for
+  byte to the last snapshot.
+
 ### Breaking
 - `RealizedVolatilitySignal.annualization` has no default any more: it is a
   research convention (252 for XNYS, 255 for XPAR), and the default of 252

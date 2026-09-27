@@ -733,10 +733,42 @@ max drawdown                 -21.65%       -21.66%
 sharpe ratio                    0.54          0.67
 excess return                 -3.53%
 
+relative to ETF_WORLD (TOTAL_RETURN), 2025-01-02 to 2026-09-17
+  437 valuations, 436 returns, 255 sessions/year, risk-free 2.00%
+book                                 net
+regression alpha, a year          -1.84%
+beta                               1.015
+active return, a year             -1.69%
+tracking error, a year             1.90%
+information ratio                 -0.890
+r squared                          98.4%
+  alpha is A x the intercept, not a compounded return; the ratios scale by sqrt(A)
+
 ETF_WORLD is a yardstick, not an alternative that was traded: one share
 held from the first close, with no cost, no lot and no cash left over. The
 strategy starts in cash and trades at the next open on its own schedule.
 ```
+
+The second block measures the strategy *relative* to the benchmark, on the
+simple returns of the 436 sessions both curves share
+(`quant_backtester.analytics.relative`). **Beta** is the slope of the least
+squares fit of the strategy's excess return over the risk-free rate on the
+benchmark's: 1.015 means the rotation moved almost exactly with the world
+index, which an R squared of 98.4% confirms - switching between two equity
+funds is not a hedge. **Alpha** is the intercept of that fit multiplied by the
+255 sessions of a year: -1.84% a year that the exposure does not explain. It is
+a scaled coefficient and not a compounded return, and against a benchmark other
+than the market it is a regression alpha, not Jensen's. The **active return**
+is the mean of the daily difference of the two returns, annualised the same
+way; the **tracking error** is its spread times the root of 255; the
+**information ratio** is their quotient, -0.89. None of the three is the
+`excess return` line above, which is a difference of total returns. A figure the
+sample cannot identify - under the declared `minimum_sessions`, a benchmark
+that does not move, a constant active return - is a dash with its reason,
+never a zero. `result.report()` shows the same figures gross and net side by
+side, `result.compare(book=Book.GROSS)` the gross ones alone, and
+`result.report(benchmark=...)` measures the same run against another yardstick
+without touching the report it keeps. The formulas are in `docs/FORMULES.md`.
 
 Less than half a point of that gap was the contested bar of 24 October 2025:
 reviewed, it moved the strategy from 16.19% to 16.66%, and the gap to the
@@ -806,7 +838,11 @@ its fingerprint and the state of the code, followed by its refused orders by
 reason; `--suite all` takes a little over two minutes. `--suite readme` prints
 every other figure of this README, and `--records DIR` writes each run's
 sessions, orders, fills, rejects and holdings so that two versions of the code
-can be compared run for run.
+can be compared run for run, and its relative figures gross and net with what
+they are read with (`<run>_relative.csv`). After each table, the same runs are
+listed against `ETF_WORLD`, net book: regression alpha a year, beta,
+information ratio, tracking error and the number of returns. The `vs world`
+column stays what it is, a difference of total returns.
 
 ```text
 strategy            period                         net    gross   a year  sharpe   max dd     costs  rebal.  fills  rejects  est.  vs world
@@ -860,6 +896,47 @@ cash a switch leaves once the sale has paid its costs, and buy and hold has
 none at all - it keeps its positions and sends nothing. `est.` counts the
 sessions a position was valued on an older close: none, since the contested
 bar of 24 October 2025 was reviewed.
+
+The same runs against `ETF_WORLD`, net book - regression alpha a year, beta,
+information ratio, tracking error and the number of daily returns:
+
+```text
+strategy            period                   benchmark       alpha/yr    beta  info. ratio  track. err.     n
+buy_and_hold        2018-07-16 2026-09-17    ETF_WORLD          0.03%   0.999        0.218        0.08%  2093
+equal_weight        2018-07-16 2026-09-17    ETF_WORLD          0.69%   1.019        0.464        1.93%  2093
+momentum_rotation   2018-07-16 2026-09-17    ETF_WORLD         -0.31%   1.029        0.003        2.77%  2093
+momentum_vix        2018-07-16 2026-09-17    ETF_WORLD          1.18%   0.670       -0.255        9.68%  2093
+buy_and_hold        2019-01-02 2021-12-31    ETF_WORLD          0.28%   0.998        0.559        0.44%   769
+equal_weight        2019-01-02 2021-12-31    ETF_WORLD         -0.57%   0.998       -0.204        3.00%   769
+momentum_rotation   2019-01-02 2021-12-31    ETF_WORLD          1.65%   1.025        0.682        3.14%   769
+momentum_vix        2019-01-02 2021-12-31    ETF_WORLD          6.62%   0.608       -0.080       11.88%   769
+buy_and_hold        2022-01-03 2023-12-29    ETF_WORLD         -0.40%   0.997       -0.720        0.56%   511
+equal_weight        2022-01-03 2023-12-29    ETF_WORLD          3.00%   0.920        0.592        4.98%   511
+momentum_rotation   2022-01-03 2023-12-29    ETF_WORLD         -1.90%   1.021       -0.659        2.86%   511
+momentum_vix        2022-01-03 2023-12-29    ETF_WORLD         -6.08%   0.831       -0.857        7.21%   511
+buy_and_hold        2024-01-02 2026-09-17    ETF_WORLD         -0.01%   0.997       -1.411        0.04%   692
+equal_weight        2024-01-02 2026-09-17    ETF_WORLD         -1.23%   1.019       -0.489        1.94%   692
+momentum_rotation   2024-01-02 2026-09-17    ETF_WORLD         -1.59%   1.030       -0.523        2.19%   692
+momentum_vix        2024-01-02 2026-09-17    ETF_WORLD          0.35%   0.651       -0.566        8.47%   692
+```
+
+Three things the total returns did not say. The rotation is the index with
+noise: a beta of 1.03 in every period, and an information ratio of 0.003 over
+eight years - no active return at all once 2.8% of tracking error is paid for,
+with the one good regime (2019-2021) given back in the two others. The VIX gate
+is the only strategy that changes its exposure, a beta of 0.61 to 0.83: its
+positive alpha over the whole history means it earned more than that lower
+exposure explains, and its negative information ratio that it still earned
+less than the index, with a tracking error of 7 to 12 points a year - a
+different product rather than a better one. And the equal weight, the best of
+the four over the whole history, owes it to one regime (an alpha of 3% in
+2022-2023, when the S&P 500 fund held up better) and gives part of it back
+since. Buy and hold of the world fund is the benchmark bought under real
+costs, lots and cash: 0.08% of tracking error over eight years, which is the
+check that the two curves are measured the same way; its information ratio of
+-1.41 in 2024-2026 is a ratio over 0.04% of tracking error, and says nothing.
+None of these figures has an interval yet, and all of these periods have been
+looked at: they describe the history, they do not test a rule.
 
 ## Research: what is left to test, and how
 

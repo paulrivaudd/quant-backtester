@@ -161,6 +161,46 @@ croissance d'une séance = (titres · C_t + cash reçu) / C_{t−1}
 Un split multiplie le nombre de titres. Sous `TOTAL_RETURN`, un dividende est
 versé sur chaque titre à la date ex et réinvesti à cette clôture.
 
+**Mesures relatives au benchmark** (`analytics/relative.py`,
+`RelativePerformanceStats`). Les deux courbes sont d'abord alignées par
+`aligned_equity_curves`. Les extrémités peuvent être rognées, mais un trou
+**intérieur** d'un seul côté est refusé : sinon, un rendement lundi–mercredi
+serait compté comme une seule séance. Avec `r_s,t`, `r_b,t` les rendements
+simples de la stratégie et du benchmark, `x_t = r_b,t − r_f`, `y_t = r_s,t − r_f`
+et `n` le nombre de rendements :
+
+```
+β̂        = Σ (x_t − x̄)(y_t − ȳ) / Σ (x_t − x̄)²        (MCO avec constante)
+α̂_séance = ȳ − β̂ · x̄
+α̂_an     = A · α̂_séance                               (mise à l'échelle, pas un taux composé)
+a_t       = r_s,t − r_b,t                             (rendement actif ; r_f s'y annule)
+actif_an  = A · ā
+TE_an     = sqrt(A) · std(a, ddof = 1)
+IR        = actif_an / TE_an = sqrt(A) · ā / s_a
+R²        = 1 − Σ ε̂_t² / Σ (y_t − ȳ)²
+```
+
+| Cas | Résultat |
+|---|---|
+| moins de `minimum_sessions` valorisations, ou moins de 2 rendements | les sept chiffres à `None`, `insufficient_observations` |
+| écart-type des rendements du benchmark ≤ `RETURN_STD_TOLERANCE` (10⁻¹²) | α, β, R² à `None`, `zero_benchmark_variance` ; le bloc actif reste calculé |
+| stratégie à rendement constant | R² à `None`, `zero_strategy_variance` ; β ≈ 0 |
+| rendement actif constant | TE = 0,0 exactement, IR à `None`, `zero_tracking_error` |
+| débordement numérique | `ValueError`, jamais un `NaN` ou un infini silencieux |
+
+Exemple à la main (`tests/analytics/test_relative.py`, M01) : avec
+`x = (−2 %, −1 %, 0, 1 %, 2 %)` et `y = 0,05 % + 1,5 x`, on retrouve `β = 1,5`,
+`α_séance = 0,05 %` et `α_an = 252 × 0,0005 = 12,6 %`. Le rendement actif vaut
+aussi 12,6 % parce que `x̄ = 0`, ce qui n'est pas vrai en général. On obtient
+aussi `TE = 12,55 %`, `IR = 1,004` et `R² = 1`.
+
+Ces trois mesures ne se remplacent pas entre elles, et aucune ne remplace
+l'`excess return` de la comparaison (différence des rendements totaux) ni une
+différence de Sharpe. Un β proche de 1 avec un R² élevé dit que la stratégie
+suit la référence ; un α négatif dit qu'elle a rapporté moins que ce que cette
+exposition explique. Aucun intervalle de confiance n'est encore calculé pour α,
+β ou IR : ne pas parler d'« alpha significatif ».
+
 **Bootstrap apparié** (`analytics/uncertainty.py`). Les rendements de la stratégie
 et du témoin sont alignés sur les mêmes séances. Des blocs de `b` séances
 consécutives sont tirés avec remise, **avec les mêmes indices pour les deux

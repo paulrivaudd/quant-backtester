@@ -238,12 +238,56 @@ def row(label: str, result: StrategyResult) -> str:
     return f"{line}\n{'':<20}rejects: {reasons}" if reasons else line
 
 
+RELATIVE_HEADER = (
+    f"{'strategy':<20}{'period':<25}{'benchmark':<14}{'alpha/yr':>10}{'beta':>8}"
+    f"{'info. ratio':>13}{'track. err.':>13}{'n':>6}"
+)
+"""The columns of the relative table: net book, against the declared benchmark.
+
+Alpha is the regression intercept times the sessions of a year, not a
+compounded return and not ``vs world`` - which stays the difference of the two
+total returns. The figures come from ``result.compare().relative``; nothing is
+recomputed here.
+"""
+
+
+def relative_row(label: str, result: StrategyResult) -> str:
+    """Return one line of the relative table, or why it has no figures."""
+    comparison = result.compare()
+    relative = comparison.relative
+    period = f"{result.start} {result.end}"
+    if relative is None:
+        return f"{label:<20}{period:<25}{comparison.label:<14}relative figures not computed"
+    line = (
+        f"{label:<20}{period:<25}{comparison.label:<14}"
+        f"{percent(relative.alpha_annualised):>10}{ratio(relative.beta):>8}"
+        f"{ratio(relative.information_ratio):>13}"
+        f"{percent(relative.tracking_error_annualised):>13}{relative.observations:>6}"
+    )
+    reasons = ", ".join(relative.diagnostics)
+    return f"{line}\n{'':<20}unavailable: {reasons}" if reasons else line
+
+
+def ratio(value: float | None) -> str:
+    """Return a beta or an information ratio with three decimals, or a dash."""
+    return "-" if value is None else f"{value:.3f}"
+
+
+def print_relative(rows: Sequence[tuple[str, StrategyResult]]) -> None:
+    """Print the relative table of finished runs, net book."""
+    print(RELATIVE_HEADER)
+    for label, result in rows:
+        print(relative_row(label, result))
+
+
 def write_records(result: StrategyResult, directory: Path, name: str) -> None:
-    """Write one run's sessions, orders, fills, rejects and holdings to CSV.
+    """Write one run's sessions, orders, fills, rejects, holdings and relative figures to CSV.
 
     Every float is written with seventeen significant digits, which is enough
     for it to read back to exactly the same double: the files are for comparing
-    two versions of the code bit for bit, not for reading.
+    two versions of the code bit for bit, not for reading. The relative file
+    holds alpha, beta, tracking error and information ratio, gross and net,
+    with what they are read with (``StrategyResult.relative_records``).
     """
     directory.mkdir(parents=True, exist_ok=True)
     views = {
@@ -255,6 +299,9 @@ def write_records(result: StrategyResult, directory: Path, name: str) -> None:
     }
     for view, frame in views.items():
         frame.to_csv(directory / f"{name}_{view}.csv", float_format="%.17g")
+    result.relative_records().to_csv(
+        directory / f"{name}_relative.csv", index=False, float_format="%.17g"
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -301,12 +348,16 @@ def run_baselines(
 ) -> None:
     """Run every baseline over every period, and print the table."""
     print(HEADER)
+    finished: list[tuple[str, StrategyResult]] = []
     for start, end in periods:
         for baseline in BASELINES:
             result = runs.run(baseline.strategy, UNIVERSE, start, end, schedule=baseline.schedule)
             print(row(baseline.label, result), flush=True)
             keeping.keep(result, f"baselines_{baseline.label}_{start}_{end}", baseline.label)
+            finished.append((baseline.label, result))
         print()
+    print_relative(finished)
+    print()
 
 
 def run_readme(runs: StrategyRunner, keeping: Keeping) -> None:
@@ -338,10 +389,18 @@ def run_readme(runs: StrategyRunner, keeping: Keeping) -> None:
     print(flush=True)
     print(f"== buy and hold against a daily equal weight, both funds  {start} {end}")
     print(HEADER)
+    finished: list[tuple[str, StrategyResult]] = [
+        (REFERENCE.label, reference),
+        (CONTROL.label, control),
+    ]
     for baseline in HOLD_AGAINST_REBALANCE:
         result = runs.run(baseline.strategy, UNIVERSE, start, end, schedule=baseline.schedule)
         print(row(baseline.label, result), flush=True)
         keeping.keep(result, f"readme_{baseline.label}_{start}_{end}", baseline.label)
+        finished.append((baseline.label, result))
+    print()
+    print(f"== against {BENCHMARK}, net book  {start} {end}")
+    print_relative(finished)
     print()
 
 

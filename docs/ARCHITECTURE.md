@@ -79,7 +79,7 @@ Trois règles supplémentaires sont vérifiées par les mêmes tests :
 | `portfolio/` | Ce qu'un livre a le droit de détenir, et ce qu'il détient | `targets` (`TargetAllocation`), `allocation` (`PortfolioModel`, `ConstrainedTarget`), `constraints`, `limits` (`PortfolioLimits`), `holdings`, `state` (`PortfolioState`), `view` |
 | `execution/` | Ce que le marché fait d'un ordre | `model` (`ExecutionModel`, `Sizing`), `costs` (`CostModel`), `rounding` (lots), `orders`, `fills` (`Fill`, `ExecutionReject`) |
 | `backtest/` | Le temps | `config` (`BacktestConfig`), `engine`, `timetable`, `schedule`, `context` (`StrategyContext`), `market`, `records` (`BacktestRecord`), `result` (`BacktestResult`), `runner` (`StrategyRunner`, `StrategyResult`) |
-| `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves`, `performance`, `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots` |
+| `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots` |
 | `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `examples/` |
 | `research/` | La discipline de recherche | `hypotheses`, `registry`, `archive`, `paper`, `journal` |
 
@@ -333,7 +333,12 @@ Il faut distinguer quatre objets :
   turnover, le cash moyen, les séances sans prix, les achats coupés, et les
   hypothèses de fill.
 - `compare()` confronte le run au benchmark déclaré du runner, valorisé
-  pendant le run.
+  pendant le run, sur une période sans trou intérieur. En plus des mesures
+  absolues, il donne l'alpha de régression, le bêta, le rendement actif, la
+  tracking error, le ratio d'information et le R² (`comparison.relative`).
+  `report()` les montre en brut et en net, et `report(benchmark=...)` produit
+  un rapport exploratoire contre une autre référence sans toucher celui qui
+  est conservé. Formules et cas indéfinis : [FORMULES.md](FORMULES.md) §4.
 - `analytics.uncertainty.paired_block_bootstrap` rééchantillonne par blocs la
   **différence** entre une stratégie et un témoin exécutable, sous la même
   convention que le rapport.
