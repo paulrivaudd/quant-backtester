@@ -41,3 +41,6 @@ market_data/.lock
 
 # The lock a research journal is appended under: a runtime file, never committed.
 *.jsonl.lock
+
+# Figures written by scripts/run_golden_cross_exercise.py
+golden_cross_output/

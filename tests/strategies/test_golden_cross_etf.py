@@ -295,8 +295,9 @@ def test_5_the_two_figures_are_saved_and_the_directory_created(
 
     monkeypatch.setattr(plt, "show", refuse)
     directory = tmp_path / "not" / "there" / "yet"
-    load_script().save_figures(demo_result, directory)
-    assert sorted(path.name for path in directory.iterdir()) == ["drawdown.png", "equity.png"]
+    load_script().save_figures(demo_result, directory, DEMO_STRATEGY)
+    saved = sorted(path.name for path in directory.iterdir())
+    assert saved == ["drawdown.png", "equity.png", "moving_averages.png"]
     for path in directory.iterdir():
         assert path.read_bytes().startswith(b"\x89PNG")
 
@@ -322,6 +323,7 @@ def test_4_2_main_runs_the_declared_strategy_prints_it_and_saves_its_figures(
     assert f"run_id       {demo_result.run_id}" in printed
     assert (output / "equity.png").is_file()
     assert (output / "drawdown.png").is_file()
+    assert (output / "moving_averages.png").is_file()
 
 
 def test_4_2_the_script_declares_the_strategy_of_the_exercise() -> None:
@@ -332,3 +334,83 @@ def test_4_2_the_script_declares_the_strategy_of_the_exercise() -> None:
     )
     assert script.UNIVERSE == ("ETF_WORLD",)
     assert script.PERIOD == ("2019-04-01", "2026-09-17")
+
+
+# --- le graphe des moyennes mobiles ------------------------------------------------------
+
+FIVE_DAYS = [date(2026, 1, day) for day in (5, 6, 7, 8, 9)]
+"""Five consecutive sessions, Monday to Friday."""
+
+
+def closes_on(days: list[date], values: list[float]) -> pd.Series:  # type: ignore[type-arg]
+    """Return closes indexed by session date, as the reader hands them over."""
+    return pd.Series(values, index=pd.Index(days, name="observation_date"), name="adjusted_close")
+
+
+def test_the_averages_are_the_plain_means_of_the_last_closes() -> None:
+    """Closes 10, 20, 30, 40, 50: MA2 and MA3 are checked by hand."""
+    closes = closes_on(FIVE_DAYS, [10.0, 20.0, 30.0, 40.0, 50.0])
+    frame = load_script().moving_averages(closes, FIVE_DAYS, 2, 3)
+    assert list(frame.index) == FIVE_DAYS
+    assert list(frame["close"]) == [10.0, 20.0, 30.0, 40.0, 50.0]
+    assert list(frame["fast"].iloc[1:]) == [15.0, 25.0, 35.0, 45.0]
+    assert list(frame["slow"].iloc[2:]) == [20.0, 30.0, 40.0]
+    assert frame["fast"].iloc[:1].isna().all()
+    assert frame["slow"].iloc[:2].isna().all()
+
+
+def test_an_average_is_not_drawn_over_a_missing_session() -> None:
+    """Wednesday has no close: no window holding it has an average, as for the signal."""
+    days = [day for day in FIVE_DAYS if day != date(2026, 1, 7)]
+    closes = closes_on(days, [10.0, 20.0, 40.0, 50.0])
+    frame = load_script().moving_averages(closes, FIVE_DAYS, 2, 3)
+    assert list(frame["fast"].isna()) == [True, False, True, True, False]
+    assert frame["slow"].isna().all()
+    assert frame.loc[date(2026, 1, 9), "fast"] == 45.0
+
+
+def test_a_later_close_changes_no_earlier_average() -> None:
+    """The look-ahead guard: Friday's close, whatever it is, moves nothing before Friday."""
+    script = load_script()
+    calm = script.moving_averages(
+        closes_on(FIVE_DAYS, [10.0, 20.0, 30.0, 40.0, 50.0]), FIVE_DAYS, 2, 3
+    )
+    crash = script.moving_averages(
+        closes_on(FIVE_DAYS, [10.0, 20.0, 30.0, 40.0, 1.0]), FIVE_DAYS, 2, 3
+    )
+    pd.testing.assert_frame_equal(calm.iloc[:4], crash.iloc[:4])
+    assert calm.loc[FIVE_DAYS[4], "fast"] != crash.loc[FIVE_DAYS[4], "fast"]
+
+
+def test_the_figure_shows_the_price_both_averages_and_the_trades() -> None:
+    script = load_script()
+    frame = script.moving_averages(
+        closes_on(FIVE_DAYS, [10.0, 20.0, 30.0, 40.0, 50.0]), FIVE_DAYS, 2, 3
+    )
+    fills = pd.DataFrame({"session_date": [FIVE_DAYS[2], FIVE_DAYS[4]], "side": ["BUY", "SELL"]})
+    figure = script.cross_figure(
+        frame, {FIVE_DAYS[2], FIVE_DAYS[3]}, fills, fast=2, slow=3, title="a title"
+    )
+    axes = figure.axes[0]
+    assert axes.get_title() == "a title"
+    labels = axes.get_legend_handles_labels()[1]
+    assert labels == ["invested", "close", "MA2", "MA3", "buy", "sell"]
+    buys, sells = axes.collections[1], axes.collections[2]
+    assert [point[1] for point in buys.get_offsets()] == [30.0]
+    assert [point[1] for point in sells.get_offsets()] == [50.0]
+
+
+def test_a_figure_of_no_session_is_refused() -> None:
+    script = load_script()
+    empty = script.moving_averages(closes_on([], []), [], 2, 3)
+    fills = pd.DataFrame({"session_date": [], "side": []})
+    with pytest.raises(ValueError, match="nothing to draw"):
+        script.cross_figure(empty, set(), fills, fast=2, slow=3, title="empty")
+
+
+def test_a_label_that_is_not_a_date_is_refused() -> None:
+    script = load_script()
+    assert script.session_date(pd.Timestamp("2026-01-05 09:00")) == date(2026, 1, 5)
+    assert script.session_date(date(2026, 1, 5)) == date(2026, 1, 5)
+    with pytest.raises(TypeError, match="session date"):
+        script.session_date("2026-01-05")

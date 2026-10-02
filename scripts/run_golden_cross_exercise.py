@@ -11,11 +11,14 @@ Les tests sont dans ``tests/strategies/test_golden_cross_etf.py``.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
+from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd
+from matplotlib.figure import Figure
 
 from quant_backtester.analytics.comparison import BenchmarkBasis, BenchmarkSpec
 from quant_backtester.analytics.config import AnalyticsConfig
@@ -49,6 +52,9 @@ TABLE_ROWS = 10
 
 FIGURE_DPI = 160
 """Résolution des figures enregistrées."""
+
+PRICE_COLOUR, FAST_COLOUR, SLOW_COLOUR, HELD_COLOUR = "#6b7280", "#c05621", "#1f4e79", "#2f855a"
+"""Couleurs du graphe des moyennes : le prix, la rapide, la lente, les séances investies."""
 
 REFERENCE_CALENDAR = "XPAR"
 """Le calendrier sur lequel le run avance : celui de la place où l'ETF se négocie."""
@@ -167,8 +173,133 @@ def print_run(result: StrategyResult) -> None:
         print(frame.to_string(max_rows=TABLE_ROWS) if len(frame) else "(none)")
 
 
-def save_figures(result: StrategyResult, directory: Path) -> None:
-    """Save the equity and drawdown curves of the run as PNG files.
+def session_date(value: object) -> date:
+    """Return an index label as the session date it stands for.
+
+    Raises
+    ------
+    TypeError
+        Si la valeur n'est ni une date ni un horodatage.
+    """
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    raise TypeError(f"expected a session date, got {value!r}")
+
+
+def moving_averages(
+    closes: pd.Series,  # type: ignore[type-arg]
+    sessions: Sequence[date],
+    fast: int,
+    slow: int,
+) -> pd.DataFrame:
+    """Return the close and its two moving averages, one row per expected session.
+
+    Parameters
+    ----------
+    closes : pd.Series
+        Clôtures ajustées indexées par date de séance, connues après la clôture
+        de la dernière séance de ``sessions``.
+    sessions : Sequence[date]
+        Les séances attendues du calendrier, dans l'ordre, trous compris.
+    fast, slow : int
+        Longueurs des deux moyennes, en séances.
+
+    Returns
+    -------
+    pd.DataFrame
+        Colonnes ``close``, ``fast`` et ``slow``, indexées par ``sessions``. La
+        moyenne d'une séance ne lit que les clôtures de cette séance et des
+        précédentes. Elle vaut ``NaN`` tant que ses N séances consécutives n'ont
+        pas toutes une clôture : c'est le contrat du signal, qui refuse une
+        fenêtre trouée plutôt que de la compléter avec des séances plus anciennes.
+    """
+    known = {session_date(day): float(value) for day, value in closes.items()}
+    frame = pd.DataFrame(
+        {"close": [known.get(day, math.nan) for day in sessions]},
+        index=pd.Index(list(sessions), name="session_date"),
+    )
+    frame["fast"] = frame["close"].rolling(fast, min_periods=fast).mean()
+    frame["slow"] = frame["close"].rolling(slow, min_periods=slow).mean()
+    return frame
+
+
+def cross_figure(
+    averages: pd.DataFrame,
+    held: Collection[date],
+    fills: pd.DataFrame,
+    *,
+    fast: int,
+    slow: int,
+    title: str,
+) -> Figure:
+    """Draw the price, its two moving averages and what the run did about them.
+
+    Parameters
+    ----------
+    averages : pd.DataFrame
+        Le résultat de :func:`moving_averages`, réduit à la période à dessiner.
+    held : Collection[date]
+        Les séances à la clôture desquelles le run détenait l'instrument.
+    fills : pd.DataFrame
+        Les exécutions du run : colonnes ``session_date`` et ``side``.
+    fast, slow : int
+        Longueurs des deux moyennes, pour la légende.
+    title : str
+        Ce que la figure montre.
+
+    Returns
+    -------
+    Figure
+        Le prix, la moyenne rapide et la lente ; un fond coloré sur les séances
+        investies ; un triangle sur le prix à chaque achat et à chaque vente.
+
+    Raises
+    ------
+    ValueError
+        Si ``averages`` ne contient aucune séance.
+
+    Notes
+    -----
+    Les courbes expliquent, elles ne décident pas : le fond et les triangles
+    viennent du run lui-même. Un ordre est exécuté à l'ouverture qui suit le
+    croisement, donc un triangle tombe une séance après lui.
+    """
+    if len(averages) == 0:
+        raise ValueError("there is nothing to draw: the averages hold no session")
+    days = list(averages.index)
+    figure = Figure(figsize=(11, 5.5), layout="constrained")
+    axes = figure.add_subplot()
+    axes.fill_between(
+        days,
+        0.0,
+        1.0,
+        where=[day in held for day in days],
+        transform=axes.get_xaxis_transform(),
+        color=HELD_COLOUR,
+        alpha=0.10,
+        linewidth=0.0,
+        label="invested",
+    )
+    axes.plot(days, list(averages["close"]), color=PRICE_COLOUR, linewidth=0.9, label="close")
+    axes.plot(days, list(averages["fast"]), color=FAST_COLOUR, linewidth=1.5, label=f"MA{fast}")
+    axes.plot(days, list(averages["slow"]), color=SLOW_COLOUR, linewidth=1.5, label=f"MA{slow}")
+    for side, marker, colour in (("BUY", "^", HELD_COLOUR), ("SELL", "v", "#c53030")):
+        traded = [day for day in fills.loc[fills["side"] == side, "session_date"] if day in days]
+        prices = [float(averages.loc[day, "close"]) for day in traded]
+        axes.scatter(
+            traded, prices, marker=marker, color=colour, s=70, zorder=3, label=side.lower()
+        )
+    axes.set_title(title)
+    axes.set_ylabel("adjusted close")
+    axes.grid(visible=True, alpha=0.25)
+    axes.legend(loc="upper left", frameon=False)
+    return figure
+
+
+def save_figures(result: StrategyResult, directory: Path, strategy: GoldenCrossETF) -> None:
+    """Save the equity, drawdown and moving-average figures of the run as PNG files.
 
     Parameters
     ----------
@@ -176,15 +307,42 @@ def save_figures(result: StrategyResult, directory: Path) -> None:
         Le run terminé.
     directory : Path
         Dossier de sortie, créé s'il n'existe pas.
+    strategy : GoldenCrossETF
+        La stratégie du run : l'instrument et les deux longueurs à dessiner.
 
     Notes
     -----
     Exercice MA 5. Le résultat sait dessiner ses courbes ; une figure se
     sauvegarde, elle ne s'affiche pas dans un script.
+
+    Les moyennes de ``moving_averages.png`` sont recalculées ici sur les
+    clôtures ajustées telles qu'elles sont connues après la dernière clôture du
+    run, et non telles que chaque décision les voyait. Les deux coïncident pour
+    un fonds sans dividende ni division ; sinon une distribution versée depuis
+    déplace le niveau des prix antérieurs, pas l'ordre des deux moyennes à
+    l'instant où elles ont été lues.
     """
     directory.mkdir(parents=True, exist_ok=True)
     result.plot().savefig(directory / "equity.png", dpi=FIGURE_DPI)
     result.plot_drawdown().savefig(directory / "drawdown.png", dpi=FIGURE_DPI)
+
+    reader = result.reader.at(result.records()[-1].valuation_time)
+    closes = reader.adjusted_history(strategy.instrument_id, end=result.end)
+    calendar = result.reader.calendars.get(result.reader.reference_calendar_id)
+    first = session_date(closes.index[0])
+    sessions = [session.session_date for session in calendar.sessions(first, result.end)]
+    averages = moving_averages(closes, sessions, strategy.fast_sessions, strategy.slow_sessions)
+    weights = result.weights()[strategy.instrument_id]
+    figure = cross_figure(
+        averages.loc[result.start :],
+        held={session_date(day) for day, weight in weights.items() if weight > 0},
+        fills=result.fills(),
+        fast=strategy.fast_sessions,
+        slow=strategy.slow_sessions,
+        title=f"{strategy.instrument_id}  MA{strategy.fast_sessions} / "
+        f"MA{strategy.slow_sessions}  {result.start} to {result.end}",
+    )
+    figure.savefig(directory / "moving_averages.png", dpi=FIGURE_DPI)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -211,13 +369,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--output",
         type=Path,
         default=Path("golden_cross_output"),
-        help="where the equity and drawdown figures are written",
+        help="where the equity, drawdown and moving-average figures are written",
     )
     arguments = parser.parse_args(argv)
 
     result = build_runner(STORE).run(STRATEGY, UNIVERSE, *PERIOD)
     print_run(result)
-    save_figures(result, arguments.output)
+    save_figures(result, arguments.output, STRATEGY)
     print(f"\nFigures written to {arguments.output}")
     return 0
 
