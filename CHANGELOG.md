@@ -29,6 +29,15 @@
   period and benchmark of exercise 1, and draws the close, its average, the
   levels and the trades (`moving_average_band.png`).
 
+### Exercise 3: in above one average, out below another
+- `MovingAverageEntryExitETF` (`strategies/examples/moving_average_entry_exit.py`):
+  buy one fund when its close is above its 50-session average, sell it only
+  when its close is below its 100-session one. The sale comes first: below the
+  exit average nothing is bought, whatever the entry average says. Otherwise,
+  and when either signal cannot be computed, the book is kept as it is.
+- `scripts/run_moving_average_entry_exit_exercise.py` runs it with the runner,
+  costs, period, benchmark and figure of exercise 1.
+
 ### Analytics: alpha, beta and information ratio
 - `analytics.relative.RelativePerformanceStats`: regression alpha against the
   benchmark (per session and times `sessions_per_year`), beta, annualised

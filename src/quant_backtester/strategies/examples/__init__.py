@@ -24,6 +24,9 @@ from quant_backtester.strategies.examples.momentum_single_asset import MomentumS
 from quant_backtester.strategies.examples.momentum_vix import MomentumVix
 from quant_backtester.strategies.examples.moving_average_band import MovingAverageBandETF
 from quant_backtester.strategies.examples.moving_average_cross import MovingAverageCross
+from quant_backtester.strategies.examples.moving_average_entry_exit import (
+    MovingAverageEntryExitETF,
+)
 
 __all__ = [
     "BuyAndHold",
@@ -34,4 +37,5 @@ __all__ = [
     "MomentumVix",
     "MovingAverageBandETF",
     "MovingAverageCross",
+    "MovingAverageEntryExitETF",
 ]

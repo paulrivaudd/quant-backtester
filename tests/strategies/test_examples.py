@@ -32,6 +32,7 @@ from quant_backtester.strategies.examples import (
     MomentumVix,
     MovingAverageBandETF,
     MovingAverageCross,
+    MovingAverageEntryExitETF,
 )
 
 DecisionBuilder = Callable[..., StrategyContext]
@@ -436,6 +437,7 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
         MomentumVix(gauge_id="RATE_US", lookback_sessions=5, gauge_observations=5),
         MovingAverageBandETF(instrument_id="ETF_EU", window_sessions=5),
         MovingAverageCross(instrument_id="ETF_EU", first_sessions=2, second_sessions=5),
+        MovingAverageEntryExitETF(instrument_id="ETF_EU", entry_sessions=2, exit_sessions=5),
     }
     exported = {
         name
