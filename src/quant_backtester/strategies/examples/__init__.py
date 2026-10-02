@@ -22,6 +22,7 @@ from quant_backtester.strategies.examples.golden_cross_etf import GoldenCrossETF
 from quant_backtester.strategies.examples.momentum_rotation import MomentumRotation
 from quant_backtester.strategies.examples.momentum_single_asset import MomentumSingleAsset
 from quant_backtester.strategies.examples.momentum_vix import MomentumVix
+from quant_backtester.strategies.examples.moving_average_band import MovingAverageBandETF
 from quant_backtester.strategies.examples.moving_average_cross import MovingAverageCross
 
 __all__ = [
@@ -31,5 +32,6 @@ __all__ = [
     "MomentumRotation",
     "MomentumSingleAsset",
     "MomentumVix",
+    "MovingAverageBandETF",
     "MovingAverageCross",
 ]

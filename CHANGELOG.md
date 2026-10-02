@@ -18,6 +18,17 @@
   `scripts/run_golden_cross_exercise.py`, and a README section on what the
   rule is, why it was tested and what its run shows.
 
+### Exercise 2: the price against its moving average
+- `MovingAverageBandETF` (`strategies/examples/moving_average_band.py`): buy
+  one fund when its close passes above its 50-session average, sell it when it
+  passes below. `buy_above` and `sell_below` are multiples of the average, both
+  1.0 by default; two different levels leave a band inside which the book is
+  kept as it is, as it is when the signal cannot be computed. It reads the
+  existing `MovingAverageTrendSignal` on adjusted closes.
+- `scripts/run_moving_average_band_exercise.py` runs it with the runner, costs,
+  period and benchmark of exercise 1, and draws the close, its average, the
+  levels and the trades (`moving_average_band.png`).
+
 ### Analytics: alpha, beta and information ratio
 - `analytics.relative.RelativePerformanceStats`: regression alpha against the
   benchmark (per session and times `sessions_per_year`), beta, annualised

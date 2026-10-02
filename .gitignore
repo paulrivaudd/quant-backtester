@@ -44,3 +44,6 @@ market_data/.lock
 
 # Figures written by scripts/run_golden_cross_exercise.py
 golden_cross_output/
+
+# Figures written by scripts/run_moving_average_band_exercise.py
+moving_average_band_output/
