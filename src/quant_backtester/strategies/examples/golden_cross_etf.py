@@ -34,6 +34,7 @@ from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.base import Signal
 from quant_backtester.signals.engine import SignalRequest
 from quant_backtester.signals.price.trend import MovingAverageCrossSignal
+from quant_backtester.signals.types import PriceBasis, SignalStatus, require_identifier
 from quant_backtester.strategies.base import Strategy
 
 
@@ -65,6 +66,22 @@ class GoldenCrossETF(Strategy):
     slow_sessions: int = 200
     strategy_id: str = "golden_cross_etf"
 
+    def __post_init__(self) -> None:
+        """Reject a configuration that cannot be computed."""
+        require_identifier(self.instrument_id, "instrument_id")
+        require_identifier(self.strategy_id, "strategy_id")
+        # The signal refuses an average of one price and two equal lengths;
+        # building it here is how those rules are applied without a copy.
+        self.signal()
+        # The signal takes either order. The names of this strategy do not: a
+        # "fast" average longer than the "slow" one holds the fund in a
+        # downtrend while being recorded as a golden cross.
+        if self.fast_sessions > self.slow_sessions:
+            raise ValueError(
+                f"fast_sessions ({self.fast_sessions}) must be below slow_sessions "
+                f"({self.slow_sessions})"
+            )
+
     def signal(self) -> MovingAverageCrossSignal:
         """Return the signal this strategy reads.
 
@@ -80,7 +97,12 @@ class GoldenCrossETF(Strategy):
         prix et le champ. Relisez la docstring de ``MovingAverageCrossSignal``
         (``signals/price/trend.py``) pour l'ordre des deux longueurs.
         """
-        raise NotImplementedError("Exercice MA 2.1")
+        return MovingAverageCrossSignal(
+            signal_id=f"ma{self.fast_sessions}_over_ma{self.slow_sessions}",
+            first_sessions=self.fast_sessions,
+            second_sessions=self.slow_sessions,
+            price_basis=PriceBasis.ADJUSTED,
+        )
 
     def required_signals(self) -> Sequence[Signal | SignalRequest]:
         """Return the signals the engine computes before each decision.
@@ -96,7 +118,7 @@ class GoldenCrossETF(Strategy):
         trading ; l'énoncé demande de restreindre le calcul à l'ETF étudié.
         Voir ``SignalRequest`` dans ``signals/engine.py``.
         """
-        raise NotImplementedError("Exercice MA 3.1")
+        return (SignalRequest(signal=self.signal(), instruments=(self.instrument_id,)),)
 
     def decide(self, ctx: StrategyContext) -> TargetAllocation:
         """Return the target for the next open.
@@ -119,4 +141,9 @@ class GoldenCrossETF(Strategy):
         vide ; voir ``backtest/context.py``. Ni fichier, ni calendrier, ni
         historique : tout ce dont la décision a besoin est dans ``ctx``.
         """
-        raise NotImplementedError("Exercice MA 3.2")
+        signal_id = self.signal().signal_id
+        if ctx.signal_status(signal_id, self.instrument_id) is not SignalStatus.OK:
+            return ctx.cash()
+        if ctx.signal_value(signal_id, self.instrument_id) <= 0:
+            return ctx.cash()
+        return ctx.weights({self.instrument_id: 1.0})

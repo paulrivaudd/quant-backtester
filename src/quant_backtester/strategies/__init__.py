@@ -29,6 +29,7 @@ from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
     BuyAndHold,
     EqualWeightRebalance,
+    GoldenCrossETF,
     MomentumRotation,
     MomentumSingleAsset,
     MomentumVix,
@@ -40,6 +41,7 @@ __all__ = [
     "BuyAndHold",
     "EqualWeightRebalance",
     "FunctionalStrategy",
+    "GoldenCrossETF",
     "MomentumRotation",
     "MomentumSingleAsset",
     "MomentumVix",

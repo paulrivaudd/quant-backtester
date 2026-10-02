@@ -89,7 +89,6 @@ def load_script() -> ModuleType:
 
 
 def test_2_1_the_signal_is_the_existing_cross_configured_as_asked() -> None:
-    pytest.skip("Exercice MA 2.1")
     signal = GoldenCrossETF().signal()
     assert isinstance(signal, MovingAverageCrossSignal)
     assert signal.signal_id == "ma50_over_ma200"
@@ -102,7 +101,6 @@ def test_2_1_the_signal_is_the_existing_cross_configured_as_asked() -> None:
 
 
 def test_3_1_the_contract_of_the_class() -> None:
-    pytest.skip("Exercice MA 3.1")
     strategy = GoldenCrossETF()
     assert isinstance(strategy, Strategy)
     assert strategy.instrument_id == "ETF_WORLD"
@@ -113,18 +111,16 @@ def test_3_1_the_contract_of_the_class() -> None:
 
 
 def test_3_1_the_signal_is_asked_for_the_studied_etf_only() -> None:
-    pytest.skip("Exercice MA 3.1")
     strategy = GoldenCrossETF()
     declared = list(strategy.required_signals())
     assert len(declared) == 1
     request = declared[0]
     assert isinstance(request, SignalRequest)
     assert request.signal == strategy.signal()
-    assert list(request.instruments or ()) == ["ETF_WORLD"]
+    assert list(request.names() or ()) == ["ETF_WORLD"]
 
 
 def test_3_1_the_parameters_enter_the_definition() -> None:
-    pytest.skip("Exercice MA 3.1")
     assert GoldenCrossETF().fingerprint() != GoldenCrossETF(slow_sessions=150).fingerprint()
 
 
@@ -134,7 +130,6 @@ def test_3_1_the_parameters_enter_the_definition() -> None:
     ids=["empty-instrument", "equal-lengths", "too-short"],
 )
 def test_3_1_an_impossible_configuration_is_refused(parameters: dict[str, object]) -> None:
-    pytest.skip("Exercice MA 3.1")
     with pytest.raises(ValueError):
         GoldenCrossETF(**parameters)  # type: ignore[arg-type]
 
@@ -149,7 +144,6 @@ def test_3_2_a_rising_etf_is_held_in_full(
     make_context: Callable[[MarketDataReader, datetime], SignalContext],
     make_decision: Callable[..., StrategyContext],
 ) -> None:
-    pytest.skip("Exercice MA 3.2")
     market = make_market({"ETF_EU": make_bars("ETF_EU", xpar, history(xpar, +1.0))})
     allocation = decide(on_etf_eu(), market, make_context, make_decision)
     assert dict(allocation.weights) == {"ETF_EU": 1.0}
@@ -162,7 +156,6 @@ def test_3_2_a_falling_etf_is_not_held(
     make_context: Callable[[MarketDataReader, datetime], SignalContext],
     make_decision: Callable[..., StrategyContext],
 ) -> None:
-    pytest.skip("Exercice MA 3.2")
     market = make_market({"ETF_EU": make_bars("ETF_EU", xpar, history(xpar, -1.0))})
     allocation = decide(on_etf_eu(), market, make_context, make_decision)
     assert dict(allocation.weights) == {}
@@ -176,7 +169,6 @@ def test_3_2_a_signal_of_exactly_zero_is_cash(
     make_decision: Callable[..., StrategyContext],
 ) -> None:
     """Flat prices: both averages equal, the signal is 0, and 0 is not > 0."""
-    pytest.skip("Exercice MA 3.2")
     market = make_market({"ETF_EU": make_bars("ETF_EU", xpar, history(xpar, 0.0))})
     allocation = decide(on_etf_eu(), market, make_context, make_decision)
     assert dict(allocation.weights) == {}
@@ -190,7 +182,6 @@ def test_3_2_too_short_a_history_is_cash_and_not_an_error(
     make_decision: Callable[..., StrategyContext],
 ) -> None:
     """A rising series of fewer than 200 sessions: no MA200, so no position."""
-    pytest.skip("Exercice MA 3.2")
     short = {day: price for day, price in history(xpar, +1.0).items() if day >= date(2026, 6, 1)}
     market = make_market({"ETF_EU": make_bars("ETF_EU", xpar, short)})
     allocation = decide(on_etf_eu(), market, make_context, make_decision)
@@ -205,7 +196,6 @@ def test_3_2_a_price_after_the_decision_changes_nothing(
     make_decision: Callable[..., StrategyContext],
 ) -> None:
     """The look-ahead guard: a crash the next day cannot move today's decision."""
-    pytest.skip("Exercice MA 3.2")
     closes = history(xpar, +1.0, until=date(2026, 12, 1))
     before = make_market({"ETF_EU": make_bars("ETF_EU", xpar, closes)})
     first = decide(on_etf_eu(), before, make_context, make_decision)
@@ -220,7 +210,6 @@ def test_3_2_a_price_after_the_decision_changes_nothing(
 
 def test_3_3_the_strategy_is_exported_by_the_package() -> None:
     """Once exported, add it to ``runnable`` in ``test_examples.py`` too."""
-    pytest.skip("Exercice MA 3.3")
     import quant_backtester.strategies as strategies
 
     assert strategies.GoldenCrossETF is GoldenCrossETF  # type: ignore[attr-defined]

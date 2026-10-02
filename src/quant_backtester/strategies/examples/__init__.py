@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from quant_backtester.strategies.examples.buy_and_hold import BuyAndHold
 from quant_backtester.strategies.examples.equal_weight import EqualWeightRebalance
+from quant_backtester.strategies.examples.golden_cross_etf import GoldenCrossETF
 from quant_backtester.strategies.examples.momentum_rotation import MomentumRotation
 from quant_backtester.strategies.examples.momentum_single_asset import MomentumSingleAsset
 from quant_backtester.strategies.examples.momentum_vix import MomentumVix
@@ -26,6 +27,7 @@ from quant_backtester.strategies.examples.moving_average_cross import MovingAver
 __all__ = [
     "BuyAndHold",
     "EqualWeightRebalance",
+    "GoldenCrossETF",
     "MomentumRotation",
     "MomentumSingleAsset",
     "MomentumVix",

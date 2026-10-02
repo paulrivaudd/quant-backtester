@@ -26,6 +26,7 @@ from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
     BuyAndHold,
     EqualWeightRebalance,
+    GoldenCrossETF,
     MomentumRotation,
     MomentumSingleAsset,
     MomentumVix,
@@ -428,6 +429,7 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
     runnable = {
         BuyAndHold(instruments=UNIVERSE),
         EqualWeightRebalance(instruments=UNIVERSE),
+        GoldenCrossETF(instrument_id="ETF_EU", fast_sessions=2, slow_sessions=5),
         MomentumSingleAsset(instrument_id="ETF_EU", lookback_sessions=5),
         MomentumRotation(lookback_sessions=5, top_n=1),
         MomentumVix(gauge_id="RATE_US", lookback_sessions=5, gauge_observations=5),
