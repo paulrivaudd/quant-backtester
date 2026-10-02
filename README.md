@@ -3,6 +3,25 @@
 A daily-frequency backtesting framework for systematic strategies, built around
 one priority: results you can trust and reproduce.
 
+## Contents
+
+- [Status](#status)
+- [Design goals](#design-goals)
+- [Layout](#layout)
+- [The data layer](#the-data-layer)
+- [The signals layer](#the-signals-layer)
+- [Getting started](#getting-started)
+- [A run, end to end](#a-run-end-to-end)
+- [What a run records](#what-a-run-records)
+- [Writing a strategy](#writing-a-strategy)
+- [Running one](#running-one)
+- [Four baselines, several periods](#four-baselines-several-periods)
+- [First strategy tested: the golden cross (exercise 1)](#first-strategy-tested-the-golden-cross-exercise-1)
+- [Research: what is left to test, and how](#research-what-is-left-to-test-and-how)
+- [What a strategy may not do](#what-a-strategy-may-not-do)
+
+The longer sections are folded: click a line starting with a triangle to open it.
+
 ## Status
 
 The **market data layer is complete and in use**: providers, calendars, a local
@@ -89,6 +108,12 @@ figure the run cannot support is reported as nothing rather than invented.
 
 ## Layout
 
+Seven layers that depend on each other one way, with research, tests, scripts
+and docs around them.
+
+<details>
+<summary>Show the directory tree</summary>
+
 ```
 src/quant_backtester/
     data/        providers, Parquet store, trading calendars   (done)
@@ -138,7 +163,15 @@ its own `tail(20)` and get twenty observations spanning twenty-six sessions, or
 read a price nobody had decided was knowable yet. Every part of the context
 answers for the same instant, and the construction refuses a set that does not.
 
+</details>
+
 ## The data layer
+
+Providers, calendars, a local Parquet store, validation, cross-checking, a
+revision policy and a point-in-time reader: one module per job.
+
+<details>
+<summary>Show the modules and what each one guarantees</summary>
 
 | Module | Role |
 |---|---|
@@ -224,7 +257,15 @@ asks what the universe held on the session it is deciding on. A bound left open
 in the file is closed with the instrument's own listing dates when it is read:
 a fund launched in 2018 is not a member of anything in 2010.
 
+</details>
+
 ## The signals layer
+
+A signal is computed at one instant, over a window checked to be what it
+claims, and every value comes with a status.
+
+<details>
+<summary>Show the modules and the rules</summary>
 
 | Module | Role |
 |---|---|
@@ -296,6 +337,8 @@ snapshot.value("momentum_60d", "ETF_WORLD")  # 0.0259
 snapshot.status("momentum_60d", "ETF_WORLD")  # SignalStatus.OK
 snapshot.result("momentum_60d").ok()  # the rows a strategy may use
 ```
+
+</details>
 
 ## Getting started
 
@@ -383,6 +426,9 @@ state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
 The engine below is the primitive, and the sections after this one show the
 façade that a user actually writes against. It is here because everything the
 façade does is *this*, with the configuration filled in once:
+
+<details>
+<summary>Show the full example</summary>
 
 ```python
 from quant_backtester.analytics import AnalyticsConfig, PerformanceReport
@@ -518,9 +564,14 @@ not a price anyone could trade at that morning. Valuation may estimate - a
 close that did not print is marked at the last price known, and named -
 execution never does.
 
+</details>
+
 ## What a run records
 
 One immutable `BacktestRecord` per session, and every table is a view of those:
+
+<details>
+<summary>Show the tables of a result</summary>
 
 | Asked of a result | What it holds |
 |---|---|
@@ -554,9 +605,14 @@ that never reached the cash, would be worse than a run that says it cannot
 continue. Execution is the next open and nothing else; the book is long-only
 and kept in one currency.
 
+</details>
+
 ## Writing a strategy
 
 A strategy is a name, the signals it needs, and one decision:
+
+<details>
+<summary>Show an example and the context it is handed</summary>
 
 ```python
 from quant_backtester.strategies import Strategy
@@ -639,7 +695,15 @@ no refused order against 372, most of them rebalancings too small to send — an
 calling the second one "buy and hold", as an earlier version of this project
 did, hides the very thing the comparison exists to measure.
 
+</details>
+
 ## Running one
+
+A runner takes a strategy, a universe and a period, and hands back the run with
+its configuration, its report and its comparison to a benchmark.
+
+<details>
+<summary>Show the runner, the report and the comparison</summary>
 
 ```python
 runner = StrategyRunner(
@@ -827,6 +891,8 @@ is marked at the last close that existed and named; and one quoted in another
 currency is refused rather than drawn, because without an FX conversion the
 difference between the two curves is an exchange rate.
 
+</details>
+
 ## Four baselines, several periods
 
 `scripts/run_baselines.py` runs the four reference strategies over the whole
@@ -843,6 +909,9 @@ they are read with (`<run>_relative.csv`). After each table, the same runs are
 listed against `ETF_WORLD`, net book: regression alpha a year, beta,
 information ratio, tracking error and the number of returns. The `vs world`
 column stays what it is, a difference of total returns.
+
+<details>
+<summary>Show the table: four strategies over four periods</summary>
 
 ```text
 strategy            period                         net    gross   a year  sharpe   max dd     costs  rebal.  fills  rejects  est.  vs world
@@ -879,6 +948,8 @@ momentum_vix        2024-01-02 2026-09-17       35.90%   46.81%   11.99%    0.88
                     rejects: INSUFFICIENT_CASH 32
 ```
 
+</details>
+
 Over eight years the simplest things win. Half and half, rebalanced monthly,
 beats everything; the rotation earns, gross, what the equal weight keeps net,
 and hands twenty-four points of it to 88 sessions of switching. The VIX gate does what it
@@ -900,6 +971,9 @@ bar of 24 October 2025 was reviewed.
 The same runs against `ETF_WORLD`, net book - regression alpha a year, beta,
 information ratio, tracking error and the number of daily returns:
 
+<details>
+<summary>Show the table: the same runs relative to ETF_WORLD</summary>
+
 ```text
 strategy            period                   benchmark       alpha/yr    beta  info. ratio  track. err.     n
 buy_and_hold        2018-07-16 2026-09-17    ETF_WORLD          0.03%   0.999        0.218        0.08%  2093
@@ -919,6 +993,8 @@ equal_weight        2024-01-02 2026-09-17    ETF_WORLD         -1.23%   1.019   
 momentum_rotation   2024-01-02 2026-09-17    ETF_WORLD         -1.59%   1.030       -0.523        2.19%   692
 momentum_vix        2024-01-02 2026-09-17    ETF_WORLD          0.35%   0.651       -0.566        8.47%   692
 ```
+
+</details>
 
 Three things the total returns did not say. The rotation is the index with
 noise: a beta of 1.03 in every period, and an information ratio of 0.003 over
@@ -982,6 +1058,13 @@ regression alpha, a year      -2.10%
 information ratio             -0.634
 sessions invested          1495 of 1912, average cash 21.95%
 ```
+
+![ETF_WORLD with its 50- and 200-session averages, the sessions invested and the trades](docs/figures/golden_cross_moving_averages.png)
+
+The close with its two averages; the shaded sessions are those the run was
+invested on, and each triangle is a buy or a sell, one session after the
+crossing that caused it. The figure is `moving_averages.png`, written by the
+script.
 
 The rule earns half of what holding the fund earned, and the run says why:
 
