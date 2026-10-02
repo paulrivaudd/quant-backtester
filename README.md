@@ -938,6 +938,74 @@ check that the two curves are measured the same way; its information ratio of
 None of these figures has an interval yet, and all of these periods have been
 looked at: they describe the history, they do not test a rule.
 
+## First strategy tested: the golden cross (exercise 1)
+
+The first strategy written from an empty file and run on the real store is the
+oldest trend rule there is. `GoldenCrossETF`
+(`strategies/examples/golden_cross_etf.py`) holds one fund, `ETF_WORLD`, and
+asks one question after each Paris close:
+
+```text
+s(t) = MA50(t) / MA200(t) - 1        both averages on adjusted closes, ending at t
+
+s(t) > 0                             hold 100% of the fund
+s(t) <= 0, or no usable signal       hold 100% cash
+```
+
+The target is executed at the next open, by the engine. A signal that cannot be
+computed - fewer than 200 consecutive sessions, a missing bar - is cash, not a
+guess.
+
+**Why this one.** Not because it is expected to work. It is chosen because it
+is simple enough to check by hand, so that a surprising number is a bug in the
+chain and not a subtlety of the rule, and because its weaknesses are well known,
+so the run shows whether the framework reports them honestly. It exercises every
+layer once: a windowed signal, a decision with an "unusable" case, whole-share
+orders, three named costs, a benchmark.
+
+`scripts/run_golden_cross_exercise.py` runs it with the costs of this README,
+100,000 euros, from 2019-04-01 to 2026-09-17 (1912 sessions), measured against
+the fund itself held without trading:
+
+```text
+                            strategy     ETF_WORLD
+total return                  71.58%       149.91%
+annualised return              7.50%        13.06%
+annualised volatility         13.45%        15.90%
+max drawdown                 -33.55%       -33.62%
+sharpe ratio                    0.46          0.72
+
+gross total return            72.61%
+costs                          1,035   over 11 fills
+beta                           0.715
+regression alpha, a year      -2.10%
+information ratio             -0.634
+sessions invested          1495 of 1912, average cash 21.95%
+```
+
+The rule earns half of what holding the fund earned, and the run says why:
+
+- **It is late, both ways.** A 200-session average turns long after the price
+  has. In 2020 the rule sold on 30 March at 246.13, after the fall it was meant
+  to avoid - its worst drawdown is the benchmark's, to a tenth of a point - and
+  bought back on 3 August at 293.09, 19% higher. In 2025 the same thing: sold on
+  22 April at 478.83, back in on 18 August at 571.44.
+- **It is whipsawed when the market goes sideways.** Between September 2022 and
+  May 2023 it bought three times and sold twice, for nothing.
+- **Costs are not the reason.** One point of total return over seven years:
+  the rule trades too rarely for execution to matter. What it loses, it loses
+  by being out of the market on the wrong days.
+- **Lower risk, but not better risk.** Beta is 0.71 and volatility is lower
+  because the book is in cash a fifth of the time, and that cash earns nothing
+  here while the Sharpe ratio is still charged 2% a year.
+
+What this run does not show: it is one fund, one pair of lengths and one
+period, all of it already looked at, so it describes a history and tests
+nothing. Trying 20/50 or 100/200 until one beats the fund would be fitting the
+rule to these seven years. The run is not in `research/registry.jsonl`; it is an
+exercise, recorded as run `9a931dca…` on commit `a419763`, and its figures come
+from its own script rather than from `run_baselines.py --suite readme`.
+
 ## Research: what is left to test, and how
 
 Every session of 2018 to 2026 on `ROTATION_2` has been looked at, and those
