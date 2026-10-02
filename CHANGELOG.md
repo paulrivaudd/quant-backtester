@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### History rewritten on 2026-10-02
+- The 21 commits of 2026-09-20 that carried a `Co-Authored-By: Claude` line
+  were rewritten without it, and the 89 commits after them with them: 110
+  hashes changed, from `101f1e5` onwards. Trees, authors, dates and the rest of
+  every message are identical, checked commit by commit.
+- `docs/HISTORY_REWRITE_2026-10-02.md` maps each old hash to its new one.
+  `research/registry.jsonl` is left as it was written: its 19 lines name
+  `5eb5b07`, which is now `61a017c`, and their `run_id` was computed with the
+  old hash. A run repeated on the new commit has another `run_id` and the same
+  numbers.
+
+### Exercise 1: the golden cross
+- `GoldenCrossETF` (`strategies/examples/golden_cross_etf.py`), its runner
+  `scripts/run_golden_cross_exercise.py`, and a README section on what the
+  rule is, why it was tested and what its run shows.
+
 ### Analytics: alpha, beta and information ratio
 - `analytics.relative.RelativePerformanceStats`: regression alpha against the
   benchmark (per session and times `sessions_per_year`), beta, annualised

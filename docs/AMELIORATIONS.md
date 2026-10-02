@@ -2,7 +2,7 @@
 
 État au 2026-09-26, après la réponse à l'audit de l'archive (9). Cette liste
 recense ce qui limite encore ce qu'un résultat peut affirmer, classé par
-priorité. La première version de cette note (`207d928`) comportait des erreurs
+priorité. La première version de cette note (`35cb750`) comportait des erreurs
 que l'audit a relevées ; elles sont corrigées ci-dessous, et chaque point dit
 ce qui est fait, ce qui reste à faire, et pourquoi.
 

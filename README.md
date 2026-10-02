@@ -1003,7 +1003,7 @@ What this run does not show: it is one fund, one pair of lengths and one
 period, all of it already looked at, so it describes a history and tests
 nothing. Trying 20/50 or 100/200 until one beats the fund would be fitting the
 rule to these seven years. The run is not in `research/registry.jsonl`; it is an
-exercise, recorded as run `9a931dca…` on commit `a419763`, and its figures come
+exercise, recorded as run `34ea6016…` on commit `1c8ec57`, and its figures come
 from its own script rather than from `run_baselines.py --suite readme`.
 
 ## Research: what is left to test, and how

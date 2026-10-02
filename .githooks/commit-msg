@@ -4,8 +4,9 @@
 # The history of this repository is its owner's: no Co-Authored-By trailer
 # naming Claude, and no "Generated with Claude Code" footer. The rule lived in a
 # note for a while and was broken anyway; a hook is a rule that cannot be
-# forgotten. Rewriting the commits that already carry one is not the fix - a
-# commit a result was recorded against must keep existing.
+# forgotten. The 21 commits that already carried one were rewritten on
+# 2026-10-02; docs/HISTORY_REWRITE_2026-10-02.md maps every old hash to its new
+# one, so a result recorded against an old commit can still be traced.
 #
 # Enabled once per clone:  git config core.hooksPath .githooks
 if grep -Eiq '^[[:space:]]*co-authored-by:.*(claude|anthropic)|generated with.*claude' "$1"; then
