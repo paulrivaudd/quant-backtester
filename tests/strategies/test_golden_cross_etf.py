@@ -26,9 +26,11 @@ import pandas as pd
 import pytest
 
 from quant_backtester.backtest.context import StrategyContext
+from quant_backtester.backtest.runner import StrategyResult, StrategyRunner
 from quant_backtester.data.calendars import TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.schemas import BarField
+from quant_backtester.demo import demo_runner
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
@@ -219,7 +221,6 @@ def test_3_3_the_strategy_is_exported_by_the_package() -> None:
 
 
 def test_4_the_runner_declares_every_assumption_of_the_exercise() -> None:
-    pytest.skip("Exercice MA 4")
     runner = load_script().build_runner(REPOSITORY / "market_data")
     assert runner.reference_calendar_id == "XPAR"
     assert runner.base_currency == "EUR"
@@ -231,3 +232,103 @@ def test_4_the_runner_declares_every_assumption_of_the_exercise() -> None:
     assert (runner.analytics.sessions_per_year, runner.analytics.risk_free_rate) == (255, 0.02)
     assert runner.benchmark is not None
     assert runner.benchmark.instrument_id == "ETF_WORLD"  # type: ignore[union-attr]
+
+
+# --- 4.2 et 5 lancer, lire, dessiner -----------------------------------------------------
+
+DEMO_SEED = 20240101
+"""Seed of the synthetic market the script's output is tested on."""
+
+DEMO_STRATEGY = GoldenCrossETF(instrument_id="FUND_A", fast_sessions=5, slow_sessions=20)
+"""The strategy on the demo market: lengths its two years of history can serve."""
+
+DEMO_PERIOD = ("2025-01-02", "2025-12-31")
+"""The measured year of the demo market; 2024 is the warm-up."""
+
+
+@pytest.fixture(scope="module")
+def demo(tmp_path_factory: pytest.TempPathFactory) -> StrategyRunner:
+    """Return a runner over the offline synthetic market."""
+    return demo_runner(tmp_path_factory.mktemp("golden_cross") / "store", seed=DEMO_SEED)
+
+
+@pytest.fixture(scope="module")
+def demo_result(demo: StrategyRunner) -> StrategyResult:
+    """Return one finished run of the strategy on the synthetic market."""
+    return demo.run(DEMO_STRATEGY, ("FUND_A",), *DEMO_PERIOD)
+
+
+def test_5_the_printout_identifies_the_run_and_shows_every_table(
+    demo_result: StrategyResult, capsys: pytest.CaptureFixture[str]
+) -> None:
+    load_script().print_run(demo_result)
+    printed = capsys.readouterr().out
+    assert f"run_id       {demo_result.run_id}" in printed
+    assert f"fingerprint  {demo_result.fingerprint}" in printed
+    assert f"period       {demo_result.start} to {demo_result.end}" in printed
+    assert demo_result.report().render() in printed
+    assert demo_result.compare().render() in printed
+    for table in ("orders", "fills", "rejects", "weights", "costs"):
+        assert f"== {table}: {len(getattr(demo_result, table)())} rows ==" in printed
+
+
+def test_5_a_long_table_is_cut_and_an_empty_one_says_so(
+    demo_result: StrategyResult, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """One row per session would bury the report; no row at all must not print a header."""
+    script = load_script()
+    assert len(demo_result.weights()) > script.TABLE_ROWS
+    script.print_run(demo_result)
+    printed = capsys.readouterr().out
+    weights = printed.split("== weights:")[1].split("== costs:")[0]
+    assert len(weights.splitlines()) < len(demo_result.weights())
+    assert len(demo_result.rejects()) > 0 or "(none)" in printed
+
+
+def test_5_the_two_figures_are_saved_and_the_directory_created(
+    demo_result: StrategyResult, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import matplotlib.pyplot as plt
+
+    def refuse() -> None:
+        raise AssertionError("a script saves a figure, it does not show it")
+
+    monkeypatch.setattr(plt, "show", refuse)
+    directory = tmp_path / "not" / "there" / "yet"
+    load_script().save_figures(demo_result, directory)
+    assert sorted(path.name for path in directory.iterdir()) == ["drawdown.png", "equity.png"]
+    for path in directory.iterdir():
+        assert path.read_bytes().startswith(b"\x89PNG")
+
+
+def test_4_2_main_runs_the_declared_strategy_prints_it_and_saves_its_figures(
+    demo: StrategyRunner,
+    demo_result: StrategyResult,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The real store is not committed: main is wired onto the synthetic market."""
+    script = load_script()
+    monkeypatch.setattr(script, "build_runner", lambda root: demo)
+    monkeypatch.setattr(script, "STRATEGY", DEMO_STRATEGY)
+    monkeypatch.setattr(script, "UNIVERSE", ("FUND_A",))
+    monkeypatch.setattr(script, "PERIOD", DEMO_PERIOD)
+    output = tmp_path / "figures"
+
+    assert script.main(["--output", str(output)]) == 0
+
+    printed = capsys.readouterr().out
+    assert f"run_id       {demo_result.run_id}" in printed
+    assert (output / "equity.png").is_file()
+    assert (output / "drawdown.png").is_file()
+
+
+def test_4_2_the_script_declares_the_strategy_of_the_exercise() -> None:
+    script = load_script()
+    strategy = script.STRATEGY
+    assert strategy == GoldenCrossETF(
+        instrument_id="ETF_WORLD", fast_sessions=50, slow_sessions=200
+    )
+    assert script.UNIVERSE == ("ETF_WORLD",)
+    assert script.PERIOD == ("2019-04-01", "2026-09-17")
