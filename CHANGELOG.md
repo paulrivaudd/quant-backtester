@@ -24,6 +24,21 @@
   the night carries 92.5% of the log return on the discovery window and 47.2%
   on the validation one, and a night-only book loses 89% net of costs.
 
+### Study: a trend rule that holds through a hedged panic
+- `ReturnLevelCorrelationSignal` (`signals/cross_asset/correlation.py`): the
+  correlation of a fund's log returns with the changes of a published series,
+  over the last dates both hold. `SignalUnit.CORRELATION` is new.
+- `RateRegimeTrend` (`strategies/examples/rate_regime_trend.py`): hold a fund
+  above its 200-session average, and below it only while shares and the
+  ten-year yield move together and the VIX is in a panic.
+- `scripts/run_rate_regime_study.py` runs it against buy and hold and the plain
+  trend rule on `ETF_WORLD`, then on the S&P 500 index from 1991 to 2018, a
+  paper run on a copy of the registry in which the index is tradable.
+  Hypothesis `rate_regime_trend` was written before the first run. On the
+  validation window its net Sharpe is 0.404 against 0.393 for buy and hold, a
+  difference of +0.011 with a 95% interval of [-0.238, +0.243]: met to the
+  letter, and no evidence of anything. On `ETF_WORLD` it is below both.
+
 ### Figures: trades are crosses
 - The buys and sells of the moving-average figures are a green and a red
   cross instead of two filled triangles, which hid the price under them.

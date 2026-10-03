@@ -27,6 +27,7 @@ from quant_backtester.strategies.examples.moving_average_cross import MovingAver
 from quant_backtester.strategies.examples.moving_average_entry_exit import (
     MovingAverageEntryExitETF,
 )
+from quant_backtester.strategies.examples.rate_regime_trend import RateRegimeTrend
 
 __all__ = [
     "BuyAndHold",
@@ -38,4 +39,5 @@ __all__ = [
     "MovingAverageBandETF",
     "MovingAverageCross",
     "MovingAverageEntryExitETF",
+    "RateRegimeTrend",
 ]

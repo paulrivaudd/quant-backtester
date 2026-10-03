@@ -33,6 +33,7 @@ from quant_backtester.strategies.examples import (
     MovingAverageBandETF,
     MovingAverageCross,
     MovingAverageEntryExitETF,
+    RateRegimeTrend,
 )
 
 DecisionBuilder = Callable[..., StrategyContext]
@@ -438,6 +439,18 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
         MovingAverageBandETF(instrument_id="ETF_EU", window_sessions=5),
         MovingAverageCross(instrument_id="ETF_EU", first_sessions=2, second_sessions=5),
         MovingAverageEntryExitETF(instrument_id="ETF_EU", entry_sessions=2, exit_sessions=5),
+        RateRegimeTrend(
+            instrument_id="ETF_EU",
+            equity_id="IDX_US",
+            rate_id="RATE_US",
+            stress_id="RATE_US",
+            trend_sessions=5,
+            correlation_pairs=3,
+            stress_observations=5,
+            stress_minimum=1.5,
+            regime_max_age_sessions=1,
+            stress_max_age_sessions=1,
+        ),
     }
     exported = {
         name

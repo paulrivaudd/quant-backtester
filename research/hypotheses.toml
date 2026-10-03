@@ -78,3 +78,12 @@ statement = "A Paris-listed fund of US-heavy equities earns its return between t
 universe = "ETF_WORLD from 2019-04-01 to 2026-09-17, then ETF_SP500_PEA from 2014-03-18 to 2019-03-29, a period the first never saw."
 prediction = "The night segment carries more than two thirds of the log return of the fund, on both windows."
 refutation = "A night share at or below one half on either window. Separately, a night-only book that ends below buy and hold once each leg has paid its costs refutes the trade, whatever the share."
+
+[[hypothesis]]
+hypothesis_id = "rate_regime_trend"
+status = "PREREGISTERED"
+written_on = 2026-10-03
+statement = "A 200-session trend rule is right to sell a fall, except a panic that happens while shares and the ten-year yield move together: that one is bought back, and holding through it beats selling it."
+universe = "ETF_WORLD from 2019-04-01 to 2026-09-17 (first run, no parameter fitted), then the S&P 500 index held on paper in USD from 1991-01-02 to 2018-12-31. Parameters fixed before any run: trend 200 sessions, correlation 60 pairs, VIX z-score over 60 observations above 1.5."
+prediction = "On the validation window, a net Sharpe ratio above buy and hold's with a smaller maximum drawdown, and a net return above the plain 200-session trend rule's."
+refutation = "On the validation window, a net Sharpe ratio at or below buy and hold's, or a net return at or below the plain 200-session trend rule's: the regime then adds nothing to the trend."

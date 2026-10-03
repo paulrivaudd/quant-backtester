@@ -78,6 +78,9 @@ class SignalUnit(Enum):
     BINARY = "BINARY"
     """``0.0`` or ``1.0``. A state, not a strength."""
 
+    CORRELATION = "CORRELATION"
+    """A Pearson correlation, in ``[-1, 1]``. Dimensionless."""
+
 
 class SignalStatus(Enum):
     """Why a signal has the value it has - or why it has none.

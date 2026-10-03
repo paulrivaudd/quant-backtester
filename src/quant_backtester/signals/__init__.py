@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from quant_backtester.signals.base import Signal, SignalResult
 from quant_backtester.signals.context import SignalContext
+from quant_backtester.signals.cross_asset.correlation import ReturnLevelCorrelationSignal
 from quant_backtester.signals.cross_sectional.rank import CrossSectionalRank
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.level.change import LevelChangeSignal
@@ -58,6 +59,7 @@ __all__ = [
     "MovingAverageTrendSignal",
     "PriceBasis",
     "RealizedVolatilitySignal",
+    "ReturnLevelCorrelationSignal",
     "ReturnSignal",
     "Signal",
     "SignalContext",

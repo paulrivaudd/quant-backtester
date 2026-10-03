@@ -53,3 +53,6 @@ moving_average_entry_exit_output/
 
 # Figures written by scripts/run_session_segments_study.py
 session_segments_output/
+
+# Figures written by scripts/run_rate_regime_study.py
+rate_regime_output/
