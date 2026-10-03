@@ -13,6 +13,11 @@
   old hash. A run repeated on the new commit has another `run_id` and the same
   numbers.
 
+### Figures: trades are crosses
+- The buys and sells of the moving-average figures are a green and a red
+  cross instead of two filled triangles, which hid the price under them.
+  `docs/figures/golden_cross_moving_averages.png` is redrawn; no number moved.
+
 ### Exercise 1: the golden cross
 - `GoldenCrossETF` (`strategies/examples/golden_cross_etf.py`), its runner
   `scripts/run_golden_cross_exercise.py`, and a README section on what the

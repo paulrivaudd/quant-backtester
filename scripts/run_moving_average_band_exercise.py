@@ -35,6 +35,7 @@ from run_golden_cross_exercise import (
     HELD_COLOUR,
     PERIOD,
     PRICE_COLOUR,
+    SELL_COLOUR,
     SLOW_COLOUR,
     STORE,
     UNIVERSE,
@@ -51,8 +52,8 @@ STRATEGY = MovingAverageBandETF(
 )
 """The strategy of the exercise, its four parameters written and not left to a default."""
 
-LEVEL_COLOUR, SELL_COLOUR = "#c05621", "#c53030"
-"""Colours of the figure: the two levels around the average, the sells."""
+LEVEL_COLOUR = "#c05621"
+"""Colour of the two levels around the average."""
 
 
 def band_levels(
@@ -124,8 +125,8 @@ def band_figure(
     -------
     Figure
         The close, its average, and each level that is not the average itself; a coloured
-        background on the sessions invested; a triangle on the price at every
-        buy and every sell.
+        background on the sessions invested; a cross on the price, green at
+        every buy and red at every sell.
 
     Raises
     ------
@@ -134,9 +135,9 @@ def band_figure(
 
     Notes
     -----
-    The curves explain, they do not decide: the background and the triangles
+    The curves explain, they do not decide: the background and the crosses
     come from the run itself. An order is executed at the open after the close
-    that reached a level, so a triangle falls one session after it.
+    that reached a level, so a cross falls one session after it.
     """
     if len(levels) == 0:
         raise ValueError("there is nothing to draw: the levels hold no session")
@@ -172,11 +173,18 @@ def band_figure(
             linestyle=style,
             label=f"{verb} {level:.0%} of MA{window}",
         )
-    for side, marker, colour in (("BUY", "^", HELD_COLOUR), ("SELL", "v", SELL_COLOUR)):
+    for side, colour in (("BUY", HELD_COLOUR), ("SELL", SELL_COLOUR)):
         traded = [day for day in fills.loc[fills["side"] == side, "session_date"] if day in days]
         prices = [float(levels.loc[day, "close"]) for day in traded]
         axes.scatter(
-            traded, prices, marker=marker, color=colour, s=70, zorder=3, label=side.lower()
+            traded,
+            prices,
+            marker="x",
+            color=colour,
+            s=90,
+            linewidths=2.2,
+            zorder=3,
+            label=side.lower(),
         )
     axes.set_title(title)
     axes.set_ylabel("adjusted close")

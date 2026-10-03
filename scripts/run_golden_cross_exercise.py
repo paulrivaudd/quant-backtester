@@ -56,6 +56,9 @@ FIGURE_DPI = 160
 PRICE_COLOUR, FAST_COLOUR, SLOW_COLOUR, HELD_COLOUR = "#6b7280", "#c05621", "#1f4e79", "#2f855a"
 """Couleurs du graphe des moyennes : le prix, la rapide, la lente, les séances investies."""
 
+SELL_COLOUR = "#c53030"
+"""Couleur de la croix d'une vente ; celle d'un achat est ``HELD_COLOUR``."""
+
 REFERENCE_CALENDAR = "XPAR"
 """Le calendrier sur lequel le run avance : celui de la place où l'ETF se négocie."""
 
@@ -253,7 +256,7 @@ def cross_figure(
     -------
     Figure
         Le prix, la moyenne rapide et la lente ; un fond coloré sur les séances
-        investies ; un triangle sur le prix à chaque achat et à chaque vente.
+        investies ; une croix sur le prix, verte à chaque achat et rouge à chaque vente.
 
     Raises
     ------
@@ -262,9 +265,9 @@ def cross_figure(
 
     Notes
     -----
-    Les courbes expliquent, elles ne décident pas : le fond et les triangles
+    Les courbes expliquent, elles ne décident pas : le fond et les croix
     viennent du run lui-même. Un ordre est exécuté à l'ouverture qui suit le
-    croisement, donc un triangle tombe une séance après lui.
+    croisement, donc une croix tombe une séance après lui.
     """
     if len(averages) == 0:
         raise ValueError("there is nothing to draw: the averages hold no session")
@@ -285,11 +288,18 @@ def cross_figure(
     axes.plot(days, list(averages["close"]), color=PRICE_COLOUR, linewidth=0.9, label="close")
     axes.plot(days, list(averages["fast"]), color=FAST_COLOUR, linewidth=1.5, label=f"MA{fast}")
     axes.plot(days, list(averages["slow"]), color=SLOW_COLOUR, linewidth=1.5, label=f"MA{slow}")
-    for side, marker, colour in (("BUY", "^", HELD_COLOUR), ("SELL", "v", "#c53030")):
+    for side, colour in (("BUY", HELD_COLOUR), ("SELL", SELL_COLOUR)):
         traded = [day for day in fills.loc[fills["side"] == side, "session_date"] if day in days]
         prices = [float(averages.loc[day, "close"]) for day in traded]
         axes.scatter(
-            traded, prices, marker=marker, color=colour, s=70, zorder=3, label=side.lower()
+            traded,
+            prices,
+            marker="x",
+            color=colour,
+            s=90,
+            linewidths=2.2,
+            zorder=3,
+            label=side.lower(),
         )
     axes.set_title(title)
     axes.set_ylabel("adjusted close")

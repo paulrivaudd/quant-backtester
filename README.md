@@ -1062,7 +1062,7 @@ sessions invested          1495 of 1912, average cash 21.95%
 ![ETF_WORLD with its 50- and 200-session averages, the sessions invested and the trades](docs/figures/golden_cross_moving_averages.png)
 
 The close with its two averages; the shaded sessions are those the run was
-invested on, and each triangle is a buy or a sell, one session after the
+invested on, and each cross is a buy (green) or a sell (red), one session after the
 crossing that caused it. The figure is `moving_averages.png`, written by the
 script.
 
