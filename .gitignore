@@ -50,3 +50,6 @@ moving_average_band_output/
 
 # Figures written by scripts/run_moving_average_entry_exit_exercise.py
 moving_average_entry_exit_output/
+
+# Figures written by scripts/run_session_segments_study.py
+session_segments_output/

@@ -13,6 +13,17 @@
   old hash. A run repeated on the new commit has another `run_id` and the same
   numbers.
 
+### Study: the night against the session
+- `analytics/segments.py` splits a close-to-close return into its night
+  (previous close to open) and its day (open to close), adds them up and
+  compounds the books that hold one segment only, gross and net of costs.
+- `scripts/run_session_segments_study.py` runs it on `ETF_WORLD` (discovery)
+  and on `ETF_SP500_PEA` before 2019-04-01 (validation), and draws the price
+  above the profit and loss of the books. Hypothesis `session_segments` was
+  written in `research/hypotheses.toml` before the first run, and is refuted:
+  the night carries 92.5% of the log return on the discovery window and 47.2%
+  on the validation one, and a night-only book loses 89% net of costs.
+
 ### Figures: trades are crosses
 - The buys and sells of the moving-average figures are a green and a red
   cross instead of two filled triangles, which hid the price under them.

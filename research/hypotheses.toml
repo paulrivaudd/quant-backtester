@@ -69,3 +69,12 @@ statement = "Standing aside while the VIX is high cuts the drawdown of the rotat
 universe = "ROTATION_2"
 prediction = "Smaller maximum drawdown than momentum_rotation, at a similar net return."
 refutation = "A drawdown no smaller than momentum_rotation's, or a net return clearly lower."
+
+[[hypothesis]]
+hypothesis_id = "session_segments"
+status = "PREREGISTERED"
+written_on = 2026-10-03
+statement = "A Paris-listed fund of US-heavy equities earns its return between the Paris close and the next Paris open, when New York is still trading, and not during the Paris session."
+universe = "ETF_WORLD from 2019-04-01 to 2026-09-17, then ETF_SP500_PEA from 2014-03-18 to 2019-03-29, a period the first never saw."
+prediction = "The night segment carries more than two thirds of the log return of the fund, on both windows."
+refutation = "A night share at or below one half on either window. Separately, a night-only book that ends below buy and hold once each leg has paid its costs refutes the trade, whatever the share."
