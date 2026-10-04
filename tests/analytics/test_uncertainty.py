@@ -191,3 +191,17 @@ def test_a_book_that_does_not_vary_has_no_sharpe_and_is_not_compared() -> None:
 
     with pytest.raises(UndefinedStatistic, match="control's returns do not vary"):
         boot(curve(noise(100, 1)), flat, PairedStatistic.SHARPE)
+
+
+@pytest.mark.parametrize("rate", [0.001, 0.0, -0.001])
+def test_returns_constant_in_theory_are_refused_like_the_report_refuses_them(rate: float) -> None:
+    """Audit 13, C01: the bootstrap and the report draw the line at the same place.
+
+    Compounding a constant return leaves rounding noise between sessions. The
+    report prints no Sharpe ratio for it; a Sharpe difference of 1e14 is not
+    resampled either.
+    """
+    steady = curve([rate] * 100)
+
+    with pytest.raises(UndefinedStatistic, match="strategy's returns do not vary"):
+        boot(steady, curve(noise(100, 1)), PairedStatistic.SHARPE)

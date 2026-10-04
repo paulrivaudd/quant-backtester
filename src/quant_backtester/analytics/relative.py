@@ -46,18 +46,8 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
-from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.config import RETURN_STD_TOLERANCE, AnalyticsConfig
 from quant_backtester.analytics.curves import aligned_equity_curves, session_returns
-
-RETURN_STD_TOLERANCE: Final[float] = 1e-12
-"""Per-session standard deviation, as a fraction, at or below which a series is
-treated as constant.
-
-A beta over a benchmark whose returns vary by rounding error alone, or a ratio
-over a tracking error of that size, is a number made of noise; this is where
-the line is drawn, and it is recorded in :meth:`RelativePerformanceStats.definition`.
-Not ``numpy.isclose``'s default, which is a tolerance on values and not on a
-spread of daily returns."""
 
 R_SQUARED_ROUNDING: Final[float] = 1e-12
 """How far outside ``[0, 1]`` an R squared may fall to rounding and still be

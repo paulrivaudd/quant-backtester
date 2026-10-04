@@ -12,6 +12,24 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, fields
+from typing import Final
+
+RETURN_STD_TOLERANCE: Final[float] = 1e-12
+"""Per-session standard deviation, as a fraction, at or below which a series is
+treated as constant.
+
+A beta over a benchmark whose returns vary by rounding error alone, or a ratio
+over a tracking error of that size, is a number made of noise; this is where
+the line is drawn, and it is recorded in :meth:`RelativePerformanceStats.definition`.
+Not ``numpy.isclose``'s default, which is a tolerance on values and not on a
+spread of daily returns.
+
+One convention for every figure that divides by a spread - the Sharpe ratio of
+a report, the one a bootstrap resamples, a beta, an information ratio, the
+quality score. Dividing successive portfolio values leaves a dispersion of the
+order of 1e-15 on returns that are constant in theory; an exact comparison
+with zero does not see it, and the ratio comes out at 1e14 (audit 13, C01).
+"""
 
 
 @dataclass(frozen=True, slots=True)

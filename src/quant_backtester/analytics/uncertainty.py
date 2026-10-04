@@ -30,7 +30,7 @@ from itertools import pairwise
 import numpy as np
 import pandas as pd
 
-from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.config import RETURN_STD_TOLERANCE, AnalyticsConfig
 
 
 class PairedStatistic(Enum):
@@ -134,12 +134,14 @@ def _sharpe(returns: list[float], config: AnalyticsConfig, book: str) -> float:
     Raises
     ------
     UndefinedStatistic
-        If the excess returns do not vary: the ratio does not exist.
+        If the excess returns do not vary beyond
+        :data:`~quant_backtester.analytics.config.RETURN_STD_TOLERANCE`, on the
+        sample or on a resample of it: the ratio does not exist.
     """
     excess = [value - config.risk_free_per_session for value in returns]
     mean = math.fsum(excess) / len(excess)
     variance = math.fsum((value - mean) ** 2 for value in excess) / (len(excess) - 1)
-    if variance == 0.0:
+    if math.sqrt(variance) <= RETURN_STD_TOLERANCE:
         raise UndefinedStatistic(
             f"the {book}'s returns do not vary on this sample, so its Sharpe ratio does "
             "not exist; the comparison is refused rather than read as zero"

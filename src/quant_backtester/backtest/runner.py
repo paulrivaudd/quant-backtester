@@ -54,10 +54,10 @@ from quant_backtester.analytics.comparison import (
     Comparison,
     compare,
 )
-from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.config import RETURN_STD_TOLERANCE, AnalyticsConfig
 from quant_backtester.analytics.curves import Book, drawdown_curve, equity_curve
 from quant_backtester.analytics.plots import drawdown_figure, equity_figure
-from quant_backtester.analytics.relative import RETURN_STD_TOLERANCE, STATISTICS
+from quant_backtester.analytics.relative import STATISTICS
 from quant_backtester.analytics.report import PerformanceReport
 from quant_backtester.backtest.config import BacktestConfig
 from quant_backtester.backtest.engine import BacktestEngine, StrategyMutated

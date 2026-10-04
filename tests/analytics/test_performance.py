@@ -13,9 +13,11 @@ import statistics
 from collections.abc import Callable
 from datetime import date
 
+import numpy as np
+import pandas as pd
 import pytest
 
-from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.config import RETURN_STD_TOLERANCE, AnalyticsConfig
 from quant_backtester.analytics.curves import Book, equity_curve
 from quant_backtester.analytics.performance import PerformanceStats, max_drawdown
 from quant_backtester.backtest.engine import BacktestResult
@@ -194,3 +196,43 @@ def test_a_run_of_nothing_still_answers(run: RunBuilder) -> None:
     assert empty.annualised_return is None
     assert empty.annualised_volatility is None
     assert empty.drawdown.depth == 0.0
+
+
+def compounded(returns: np.ndarray) -> pd.Series:
+    """Return the curve of a sequence of session returns, as an engine would value it."""
+    days = [
+        date.fromordinal(date(2026, 1, 1).toordinal() + index) for index in range(len(returns) + 1)
+    ]
+    values = 100.0 * np.cumprod(np.r_[1.0, 1.0 + returns])
+    return pd.Series(values, index=pd.Index(days, dtype="object"), dtype="float64")
+
+
+@pytest.mark.parametrize("rate", [0.001, 0.0, -0.001])
+def test_returns_constant_in_theory_have_no_sharpe_ratio(rate: float) -> None:
+    """Audit 13, C01: rounding noise on a constant return is not a spread to divide by.
+
+    The curve is built by compounding, so its session returns differ from one
+    another in their last bits; the ratio used to come out at 1.7e14.
+    """
+    config = AnalyticsConfig(sessions_per_year=255, risk_free_rate=0.02)
+
+    figures = PerformanceStats.from_equity(compounded(np.full(100, rate)), config)
+
+    assert figures.sharpe_ratio is None
+    assert figures.annualised_volatility is not None
+    assert figures.annualised_volatility < RETURN_STD_TOLERANCE * math.sqrt(255)
+    assert figures.total_return == pytest.approx((1.0 + rate) ** 100 - 1.0)
+
+
+def test_the_tolerance_is_where_a_spread_starts_to_count() -> None:
+    config = AnalyticsConfig(sessions_per_year=252, risk_free_rate=0.0)
+    wobble = np.tile([1.0, -1.0], 50)
+
+    below = PerformanceStats.from_equity(compounded(0.001 + 1e-13 * wobble), config)
+    above = PerformanceStats.from_equity(compounded(0.001 + 1e-9 * wobble), config)
+
+    assert below.sharpe_ratio is None
+    assert above.sharpe_ratio is not None
+    assert above.sharpe_ratio == pytest.approx(
+        0.001 / (1e-9 * math.sqrt(100 / 99)) * math.sqrt(252), rel=1e-3
+    )

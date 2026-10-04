@@ -19,7 +19,7 @@ from datetime import date
 
 import pandas as pd
 
-from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.config import RETURN_STD_TOLERANCE, AnalyticsConfig
 from quant_backtester.analytics.curves import drawdown_curve, elapsed_years, session_returns
 
 
@@ -167,12 +167,17 @@ def _sharpe_ratio(returns: pd.Series, config: AnalyticsConfig) -> float | None:
     actually earned over the rate, and the denominator is the spread of those
     same numbers. Mixing a compounded return with a per-session spread is a
     common way of publishing a ratio the data does not support.
+
+    ``None`` when the excess returns do not vary beyond
+    :data:`~quant_backtester.analytics.config.RETURN_STD_TOLERANCE`: the ratio
+    does not exist then, and is neither zero nor the quotient of two rounding
+    errors.
     """
     if len(returns) < 2:
         return None
     excess = (returns - config.risk_free_per_session).to_numpy()
     spread = float(excess.std(ddof=1))
-    if spread == 0.0:
+    if spread <= RETURN_STD_TOLERANCE:
         return None
     return float(excess.mean()) / spread * math.sqrt(config.sessions_per_year)
 

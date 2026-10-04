@@ -28,7 +28,7 @@ from quant_backtester.analytics.comparison import (
     Comparison,
     compare,
 )
-from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.config import RETURN_STD_TOLERANCE, AnalyticsConfig
 from quant_backtester.analytics.contribution import InstrumentAttribution, InstrumentPnL
 from quant_backtester.analytics.curves import (
     Book,
@@ -46,7 +46,7 @@ from quant_backtester.analytics.quality import (
     QualityScore,
     quality_score,
 )
-from quant_backtester.analytics.relative import RETURN_STD_TOLERANCE, RelativePerformanceStats
+from quant_backtester.analytics.relative import RelativePerformanceStats
 from quant_backtester.analytics.report import PerformanceReport
 
 __all__ = [

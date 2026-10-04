@@ -43,10 +43,10 @@ import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis, norm, skew
 
-from quant_backtester.analytics.config import AnalyticsConfig
+from quant_backtester.analytics.config import RETURN_STD_TOLERANCE, AnalyticsConfig
 from quant_backtester.analytics.curves import aligned_equity_curves
 from quant_backtester.analytics.performance import max_drawdown
-from quant_backtester.analytics.relative import RETURN_STD_TOLERANCE, RelativePerformanceStats
+from quant_backtester.analytics.relative import RelativePerformanceStats
 from quant_backtester.numbers import require_finite, require_finite_non_negative
 from quant_backtester.signals.types import require_positive_int
 
