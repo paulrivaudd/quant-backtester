@@ -26,12 +26,15 @@ from __future__ import annotations
 from quant_backtester.signals.base import Signal, SignalResult
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.cross_asset.correlation import ReturnLevelCorrelationSignal
+from quant_backtester.signals.cross_asset.relative_residual import RelativeResidualSignal
 from quant_backtester.signals.cross_sectional.rank import CrossSectionalRank
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.level.change import LevelChangeSignal
+from quant_backtester.signals.level.vix_relief import VixReliefSignal
 from quant_backtester.signals.level.zscore import LevelZScoreSignal
 from quant_backtester.signals.price.mean_reversion import MeanReversionSignal
 from quant_backtester.signals.price.momentum import MomentumSignal
+from quant_backtester.signals.price.normalized_pullback import NormalizedPullbackSignal
 from quant_backtester.signals.price.returns import ReturnSignal
 from quant_backtester.signals.price.trend import (
     MovingAverageCrossSignal,
@@ -57,8 +60,10 @@ __all__ = [
     "MomentumSignal",
     "MovingAverageCrossSignal",
     "MovingAverageTrendSignal",
+    "NormalizedPullbackSignal",
     "PriceBasis",
     "RealizedVolatilitySignal",
+    "RelativeResidualSignal",
     "ReturnLevelCorrelationSignal",
     "ReturnSignal",
     "Signal",
@@ -69,6 +74,7 @@ __all__ = [
     "SignalSnapshot",
     "SignalStatus",
     "SignalUnit",
+    "VixReliefSignal",
     "WindowMode",
     "WindowSpec",
 ]

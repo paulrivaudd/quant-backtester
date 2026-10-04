@@ -15,6 +15,7 @@ instruments is done by standardising, not by dividing.
 from __future__ import annotations
 
 from quant_backtester.signals.level.change import LevelChangeSignal
+from quant_backtester.signals.level.vix_relief import VixReliefSignal
 from quant_backtester.signals.level.zscore import LevelZScoreSignal
 
-__all__ = ["LevelChangeSignal", "LevelZScoreSignal"]
+__all__ = ["LevelChangeSignal", "LevelZScoreSignal", "VixReliefSignal"]

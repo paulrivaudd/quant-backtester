@@ -18,6 +18,10 @@ dist/
 # Research output
 results/
 
+# Calibrated models: derived from committed code, a committed configuration and
+# the store, like every other result.
+artifacts/
+
 # The market data tree: metadata/ is committed configuration and MUST stay
 # tracked - it determines past results. Everything the pipeline writes is
 # derived from raw/ plus that configuration, and is never committed.

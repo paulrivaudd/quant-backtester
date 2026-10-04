@@ -20,7 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen
+      # The ml extra brings PyTorch (CPU): without it the model tests are skipped.
+      - run: uv sync --frozen --extra ml
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pyright

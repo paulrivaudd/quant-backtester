@@ -16,28 +16,46 @@ universes at one instant.
 
 from __future__ import annotations
 
+from quant_backtester.strategies.examples.buffered_dual_momentum import BufferedDualMomentum
 from quant_backtester.strategies.examples.buy_and_hold import BuyAndHold
 from quant_backtester.strategies.examples.equal_weight import EqualWeightRebalance
+from quant_backtester.strategies.examples.factor_etf_blend import FactorETFBlend
 from quant_backtester.strategies.examples.golden_cross_etf import GoldenCrossETF
 from quant_backtester.strategies.examples.momentum_rotation import MomentumRotation
 from quant_backtester.strategies.examples.momentum_single_asset import MomentumSingleAsset
 from quant_backtester.strategies.examples.momentum_vix import MomentumVix
+from quant_backtester.strategies.examples.monetary_carry import MonetaryCarry
 from quant_backtester.strategies.examples.moving_average_band import MovingAverageBandETF
 from quant_backtester.strategies.examples.moving_average_cross import MovingAverageCross
 from quant_backtester.strategies.examples.moving_average_entry_exit import (
     MovingAverageEntryExitETF,
 )
 from quant_backtester.strategies.examples.rate_regime_trend import RateRegimeTrend
+from quant_backtester.strategies.examples.realized_vol_control import RealizedVolControl
+from quant_backtester.strategies.examples.relative_residual_tilt import RelativeResidualTilt
+from quant_backtester.strategies.examples.smooth_moving_average import SmoothMovingAverage
+from quant_backtester.strategies.examples.trend_filtered_pullback import TrendFilteredPullback
+from quant_backtester.strategies.examples.vix_relief_entry import VixReliefEntry
+from quant_backtester.strategies.examples.world_ma20_benchmark import WorldMA20Benchmark
 
 __all__ = [
+    "BufferedDualMomentum",
     "BuyAndHold",
     "EqualWeightRebalance",
+    "FactorETFBlend",
     "GoldenCrossETF",
     "MomentumRotation",
     "MomentumSingleAsset",
     "MomentumVix",
+    "MonetaryCarry",
     "MovingAverageBandETF",
     "MovingAverageCross",
     "MovingAverageEntryExitETF",
     "RateRegimeTrend",
+    "RealizedVolControl",
+    "RelativeResidualTilt",
+    "SmoothMovingAverage",
+    "TrendFilteredPullback",
+    "VixReliefEntry",
+    "WorldMA20Benchmark",
 ]

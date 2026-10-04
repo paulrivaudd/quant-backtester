@@ -27,11 +27,14 @@ from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import numpy as np
 import pandas as pd
 import pytest
 
+from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.backtest.market import StrategyMarketView
+from quant_backtester.backtest.runner import StrategyRunner
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.instruments import (
     AssetType,
@@ -51,6 +54,10 @@ from quant_backtester.data.schemas import (
     BarField,
     CheckStatus,
 )
+from quant_backtester.demo import checked_bars_frame
+from quant_backtester.execution.costs import CostModel
+from quant_backtester.execution.model import ExecutionModel, Sizing
+from quant_backtester.ml.config import NeuralStrategyConfig
 from quant_backtester.portfolio.holdings import Holding
 from quant_backtester.portfolio.state import PortfolioState
 from quant_backtester.portfolio.view import PortfolioView
@@ -570,3 +577,201 @@ def evening() -> Callable[[date], datetime]:
 def prices() -> Callable[..., dict[date, float]]:
     """Return a builder of a price rising by a fixed step each session."""
     return rising
+
+
+# --- the market a fitted model is calibrated on --------------------------------------
+#
+# Ten sessions are enough for a moving average and not for a training set, so
+# the tests of ``quant_backtester.ml`` run on a longer market: two Paris funds
+# with an open apart from their close, drawn from a seed over every session of
+# 2026, and a published level for every weekday. The model itself is kept small
+# - six observations of history - so that every window can still be checked by
+# hand and a calibration takes a second.
+
+NEURAL_FUNDS = ("ETF_EU", "ETF_OTHER")
+"""The two funds a test model may buy."""
+
+NEURAL_LEVEL = "RATE_US"
+"""The published series a test model reads the level of."""
+
+NEURAL_TEST_PERIOD = (date(2026, 9, 1), date(2026, 10, 30))
+"""A period after the calibration of :func:`neural_config`: its final test."""
+
+Bars = dict[str, dict[date, tuple[float, float, float, float]]]
+Levels = dict[date, float]
+Mutation = Callable[[Bars, Levels], None]
+NeuralMarketBuilder = Callable[..., MarketDataReader]
+NeuralRunnerBuilder = Callable[..., StrategyRunner]
+
+
+def neural_prices(calendar: TradingCalendar, seed: int) -> tuple[Bars, Levels]:
+    """Return the drawn bars of the two funds and the level of every weekday of 2026.
+
+    A session's open is drawn around the previous close and its close around
+    its open, in session order, so a session's prices depend on the sessions
+    before it only.
+    """
+    rng = np.random.default_rng(seed)
+    sessions = [day.session_date for day in calendar.sessions(date(2026, 1, 5), date(2026, 12, 31))]
+    bars: Bars = {}
+    for name, start, drift in zip(NEURAL_FUNDS, (100.0, 40.0), (0.0006, -0.0002), strict=True):
+        close = start
+        bars[name] = {}
+        for session in sessions:
+            overnight, intraday = rng.standard_normal(2)
+            opening = close * float(np.exp(0.004 * overnight))
+            close = opening * float(np.exp(drift + 0.008 * intraday))
+            bars[name][session] = (
+                round(opening, 4),
+                round(max(opening, close), 4),
+                round(min(opening, close), 4),
+                round(close, 4),
+            )
+    levels: Levels = {}
+    day = date(2026, 1, 2)
+    while day <= date(2026, 12, 31):
+        if day.weekday() < 5:
+            levels[day] = round(18.0 + 6.0 * float(np.sin(len(levels) / 9.0)), 4)
+        day = date.fromordinal(day.toordinal() + 1)
+    return bars, levels
+
+
+@pytest.fixture
+def neural_config() -> NeuralStrategyConfig:
+    """Return a model small enough to check by hand and to calibrate in a second.
+
+    Six observations of history, averages over 2, 3 and 6 of them, volatilities
+    over 2 and 4 returns: the layout of the real model, 9 inputs a series
+    instead of 106. Trained from January to June 2026, selected on July and
+    August, which leaves September onwards for a test.
+    """
+    return NeuralStrategyConfig(
+        calibration_start=date(2026, 1, 12),
+        validation_start=date(2026, 7, 1),
+        calibration_end=date(2026, 8, 31),
+        feature_ids=(*NEURAL_FUNDS, NEURAL_LEVEL),
+        tradable_ids=NEURAL_FUNDS,
+        history_sessions=6,
+        ma_windows=(2, 3, 6),
+        vol_windows=(2, 4),
+        max_asset_weight=1.0,
+        min_asset_weight=0.01,
+        rebalance_band=0.03,
+        risk_aversion=5.0,
+        seed=42,
+        level_id=NEURAL_LEVEL,
+        encoder_width=3,
+        hidden_width=4,
+        max_epochs=6,
+        validation_every=2,
+        minimum_training_decisions=100,
+        minimum_validation_sessions=20,
+    )
+
+
+@pytest.fixture
+def make_neural_market(
+    tmp_path: Path,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+    make_levels: LevelsBuilder,
+    rng_seed: int,
+) -> NeuralMarketBuilder:
+    """Return a builder of a store of its own holding the drawn market.
+
+    ``mutate`` receives the drawn bars and levels and may edit them before
+    they are written: that is how a test changes what happens after a date,
+    removes an observation or introduces a split, on a second store, and
+    compares what two calibrations or two decisions made of it.
+    """
+
+    def build(
+        name: str = "neural",
+        *,
+        mutate: Mutation | None = None,
+        actions: pd.DataFrame | None = None,
+    ) -> MarketDataReader:
+        root = tmp_path / name
+        for subdir in ("metadata", "raw", "clean", "validation"):
+            (root / subdir).mkdir(parents=True)
+        bars, levels = neural_prices(xpar, rng_seed)
+        if mutate is not None:
+            mutate(bars, levels)
+        repository = MarketDataRepository(root)
+        for instrument_id, drawn in bars.items():
+            repository.save_checked_bars(
+                instrument_id, checked_bars_frame(instrument_id, xpar, drawn)
+            )
+        repository.save_levels(NEURAL_LEVEL, make_levels(NEURAL_LEVEL, levels))
+        if actions is not None:
+            repository.save_corporate_actions(actions)
+        return MarketDataReader(
+            repository=repository,
+            instruments=instruments,
+            calendars=calendars,
+            reference_calendar_id="XPAR",
+        )
+
+    return build
+
+
+@pytest.fixture
+def neural_market(make_neural_market: NeuralMarketBuilder) -> MarketDataReader:
+    """Return the drawn market, as written."""
+    return make_neural_market()
+
+
+@pytest.fixture
+def make_neural_runner(calendars: CalendarRegistry) -> NeuralRunnerBuilder:
+    """Return a builder of the runner a model is validated and tested with."""
+
+    def build(reader: MarketDataReader, *, cost_scale: float = 1.0) -> StrategyRunner:
+        return StrategyRunner(
+            reader=reader,
+            calendars=calendars,
+            reference_calendar_id="XPAR",
+            base_currency="EUR",
+            analytics=AnalyticsConfig(sessions_per_year=252, risk_free_rate=0.0),
+            execution=ExecutionModel(
+                costs=CostModel(
+                    commission_rate=0.0005 * cost_scale,
+                    minimum_commission=1.0 * cost_scale,
+                    half_spread_rate=0.0003 * cost_scale,
+                    slippage_rate=0.0002 * cost_scale,
+                ),
+                sizing=Sizing.AT_DECISION,
+            ),
+            initial_cash=100_000.0,
+        )
+
+    return build
+
+
+@pytest.fixture
+def neural_artifact(neural_config: NeuralStrategyConfig):
+    """Return an untrained model of :func:`neural_config`, with a fitted-looking scaler.
+
+    The parameters are those of a seeded initialisation: enough to test what
+    is read, proposed, decided and stored, none of which depends on a model
+    being any good. Its information stops at the end of the validation period.
+    """
+    torch = pytest.importorskip("torch")
+    from quant_backtester.ml.artifacts import NeuralArtifact
+    from quant_backtester.ml.features import FeatureScaler
+    from quant_backtester.ml.network import NeuralAllocator
+
+    torch.manual_seed(7)
+    state = {
+        name: values.numpy().copy()
+        for name, values in NeuralAllocator(neural_config).state_dict().items()
+    }
+    size = neural_config.input_size
+    scaler = FeatureScaler(np.full(size, 0.01), np.full(size, 0.05), neural_config.clip)
+    return NeuralArtifact(
+        config=neural_config,
+        state=state,
+        scaler=scaler,
+        information_cutoff=paris(neural_config.calibration_end, 23, 0),
+        selected_epoch=0,
+    )

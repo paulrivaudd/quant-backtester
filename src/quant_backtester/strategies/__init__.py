@@ -21,37 +21,62 @@ it reads, so ``runner.run(strategy, universe, start, end)`` is the whole of
 what a user has to write. A rule that needed its signals wired in from outside
 would look identical in an import list and fail at the first decision, which is
 why there is no such thing here any more.
+
+The strategies that are kept have a code and a label in ``catalogue``:
+``SA1 - std MA20``, ``ML1 - neural allocation``. The ML family lives in
+``strategies.ml`` and is not imported here: it needs PyTorch, an optional
+dependency, and is reached through the catalogue or its own module.
 """
 
 from __future__ import annotations
 
+from quant_backtester.strategies.adaptive.etf_ensemble import ETFEnsemble
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
+    BufferedDualMomentum,
     BuyAndHold,
     EqualWeightRebalance,
+    FactorETFBlend,
     GoldenCrossETF,
     MomentumRotation,
     MomentumSingleAsset,
     MomentumVix,
+    MonetaryCarry,
     MovingAverageBandETF,
     MovingAverageCross,
     MovingAverageEntryExitETF,
     RateRegimeTrend,
+    RealizedVolControl,
+    RelativeResidualTilt,
+    SmoothMovingAverage,
+    TrendFilteredPullback,
+    VixReliefEntry,
+    WorldMA20Benchmark,
 )
 from quant_backtester.strategies.functional import FunctionalStrategy, strategy
 
 __all__ = [
+    "BufferedDualMomentum",
     "BuyAndHold",
+    "ETFEnsemble",
     "EqualWeightRebalance",
+    "FactorETFBlend",
     "FunctionalStrategy",
     "GoldenCrossETF",
     "MomentumRotation",
     "MomentumSingleAsset",
     "MomentumVix",
+    "MonetaryCarry",
     "MovingAverageBandETF",
     "MovingAverageCross",
     "MovingAverageEntryExitETF",
     "RateRegimeTrend",
+    "RealizedVolControl",
+    "RelativeResidualTilt",
+    "SmoothMovingAverage",
     "Strategy",
+    "TrendFilteredPullback",
+    "VixReliefEntry",
+    "WorldMA20Benchmark",
     "strategy",
 ]

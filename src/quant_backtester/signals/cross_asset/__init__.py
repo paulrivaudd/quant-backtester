@@ -8,5 +8,6 @@ engine's reference calendar rather than on each venue's own.
 from __future__ import annotations
 
 from quant_backtester.signals.cross_asset.correlation import ReturnLevelCorrelationSignal
+from quant_backtester.signals.cross_asset.relative_residual import RelativeResidualSignal
 
-__all__ = ["ReturnLevelCorrelationSignal"]
+__all__ = ["RelativeResidualSignal", "ReturnLevelCorrelationSignal"]

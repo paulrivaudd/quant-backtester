@@ -427,6 +427,18 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
     declares what it reads, and this is what says so.
     """
     import quant_backtester.strategies as package
+    from quant_backtester.strategies import (
+        BufferedDualMomentum,
+        ETFEnsemble,
+        FactorETFBlend,
+        MonetaryCarry,
+        RealizedVolControl,
+        RelativeResidualTilt,
+        SmoothMovingAverage,
+        TrendFilteredPullback,
+        VixReliefEntry,
+        WorldMA20Benchmark,
+    )
     from quant_backtester.strategies.base import Strategy as Contract
 
     runnable = {
@@ -450,6 +462,22 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
             stress_minimum=1.5,
             regime_max_age_sessions=1,
             stress_max_age_sessions=1,
+        ),
+        WorldMA20Benchmark(instrument_id="ETF_EU"),
+        BufferedDualMomentum(first_id="ETF_EU", second_id="ETF_OTHER"),
+        SmoothMovingAverage(instrument_id="ETF_EU"),
+        TrendFilteredPullback(instrument_id="ETF_EU"),
+        RelativeResidualTilt(first_id="ETF_EU", second_id="ETF_OTHER"),
+        RealizedVolControl(instrument_id="ETF_EU"),
+        FactorETFBlend(instrument_ids=("ETF_EU", "ETF_OTHER", "ETF_LATE")),
+        MonetaryCarry(instrument_id="ETF_LATE"),
+        VixReliefEntry(instrument_id="ETF_OTHER", vix_id="RATE_US"),
+        ETFEnsemble(
+            enable_factors=False,
+            enable_monetary=False,
+            world_id="ETF_EU",
+            sp500_id="ETF_OTHER",
+            vix_id="RATE_US",
         ),
     }
     exported = {

@@ -17,6 +17,12 @@ dependencies = [
     "yfinance>=1.7.0",
 ]
 
+[project.optional-dependencies]
+# The neural strategies (ML family). Everything else runs without it.
+ml = [
+    "torch>=2.14.1",
+]
+
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]
 build-backend = "uv_build"
@@ -28,6 +34,17 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.7",
 ]
+
+# PyTorch from its CPU index: the reference environment of the ML strategies is
+# the CPU, and the default wheel would pull gigabytes of GPU libraries nothing
+# here uses.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.ruff]
 line-length = 100

@@ -79,12 +79,22 @@ Trois règles supplémentaires sont vérifiées par les mêmes tests :
 | `portfolio/` | Ce qu'un livre a le droit de détenir, et ce qu'il détient | `targets` (`TargetAllocation`), `allocation` (`PortfolioModel`, `ConstrainedTarget`), `constraints`, `limits` (`PortfolioLimits`), `holdings`, `state` (`PortfolioState`), `view` |
 | `execution/` | Ce que le marché fait d'un ordre | `model` (`ExecutionModel`, `Sizing`), `costs` (`CostModel`), `rounding` (lots), `orders`, `fills` (`Fill`, `ExecutionReject`) |
 | `backtest/` | Le temps | `config` (`BacktestConfig`), `engine`, `timetable`, `schedule`, `context` (`StrategyContext`), `market`, `records` (`BacktestRecord`), `result` (`BacktestResult`), `runner` (`StrategyRunner`, `StrategyResult`) |
-| `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots` |
-| `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `examples/` |
+| `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (score 0-100 % contre le marché, règles versionnées `QUALITY_V1`) |
+| `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1`, `ML1`…), `examples/`, `adaptive/`, `ml/` |
+| `ml/` | Les modèles ajustés (hors couches, voir ci-dessous) | `config` (`NeuralStrategyConfig`), `features` (`NeuralFeatureBuilder`, `FeatureScaler`), `network` (`NeuralAllocator`), `artifacts` (`NeuralArtifact`), `dataset` (`ForwardOpenReturnBuilder`, purge), `training` (`calibrate_neural_strategy`) |
 | `research/` | La discipline de recherche | `hypotheses`, `registry`, `archive`, `paper`, `journal` |
 
 `provenance.py` (état git du code qui a produit un résultat) et `numbers.py`
 (gardes sur les paramètres numériques) sont transverses.
+
+`ml/` n'est pas une couche. `config`, `features`, `network` et `artifacts` ne
+lisent rien au-dessus de `signals/` : ce sont eux qu'importent le signal
+(`signals/ml/`) et la stratégie (`strategies/ml/`) d'un modèle. `dataset` et
+`training` tournent hors ligne, **avant** tout backtest : ils composent le
+lecteur, le runner et la stratégie, comme `backtest/runner.py`, et aucune
+couche ne les importe. PyTorch est une dépendance optionnelle
+(`uv sync --extra ml`) que seuls ces trois dossiers importent ; les tests de
+`tests/test_package_structure.py` vérifient les trois règles.
 
 ## 3. Une séance, trois instants
 
@@ -279,6 +289,42 @@ git trace une modification de son corps.
 
 Les scripts de référence passent `top_n=1` sur l'univers à deux fonds. Avec la
 valeur par défaut `top_n=2`, la rotation détiendrait les deux.
+
+### Le catalogue (`strategies/catalogue.py`)
+
+Une stratégie conservée reçoit un **code** (famille + numéro) et un **libellé**
+court. Les trois écritures d'un nom en découlent et ne s'écrivent nulle part à
+la main :
+
+| Usage | Forme | Exemple |
+|---|---|---|
+| tableau, figure, légende | `display_name` | `SA3 - smooth MA` |
+| `strategy_id` d'un résultat | `strategy_id` | `SA3_smooth_ma` |
+| nom de fichier | `slug` | `sa3_smooth_ma` |
+
+Familles : `SA` (règles statistiques sur prix et séries publiées) et `ML`
+(poids proposés par un modèle ajusté). Un code est attribué une fois, dans
+l'ordre d'adoption, et n'est jamais réutilisé ; le libellé peut être reformulé.
+`SA1` à `SA10` sont les dix règles ETF du 2026-10-03 (numérotées 0 à 9 dans
+leur spécification : `SA1` est le benchmark MA20, `SA10` l'ensemble), `ML1`
+l'allocation neuronale. Les exemples et exercices antérieurs ne sont pas
+catalogués. `entry("SA3")`, `entry_of(strategy)` et `family(Family.SA)`
+donnent une entrée ; `entry.load()` importe la classe à la demande.
+
+### ML1, l'allocation neuronale (`strategies/ml/neural_allocation.py`)
+
+Un petit réseau (encodeur partagé `Linear(100, 8)`, couche cachée de 16,
+softmax sur les fonds achetables et le cash) propose chaque soir des poids. Il
+est entraîné **avant** le backtest (`scripts/run_neural_strategy.py`), puis
+figé dans un artefact identifié par son contenu (`model_id`). La décision
+plafonne, retire les poids sous 1 %, puis compare au livre réellement détenu :
+`hold_positions` dans la bande de 3 points (cash compris), `weights` sinon,
+`cash` si une entrée manque. Trois garde-fous propres à un modèle ajusté :
+l'entrée est construite par le même `NeuralFeatureBuilder` à l'entraînement et
+en décision ; les rendements futurs ouverture→ouverture ne sont lus que par
+`ForwardOpenReturnBuilder`, sur un lecteur figé à la fin de l'apprentissage ;
+l'artefact porte sa date limite d'information et une décision prise avant est
+refusée (`InformationCutoffError`).
 
 ## 8. Portefeuille et exécution
 

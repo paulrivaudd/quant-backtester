@@ -19,6 +19,7 @@ over a spread of zero - is ``None`` rather than a number nobody could defend.
 from __future__ import annotations
 
 from quant_backtester.analytics.attribution import CostAttribution, RunQuality
+from quant_backtester.analytics.benchmark_comparison import BenchmarkAlpha, alpha_vs_benchmark
 from quant_backtester.analytics.comparison import (
     BenchmarkBasis,
     BenchmarkCurrencyMismatch,
@@ -39,12 +40,20 @@ from quant_backtester.analytics.curves import (
 )
 from quant_backtester.analytics.performance import Drawdown, PerformanceStats, max_drawdown
 from quant_backtester.analytics.plots import drawdown_figure, equity_figure
+from quant_backtester.analytics.quality import (
+    QUALITY_V1,
+    QualityRules,
+    QualityScore,
+    quality_score,
+)
 from quant_backtester.analytics.relative import RETURN_STD_TOLERANCE, RelativePerformanceStats
 from quant_backtester.analytics.report import PerformanceReport
 
 __all__ = [
+    "QUALITY_V1",
     "RETURN_STD_TOLERANCE",
     "AnalyticsConfig",
+    "BenchmarkAlpha",
     "BenchmarkBasis",
     "BenchmarkCurrencyMismatch",
     "BenchmarkCurve",
@@ -57,9 +66,12 @@ __all__ = [
     "InstrumentPnL",
     "PerformanceReport",
     "PerformanceStats",
+    "QualityRules",
+    "QualityScore",
     "RelativePerformanceStats",
     "RunQuality",
     "aligned_equity_curves",
+    "alpha_vs_benchmark",
     "compare",
     "drawdown_curve",
     "drawdown_figure",
@@ -67,5 +79,6 @@ __all__ = [
     "equity_curve",
     "equity_figure",
     "max_drawdown",
+    "quality_score",
     "session_returns",
 ]

@@ -221,3 +221,69 @@ def test_nothing_below_the_research_layer_imports_it(path: Path):
     )
 
     assert not reaching_up, f"{path.name} imports {', '.join(reaching_up)}"
+
+
+ML = PACKAGE / "ml"
+"""Source of the fitted-model package, which is not one layer."""
+
+ML_INFERENCE = ("config.py", "features.py", "network.py", "artifacts.py")
+"""What a model's signal and strategy import: nothing above the signals."""
+
+TORCH_MODULES = (ML, SIGNALS / "ml", STRATEGIES / "ml")
+"""The only places PyTorch, an optional dependency, may be imported from."""
+
+
+@pytest.mark.parametrize("name", ML_INFERENCE)
+def test_what_a_model_needs_to_decide_reads_nothing_above_the_signals(name: str):
+    """The signal of a model imports these, so they must not reach the layers above it.
+
+    The training does - it runs the engine to validate a candidate - and lives
+    in ``ml.dataset`` and ``ml.training``, which nothing below the scripts
+    imports.
+    """
+    above = sorted(
+        module
+        for module in imported_modules(ML / name)
+        if (layer := _layer_of(module)) is not None and LAYER_RANK[layer] > LAYER_RANK["signals"]
+    )
+
+    assert not above, f"ml/{name} imports {', '.join(above)}"
+
+
+def test_no_layer_imports_the_training_of_a_model():
+    """A model is trained before a run, by a script: no decision can start a training."""
+    offline = ("quant_backtester.ml.training", "quant_backtester.ml.dataset")
+    for layer in LAYERS:
+        for path in (PACKAGE / layer).rglob("*.py"):
+            reaching = sorted(name for name in imported_modules(path) if name in offline)
+            assert not reaching, f"{path.relative_to(PACKAGE)} imports {', '.join(reaching)}"
+
+
+def test_pytorch_is_imported_by_the_model_code_only():
+    """Every other strategy keeps running without the ``ml`` extra installed."""
+    for path in PACKAGE.rglob("*.py"):
+        if any(root in path.parents for root in TORCH_MODULES):
+            continue
+        direct = {name.split(".")[0] for name in imported_modules(path)}
+        assert "torch" not in direct, f"{path.relative_to(PACKAGE)} imports torch"
+        reaching = sorted(
+            name
+            for name in imported_modules(path)
+            if name.startswith(
+                (
+                    "quant_backtester.ml.network",
+                    "quant_backtester.ml.artifacts",
+                    "quant_backtester.ml.training",
+                    "quant_backtester.signals.ml.",
+                    "quant_backtester.strategies.ml.",
+                )
+            )
+        )
+        assert not reaching, f"{path.relative_to(PACKAGE)} imports {', '.join(reaching)}"
+
+
+def test_the_model_code_downloads_nothing():
+    """A calibration reads the store and nothing else."""
+    network = {"urllib", "urllib.request", "requests", "httpx", "yfinance"}
+    for path in ML.rglob("*.py"):
+        assert not imported_modules(path) & network, f"{path.name} imports a network library"
