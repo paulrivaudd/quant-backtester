@@ -87,3 +87,12 @@ statement = "A 200-session trend rule is right to sell a fall, except a panic th
 universe = "ETF_WORLD from 2019-04-01 to 2026-09-17 (first run, no parameter fitted), then the S&P 500 index held on paper in USD from 1991-01-02 to 2018-12-31. Parameters fixed before any run: trend 200 sessions, correlation 60 pairs, VIX z-score over 60 observations above 1.5."
 prediction = "On the validation window, a net Sharpe ratio above buy and hold's with a smaller maximum drawdown, and a net return above the plain 200-session trend rule's."
 refutation = "On the validation window, a net Sharpe ratio at or below buy and hold's, or a net return at or below the plain 200-session trend rule's: the regime then adds nothing to the trend."
+
+[[hypothesis]]
+hypothesis_id = "ml1_neural_allocation"
+status = "PREREGISTERED"
+written_on = 2026-10-04
+statement = "A small network reading 100 sessions of ETF_WORLD, ETF_SP500_PEA and the VIX, trained on 2019-2023 and selected on 2024, allocates between the two funds and cash better than holding the world fund."
+universe = "ETF_WORLD and ETF_SP500_PEA, final test from 2025-01-02 to 2026-09-30, run once on the artifact of seed 42 at x1 costs. Written after the calibration and its 2024 validation were seen (selected epoch 20, about a third in each fund and a third in cash) and before any test run. The test sessions are not untouched: both funds' history to 2026-09 was looked at in earlier exercises."
+prediction = "On the test, a net Sharpe ratio above that of ETF_WORLD bought and held with the same costs, and a quality score (QUALITY_V1, one trial) of at least 50%."
+refutation = "A net Sharpe ratio at or below buy and hold's, or a quality score under 50%. Seeds 43 and 44 and x2 costs are reported beside it and never replace seed 42."
