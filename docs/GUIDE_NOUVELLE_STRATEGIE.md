@@ -199,11 +199,13 @@ class MovingAverageCross(Strategy):
         return (self.signal(),)  # MovingAverageCrossSignal, ADJUSTED
 
     def decide(self, ctx):
-        if ctx.signal_status(self.signal_id, self.instrument_id) is not SignalStatus.OK:
-            return ctx.cash()
+        status = ctx.signal_status(self.signal_id, self.instrument_id)
+        among = ctx.considering({self.instrument_id: status})
+        if status is not SignalStatus.OK:
+            return ctx.cash(among=among)
         if ctx.signal_value(self.signal_id, self.instrument_id) <= 0.0:
-            return ctx.cash()
-        return ctx.weights({self.instrument_id: 1.0})
+            return ctx.cash(among=among)
+        return ctx.weights({self.instrument_id: 1.0}, among=among)
 ```
 
 Les règles de la décision :
@@ -212,6 +214,11 @@ Les règles de la décision :
   sort du marché ; `ctx.hold_positions()` garde les positions sans passer
   d'ordre. Ce sont deux stratégies différentes : écrivez le choix dans la
   docstring.
+- **Enregistrez ce que la décision a lu.** `ctx.considering({fonds: statut})`
+  construit la sélection à passer en `among` : un signal valide compte un
+  instrument considéré, quelle que soit la réponse ; un signal inutilisable
+  n'en compte aucun et garde son statut. Sans cela, « la règle a dit non » et
+  « la règle n'avait rien à lire » donnent le même enregistrement.
 - **Aucun état mutable.** Ce qui dépend du passé vient du contexte
   (`ctx.portfolio`), jamais d'un attribut ou d'une closure qu'on incrémente.
 - **Aucun import de `quant_backtester.data`**, aucune date « du jour », aucune
@@ -267,10 +274,10 @@ Lancez-le avec `uv run python mon_essai.py`, store local rempli
   existe.
 - **Coûts** : `dataclasses.replace(runs, execution=...)` pour un autre
   `ExecutionModel` (voir `scripts/sensitivity.py` pour les coûts ×2).
-- **Lire le rapport** : pour cette stratégie mono-actif, « sessions with
-  nothing to choose from » compte les séances passées en cash via
-  `ctx.cash()` sans sélection. Ce n'est pas un défaut de données. Regardez
-  plutôt les statuts et les rejets.
+- **Lire le rapport** : « sessions with nothing to choose from » compte les
+  décisions où aucun signal n'était lisible. Une séance passée en cash sur un
+  signal valide n'y figure pas, à condition que la stratégie passe `among`
+  comme ci-dessus.
 
 ## 5. Juger une variante honnêtement
 

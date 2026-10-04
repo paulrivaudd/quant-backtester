@@ -504,7 +504,7 @@ orders, fills, rejects                43, 43, 14
 assumptions
   fills: OPEN_AUCTION_NOTIONAL - sized and filled at the next opening price
   gross: the same fills with no cost taken out - not a separate cost-free run
-  cash: earns nothing; the risk-free rate is used by the Sharpe ratio only
+  cash: earns nothing; the risk-free rate enters the Sharpe ratio and the regression alpha and beta, nothing else
   limits: cap target weights, before costs
   a decision lives: one execution; a refused order is not retried
   history read: ASSUMED_UNREVISED ETF_SP500_PEA, ETF_WORLD

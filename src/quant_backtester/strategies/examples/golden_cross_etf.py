@@ -1,20 +1,17 @@
 """Exercice « Moving-Average Crossover » : une stratégie mono-ETF MM50 / MM200.
 
-Squelette de l'exercice ``exercice_moving_average_crossover.pdf`` (étape 3).
-Les corps lèvent ``NotImplementedError`` : à vous de les écrire, dans l'ordre
-2.1 (le signal), 3.1 (le contrat), 3.2 (la décision), puis 3.3 (l'export dans
-``strategies/examples/__init__.py`` et ``strategies/__init__.py``).
+Solution de l'exercice ``exercice_moving_average_crossover.pdf`` (étape 3),
+écrite dans l'ordre de l'énoncé : 2.1 (le signal), 3.1 (le contrat), 3.2 (la
+décision), puis 3.3 (l'export dans ``strategies/examples/__init__.py`` et
+``strategies/__init__.py``). Les numéros de question restent dans les
+docstrings pour qu'on retrouve l'énoncé.
 
-À l'étape 3.3, un test existant vous attend : une stratégie exportée par le
-paquet doit aussi figurer dans la liste ``runnable`` de
+La stratégie figure dans la liste ``runnable`` de
 ``tests/strategies/test_examples.py::test_every_strategy_this_package_exports_can_be_run_as_it_stands``,
-qui vérifie qu'elle déclare tout ce qu'elle lit. Lisez ce test pour choisir des
-longueurs que son marché de dix séances peut servir.
+qui vérifie qu'elle déclare tout ce qu'elle lit.
 
-Les tests sont dans ``tests/strategies/test_golden_cross_etf.py``. Ils sont
-sautés (``pytest.skip("Exercice MA …")``) : retirez le ``skip`` d'un test quand
-la partie qu'il vérifie est écrite, puis lancez
-``uv run pytest tests/strategies/test_golden_cross_etf.py``.
+Les tests sont dans ``tests/strategies/test_golden_cross_etf.py`` et sont tous
+actifs : ``uv run pytest tests/strategies/test_golden_cross_etf.py``.
 
 Rappel du cahier des charges (§1.2 et §1.3) :
 

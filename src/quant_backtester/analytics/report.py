@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Final
 
 import pandas as pd
 
@@ -321,6 +323,22 @@ class PerformanceReport:
         return "\n".join(lines)
 
 
+FILL_DESCRIPTIONS: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "OPEN_AUCTION_NOTIONAL": "sized and filled at the next opening price",
+        "DECISION_CLOSE_QUANTITIES": (
+            "quantities fixed at the decision's close, filled at the next opening price"
+        ),
+    }
+)
+"""What each recorded fill model means, as a report states it.
+
+Keyed by the name the execution model records, so that the sentence follows
+the run's own sizing: with quantities fixed at the decision, an order is not
+sized at the price it is filled at (audit 13, C05).
+"""
+
+
 def _assumptions(result: BacktestResult) -> tuple[str, ...]:
     """Return the simulation's assumptions as a report states them.
 
@@ -350,9 +368,11 @@ def _assumptions(result: BacktestResult) -> tuple[str, ...]:
         f"{basis} {', '.join(sorted(names))}" for basis, names in sorted(by_basis.items())
     )
     return (
-        f"fills: {fill_model or 'not recorded'} - sized and filled at the next opening price",
+        f"fills: {fill_model or 'not recorded'} - "
+        f"{FILL_DESCRIPTIONS.get(str(fill_model), 'sizing not recorded')}",
         "gross: the same fills with no cost taken out - not a separate cost-free run",
-        "cash: earns nothing; the risk-free rate is used by the Sharpe ratio only",
+        "cash: earns nothing; the risk-free rate enters the Sharpe ratio and the "
+        "regression alpha and beta, nothing else",
         f"limits: cap {applies_to or 'not recorded'}",
         f"a decision lives: {lifetime or 'not recorded'}; a refused order is not retried",
         f"history read: {history or 'not recorded'}",

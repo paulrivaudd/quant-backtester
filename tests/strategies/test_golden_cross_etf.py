@@ -1,7 +1,7 @@
 """Exercice « Moving-Average Crossover » : les tests de GoldenCrossETF et du runner.
 
-Chaque test commence par ``pytest.skip("Exercice MA …")``. Retirez cette ligne
-quand la partie vérifiée est écrite, puis :
+L'exercice est résolu et tous les tests sont actifs ; leurs noms gardent le
+numéro de la question qu'ils vérifient :
 
     uv run pytest tests/strategies/test_golden_cross_etf.py
 

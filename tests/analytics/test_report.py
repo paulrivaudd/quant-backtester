@@ -7,6 +7,7 @@ up here rather than in a notebook six months later.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ from datetime import date, time
 import pytest
 
 from quant_backtester.analytics.config import AnalyticsConfig
-from quant_backtester.analytics.report import PerformanceReport
+from quant_backtester.analytics.report import FILL_DESCRIPTIONS, PerformanceReport
 from quant_backtester.backtest.config import BacktestConfig
 from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.backtest.engine import BacktestEngine
@@ -25,7 +26,7 @@ from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.execution.costs import CostModel
-from quant_backtester.execution.model import ExecutionModel
+from quant_backtester.execution.model import FILL_MODELS, ExecutionModel
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.price.returns import ReturnSignal
 from quant_backtester.signals.types import PriceBasis
@@ -243,3 +244,32 @@ def test_the_attribution_of_a_real_run_adds_up_to_the_run(
     # What the run paid, seen from the other side: the costs of one book and
     # the costs charged to its instruments are the same money.
     assert report.instruments.total_cost == pytest.approx(report.costs.total)
+
+
+@pytest.mark.parametrize(
+    ("fill_model", "sentence"),
+    [
+        ("OPEN_AUCTION_NOTIONAL", "sized and filled at the next opening price"),
+        (
+            "DECISION_CLOSE_QUANTITIES",
+            "quantities fixed at the decision's close, filled at the next opening price",
+        ),
+        ("SOMETHING_ELSE", "sizing not recorded"),
+    ],
+)
+def test_the_fill_assumption_follows_the_sizing_the_run_recorded(
+    run: RunBuilder, fill_model: str, sentence: str
+) -> None:
+    """Audit 13, C05: an order sized at the decision is not sized at its fill price."""
+    result = dataclasses.replace(
+        run([100.0, 101.0, 102.0]), configuration={"execution": {"fill_model": fill_model}}
+    )
+
+    assumptions = report_of(result).assumptions
+
+    assert assumptions[0] == f"fills: {fill_model} - {sentence}"
+    assert "regression alpha and beta" in assumptions[2]
+
+
+def test_every_recorded_fill_model_has_its_sentence() -> None:
+    assert set(FILL_DESCRIPTIONS) == set(FILL_MODELS.values())

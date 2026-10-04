@@ -286,6 +286,17 @@ git trace une modification de son corps.
 | `MomentumSingleAsset(instrument_id, lookback_sessions=60, minimum=0.0)` | investi si le momentum ajusté est strictement supérieur à `minimum` | cash |
 | `MomentumVix(gauge_id, …, maximum, flat_when_unknown)` | rotation tant que le z-score de la jauge est ≤ `maximum`. Un z-score de 1,5 veut dire 1,5 écart-type au-dessus de sa moyenne récente, pas un VIX à 1,5 | cash si `flat_when_unknown`, sinon rotation (paramètre obligatoire) |
 | `MovingAverageCross(instrument_id, first_sessions=50, second_sessions=20)` | investi si `MA_first / MA_second − 1 > 0`. Avec 50/20, la règle **achète la baisse** ; le « golden cross » s'écrit 20/50 | cash |
+| `GoldenCrossETF(instrument_id, fast_sessions=50, slow_sessions=200)` | 100 % du fonds si `MA_fast / MA_slow − 1 > 0` strictement, cash sinon ; la moyenne rapide doit être plus courte que la lente | cash |
+| `MovingAverageBandETF(instrument_id, window_sessions=50, sell_below=1.0, buy_above=1.0)` | achète quand la clôture passe au-dessus de `buy_above` × sa moyenne et que le fonds n'est pas détenu, vend sous `sell_below` × la moyenne, ne fait rien entre les deux | positions conservées, aucun ordre |
+| `MovingAverageEntryExitETF(instrument_id, entry_sessions=50, exit_sessions=100)` | achète au-dessus de la moyenne d'entrée, vend sous la moyenne de sortie | positions conservées, aucun ordre |
+| `RateRegimeTrend(instrument_id, …)` | détient le fonds au-dessus de sa moyenne longue ; au-dessous, vend sauf si une panique (z-score du VIX) tombe pendant que les actions et le taux à dix ans évoluent ensemble (corrélation positive) | positions conservées si la tendance est illisible ; régime illisible = pas d'exception à la vente |
+
+Une règle sur un seul fonds enregistre ce qu'elle a lu avec
+`ctx.considering({fonds: statut})`, passé en `among` à `cash`, `weights` ou
+`hold_positions` : un jour en cash sur un signal valide compte un instrument
+considéré, un jour sans signal lisible n'en compte aucun et porte le statut.
+C'est ce qui permet au rapport de ne compter en « sessions with nothing to
+choose from » que les secondes.
 
 Les scripts de référence passent `top_n=1` sur l'univers à deux fonds. Avec la
 valeur par défaut `top_n=2`, la rotation détiendrait les deux.
