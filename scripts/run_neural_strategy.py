@@ -235,54 +235,61 @@ def neural_decisions(result: StrategyResult, strategy: NeuralAllocationStrategy)
         reason, and the series that made an input unusable. The proposal is
         computed again by the strategy's own signal on a reader fixed at the
         recorded decision instant; the action is the recorded one.
+
+    Raises
+    ------
+    StoreChanged
+        If the store no longer holds what the run read: a proposal computed on
+        revised prices is not the one the run decided on.
     """
     config = strategy.config
     signal = strategy.signal()
     rows: list[dict[str, object]] = []
-    for record in result.records():
-        if record.decision is None or record.decision_time is None:
-            continue
-        context = SignalContext(
-            market=result.reader.at(record.decision_time),
-            instruments=result.reader.instruments,
-            calendars=result.reader.calendars,
-        )
-        frame = signal.compute(context, config.tradable_ids).frame
-        usable = all(status is SignalStatus.OK for status in frame["status"])
-        proposed = (
-            {name: float(frame.loc[name, "value"]) for name in config.tradable_ids}
-            if usable
-            else None
-        )
-        held = {name: weight for name, weight in record.actual_weights.items() if weight > 0.0}
-        explained = neural_decision(
-            proposed,
-            held,
-            max_asset_weight=config.max_asset_weight,
-            min_asset_weight=config.min_asset_weight,
-            rebalance_band=config.rebalance_band,
-        )
-        requested = record.decision.requested
-        if requested.hold_positions:
-            action = Action.HOLD
-        elif not requested.weights:
-            action = Action.CASH
-        else:
-            action = Action.WEIGHTS
-        row: dict[str, object] = {
-            "session_date": record.session_date,
-            "model_id": strategy.model_id,
-        }
-        for name in config.tradable_ids:
-            row[f"proposed_{name}"] = None if proposed is None else proposed[name]
-            row[f"target_{name}"] = explained.target.get(name, 0.0)
-            row[f"held_{name}"] = held.get(name, 0.0)
-        row["proposed_cash"] = float(frame["cash_weight"].iloc[0])
-        row["held_cash"] = 1.0 - sum(held.values())
-        row["action"] = action.value
-        row["reason"] = explained.reason
-        row["faulty_series"] = str(frame["faulty_series"].iloc[0])
-        rows.append(row)
+    with result.reading() as store:
+        for record in result.records():
+            if record.decision is None or record.decision_time is None:
+                continue
+            context = SignalContext(
+                market=store.at(record.decision_time),
+                instruments=result.reader.instruments,
+                calendars=result.reader.calendars,
+            )
+            frame = signal.compute(context, config.tradable_ids).frame
+            usable = all(status is SignalStatus.OK for status in frame["status"])
+            proposed = (
+                {name: float(frame.loc[name, "value"]) for name in config.tradable_ids}
+                if usable
+                else None
+            )
+            held = {name: weight for name, weight in record.actual_weights.items() if weight > 0.0}
+            explained = neural_decision(
+                proposed,
+                held,
+                max_asset_weight=config.max_asset_weight,
+                min_asset_weight=config.min_asset_weight,
+                rebalance_band=config.rebalance_band,
+            )
+            requested = record.decision.requested
+            if requested.hold_positions:
+                action = Action.HOLD
+            elif not requested.weights:
+                action = Action.CASH
+            else:
+                action = Action.WEIGHTS
+            row: dict[str, object] = {
+                "session_date": record.session_date,
+                "model_id": strategy.model_id,
+            }
+            for name in config.tradable_ids:
+                row[f"proposed_{name}"] = None if proposed is None else proposed[name]
+                row[f"target_{name}"] = explained.target.get(name, 0.0)
+                row[f"held_{name}"] = held.get(name, 0.0)
+            row["proposed_cash"] = float(frame["cash_weight"].iloc[0])
+            row["held_cash"] = 1.0 - sum(held.values())
+            row["action"] = action.value
+            row["reason"] = explained.reason
+            row["faulty_series"] = str(frame["faulty_series"].iloc[0])
+            rows.append(row)
     return pd.DataFrame(rows)
 
 

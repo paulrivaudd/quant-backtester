@@ -26,9 +26,10 @@ import pandas as pd
 import pytest
 
 from quant_backtester.backtest.context import StrategyContext
-from quant_backtester.backtest.runner import StrategyResult, StrategyRunner
+from quant_backtester.backtest.runner import StoreChanged, StrategyResult, StrategyRunner
 from quant_backtester.data.calendars import TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.schemas import BarField
 from quant_backtester.demo import demo_runner
 from quant_backtester.portfolio.targets import TargetAllocation
@@ -414,3 +415,48 @@ def test_a_label_that_is_not_a_date_is_refused() -> None:
     assert script.session_date(date(2026, 1, 5)) == date(2026, 1, 5)
     with pytest.raises(TypeError, match="session date"):
         script.session_date("2026-01-05")
+
+
+def test_a_run_that_never_held_the_fund_still_saves_its_figures(
+    demo: StrategyRunner, tmp_path: Path
+) -> None:
+    """Audit 13, C02: a run that stayed in cash has no weight column, and is still drawn.
+
+    The average is longer than the whole history, so the signal is never
+    computable, no order is sent, and the weights table has no instrument.
+    """
+    strategy = dataclasses.replace(DEMO_STRATEGY, fast_sessions=600, slow_sessions=700)
+    result = demo.run(strategy, ("FUND_A",), *DEMO_PERIOD)
+    assert len(result.fills()) == 0
+    assert "FUND_A" not in result.weights().columns
+
+    load_script().save_figures(result, tmp_path / "cash", strategy)
+
+    assert sorted(path.name for path in (tmp_path / "cash").iterdir()) == [
+        "drawdown.png",
+        "equity.png",
+        "moving_averages.png",
+    ]
+
+
+def test_figures_are_refused_whole_once_the_store_is_no_longer_the_runs(tmp_path: Path) -> None:
+    """Audit 13, C03: averages are not redrawn on prices the run never read.
+
+    A close of the run's period is revised after the run. The decisions and
+    the P&L are those of the first prices; a figure rebuilt from the store now
+    would show averages that no longer explain them, so nothing is written.
+    """
+    runner = demo_runner(tmp_path / "store", seed=DEMO_SEED)
+    result = runner.run(DEMO_STRATEGY, ("FUND_A",), *DEMO_PERIOD)
+    script = load_script()
+    script.save_figures(result, tmp_path / "before", DEMO_STRATEGY)
+
+    repository = MarketDataRepository(tmp_path / "store")
+    bars = repository.load_checked_bars("FUND_A")
+    bars.loc[bars.index[-30], ["open", "high", "low", "close"]] = 10.0
+    repository.save_checked_bars("FUND_A", bars)
+
+    with pytest.raises(StoreChanged, match="no longer holds"):
+        script.save_figures(result, tmp_path / "after", DEMO_STRATEGY)
+    assert not (tmp_path / "after").exists()
+    assert len(list((tmp_path / "before").iterdir())) == 3

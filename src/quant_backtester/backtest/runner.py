@@ -37,7 +37,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
@@ -391,6 +392,30 @@ class StrategyResult:
         """Return what fraction of the book each instrument actually was, per session."""
         return self.backtest.weights()
 
+    def weight_of(self, instrument_id: str) -> pd.Series:  # type: ignore[type-arg]
+        """Return the fraction of the book one instrument was, session by session.
+
+        Parameters
+        ----------
+        instrument_id : str
+            The instrument, held at some point or never.
+
+        Returns
+        -------
+        pd.Series
+            Indexed by session. Zero on every session for an instrument the
+            run never held: :meth:`weights` has a column per instrument ever
+            held, so a run that stayed in cash has none, and a figure of it
+            still has to be drawn (audit 13, C02).
+        """
+        weights = self.weights()
+        held = (
+            [float(weight) for weight in weights[instrument_id]]
+            if instrument_id in weights.columns
+            else [0.0] * len(weights)
+        )
+        return pd.Series(held, index=weights.index, name=instrument_id, dtype="float64")
+
     def target_weights(self) -> pd.DataFrame:
         """Return the target standing after each session, as the portfolio accepted it."""
         return self.backtest.target_weights()
@@ -454,6 +479,35 @@ class StrategyResult:
         wanted = self._benchmark(benchmark)
         if self.benchmark_curve is not None and wanted == self.benchmark_spec:
             return self.benchmark_curve
+        with self.reading() as store:
+            return value_benchmark(self.backtest, store, wanted, base_currency=self.base_currency)
+
+    @contextmanager
+    def reading(self) -> Iterator[MarketDataReader]:
+        """Hold the store for a read made after the run, if it is still the run's store.
+
+        Yields
+        ------
+        MarketDataReader
+            The reader the run used, while the store is held against writers.
+            Fix it at an instant of the run with ``at`` as the engine did.
+
+        Raises
+        ------
+        StoreChanged
+            If the store no longer holds exactly what the run read. Checked
+            before anything is yielded, so a caller that reads first and
+            writes afterwards leaves no half-updated output behind.
+
+        Notes
+        -----
+        A run's records never change, and anything rebuilt from the store
+        afterwards - a benchmark, the averages drawn under the trades, the
+        proposals of a model exported beside its decisions - is only the same
+        experiment while the prices are the ones the run read. A figure drawn
+        on a revised close explains trades the revised close would not have
+        made (audit A05; audit 13, C03).
+        """
         with self.reader.pinned() as now:
             if now.digest != self.data_state.digest:
                 changed = sorted(
@@ -463,12 +517,10 @@ class StrategyResult:
                 )
                 raise StoreChanged(
                     f"the store no longer holds what this run read ({len(changed)} file(s) "
-                    f"differ, e.g. {changed[0]}); a benchmark valued now would describe "
+                    f"differ, e.g. {changed[0]}); what is read from it now would describe "
                     "another experiment. Run it again."
                 )
-            return value_benchmark(
-                self.backtest, self.reader, wanted, base_currency=self.base_currency
-            )
+            yield self.reader
 
     def compare(
         self, benchmark: BenchmarkSpec | str | None = None, book: Book = Book.NET

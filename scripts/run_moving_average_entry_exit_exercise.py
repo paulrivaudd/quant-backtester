@@ -70,17 +70,20 @@ def save_figures(
     split; otherwise a distribution paid since moves the level of every
     earlier price, not its position against its own averages when it was read.
     """
+    # Read before anything is written, and only from the store the run read:
+    # averages drawn on a revised close would explain trades it never made.
+    with result.reading() as store:
+        market = store.at(result.records()[-1].valuation_time)
+        closes = market.adjusted_history(strategy.instrument_id, end=result.end)
     directory.mkdir(parents=True, exist_ok=True)
     result.plot().savefig(directory / "equity.png", dpi=FIGURE_DPI)
     result.plot_drawdown().savefig(directory / "drawdown.png", dpi=FIGURE_DPI)
 
-    reader = result.reader.at(result.records()[-1].valuation_time)
-    closes = reader.adjusted_history(strategy.instrument_id, end=result.end)
     calendar = result.reader.calendars.get(result.reader.reference_calendar_id)
     first = session_date(closes.index[0])
     sessions = [session.session_date for session in calendar.sessions(first, result.end)]
     averages = moving_averages(closes, sessions, strategy.entry_sessions, strategy.exit_sessions)
-    weights = result.weights()[strategy.instrument_id]
+    weights = result.weight_of(strategy.instrument_id)
     figure = cross_figure(
         averages.loc[result.start :],
         held={session_date(day) for day, weight in weights.items() if weight > 0},

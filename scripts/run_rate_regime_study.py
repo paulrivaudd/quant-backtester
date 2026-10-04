@@ -391,10 +391,11 @@ def save_figure(window: Window, results: Mapping[str, StrategyResult], directory
     close of the run, not as each decision saw them.
     """
     regime = results[REGIME]
-    reader = regime.reader.at(regime.records()[-1].valuation_time)
-    closes = reader.adjusted_history(window.instrument_id, end=regime.end)
+    with regime.reading() as store:
+        market = store.at(regime.records()[-1].valuation_time)
+        closes = market.adjusted_history(window.instrument_id, end=regime.end)
     average = trailing_average(closes, TREND_SESSIONS)
-    weights = regime.weights()[window.instrument_id]
+    weights = regime.weight_of(window.instrument_id)
     figure = study_figure(
         closes.loc[regime.start :],
         average.loc[regime.start :],

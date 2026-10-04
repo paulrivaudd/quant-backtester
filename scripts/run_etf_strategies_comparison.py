@@ -652,19 +652,23 @@ def orders_figure(
 
 def closes_of(result: StrategyResult) -> dict[str, pd.Series]:  # type: ignore[type-arg]
     """Return the raw closes of the tradable funds over a run, as the run could read them."""
-    reader = result.reader.at(result.records()[-1].valuation_time)
     closes: dict[str, pd.Series] = {}  # type: ignore[type-arg]
-    for instrument_id in UNIVERSE:
-        series = reader.history(instrument_id, BarField.CLOSE)
-        inside = [
-            isinstance(day, date) and result.start <= day <= result.end for day in series.index
-        ]
-        closes[instrument_id] = series.loc[inside]
+    with result.reading() as store:
+        reader = store.at(result.records()[-1].valuation_time)
+        for instrument_id in UNIVERSE:
+            series = reader.history(instrument_id, BarField.CLOSE)
+            inside = [
+                isinstance(day, date) and result.start <= day <= result.end for day in series.index
+            ]
+            closes[instrument_id] = series.loc[inside]
     return closes
 
 
 def save_orders(output: Path, results: Mapping[str, StrategyResult]) -> list[Path]:
     """Write every fill of every book, and one figure of orders per book."""
+    # Every close is read before the first file is written: a store that
+    # changed since the runs stops the export whole.
+    closes = {name: closes_of(result) for name, result in results.items()}
     output.mkdir(parents=True, exist_ok=True)
     frames = [result.fills().assign(book=name) for name, result in results.items()]
     written = [output / "fills.csv"]
@@ -672,7 +676,7 @@ def save_orders(output: Path, results: Mapping[str, StrategyResult]) -> list[Pat
     held = results[HELD].equity()
     for name, result in results.items():
         figure = orders_figure(
-            name, closes_of(result), result.fills(), result.weights(), result.equity(), held
+            name, closes[name], result.fills(), result.weights(), result.equity(), held
         )
         path = output / f"orders_{slug(name)}.png"
         figure.savefig(path, dpi=FIGURE_DPI, facecolor=SURFACE)

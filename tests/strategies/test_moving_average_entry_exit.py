@@ -409,3 +409,25 @@ def test_main_runs_the_declared_strategy_prints_it_and_saves_its_figures(
     assert f"run_id       {demo_result.run_id}" in printed
     assert f"== fills: {len(demo_result.fills())} rows ==" in printed
     assert (output / "moving_averages.png").is_file()
+
+
+def test_a_run_that_never_held_the_fund_still_saves_its_figures(
+    demo: StrategyRunner, tmp_path: Path
+) -> None:
+    """Audit 13, C02: a run that stayed in cash has no weight column, and is still drawn.
+
+    The average is longer than the whole history, so the signal is never
+    computable, no order is sent, and the weights table has no instrument.
+    """
+    strategy = dataclasses.replace(DEMO_STRATEGY, entry_sessions=600, exit_sessions=700)
+    result = demo.run(strategy, ("FUND_A",), *DEMO_PERIOD)
+    assert len(result.fills()) == 0
+    assert "FUND_A" not in result.weights().columns
+
+    load_script().save_figures(result, tmp_path / "cash", strategy)
+
+    assert sorted(path.name for path in (tmp_path / "cash").iterdir()) == [
+        "drawdown.png",
+        "equity.png",
+        "moving_averages.png",
+    ]

@@ -9,7 +9,7 @@ than remembered by whoever ran it.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date, time
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 
 import pandas as pd
@@ -24,6 +24,7 @@ from quant_backtester.backtest.timetable import BacktestTimetable
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.repository import MarketDataRepository, StoreBusy
+from quant_backtester.data.schemas import ActionType
 from quant_backtester.data.universes import Membership, StaticUniverse, Universe
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
@@ -1085,3 +1086,57 @@ def test_an_exploratory_report_reuses_the_kept_benchmark_and_guards_any_other(
     assert again.net_comparison.relative == result.analytics.net_comparison.relative
     with pytest.raises(StoreChanged, match="no longer holds"):
         result.report(benchmark="ETF_EU")
+
+
+def test_a_read_after_the_run_is_allowed_only_on_the_store_the_run_read(
+    runner: StrategyRunner,
+    repository: MarketDataRepository,
+    make_bars: Callable[..., pd.DataFrame],
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+    sessions: tuple[date, ...],
+) -> None:
+    """Audit 13, C03: the check a benchmark gets, for anything rebuilt from the store."""
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], sessions[0], sessions[-1])
+
+    with result.reading() as store:
+        closes = store.at(result.records()[-1].valuation_time).adjusted_history("ETF_EU")
+    assert store is result.reader
+    assert float(closes.iloc[-1]) == 109.0
+
+    revised = prices(100.0, 1.0)
+    revised[sessions[-2]] = 10.0
+    repository.save_checked_bars("ETF_EU", make_bars("ETF_EU", xpar, revised))
+
+    with pytest.raises(StoreChanged, match="no longer holds"), result.reading():
+        raise AssertionError("a changed store must not be handed over")
+
+
+def test_a_corporate_action_added_after_the_run_closes_the_store_to_it_too(
+    runner: StrategyRunner,
+    repository: MarketDataRepository,
+    make_actions: Callable[..., pd.DataFrame],
+    sessions: tuple[date, ...],
+) -> None:
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], sessions[0], sessions[-1])
+    known = datetime(2026, 9, 1, 6, 0, tzinfo=UTC)
+    repository.save_corporate_actions(
+        make_actions([("ETF_OTHER", ActionType.SPLIT, sessions[3], 2.0, known)])
+    )
+
+    with pytest.raises(StoreChanged), result.reading():
+        raise AssertionError("an adjusted history would now be another series")
+
+
+def test_the_weight_of_a_fund_never_held_is_zero_on_every_session(
+    runner: StrategyRunner, sessions: tuple[date, ...]
+) -> None:
+    """Audit 13, C02: the weights table has a column per fund ever held, and no other."""
+    result = runner.run(BuyAndHold(instruments=("ETF_EU",)), ["ETF_EU"], sessions[0], sessions[-1])
+
+    never = result.weight_of("ETF_OTHER")
+
+    assert "ETF_OTHER" not in result.weights().columns
+    assert list(never.index) == list(result.weights().index)
+    assert set(never) == {0.0}
+    pd.testing.assert_series_equal(result.weight_of("ETF_EU"), result.weights()["ETF_EU"])
