@@ -362,6 +362,37 @@ class StrategyContext:
                 skipped[str(name)] = status
         return skipped
 
+    def considering(self, readings: Mapping[str, SignalStatus]) -> Selection:
+        """Return the record of what a decision on fixed instruments was taken among.
+
+        Parameters
+        ----------
+        readings : Mapping[str, SignalStatus]
+            For each instrument the rule looks at, the status of the signal it
+            is read through: ``OK`` when the rule had a number to decide on.
+
+        Returns
+        -------
+        Selection
+            No name chosen yet, ``considered`` counting the instruments whose
+            signal was usable, and the status of each of the others. Passed as
+            ``among`` to :meth:`cash`, :meth:`weights` or
+            :meth:`hold_positions`.
+
+        Notes
+        -----
+        For a rule that does not rank: one fund against its own average, a
+        fixed pair. Without it, a rule that reads a valid signal and answers
+        cash records ``considered = 0``, exactly as a rule that could read
+        nothing, and a report counts both as sessions with nothing to choose
+        from (audit 13, C04). Standing aside on a number and having no number
+        are two days, and only this tells them apart afterwards.
+        """
+        skipped = {
+            name: status for name, status in readings.items() if status is not SignalStatus.OK
+        }
+        return Selection(names=(), considered=len(readings) - len(skipped), skipped=skipped)
+
     # -- expressing a decision --------------------------------------------
 
     def weights(

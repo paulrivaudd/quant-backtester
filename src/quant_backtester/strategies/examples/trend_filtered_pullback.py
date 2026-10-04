@@ -113,4 +113,4 @@ class TrendFilteredPullback(RuleStrategy):
             entry_z=self.entry_z,
             z_range=self.z_range,
         )
-        return Evaluation(target, reader.unusable)
+        return Evaluation(target, reader.unusable, reader.readable)

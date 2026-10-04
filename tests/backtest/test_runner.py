@@ -30,7 +30,11 @@ from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.provenance import SourceState, SourceStatus
-from quant_backtester.strategies.examples import BuyAndHold, MomentumSingleAsset
+from quant_backtester.strategies.examples import (
+    BuyAndHold,
+    MomentumSingleAsset,
+    MovingAverageCross,
+)
 from quant_backtester.strategies.functional import FunctionalStrategy
 
 PARIS = BacktestTimetable(
@@ -1140,3 +1144,21 @@ def test_the_weight_of_a_fund_never_held_is_zero_on_every_session(
     assert list(never.index) == list(result.weights().index)
     assert set(never) == {0.0}
     pd.testing.assert_series_equal(result.weight_of("ETF_EU"), result.weights()["ETF_EU"])
+
+
+def test_a_rule_that_says_no_on_valid_signals_had_something_to_choose_from(
+    runner: StrategyRunner, sessions: tuple[date, ...]
+) -> None:
+    """Audit 13, C04: a book in cash by decision is not a book with nothing to read.
+
+    On a rising fund the 3-session average is below the 2-session one at every
+    decision, so this rule stands aside all along - on a signal that was there.
+    """
+    strategy = MovingAverageCross(instrument_id="ETF_EU", first_sessions=3, second_sessions=2)
+
+    result = runner.run(strategy, ["ETF_EU"], sessions[3], sessions[-1])
+
+    quality = result.report().quality
+    assert len(result.fills()) == 0
+    assert quality.sessions_with_nothing_to_choose == 0
+    assert all(record.considered == 1 for record in result.records() if record.decided)

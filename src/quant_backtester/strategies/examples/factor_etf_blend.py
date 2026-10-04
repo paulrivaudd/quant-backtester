@@ -108,4 +108,4 @@ class FactorETFBlend(RuleStrategy):
             maximum_weight=self.maximum_weight,
             equal_share=self.equal_share,
         )
-        return Evaluation(target, reader.unusable)
+        return Evaluation(target, reader.unusable, reader.readable)

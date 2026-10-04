@@ -24,10 +24,13 @@ class Evaluation:
         The complete target, before the rebalancing band.
     unusable : Mapping[str, SignalStatus]
         Why each instrument whose signal had no value had none.
+    readable : int
+        How many instruments the book may hold had every signal usable.
     """
 
     target: RuleTarget
     unusable: Mapping[str, SignalStatus] = field(default_factory=lambda: MappingProxyType({}))
+    readable: int = 0
 
 
 def settle(
@@ -38,6 +41,7 @@ def settle(
     caps: Mapping[str, float] | None = None,
     force: bool = False,
     unusable: Mapping[str, SignalStatus] | None = None,
+    readable: int = 0,
 ) -> TargetAllocation:
     """Return the decision a complete target stands for, given the book.
 
@@ -58,6 +62,11 @@ def settle(
         Send the target whatever the band says.
     unusable : Mapping[str, SignalStatus] | None
         Why inputs were missing, recorded on the decision.
+    readable : int
+        How many instruments the book may hold were read through usable
+        signals. Recorded as what the decision was taken among, so that an
+        empty target on valid signals is not counted as a session with
+        nothing to choose from.
 
     Returns
     -------
@@ -74,20 +83,20 @@ def settle(
     wanted = {name: weight for name, weight in target.items() if weight > 0.0}
     held = dict(ctx.portfolio.weights)
     if not wanted:
-        return ctx.cash(among=_among((), unusable))
+        return ctx.cash(among=_among((), unusable, readable))
     exits = any(name not in wanted for name in held)
     breached = any(held.get(name, 0.0) > cap for name, cap in (caps or {}).items())
     gap = max(abs(wanted.get(name, 0.0) - held.get(name, 0.0)) for name in {*wanted, *held})
     if force or exits or breached or gap >= band:
-        return ctx.weights(wanted, among=_among(tuple(wanted), unusable))
-    return ctx.hold_positions(among=_among(tuple(held), unusable))
+        return ctx.weights(wanted, among=_among(tuple(wanted), unusable, readable))
+    return ctx.hold_positions(among=_among(tuple(held), unusable, readable))
 
 
-def _among(names: tuple[str, ...], unusable: Mapping[str, SignalStatus] | None) -> Selection | None:
-    """Return the record of what could not be read, or ``None`` when all could."""
-    if not unusable:
-        return None
-    return Selection(names=(), considered=len(names), skipped=dict(unusable))
+def _among(
+    names: tuple[str, ...], unusable: Mapping[str, SignalStatus] | None, readable: int
+) -> Selection:
+    """Return what a decision was taken among: the readable count, and what was not."""
+    return Selection(names=(), considered=max(readable, len(names)), skipped=dict(unusable or {}))
 
 
 class RuleStrategy(Strategy):
@@ -124,4 +133,5 @@ class RuleStrategy(Strategy):
             band=self.rebalance_band,
             caps=self.caps(),
             unusable=evaluation.unusable,
+            readable=evaluation.readable,
         )

@@ -281,19 +281,24 @@ class NeuralAllocationStrategy(Strategy):
             min_asset_weight=self.config.min_asset_weight,
             rebalance_band=self.config.rebalance_band,
         )
+        among = self._among(ctx)
         if decision.action is Action.CASH:
-            return ctx.cash(among=self._unusable(ctx) if proposed is None else None)
+            return ctx.cash(among=among)
         if decision.action is Action.HOLD:
-            return ctx.hold_positions()
-        return ctx.weights(dict(decision.target))
+            return ctx.hold_positions(among=among)
+        return ctx.weights(dict(decision.target), among=among)
 
-    def _unusable(self, ctx: StrategyContext) -> Selection:
-        """Return the record of why no fund had a proposal."""
+    def _among(self, ctx: StrategyContext) -> Selection:
+        """Return what the decision was taken among: the funds that had a proposal.
+
+        Every fund when the input was usable, none - with the status that
+        explains it - when it was not: cash chosen on a proposal and cash for
+        want of one are recorded as two different days.
+        """
         frame = ctx.signal(self._signal.signal_id)
-        skipped = {
-            str(name): status for name, status in zip(frame.index, frame["status"], strict=True)
-        }
-        return Selection(names=(), considered=0, skipped=skipped)
+        return ctx.considering(
+            {str(name): status for name, status in zip(frame.index, frame["status"], strict=True)}
+        )
 
 
 def require_after_cutoff(strategy: NeuralAllocationStrategy, first_decision: datetime) -> None:

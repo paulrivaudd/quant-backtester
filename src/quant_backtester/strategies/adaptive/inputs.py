@@ -165,11 +165,16 @@ class SignalReader:
     A rule takes ``None`` for an input that has no value; the status that
     explains it is kept here, by instrument, so that a target left empty can
     say why. An instrument refused for several signals keeps the first reason.
+
+    The instruments that *were* read are kept too: a rule that read its fund
+    and answered cash did not lack anything to choose from, and the record of
+    the decision has to be able to say so (audit 13, C04).
     """
 
     def __init__(self, ctx: StrategyContext) -> None:
         self._ctx = ctx
         self._unusable: dict[str, SignalStatus] = {}
+        self._read: set[str] = set()
 
     def value(self, signal: Signal, instrument_id: str) -> float | None:
         """Return one signal's value for one instrument, ``None`` when it has none."""
@@ -177,9 +182,19 @@ class SignalReader:
         if status is not SignalStatus.OK:
             self._unusable.setdefault(instrument_id, status)
             return None
+        self._read.add(instrument_id)
         return self._ctx.signal_value_or_none(signal.signal_id, instrument_id)
 
     @property
     def unusable(self) -> Mapping[str, SignalStatus]:
         """Return why each instrument that could not be read could not."""
         return dict(self._unusable)
+
+    @property
+    def readable(self) -> int:
+        """Return how many instruments the book may hold had every signal read usable.
+
+        A gauge that is read and never held is not counted: it is not
+        something the decision chooses among.
+        """
+        return len((self._read - set(self._unusable)) & set(self._ctx.universe))

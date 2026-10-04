@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Audit 13 (strategies and performance), C01 to C04
+- **C01.** Returns that are constant in theory have no Sharpe ratio: the
+  report gives `None` and the bootstrap raises `UndefinedStatistic`, under
+  `RETURN_STD_TOLERANCE`, now in `analytics/config.py` and shared by every
+  figure that divides by a spread. It used to print 1.7e14.
+- **C03.** `StrategyResult.reading()` hands the store to a read made after a
+  run only while its digest is the run's, and raises `StoreChanged` otherwise.
+  `benchmark()`, the figures of the exercise and study scripts, the ETF
+  comparison and the export of ML1's decisions go through it, before writing.
+- **C02.** `StrategyResult.weight_of()` is zero for a fund never held; the
+  figures of a run that stayed in cash are written instead of failing.
+- **C04. Records change, results do not.** A decision now records what it was
+  taken among: `considered` counts the instruments whose signal was usable,
+  whatever the rule answered, through `ctx.considering()` in the one-fund
+  examples and the readable count of `SignalReader` in the SA rules; ML1 does
+  the same. Orders, fills and P&L are identical. The field `considered` of a
+  stored record is not: it was 0 on every day a rule answered cash, and is now
+  0 only when no signal could be read, so "sessions with nothing to choose
+  from" falls for every rule that stands aside by decision. A records file
+  written before this change differs from one written after it on that field
+  alone.
+
 ### History rewritten on 2026-10-02
 - The 21 commits of 2026-09-20 that carried a `Co-Authored-By: Claude` line
   were rewritten without it, and the 89 commits after them with them: 110

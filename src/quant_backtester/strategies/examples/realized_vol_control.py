@@ -97,4 +97,4 @@ class RealizedVolControl(RuleStrategy):
             target_volatility=self.target_volatility,
             floor=self.volatility_floor,
         )
-        return Evaluation(target, reader.unusable)
+        return Evaluation(target, reader.unusable, reader.readable)

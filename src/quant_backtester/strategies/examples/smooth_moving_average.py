@@ -80,4 +80,4 @@ class SmoothMovingAverage(RuleStrategy):
         target = smooth_trend_rule(
             self.instrument_id, cross, full_exposure_gap=self.full_exposure_gap
         )
-        return Evaluation(target, reader.unusable)
+        return Evaluation(target, reader.unusable, reader.readable)

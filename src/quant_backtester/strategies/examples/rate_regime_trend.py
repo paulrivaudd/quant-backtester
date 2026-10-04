@@ -167,14 +167,16 @@ class RateRegimeTrend(Strategy):
             fund is already held and stays so, or when the trend cannot be read.
         """
         trend_id = self.trend_signal().signal_id
-        if ctx.signal_status(trend_id, self.instrument_id) is not SignalStatus.OK:
-            return ctx.hold_positions()
+        status = ctx.signal_status(trend_id, self.instrument_id)
+        among = ctx.considering({self.instrument_id: status})
+        if status is not SignalStatus.OK:
+            return ctx.hold_positions(among=among)
         rising = ctx.signal_value(trend_id, self.instrument_id) > 0.0
         if not rising and not self._hedged_panic(ctx):
-            return ctx.cash()
+            return ctx.cash(among=among)
         if ctx.portfolio.holds(self.instrument_id):
-            return ctx.hold_positions()
-        return ctx.weights({self.instrument_id: 1.0})
+            return ctx.hold_positions(among=among)
+        return ctx.weights({self.instrument_id: 1.0}, among=among)
 
     def _hedged_panic(self, ctx: StrategyContext) -> bool:
         """Return whether shares move with yields and the volatility index is in a panic."""

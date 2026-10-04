@@ -111,4 +111,4 @@ class VixReliefEntry(RuleStrategy):
             reader.value(self.recovery_signal(), self.instrument_id),
             weight=self.weight,
         )
-        return Evaluation(target, reader.unusable)
+        return Evaluation(target, reader.unusable, reader.readable)

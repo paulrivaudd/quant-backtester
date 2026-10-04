@@ -83,10 +83,10 @@ def written_decision(
     ) -> StrategyContext:
         requests = []
         for item in strategy.required_signals():
-            assert isinstance(item, SignalRequest)
-            names = item.names()
+            # A bare signal is computed over the trading universe, as the engine does.
+            names = item.names() if isinstance(item, SignalRequest) else tuple(universe)
             assert names is not None
-            signal_id = item.signal.signal_id
+            signal_id = (item.signal if isinstance(item, SignalRequest) else item).signal_id
             requests.append(
                 SignalRequest(
                     WrittenSignal(signal_id, {name: values[signal_id, name] for name in names}),

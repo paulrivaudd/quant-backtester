@@ -57,6 +57,8 @@ class EnsemblePlan:
         The final target, the money-market fund included.
     unusable : Mapping[str, SignalStatus]
         Why each instrument whose signal had no value had none.
+    readable : int
+        How many instruments the book may hold had every signal usable.
     """
 
     rules: Mapping[str, RuleTarget]
@@ -66,6 +68,7 @@ class EnsemblePlan:
     scale: float
     weights: Mapping[str, float]
     unusable: Mapping[str, SignalStatus]
+    readable: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,6 +359,7 @@ class ETFEnsemble(Strategy):
             scale=scale,
             weights=MappingProxyType({name: w for name, w in weights.items() if w > 0.0}),
             unusable=MappingProxyType(unusable),
+            readable=reader.readable,
         )
 
     def decide(self, ctx: StrategyContext) -> TargetAllocation:
@@ -390,4 +394,5 @@ class ETFEnsemble(Strategy):
             caps=dict.fromkeys(self.equity_ids(), self.equity_cap),
             force=held_risk > self.target_volatility + RISK_ROUNDING,
             unusable=plan.unusable,
+            readable=plan.readable,
         )

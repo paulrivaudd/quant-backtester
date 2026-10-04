@@ -109,4 +109,4 @@ class RelativeResidualTilt(RuleStrategy):
             neutral_weight=self.neutral_weight,
             tilt=self.tilt,
         )
-        return Evaluation(target, reader.unusable)
+        return Evaluation(target, reader.unusable, reader.readable)

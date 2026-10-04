@@ -119,4 +119,4 @@ class MonetaryCarry(RuleStrategy):
             round_trip_cost=self.round_trip_cost,
             maximum_volatility=self.maximum_volatility,
         )
-        return Evaluation(target, reader.unusable)
+        return Evaluation(target, reader.unusable, reader.readable)

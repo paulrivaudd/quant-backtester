@@ -122,4 +122,4 @@ class BufferedDualMomentum(RuleStrategy):
             tilt=self.tilt,
             single_weight=self.single_weight,
         )
-        return Evaluation(target, reader.unusable)
+        return Evaluation(target, reader.unusable, reader.readable)

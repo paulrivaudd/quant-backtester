@@ -85,8 +85,10 @@ class MomentumSingleAsset(Strategy):
 
     def decide(self, ctx: StrategyContext) -> TargetAllocation:
         """Hold the fund while its momentum is above the threshold."""
-        if ctx.signal_status(self.signal_id, self.instrument_id) is not SignalStatus.OK:
-            return ctx.cash()
+        status = ctx.signal_status(self.signal_id, self.instrument_id)
+        among = ctx.considering({self.instrument_id: status})
+        if status is not SignalStatus.OK:
+            return ctx.cash(among=among)
         if ctx.signal_value(self.signal_id, self.instrument_id) <= self.minimum:
-            return ctx.cash()
-        return ctx.weights({self.instrument_id: 1.0})
+            return ctx.cash(among=among)
+        return ctx.weights({self.instrument_id: 1.0}, among=among)

@@ -125,13 +125,15 @@ class MovingAverageBandETF(Strategy):
             ``sell_below`` times it; the book as it stands, with no order, in
             every other case.
         """
-        if ctx.signal_status(self.signal_id, self.instrument_id) is not SignalStatus.OK:
-            return ctx.hold_positions()
+        status = ctx.signal_status(self.signal_id, self.instrument_id)
+        among = ctx.considering({self.instrument_id: status})
+        if status is not SignalStatus.OK:
+            return ctx.hold_positions(among=among)
         price_over_average = 1.0 + ctx.signal_value(self.signal_id, self.instrument_id)
         if price_over_average < self.sell_below:
-            return ctx.cash()
+            return ctx.cash(among=among)
         if price_over_average > self.buy_above and not ctx.portfolio.holds(self.instrument_id):
-            return ctx.weights({self.instrument_id: 1.0})
+            return ctx.weights({self.instrument_id: 1.0}, among=among)
         # On a level, between the two, or above while already bought: a target
         # of 100% restated every evening would trade the overnight drift.
-        return ctx.hold_positions()
+        return ctx.hold_positions(among=among)

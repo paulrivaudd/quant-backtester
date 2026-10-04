@@ -75,4 +75,5 @@ class WorldMA20Benchmark(RuleStrategy):
         """Return 100% of the fund above its average, cash otherwise."""
         reader = SignalReader(ctx)
         distance = reader.value(self.signal(), self.instrument_id)
-        return Evaluation(above_average_rule(self.instrument_id, distance), reader.unusable)
+        target = above_average_rule(self.instrument_id, distance)
+        return Evaluation(target, reader.unusable, reader.readable)

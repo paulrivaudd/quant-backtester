@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from collections.abc import Callable
 from datetime import date, datetime
@@ -14,6 +15,7 @@ pytest.importorskip("torch")
 from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.ml.artifacts import NeuralArtifact
+from quant_backtester.ml.config import NeuralStrategyConfig
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine
@@ -214,3 +216,38 @@ def test_the_strategy_is_recorded_by_its_models_identity(
     assert again == strategy
     assert "_signal" not in repr(strategy)
     json.dumps(definition)
+
+
+def test_cash_chosen_on_a_proposal_is_not_recorded_as_a_day_without_data(
+    neural_artifact: NeuralArtifact, contexts, neural_market: MarketDataReader
+) -> None:
+    """Audit 13, C04: the network proposed, and the minimum left nothing to buy."""
+    config = NeuralStrategyConfig.from_definition(
+        neural_artifact.config.definition() | {"min_asset_weight": 0.99}
+    )
+    picky = NeuralAllocationStrategy.from_artifact(
+        NeuralArtifact(
+            config=config,
+            state=dict(neural_artifact.state),
+            scaler=neural_artifact.scaler,
+            information_cutoff=neural_artifact.information_cutoff,
+            selected_epoch=0,
+        )
+    )
+    ctx = contexts(neural_market)
+    snapshot = SignalEngine().compute(
+        SignalContext(
+            market=neural_market.at(ctx.as_of),
+            instruments=neural_market.instruments,
+            calendars=neural_market.calendars,
+        ),
+        list(picky.required_signals()),
+        [A, B],
+    )
+
+    allocation = picky.decide(dataclasses.replace(ctx, signals=snapshot))
+
+    assert picky.proposal(dataclasses.replace(ctx, signals=snapshot)) is not None
+    assert dict(allocation.weights) == {}
+    assert allocation.considered == 2
+    assert dict(allocation.skipped) == {}

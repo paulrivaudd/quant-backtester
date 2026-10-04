@@ -132,13 +132,17 @@ class MovingAverageEntryExitETF(Strategy):
         """
         entry_id = self.entry_signal().signal_id
         exit_id = self.exit_signal().signal_id
-        for signal_id in (entry_id, exit_id):
-            if ctx.signal_status(signal_id, self.instrument_id) is not SignalStatus.OK:
-                return ctx.hold_positions()
+        # The fund is read through two signals; the first that cannot be used
+        # is the reason it could not be decided on.
+        statuses = [ctx.signal_status(name, self.instrument_id) for name in (entry_id, exit_id)]
+        status = next((item for item in statuses if item is not SignalStatus.OK), SignalStatus.OK)
+        among = ctx.considering({self.instrument_id: status})
+        if status is not SignalStatus.OK:
+            return ctx.hold_positions(among=among)
         if ctx.signal_value(exit_id, self.instrument_id) < 0.0:
-            return ctx.cash()
+            return ctx.cash(among=among)
         above_entry = ctx.signal_value(entry_id, self.instrument_id) > 0.0
         if above_entry and not ctx.portfolio.holds(self.instrument_id):
-            return ctx.weights({self.instrument_id: 1.0})
+            return ctx.weights({self.instrument_id: 1.0}, among=among)
         # A target of 100% restated every evening would trade the overnight drift.
-        return ctx.hold_positions()
+        return ctx.hold_positions(among=among)

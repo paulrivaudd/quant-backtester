@@ -142,8 +142,12 @@ class GoldenCrossETF(Strategy):
         historique : tout ce dont la décision a besoin est dans ``ctx``.
         """
         signal_id = self.signal().signal_id
-        if ctx.signal_status(signal_id, self.instrument_id) is not SignalStatus.OK:
-            return ctx.cash()
+        status = ctx.signal_status(signal_id, self.instrument_id)
+        # What the decision was taken among is recorded with it: cash on a
+        # signal that says no and cash for want of a signal are two days.
+        among = ctx.considering({self.instrument_id: status})
+        if status is not SignalStatus.OK:
+            return ctx.cash(among=among)
         if ctx.signal_value(signal_id, self.instrument_id) <= 0:
-            return ctx.cash()
-        return ctx.weights({self.instrument_id: 1.0})
+            return ctx.cash(among=among)
+        return ctx.weights({self.instrument_id: 1.0}, among=among)
