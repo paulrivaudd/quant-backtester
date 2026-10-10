@@ -83,33 +83,41 @@ Activité : une position est détenue à la clôture de **1235 valorisations sur
 
 ### En résumé
 
-Répartir entre ETF_WORLD et ETF_SP500_PEA selon l'écart de leurs momentums 6 et 12 mois (les 21 dernières séances exclues), et sortir d'un fonds dont le momentum 12 mois est négatif. +69,2 % net, Sharpe 0,78, sans réduction de la perte maximale.
+Répartir entre ETF_WORLD et ETF_SP500_PEA selon l'écart de leurs momentums 6 et 12 mois, les 21 dernières séances exclues, et sortir d'un fonds dont le momentum 12 mois n'est pas positif. Pendant la chute de 2025 la règle réduit son inclinaison vers le S&P 500 mais garde une exposition actions presque totale ; sa sortie en cash de mai arrive ensuite pendant la reprise. +69,2 % net contre +94,8 % pour le fonds et +103,3 % pour le panier 50/50 des mêmes fonds.
 
 ### Points forts
 
-- Bat le fonds détenu les années de hausse portée par les actions américaines : +21,2 % en 2021 (fonds +18,4 %) et +30,7 % en 2024 (fonds +27,1 %).
-- Ses 63 meilleures séances (2026-03-31 au 2026-07-01, +17,2 %) dépassent celles du fonds (+16,3 %).
-- Reste investie à 100 % quand la tendance est installée : pas de cash inutile en 2024 ni en 2026.
+- **Fait.** Deux années au-dessus du fonds détenu : +21,2 % en 2021 (partielle) et +30,7 % en 2024, contre +18,4 % et +27,1 %.
+- **Fait.** Les 63 meilleurs rendements consécutifs (2026-03-31 au 2026-07-01) font +17,2 %, contre +16,3 % pour le fonds.
+- **Fait.** La répartition entre les deux fonds s'adapte : le poids du fonds S&P 500 passe de 66,9 % le 2025-02-19 à 50,1 % le 2025-04-09.
 
 ### Points faibles
 
-- N'offre aucune protection contre une chute rapide : perte maximale de -22,8 %, plus profonde que celle du fonds (-21,6 %).
-- Sort tard et rentre tard autour d'un marché baissier : -17,6 % en 2022 (fonds -13,7 %), puis +9,1 % en 2023 (fonds +19,6 %).
-- 317 ordres et 4 629 EUR de coûts, une rotation de 6,8 fois l'actif par an ; alpha de -1,0 % par an contre le fonds, et un Sharpe qui passe de 0,78 à 0,72 à coûts doublés.
+- **Fait.** Ces deux bonnes années ne dépassent pas le panier 50/50, qui fait déjà +20,7 % et +30,2 % : l'avance sur le fonds monde peut venir du panier choisi, pas du momentum.
+- **Fait.** Sur toute la période la règle fait +69,2 % net contre +103,3 % pour le panier 50/50 ; ses 4 629 EUR de coûts n'expliquent qu'une petite partie de cet écart de 34 points.
+- **Fait.** Perte maximale de -22,78 %, plus profonde que celle du fonds (-21,64 %), récupérée le 2026-04-17 seulement, 422 jours après le sommet (229 jours pour le fonds).
+- **Fait.** -17,6 % en 2022 (fonds -13,7 %), puis +9,1 % en 2023 (fonds +19,6 %) ; sa plus longue période sous un sommet dure 807 jours, du 2022-01-04 au 2024-03-21.
+- **Fait.** Sharpe de 0,78, puis 0,72 dans le second run à coûts doublés ; alpha de -1,0 % par an, sans intervalle.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Du 2025-02-19 au 2025-04-09 (36 séances), la stratégie perd -22,8 %, investie à 100 % du début à la fin. Le krach part des plus hauts : les momentums 6 et 12 mois sont encore largement positifs, donc la règle ne voit rien, et son inclinaison vers le fonds S&P 500, qui baisse davantage en euros, creuse l'écart avec le fonds monde. Un momentum à 12 mois ne peut pas réagir à une chute de sept semaines.
+**Fait.** Du 2025-02-19 au 2025-04-09, la stratégie perd -22,78 % avec un poids de clôture total de 100 % d'un bout à l'autre. Sur cet intervalle le fonds S&P 500 perd -23,3 % en clôture et le fonds monde -21,7 %, et la règle ramène le premier de 66,9 % à 50,1 % du portefeuille. **Lecture.** La règle a adapté sa répartition, pas son exposition totale : les conditions d'éligibilité, qui lisent des momentums arrêtés 21 séances plus tôt, restent positives pendant toute la baisse. **Fait.** La suite pèse autant : la stratégie est entièrement en cash du 2025-05-09 au 2025-05-26 et reprend une position le 27 mai ; entre ces deux clôtures le fonds monde monte de +3,4 %. L'année 2025 se termine à +0,6 % contre +6,6 % pour le fonds.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Sa plus forte hausse va du 2023-05-04 au 2026-10-06 (+74,3 %, 96 % d'exposition). Le meilleur trimestre, du 2026-03-31 au 2026-07-01 (+17,2 % contre +16,3 % pour le fonds), est une hausse régulière avec les deux momentums positifs : la règle est pleinement investie et surpondère le fonds le plus fort. Son plus fort retard relatif court du 2022-07-14 au 2025-05-16 (+18,1 % contre +43,8 %) : c'est le prix de la sortie tardive de 2022 et du retour tardif de 2023.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2023-05-04 au 2026-10-06 (+74,3 %, poids moyen 96 %) : une durée libre, pas un signal unique. Le meilleur trimestre glissant (2026-03-31 au 2026-07-01, +17,2 % contre +16,3 %) a un poids de clôture de 100 %. Son plus fort retard relatif court du 2022-07-14 au 2025-05-16 : +18,1 % contre +43,7 % pour le fonds, soit un écart relatif de -17,8 %. **Lecture.** Ce retard additionne la sortie de 2022, le retour de 2023 et la sortie de mai 2025.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Krach rapide depuis des plus hauts (février-avril 2025) : les momentums longs restent positifs, l'exposition reste à 100 %.
-- Reprise après un marché baissier (début 2023) : le momentum 12 mois est encore négatif et la règle regarde le rebond depuis le cash.
-- Inversion de leadership entre les États-Unis et le reste du monde : l'inclinaison suit le gagnant d'hier.
+- **Observé.** Chute rapide partie de plus hauts (février-avril 2025) : les momentums longs, lus avec 21 séances de retard, restent positifs et l'exposition totale reste à 100 %.
+- **Observé.** Reprise après une baisse (début 2023, mai 2025) : la règle est en cash ou sous-investie quand le marché remonte.
+- **Plausible.** Inversion du leadership entre les États-Unis et le reste du monde : l'inclinaison suit le fonds qui a le mieux monté.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- L'écart net au panier 50/50, régime par régime : c'est lui, et non le fonds monde, qui isole ce que le momentum ajoute.
+- Séparer le choix entre les deux fonds du timing de l'exposition totale, avec les dates d'éligibilité de chaque fonds.
+- Les 34 points de retard sur le 50/50 ne sont pas attribués : coûts, périodes en cash et inclinaison y contribuent dans des proportions non mesurées.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

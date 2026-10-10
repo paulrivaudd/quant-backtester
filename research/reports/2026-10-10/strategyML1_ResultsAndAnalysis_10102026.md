@@ -2,7 +2,7 @@
 
 Période de test 2025-01-02 → 2026-10-09 (après la date limite d'information du modèle, 2024-12-31) · modèle figé `d9bfd125bf69` (graine 42) · mêmes capital, coûts et conventions que les autres stratégies.
 
-Source : commit `788507bfab40` (DIRTY), magasin `750c23dfffc3`. **Période différente de celle des stratégies SA** (qui commence en 2021) : ces chiffres ne se comparent pas aux leurs, et ML1 n'a pas de rang dans le classement commun. Le test a déjà été lu une fois le 2026-10-04 jusqu'au 2026-09-30 ; ce run le prolonge avec le même modèle. Le score est déflaté pour un seul essai.
+Source : commit `950dc00df5dc` (CLEAN), magasin `750c23dfffc3`. **Période différente de celle des stratégies SA** (qui commence en 2021) : ces chiffres ne se comparent pas aux leurs, et ML1 n'a pas de rang dans le classement commun. Le test a déjà été lu une fois le 2026-10-04 jusqu'au 2026-09-30 ; ce run le prolonge avec le même modèle. Le score est déflaté pour un seul essai.
 
 ## 1. Indicateurs de résultat globaux
 
@@ -79,34 +79,42 @@ Activité : une position est détenue à la clôture de **452 valorisations sur 
 
 ### En résumé
 
-Un petit réseau de neurones, entraîné sur 2019-2023 et sélectionné sur 2024, propose chaque soir des poids entre ETF_WORLD, ETF_SP500_PEA et le cash. Sur sa période de test (2025-01-02 au 2026-10-09) il fait +13,4 % contre +24,5 % pour le fonds détenu : la prédiction de son hypothèse n'est pas vérifiée.
+Un petit réseau de neurones, entraîné sur 2019-2023 et sélectionné sur 2024, propose chaque soir des poids entre ETF_WORLD, ETF_SP500_PEA et le cash. Il réduit le risque global par sa part de cash, mais produit aussi des changements d'allocation importants : début avril 2025 il coupe fortement pendant la baisse puis remonte vite, et le portefeuille atteint son creux après celui du fonds. Sur ses dates de test (2025-01-02 au 2026-10-09) il ne montre pas d'avantage net : +13,4 % contre +24,5 % pour le fonds détenu.
 
 ### Points forts
 
-- Moins de risque que le fonds détenu : volatilité de 9,9 % contre 14,3 %, perte maximale de -16,1 % contre -21,5 %.
-- Peu coûteux : 270 ordres mais de petite taille, 756 EUR de coûts.
-- Comportement stable : l'exposition reste entre 47 % et 87 %, sans décision extrême.
+- **Fait.** Volatilité de 9,9 % contre 14,3 % pour le fonds, perte maximale de -16,11 % contre -21,51 %.
+- **Fait.** 270 ordres pour 756 EUR de coûts.
+- **Fait.** Perte maximale récupérée le 2025-10-28, 251 jours après le sommet.
 
 ### Points faibles
 
-- Ne bat pas le fonds : Sharpe de 0,76 contre 0,93, alpha de -1,4 % par an pour un bêta de 0,67.
-- Score de qualité de 45,8 %, sous le seuil de 50 % de son hypothèse, et Sharpe sous celui du fonds : les deux critères de réfutation sont atteints, comme lors du premier test du 2026-10-04.
-- Se comporte comme un portefeuille dilué à poids presque constants (67 % d'exposition moyenne) : la baisse du risque vient du cash, pas d'un choix du moment.
-- Une seule graine, une seule période de test de 453 séances, déjà regardée : rien ne permet de conclure sur le modèle lui-même.
+- **Fait.** Sharpe de 0,76 contre 0,93, alpha de -1,4 % par an (sans intervalle) pour un bêta de 0,67, sur ces seules dates.
+- **Fait.** Score de 45,8 %, sous le seuil de 50 % de son hypothèse, et Sharpe sous celui du fonds : les deux critères de réfutation sont atteints. Ce score est déflaté pour un seul essai et ne se compare pas à ceux des stratégies SA.
+- **Fait.** Le test d'origine, clos au 2026-09-30, a été lu le 2026-10-04 ; ce run le prolonge de sept séances avec le même modèle. L'extension ne remet pas le compteur à zéro.
+- **Fait.** Non présentés ici : les graines 43 et 44 et le run à coûts doublés, que l'hypothèse prévoit comme sensibilités. Le bloc robustesse du score utilise un stress approché, pas un second run.
+- **Lecture.** Le réseau fait du timing ; la question ouverte est de savoir si ce timing ajoute ou retire de la valeur par rapport à une allocation constante. Un mauvais timing n'est pas une absence de timing.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Du 2025-02-19 au 2025-04-22 (43 séances), la stratégie perd -16,1 % avec 64 % d'exposition moyenne, alors que le fonds perd -18,7 %. Le réseau ne réduit presque pas pendant le krach : son exposition reste entre 47 % et 79 %. Il perd donc un peu plus que ce que perdrait un portefeuille à 65 % d'actions, sa part de fonds S&P 500 baissant davantage que le fonds monde (-23,3 % contre -21,7 % jusqu'au 9 avril), et son creux arrive deux semaines après celui du fonds.
+**Fait.** Du 2025-02-19 au 2025-04-22 la stratégie perd -16,11 %. Hors la première séance, encore en cash, son poids de clôture total va de 47,4 % à 87,3 % sur toute la période, avec un écart-type d'environ 8 points : ce n'est pas un portefeuille à poids constants. Début avril il passe de 75,6 % le 2 à 47,4 % le 9, soit -28 points pendant la chute, puis remonte à 78,7 % le 16. Le 9 avril, creux du fonds, le portefeuille vaut 85 414 EUR ; le 22 avril il vaut 85 340 EUR, soit -0,09 %, alors que la clôture du fonds monde gagne +3,80 % entre ces deux dates. **Lecture.** Le creux tardif s'explique par cette chronologie de réallocations, et par la part de fonds S&P 500, plutôt que par le niveau moyen d'exposition. Les exécutions permettraient de séparer ce qui vient des poids, de la nuit et des frais.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Du 2025-04-22 au 2026-10-06 (374 séances), la stratégie gagne +32,9 % contre +48,1 % pour le fonds, avec 68 % d'exposition. Ses 63 meilleures séances (2025-04-22 au 2025-07-21, +13,0 % contre +15,4 %) sont le rebond qui suit la panique d'avril : le réseau monte son exposition vers 80 % et capte la plus grande partie de la reprise. Il gagne quand le marché monte, à proportion de ce qu'il détient.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2025-04-22 au 2026-10-06 (+32,9 % contre +47,7 % pour le fonds, poids moyen 68 %). Sur les 63 meilleurs rendements consécutifs (2025-04-22 au 2025-07-21) la stratégie fait +13,0 % contre +15,3 %, avec un poids de clôture entre 67 % et 87 %. **Lecture.** Le réseau est alors plus investi qu'en moyenne ; ce que cela doit à son choix plutôt qu'à la hausse générale n'est pas isolé.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Long marché haussier : un tiers du capital en cash non rémunéré coûte chaque jour.
-- Krach rapide : le réseau ne coupe pas, il reste investi aux deux tiers.
-- Régime de marché absent de son apprentissage (2019-2023) : rien ne garantit que ses poids restent raisonnables, et l'artefact n'est jamais réentraîné.
+- **Observé.** Marché haussier long : un tiers du capital en cash non rémunéré est un coût d'opportunité.
+- **Observé.** Chute rapide suivie d'un rebond (avril 2025) : réduction pendant la baisse, retour au risque avant le second creux du portefeuille.
+- **Plausible.** Régime absent de son apprentissage (2019-2023) : la sortie softmax et les plafonds bornent toujours les poids, mais rien n'assure leur pertinence économique si les entrées dérivent ; l'artefact n'est pas réentraîné.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- Une allocation fixe exécutable aux deux fonds et au cash, sur les mêmes dates et les mêmes coûts : multiplier 65 % par le rendement du fonds ne la remplace pas. Choisie après coup, elle resterait descriptive.
+- L'effet des changements de répartition entre fonds monde et fonds S&P 500, séparé de celui de l'exposition totale.
+- Les caractéristiques d'entrée du réseau et leurs statuts de disponibilité, séance par séance : l'historique ci-dessous ne contient que ses sorties.
+- Une seule graine et 453 valorisations déjà regardées : rien ne permet de conclure sur le modèle lui-même.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

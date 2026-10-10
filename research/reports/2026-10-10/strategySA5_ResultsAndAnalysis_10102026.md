@@ -83,33 +83,39 @@ Activité : une position est détenue à la clôture de **1415 valorisations sur
 
 ### En résumé
 
-Détenir les deux fonds autour d'une répartition 50/50 et pencher, jusqu'à 25 points, vers celui qui a pris du retard sur l'autre ces cinq derniers jours. Toujours investie à 100 % : un fonds détenu avec des frais en plus.
+Détenir les deux fonds autour d'une répartition 50/50 et pencher, jusqu'à 25 points, vers celui dont le résidu récent est négatif : le résidu des cinq derniers rendements du fonds monde dans une régression sur ceux du fonds S&P 500 estimée sur les 126 rendements précédents, normalisé. La stratégie reste presque pleinement investie et change souvent la répartition. Les frais sont un handicap majeur, mais l'apport de l'inclinaison n'est pas établi face au panier neutre : +72,8 % net contre +103,3 % pour le 50/50.
 
 ### Points forts
 
-- Brut, elle égale le fonds détenu : +93,4 % contre +94,9 %.
-- Jamais en cash : elle participe à toutes les hausses, et ses 63 meilleures séances (2025-04-09 au 2025-07-10, +18,4 %) sont celles du rebond d'avril 2025.
-- Quelques épisodes où le retour à la moyenne a payé : +13,2 % du 2022-05-24 au 2022-08-22 contre +11,7 % pour le fonds.
+- **Fait.** Presque pleinement investie après l'achat initial : le poids de clôture total ne descend pas sous 99,6 %, donc elle participe à toutes les hausses.
+- **Fait.** Perte maximale récupérée le 2025-10-29, 252 jours après le sommet, presque aussi vite que le fonds (229 jours).
+- **Fait.** Du 2022-05-24 au 2022-08-22 elle fait +13,2 % contre +11,7 % pour le fonds monde, un écart relatif de +1,3 %. Ce n'est pas mesuré contre le panier 50/50, donc cela ne dit pas que l'inclinaison a payé.
 
 ### Points faibles
 
-- La règle la plus chère en valeur : 1 904 ordres, une rotation de 29 fois l'actif par an, 20 517 EUR de coûts. Les coûts prennent 21 points de rendement (+93,4 % brut, +72,8 % net).
-- Ne tient pas à coûts doublés : +46,4 % net, Sharpe de 0,55 et score de qualité à zéro.
-- Aucune réduction du risque : bêta de 1,03, volatilité de 14,2 % (plus que le fonds), perte maximale de -22,9 %, alpha de -2,4 % par an.
+- **Fait.** Même sa comptabilité brute (+93,35 %, les mêmes ordres sans coûts) reste sous le panier 50/50 net (+103,35 %). On ne peut donc pas résumer la règle à « un bon signal détruit par les frais ».
+- **Fait.** 1 904 ordres, une rotation de 29,2 fois l'actif par an, 20 517 EUR de coûts : la règle la plus coûteuse en valeur. +93,4 % brut, +72,8 % net.
+- **Fait.** Forte sensibilité aux frais : +46,4 % net et Sharpe de 0,55 dans le second run à coûts doublés, où les quantités et la trajectoire changent ; le score tombe à zéro.
+- **Fait.** Aucune réduction du risque : bêta de 1,03, volatilité de 14,2 %, perte maximale de -22,86 %, alpha de -2,4 % par an (sans intervalle).
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Du 2025-02-19 au 2025-04-09, la stratégie perd -22,9 %, investie à 100 %. Rien dans la règle ne réduit l'exposition : elle ne choisit qu'entre deux fonds d'actions très corrélés. Pendant la chute, le fonds S&P 500 baisse plus que le fonds monde ; la règle penche vers celui qui vient de sous-performer, donc vers le plus faible, et finit un peu en dessous du fonds détenu.
+**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -22,86 %, à comparer à -21,64 % pour le fonds monde et -22,47 % pour le panier 50/50 : presque toute la perte est celle du panier. L'inclinaison change de sens pendant la chute : le fonds S&P 500 pèse 67,2 % le 7 mars, 31,4 % le 2 avril, 27,6 % le 9 avril, puis 74,4 % le 22 avril, pour une moyenne de 48,6 % sur l'intervalle. **Lecture.** La règle n'a donc pas renforcé continûment le fonds qui baissait le plus ; rien ne réduit l'exposition totale, et l'écart de 0,4 point avec le 50/50 mélange inclinaison et coûts sans qu'on puisse les séparer ici.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Sa plus forte hausse va du 2022-06-16 au 2026-10-06 (+78,6 % contre +96,6 % pour le fonds) : elle suit le marché, les coûts en moins. Le meilleur trimestre est le rebond du 2025-04-09 au 2025-07-10 (+18,4 %, le fonds +19,3 %). Ce n'est pas l'inclinaison qui gagne, c'est le fait d'être restée investie pendant la reprise, que les règles à cash ont en partie ratée.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2022-06-16 au 2026-10-06 (+78,6 % contre +96,6 % pour le fonds, écart relatif -9,1 %). Les 63 meilleurs rendements consécutifs sont ceux du rebond (2025-04-09 au 2025-07-10) : +18,4 %, contre +19,3 % pour le fonds monde comme pour le panier 50/50. **Lecture.** Être restée investie explique l'essentiel de ce gain ; la contribution propre de l'inclinaison sur cette fenêtre, positive ou négative, n'est pas isolée.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Tout marché baissier : l'exposition reste à 100 %.
-- Divergence durable entre les deux fonds (leadership américain ou change euro-dollar) : la règle renforce le perdant tant que l'écart se creuse.
-- Hausse des coûts ou du spread : le rebalancement quasi quotidien rend le résultat proportionnel aux frais.
+- **Observé.** Toute baisse du marché actions : l'exposition totale reste proche de 100 %.
+- **Observé.** Frais et spread : avec près d'un ordre par séance, le résultat y est très sensible.
+- **Plausible.** Divergence durable entre les deux fonds (leadership, change) : un résidu qui ne revient pas fait pencher du mauvais côté tant qu'il dure.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- L'attribution par rapport au panier 50/50 : résultat incrémental des écarts de poids, frais, contraintes d'exécution. Sans elle le signal ne peut pas être jugé.
+- Le nombre d'inversions de l'inclinaison, la durée de vie du résidu, et la corrélation entre le signal et le rendement relatif des séances suivantes.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

@@ -83,38 +83,45 @@ Activité : une position est détenue à la clôture de **1415 valorisations sur
 
 ### En résumé
 
-Détenir ETF_WORLD à hauteur de 12 % / max(σ, 5 %), où σ est la volatilité prévue à une séance par un GARCH(1,1) à innovations de Student, réestimé chaque soir sur les 756 derniers rendements. La prévision est la meilleure des trois, mais l'allocation qui en découle ne bat ni SA6 ni le témoin EWMA : l'hypothèse préinscrite est réfutée et la règle simple est conservée.
+Détenir ETF_WORLD à hauteur de w = min(1, 12 % / max(σ, 5 %)), où σ est la volatilité annualisée que prévoit pour la séance suivante un GARCH(1,1) à innovations de Student, réestimé chaque soir sur 756 rendements ; l'ordre n'est envoyé que si le poids détenu s'écarte de 3 points de cette cible. Sur cet historique le GARCH obtient la plus faible QLIKE moyenne, sans que cette avance sur l'EWMA soit démontrée, et elle ne se traduit pas par une meilleure performance nette : il se réexpose davantage que ses témoins avant la seconde vague d'avril 2025 et génère plus de coûts. La configuration ne satisfait pas les critères préinscrits ; les témoins simples sont conservés. Cela ne dit rien de l'utilité des modèles GARCH en général.
 
 ### Points forts
 
-- Meilleure prévision de variance des trois estimateurs : QLIKE de -8,6225 contre -8,6033 pour l'EWMA 0,94 et -8,5649 pour l'estimateur de SA6, sur 1 415 paires prévision-réalisation.
-- Estimation robuste : les 1 416 décisions ont un fit accepté, aucun repli EWMA n'a été nécessaire (persistance médiane 0,975, ν médian 5,2).
-- Réduit le risque par rapport au fonds détenu : perte maximale de -16,5 % contre -21,6 %, volatilité de 11,1 % contre 13,8 %.
-- Réagit vite dans les deux sens : c'est elle qui coupe le plus au pic de la panique (29 % le 2025-04-10) et qui se réexpose le plus tôt ensuite (58 % le 2025-05-19, contre 41 % pour SA6).
+- **Fait.** Meilleure QLIKE moyenne observée : -8,6225 contre -8,6033 pour l'EWMA 0,94 et -8,5649 pour l'estimateur de SA6, sur 1 415 paires. La QLIKE est une perte, négative ici parce que les variances sont très inférieures à un ; ce n'est pas un rendement.
+- **Fait.** Cette avance n'est établie que contre SA6 : la différence de QLIKE appariée vaut -0,058 contre SA6, intervalle bootstrap à 95 % [-0,108 ; -0,017], et -0,019 contre l'EWMA, intervalle [-0,051 ; +0,009], qui inclut zéro.
+- **Fait.** Aucun fit rejeté selon les critères numériques sur les 1 416 décisions, donc aucun repli EWMA. Cela ne démontre ni la stabilité des paramètres ni la validité des queues : la kurtosis des résidus standardisés reste de 5,7.
+- **Fait.** Perte maximale de -16,50 % contre -21,64 % pour le fonds, volatilité de 11,1 % contre 13,8 %.
+- **Fait.** Brut, elle fait un peu mieux que SA6 (+69,73 % contre +68,88 %) ; c'est après coûts qu'elle passe derrière (+65,98 % contre +67,43 %). Le témoin EWMA reste devant en brut comme en net.
 
 ### Points faibles
 
-- Ne bat pas ses témoins : Sharpe net de 0,87 contre 0,90 pour SA6 et 0,93 pour l'EWMA, et une perte maximale plus profonde (-16,5 % contre -15,7 % et -15,4 %).
-- Trade deux fois et demie plus : 508 ordres, une rotation de 5,5 fois l'actif par an et 3 749 EUR de coûts, contre 180 ordres et 1 445 EUR pour SA6. Le poids cible bouge de 2,3 points par jour en moyenne, contre 0,9.
-- L'écart se creuse à coûts doublés : Sharpe de 0,82 contre 0,91 pour l'EWMA, avec un intervalle bootstrap à 95 % de la différence [-0,172 ; -0,014] qui exclut zéro du mauvais côté.
-- Rend 29 points de rendement au fonds détenu (+66,0 % contre +94,8 %), alpha de -0,4 % par an : comme SA6, elle est sous-investie dès que la volatilité dépasse 12 %.
-- Sixième du classement commun (48,6 %), derrière SA6 (52,0 %) et le témoin EWMA (53,6 %).
+- **Fait.** Sharpe net de 0,87 contre 0,90 pour SA6 et 0,93 pour l'EWMA ; perte maximale plus profonde (-16,50 % contre -15,72 % et -15,45 %). Ce sont les critères de réfutation préinscrits.
+- **Fait.** Aux coûts de base, les intervalles de la différence de Sharpe incluent zéro : [-0,141 ; +0,076] contre SA6, [-0,147 ; +0,009] contre l'EWMA. Il n'y a donc pas de preuve à 95 % d'une infériorité générale. Dans le second run à coûts doublés, l'intervalle contre l'EWMA est [-0,172 ; -0,014], négatif, sous les hypothèses de ce bootstrap conditionnel.
+- **Fait.** 508 ordres, rotation de 5,5 fois l'actif par an, 3 749 EUR de coûts, contre 180 ordres et 1 445 EUR pour SA6 ; le poids de clôture varie de 2,3 points par séance en moyenne, contre 0,9.
+- **Fait.** +66,0 % contre +94,8 % pour le fonds, alpha de -0,4 % par an (sans intervalle) ; sommet retrouvé le 2026-01-09, 324 jours après, contre 229 pour le fonds.
+- **Fait.** Sixième du classement commun (48,6 %). L'écart avec SA6 (52,0 %) et l'EWMA (53,6 %) n'est pas un test de supériorité.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Du 2025-02-19 au 2025-04-09 (36 séances), la stratégie perd -16,5 % contre -21,6 % pour le fonds, avec 76 % d'exposition moyenne. Le krach part d'un marché calme : la volatilité prévue est de 10,9 % le 19 février et l'exposition de 100 %. La première vague est bien traitée (61 % à la mi-mars). L'erreur vient entre les deux vagues : le GARCH revient vite vers sa moyenne, la volatilité prévue retombe à 15 % dès le 20 mars alors que l'EWMA est encore à 17 % et SA6 à 20 %, et la règle remonte à 80 % d'exposition. Le choc du 3 au 7 avril la trouve à 78 %, contre 65 % pour SA6 et 67 % pour l'EWMA. Elle coupe ensuite à 29 % le 10 avril, au plus bas, quand la volatilité prévue atteint 45 %. C'est exactement la différence avec ses témoins : une prévision qui oublie plus vite se réexpose avant la seconde jambe.
+**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -16,50 % contre -21,64 % pour le fonds. Le 19 février la volatilité prévue est de 10,9 % et le poids de 99,9 %. Le poids de clôture descend à 65,8 % le 7 mars et 60,7 % le 12, puis remonte : 79,8 % le 20 mars, 77,7 % le 2 avril, quand SA6 est à 65,0 % et l'EWMA à 67,2 %. Il est de 37,7 % le 7 avril, 38,5 % le 8, 31,6 % le 9. Le creux, pour la stratégie comme pour le fonds, est le 9 avril : ce soir-là la prévision vaut 42,7 % et la cible 28,1 %, exécutée le lendemain (28,9 % détenus le 10 avril, 28,7 % le 11). La prévision de 45,2 % du 10 avril, la plus haute de la période, vient après et n'a déclenché aucune de ces ventes. **Lecture.** La remontée du risque en mars est locale et constatée ; l'attribuer au retour du GARCH vers sa moyenne est plausible, mais avec des paramètres réestimés chaque soir la trajectoire dépend des chocs et de leur recalibration, et ce n'est pas une propriété générale établie.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Sa plus forte hausse va du 2022-06-17 au 2026-10-06 (+70,2 % contre +96,7 % pour le fonds, 90 % d'exposition). Son meilleur trimestre, du 2023-10-30 au 2024-01-30 (+15,3 % contre +15,6 %), est une hausse régulière avec une volatilité prévue sous la cible de 12 % : l'exposition reste à 99 % en moyenne, la bande de 3 points absorbe les petites variations de la prévision, et la règle ne passe presque aucun ordre. Dans ce régime GARCH, EWMA et SA6 font la même chose, et le GARCH ne coûte rien.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2022-06-17 au 2026-10-06 (+70,2 % contre +96,6 % pour le fonds, poids moyen 90 %), une durée libre. Sur les 63 meilleurs rendements consécutifs (2023-10-30 au 2024-01-30, +15,27 % contre +15,58 %), le poids de clôture est de 99 % en moyenne et descend à 88,8 % ; la prévision dépasse la cible de 12 % à 13 valorisations, jusqu'à 13,6 %. Quatre ordres y sont exécutés, pour 20 EUR de coûts. **Lecture.** Quand le risque prévu reste proche ou sous la cible, GARCH, EWMA et SA6 font à peu près la même chose, pour un coût faible.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Baisse en deux temps avec une accalmie entre les deux (mars-avril 2025) : le retour rapide du GARCH vers sa moyenne reconstruit l'exposition juste avant la seconde vague. C'est la situation la plus dangereuse pour cette règle par rapport à ses témoins.
-- Choc soudain en marché calme : aucun modèle de volatilité ne le prévoit, l'exposition est à 100 % et la réduction vient après la perte, exécutée à l'ouverture suivante après le gap.
-- Volatilité qui oscille autour de la cible de 12 % : la prévision franchit sans cesse le seuil, la bande de 3 points est dépassée et la règle paie des coûts sans changer de régime.
-- Marché baissier lent et régulier (2022, -13,2 % contre -13,7 % pour le fonds) : la volatilité reste modérée, l'exposition reste à 70 % et la protection est presque nulle.
-- Rebond en V : la règle est à son exposition minimale au point bas. Elle se réexpose plus vite que SA6, mais après le premier rebond.
+- **Observé.** Baisse en deux temps avec une accalmie entre les deux (mars-avril 2025) : la stratégie aborde la seconde vague plus exposée que ses deux témoins.
+- **Observé.** Choc soudain en marché calme : le poids est proche de 100 % et la réduction est exécutée à l'ouverture suivante, après la première perte.
+- **Plausible.** Prévision oscillant autour de la cible de 12 % : la bande de 3 points est franchie plus souvent qu'avec un estimateur plus lisse, ce qui est cohérent avec ses 508 ordres.
+- **Observé.** Marché baissier lent (2022) : -13,2 % contre -13,7 % pour le fonds, avec un poids moyen de 70 % ; la protection y est presque nulle.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- Le statut REFUTED est opérationnel : un critère écrit avant le run est atteint. Ce n'est pas une preuve statistique d'infériorité de cette configuration, encore moins des modèles GARCH.
+- La distribution des paramètres estimés (persistance, ν) et des diagnostics de fit dans le temps, au-delà de leurs médianes.
+- Le GARCH peut mieux prévoir la variance de clôture à clôture et moins bien allouer après l'ouverture suivante, la bande, les coûts et le plafond : la part de chacun de ces éléments dans l'écart avec les témoins n'est pas mesurée.
+- La vérification prospective, configuration figée, commence à la première séance XPAR après le 2026-10-10.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

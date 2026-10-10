@@ -82,33 +82,40 @@ Activité : une position est détenue à la clôture de **104 valorisations sur 
 
 ### En résumé
 
-Acheter le fonds S&P 500 à 50 % quand le VIX est retombé à 80 % ou moins d'un pic de panique récent (au moins 30) et que le fonds remonte sur cinq séances. La règle se déclenche rarement et n'a rien gagné : -0,7 % net.
+Acheter le fonds S&P 500 à 50 % quand le VIX est retombé à 80 % ou moins d'un pic récent d'au moins 30 et que le fonds remonte sur cinq séances. SA9 évite la baisse de février-début avril 2025 en restant en cash, mais sa première tentative de reprise, du 15 au 22 avril, perd de l'argent ; la seconde est profitable, close en mai, puis le portefeuille reste inactif près de onze mois. Le principal risque est le faux apaisement, observé en 2022 et de nouveau en 2025. -0,7 % net.
 
 ### Points forts
 
-- Presque toujours en cash : volatilité de 2,3 %, bêta de 0,05, et aucune perte pendant le krach de février-avril 2025.
-- Son cas d'école a fonctionné : après la panique d'avril 2025 elle gagne +4,1 % en 63 séances (2025-04-28 au 2025-07-25) et +7,5 % jusqu'au 2026-04-29.
-- Peu d'ordres (42).
+- **Fait.** En cash du 2025-02-19 au 2025-04-09 : aucune variation pendant la plus forte baisse du fonds (-21,64 %).
+- **Fait.** Une position n'est détenue qu'à 104 clôtures sur 1 416 ; volatilité de 2,3 % et bêta de 0,05 au niveau du portefeuille entier.
+- **Fait.** La séquence ouverte le 2025-04-28 et close le 2025-05-21 est profitable : la valeur passe de 92 753 EUR le 22 avril à 96 131 EUR le 21 mai.
 
 ### Points faibles
 
-- Perd de l'argent sur la période : -0,7 % net, +1,3 % brut. Les 2 041 EUR de coûts, sur des positions de 50 % ouvertes et fermées en quelques jours, dépassent le gain brut.
-- Seulement 8 mois positifs sur 67 ; Sharpe négatif (-0,04), score de qualité nul, et -2,8 % à coûts doublés.
-- Trop peu d'épisodes pour juger : la règle repose sur une poignée de paniques, et celles de 2022 ont mal tourné.
+- **Fait.** -0,70 % net, +1,34 % brut : les 2 041 EUR de coûts dépassent le gain brut. -2,8 % dans le second run à coûts doublés ; Sharpe de -0,04 ; score nul.
+- **Fait.** Le bêta de 0,05 masque l'intermittence : quand elle est investie, la règle porte entre 49 % et 53 % du capital sur un seul fonds.
+- **Fait.** 8 mois positifs, 7 négatifs et 52 sans variation sur 67. Avril 2025, mois de la panique que la règle est censée exploiter, est son pire mois (-2,68 %).
+- **Fait.** Sa perte maximale (-8,00 %), partie du sommet du 2022-03-29, n'est toujours pas récupérée au 2026-10-09 : 1 655 jours.
+- **Fait.** 42 exécutions, soit 21 séquences d'entrée et de sortie : trop peu pour juger, et ce ne sont pas 21 paniques indépendantes.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Sa perte maximale de -8,0 % s'étale du 2022-03-29 au 2025-04-28 (788 séances, 3 % d'exposition moyenne) : ce sont des pertes prises par à-coups, jamais rattrapées faute d'occasions. Le cœur en est le printemps 2022 (2022-03-31 au 2022-06-30, -4,8 %) : dans un marché baissier, chaque détente du VIX est suivie d'une nouvelle vague de baisse. La règle achète le soulagement à 50 %, le fonds rechute, elle revend plus bas, et recommence.
+**Fait.** La plus forte baisse va du 2022-03-29 au 2025-04-28 (-8,00 %, poids de clôture moyen 3 %) : des pertes prises par à-coups et jamais rattrapées. Le cœur en est le printemps 2022 (2022-03-31 au 2022-06-30, -4,84 %). Le creux lui-même vient d'un faux départ en 2025 : en cash jusqu'au 14 avril (95 272 EUR), la règle ouvre une position constatée le 15 avril et en sort le 22 (92 753 EUR), soit -2,64 % en une semaine. **Lecture.** Dans les deux cas une détente du VIX est suivie d'une rechute : la règle achète le soulagement à 50 % et revend plus bas.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Du 2025-04-28 au 2026-04-29, la stratégie gagne +7,5 %, dont +4,1 % sur les 63 premières séances. Après la panique d'avril 2025, le VIX retombe nettement sous son pic alors que le fonds repart : les deux conditions sont réunies, la règle entre à 50 % et le rebond se poursuit sans seconde vague. C'est la seule panique de la période qui se soit résorbée d'un coup.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2025-04-28 au 2026-04-29 (+7,53 %), mais ce n'est pas une position tenue un an. Elle se compose de trois morceaux : après le faux départ du 15 au 22 avril, la seconde entrée (constatée le 28 avril, sortie le 21 mai 2025) porte la valeur à 96 131 EUR, soit le +4,10 % des 63 meilleurs rendements consécutifs, entièrement acquis le 21 mai ; le portefeuille reste ensuite en cash, à 96 131,21 EUR exactement, jusqu'au 2026-04-02 ; de nouvelles positions prises en avril 2026 ajoutent +3,30 % depuis ce plateau. **Lecture.** Le creux qui sert d'origine à cette mesure est choisi après coup : le récit d'un rebond capté sans accroc efface l'échec de la semaine précédente.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Marché baissier à plusieurs vagues (2022) : une détente du VIX précède une rechute, et la règle achète chaque faux soulagement.
-- Panique sans pic au-dessus de 30 : la règle ne voit rien et reste en cash, ce qui n'est pas une perte mais pas un gain non plus.
-- Série publiée avec un jour de retard : un VIX trop ancien envoie la règle en cash, parfois au moment où le signal serait utile.
+- **Observé.** Faux apaisement : une détente du VIX suivie d'une rechute, au printemps 2022 comme du 15 au 22 avril 2025.
+- **Plausible.** Panique dont le pic reste sous 30 : la règle ne s'active pas.
+- **Plausible.** Série publiée avec un jour de retard : un VIX trop ancien envoie la règle en cash.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- Le résultat net de chacune des 21 séquences, et leur regroupement par panique : c'est la seule unité d'analyse pertinente pour une règle aussi rare.
+- La règle comme poche d'un portefeuille, plutôt que seule face au cash.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

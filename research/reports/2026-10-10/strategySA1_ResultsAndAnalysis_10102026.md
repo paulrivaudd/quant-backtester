@@ -83,34 +83,42 @@ Activité : une position est détenue à la clôture de **940 valorisations sur 
 
 ### En résumé
 
-Détenir ETF_WORLD au-dessus de sa moyenne mobile 20 jours, être en cash en dessous. C'est l'étalon historique des règles SA, et la règle la plus chère à exécuter : +20,5 % net contre +94,8 % pour le fonds détenu.
+Détenir ETF_WORLD au-dessus de sa moyenne mobile 20 jours, être en cash en dessous. Sur cette période la règle amortit fortement la chute de février-avril 2025, mais cette protection n'est pas régulière : sa pire baisse se produit en 2021-2022 malgré une exposition réduite, et les passages répétés entre cash et fonds, puis les frais, dégradent le résultat. Elle reste un étalon de timing réactif, sans avantage net démontré sur le fonds détenu : +20,5 % net contre +94,8 %.
 
 ### Points forts
 
-- Évite l'essentiel d'un krach rapide : pendant la chute du fonds de février-avril 2025 (-21,6 %), la règle ne perd que -6,6 %, avec 22 % d'exposition moyenne.
-- Volatilité de 8,9 % contre 13,8 % pour le fonds, et bêta de 0,41 seulement.
-- Règle lisible, sans paramètre estimé : un seul indicateur, la distance du cours à sa MM20.
+- **Fait.** Pendant la plus forte baisse du fonds (2025-02-19 au 2025-04-09, -21,64 %), la règle perd -6,58 %, avec un poids de clôture moyen de 22 %.
+- **Fait.** Volatilité de 8,9 % contre 13,8 % pour le fonds, bêta de 0,41.
+- **Fait.** Aucun paramètre estimé : un seul indicateur, la distance du cours à sa MM20.
 
 ### Points faibles
 
-- Les coûts mangent le résultat : 143 ordres portant chacun sur tout le portefeuille, une rotation de 25,5 fois l'actif par an, 15 730 EUR de coûts. Le rendement brut est de +36,2 %, le net de +20,5 %, et de +4,4 % seulement quand les coûts sont doublés.
-- Investie 66 % du temps, elle capte moins d'un quart de la hausse du fonds : alpha de -1,6 % par an et score de qualité nul (blocs robustesse et implémentation à zéro).
-- L'ordre part le soir et s'exécute à l'ouverture suivante : la règle vend après la baisse et rachète après la hausse, et le gap de nuit est à sa charge.
-- 2026 est une année blanche (-0,04 %) alors que le fonds gagne +17,7 % : en marché haussier sans tendance nette au pas de 20 jours, les faux signaux annulent le gain.
+- **Fait.** L'une des règles les plus coûteuses, surtout au regard du gain obtenu : 15 730 EUR de coûts et une rotation de 25,5 fois l'actif par an (seule SA5 coûte plus, 20 517 EUR). Les coûts représentent environ 43 % du gain brut : +36,2 % brut, +20,5 % net, et +4,4 % dans le second run réel à coûts doublés.
+- **Fait.** Ses 143 ordres portent presque tous sur la totalité du portefeuille : dans les exécutions, la valeur traitée va de 0,9 à 1,2 fois le capital initial par ordre.
+- **Fait.** Score de qualité nul : les blocs robustesse et implémentation sont à zéro, et un seul bloc nul suffit à annuler une moyenne géométrique. Ce zéro n'est pas une probabilité de gain nulle.
+- **Fait.** Sa pire baisse (-18,95 %) n'est récupérée que le 2024-01-25, 794 jours après le sommet du 2021-11-22 ; une deuxième, partie du 2025-11-03 (-10,1 % au creux), n'est pas récupérée au 2026-10-09.
+- **Lecture.** L'ordre décidé le soir est exécuté à l'ouverture suivante : la règle agit après le mouvement qui l'a déclenchée. Le gap de nuit peut jouer dans les deux sens ; sa contribution nette n'est pas décomposée ici.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Du 2021-11-22 au 2022-07-14 (167 séances), la stratégie perd -18,95 % alors que le fonds ne perd que -12,0 %, avec 36 % d'exposition moyenne. C'est le marché baissier en dents de scie de 2022 : chaque rebond repasse au-dessus de la MM20 et déclenche un achat à 100 %, chaque rechute déclenche une vente quelques jours plus tard, plus bas. La règle n'a donc pas été protégée par son cash : elle a été investie pendant les rechutes et absente pendant une partie des rebonds, en payant les coûts de chaque aller-retour. Avril 2022 est son pire mois (-5,1 % contre -2,7 % pour le fonds).
+**Fait.** Du 2021-11-22 au 2022-07-14, la stratégie perd -18,95 % alors que le fonds perd -12,0 %, avec un poids de clôture moyen de 36 %. Sur cet intervalle les poids publiés montrent 12 passages du cash au fonds et 12 passages du fonds au cash. Avril 2022 est son pire mois (-5,08 % contre -2,67 % pour le fonds). **Lecture.** Perdre plus que le fonds en étant investi un tiers du temps suppose d'avoir été investi pendant les rechutes et absent d'une partie des rebonds : c'est ce que produisent des allers-retours autour d'une moyenne courte dans un marché baissier irrégulier. Le résultat et les frais de chacun de ces 24 passages ne sont pas isolés dans ce rapport.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Sa plus forte hausse va du 2022-07-14 au 2025-11-03 (+37,3 %, contre +59,1 % pour le fonds, 70 % d'exposition). Ses 63 meilleures séances, du 2023-11-10 au 2024-02-12 (+13,5 %), sont une hausse régulière pendant laquelle le cours reste au-dessus de sa MM20 : la règle est investie à 100 % tout du long, ne passe aucun ordre et fait exactement le rendement du fonds. C'est le seul régime où elle ne coûte rien.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2022-07-14 au 2025-11-03 (+37,3 %, le fonds +59,1 %, poids moyen 70 %) : c'est une mesure de durée libre, pas une position tenue trois ans. Les 63 meilleurs rendements consécutifs (2023-11-10 au 2024-02-12, +13,51 %) coïncident avec une fenêtre où le poids de clôture reste à 99,9 % : la règle y est déjà investie, aucun ordre n'y est exécuté, et le rendement est très proche de celui du fonds (+13,52 % en clôture). **Lecture.** La règle fait le rendement du fonds quand le cours reste au-dessus de sa moyenne, et rien de plus.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Marché sans tendance ou baissier en dents de scie (2022, 2026) : le cours croise sa MM20 sans arrêt, et chaque croisement coûte un aller-retour et un gap de nuit.
-- Rebond en V après un krach : la règle est en cash au point bas et ne rachète qu'une fois le cours repassé au-dessus de sa moyenne.
-- Toute hausse des coûts d'exécution : à coûts doublés le gain disparaît presque entièrement.
+- **Observé.** Marché baissier irrégulier (2021-2022) : passages répétés entre cash et fonds, chacun payant un aller-retour.
+- **Observé.** En 2026, jusqu'au 9 octobre, la règle fait -0,04 % quand le fonds fait +17,7 %, avec 26 changements d'état dans les poids publiés. Les faux signaux sont une explication plausible, non chiffrée ici.
+- **Plausible.** Rebond rapide après un krach : la règle est en cash au point bas et ne rachète qu'une fois le cours repassé au-dessus de sa moyenne.
+- **Observé.** Hausse des coûts d'exécution : à coûts doublés le gain disparaît presque entièrement.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- Le résultat et les frais de chaque passage cash/fonds, à partir des exécutions : c'est ce qui dirait si la perte de 2021-2022 vient des signaux ou des coûts.
+- La contribution des gaps de nuit, favorable ou défavorable.
+- L'alpha de -1,6 % par an est une estimation ponctuelle, sans intervalle.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

@@ -82,7 +82,38 @@ Mois : **44 positifs, 23 négatifs, 0 sans variation** sur 67 (mois incomplets :
 
 Activité : une position est détenue à la clôture de **1415 valorisations sur 1416** ; le poids total détenu y va de 99.9% à 100.0% (moyenne sur toutes les valorisations : 99.9%).
 
-_Aucun commentaire n'a été rédigé pour cette stratégie : seuls les faits mesurés ci-dessus sont disponibles._
+### En résumé
+
+La référence économique de l'étude : ETF_WORLD acheté une fois par le moteur, avec les mêmes coûts, puis gardé. C'est l'étalon du score QUALITY_V1, donc il n'est pas noté. Il sert à comparer les rendements, les baisses et surtout leurs durées de récupération.
+
+### Points forts
+
+- **Fait.** +94,8 % net, Sharpe de 0,93 : aucune stratégie du catalogue ne fait mieux en rendement, et seuls le témoin EWMA (0,934) et le panier 50/50 (0,96) ont un Sharpe supérieur, sans que ces écarts soient testés.
+- **Fait.** Un seul ordre, 100 EUR de coûts.
+- **Fait.** Sa plus forte baisse est aussi celle qu'il efface le plus vite parmi les livres exposés : sommet du 2025-02-19 retrouvé le 2025-10-06, 229 jours après.
+
+### Points faibles
+
+- **Fait.** Perte maximale de -21,64 % en 35 rendements, du 2025-02-19 au 2025-04-09, et volatilité de 13,8 %.
+- **Fait.** Sa plus longue période sous un sommet dure 696 jours, du 2022-01-04 au 2023-12-01 (creux à -16,7 %).
+- **Fait.** -13,7 % en 2022.
+
+### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
+
+**Fait.** Du 2025-02-19 au 2025-04-09 le fonds perd -21,64 % ; les 63 pires rendements consécutifs (2025-01-10 au 2025-04-09) font -18,16 %. Mars 2025 est son pire mois (-7,93 %). Ce sont les cours du fonds en euros : la variation inclut celle du dollar.
+
+### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
+
+**Fait.** Les 63 meilleurs rendements consécutifs suivent immédiatement le creux : +19,33 % du 2025-04-09 au 2025-07-10. C'est la fenêtre que les règles sorties du marché pendant la chute ont en partie manquée.
+
+### Situations de marché les plus risquées pour cette stratégie
+
+- **Observé.** Toute baisse du marché actions mondial, subie en entier.
+- **Observé.** Marché baissier lent (2022) : presque deux ans sous le sommet.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- Le cash des autres livres n'est pas rémunéré et le taux sans risque est nul : avec un cash rémunéré, toutes les comparaisons à ce fonds se déplaceraient en faveur des règles peu investies. Ce serait une autre hypothèse, à documenter.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

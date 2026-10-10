@@ -83,33 +83,40 @@ Activité : une position est détenue à la clôture de **198 valorisations sur 
 
 ### En résumé
 
-Acheter ETF_WORLD, à hauteur de 50 % au plus, après une baisse de cinq séances inhabituelle par rapport à sa volatilité, seulement au-dessus de sa moyenne 200 jours. Une stratégie presque toujours en cash : +4,4 % net en cinq ans et demi.
+Acheter ETF_WORLD, à hauteur de 50 % au plus, après une baisse de cinq séances inhabituelle par rapport à sa volatilité, seulement au-dessus de sa moyenne 200 jours. La faible perte du portefeuille vient largement de sa faible fréquence d'investissement : une position n'est détenue qu'à 198 clôtures sur 1 416. Quand elle s'active, la poche peut atteindre 50 % et acheter plusieurs fois une baisse qui s'installe. +4,4 % net en cinq ans et demi, concentré sur 2024.
 
 ### Points forts
 
-- Risque très faible : volatilité de 1,9 %, perte maximale de -3,4 %, bêta de 0,05.
-- Pendant le krach de 2025 elle ne perd que -2,9 % quand le fonds perd -21,6 % : le filtre de tendance coupe les achats dès que le cours passe sous sa MM200.
-- Alpha légèrement positif (+0,2 % par an) : les replis achetés en tendance haussière ont été payés en moyenne.
+- **Fait.** Au niveau du portefeuille entier : volatilité de 1,9 %, perte maximale de -3,42 %, bêta de 0,05.
+- **Fait.** Du 2025-02-19 au 2025-04-09 elle perd -2,92 % quand le fonds perd -21,64 %, avec un poids de clôture moyen de 10 %.
+- **Fait.** Alpha de +0,18 % par an contre le fonds : pratiquement nul, sans intervalle. Il ne démontre pas que les replis achetés ont été payés en moyenne.
 
 ### Points faibles
 
-- Exposition moyenne de 3,8 % : le capital dort en cash non rémunéré, et la règle passe à côté de la quasi-totalité de la hausse du fonds.
-- Les coûts prennent la moitié du gain : +9,0 % brut, +4,4 % net, pour 237 ordres et 4 572 EUR. À coûts doublés le résultat est négatif (-0,2 %).
-- Score de qualité nul et Sharpe de 0,41 ; seulement 28 mois positifs sur 67.
+- **Fait.** La volatilité de 1,9 % est celle d'un portefeuille en cash 86 % du temps. Le risque porté quand le signal est actif est celui d'une position allant jusqu'à 50,4 % du capital.
+- **Fait.** +9,0 % brut, +4,4 % net pour 237 ordres et 4 572 EUR de coûts ; -0,16 % dans le second run à coûts doublés.
+- **Fait.** Sa perte maximale, pourtant de -3,42 % seulement, n'est pas récupérée au 2026-10-09 (589 jours) ; la précédente (-2,55 %) a duré 1 039 jours, du 2021-10-05 au 2024-08-09.
+- **Fait.** 28 mois positifs, 14 négatifs et 25 sans variation. Le résultat dépend de 2024 (+5,5 %) : le produit des rendements des autres années est d'environ -1,0 %. Ce n'est pas un nouveau backtest, c'est un indicateur de concentration.
+- **Fait.** Score de qualité nul, par les blocs robustesse et implémentation.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Du 2025-02-27 au 2025-03-07 (7 séances), la stratégie perd -3,4 % avec jusqu'à 50 % d'exposition, pendant que le fonds perd -7,0 %. Le cours est encore au-dessus de sa MM200 : le premier décrochage ressemble à un repli ordinaire, la règle l'achète à pleine taille, et la baisse continue. Elle ne sort qu'une fois le signal éteint ou le cours passé sous sa moyenne longue. C'est le défaut classique d'un achat de repli : il ne distingue pas un repli du début d'une tendance baissière.
+**Fait.** Du 2025-02-27 au 2025-03-07 la stratégie perd -3,42 % pendant que le fonds perd -7,0 % en clôture. Ce n'est pas un achat unique gardé jusqu'au bout : le poids de clôture est de 12,7 % le 28 février, 49,9 % le 3 mars, 4,9 % le 4, puis de nouveau 49,4 % le 5, 49,5 % le 6 et 49,0 % le 7. La règle allège quand le signal faiblit, puis rachète après une nouvelle baisse. Le 7 mars le cours passe sous sa MM200 : la cible du soir est zéro, mais le poids détenu est encore de 49,0 %, et le cash n'est constaté que le 10 mars, après exécution à l'ouverture. **Lecture.** Le filtre de tendance ne protège pas à la clôture du franchissement, et un achat de repli ne distingue pas un repli du début d'une baisse durable.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Du 2024-04-19 au 2025-02-27 (221 séances), la stratégie gagne +6,1 % avec 6 % d'exposition moyenne, pendant que le fonds gagne +20,7 %. Dans une tendance haussière régulière, chaque repli de quelques séances est suivi d'un retour vers les plus hauts : la règle achète le creux, revend à mesure que le signal s'éteint, et encaisse de petits gains répétés. Son meilleur trimestre (2024-09-06 au 2024-12-04, +2,9 %) est de cette nature.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2024-04-19 au 2025-02-27 (+6,1 %, le fonds +20,7 %, poids moyen 6 %) : une suite d'épisodes courts, pas une position. Le meilleur trimestre glissant (2024-09-06 au 2024-12-04) fait +2,9 %. **Lecture.** Dans une hausse régulière, les replis de quelques séances ont été suivis d'un retour vers les plus hauts ; le taux de réussite et le gain net par épisode ne sont pas mesurés ici.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Début d'un vrai retournement, quand le cours est encore au-dessus de sa MM200 : le premier repli est acheté à 50 % et se prolonge.
-- Baisse par gaps de nuit successifs : l'ordre de vente est exécuté à l'ouverture suivante, après le gap.
-- Hausse sans repli : la règle n'a rien à acheter et reste en cash.
+- **Observé.** Début d'une baisse durable quand le cours est encore au-dessus de sa MM200 (mars 2025) : la poche achète à pleine taille, parfois deux fois, et la sortie se fait à l'ouverture suivant le franchissement.
+- **Plausible.** Baisse par gaps de nuit successifs : la vente est exécutée après le gap.
+- **Observé.** Frais : à coûts doublés le gain disparaît.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- Le résultat par épisode d'activité (taux de réussite, gain net moyen) sur les 198 clôtures investies : une régression agrégée ne répond pas à la question de savoir si les replis sont payés.
+- La règle comme poche d'un portefeuille déjà investi, plutôt que seule face au cash.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

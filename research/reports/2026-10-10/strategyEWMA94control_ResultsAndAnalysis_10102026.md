@@ -83,34 +83,41 @@ Activité : une position est détenue à la clôture de **1415 valorisations sur
 
 ### En résumé
 
-Le témoin de SA11 : la même règle d'allocation, la même fenêtre de 756 rendements et la même bande, sur une variance EWMA de coefficient 0,94 sans rien estimer. Il n'a pas de code de catalogue. C'est lui qui gagne la comparaison dédiée : +73,4 % net, Sharpe 0,93.
+Le témoin de SA11 : la même règle d'allocation, la même fenêtre et la même bande, sur une variance EWMA de coefficient 0,94 dont les coefficients ne sont pas réestimés. Il fournit ici le meilleur compromis observé entre performance nette, coût et réduction de la perte parmi les trois contrôles de volatilité : +73,4 % net, Sharpe 0,93. Ce constat ne démontre pas que son avance est significative. Il n'a pas de code de catalogue et n'était pas l'objet de l'hypothèse.
 
 ### Points forts
 
-- Le meilleur des trois contrôles de volatilité : Sharpe de 0,934, égal à celui du fonds détenu (0,930), avec une perte maximale de -15,4 % au lieu de -21,6 %.
-- Alpha positif contre le fonds (+0,4 % par an) pour un bêta de 0,78 ; deuxième du classement commun (53,6 %).
-- Aussi peu coûteux que SA6 : 220 ordres, 1 519 EUR, une rotation de 2,1 fois l'actif par an ; tient à coûts doublés (+70,9 %, Sharpe 0,91).
-- Aucun paramètre estimé, aucune dépendance, aucun risque de non-convergence.
+- **Fait.** Sharpe de 0,934 contre 0,930 pour le fonds détenu : un écart économiquement minuscule, qui ne démontre aucune supériorité. Perte maximale de -15,45 % au lieu de -21,64 %.
+- **Fait.** 220 ordres, 1 519 EUR de coûts, rotation de 2,1 fois l'actif par an ; +70,9 % et Sharpe de 0,91 dans le second run à coûts doublés.
+- **Fait.** Pas d'optimisation statistique quotidienne : un seul paramètre, fixé d'avance à 0,94, une variance amorcée sur 60 rendements, puis une récurrence. Pas de dépendance à un optimiseur GARCH, donc pas de non-convergence possible.
+- **Fait.** Deuxième du classement commun (53,6 %), devant SA6 (52,0 %) et SA11 (48,6 %) ; ces écarts ne sont pas un test.
 
 ### Points faibles
 
-- Prévision moins bonne que le GARCH (QLIKE -8,6033 contre -8,6225) et trop basse en moyenne : le rapport r²/q vaut 1,11.
-- Rend 21 points de rendement au fonds détenu (+73,4 % contre +94,8 %) : sous-investi dès que la volatilité dépasse 12 %.
-- Son avance sur SA6 est faible et non testée comme hypothèse : c'est un témoin, regardé après coup.
+- **Fait.** QLIKE moyenne de -8,6033, moins bonne que celle du GARCH (-8,6225) dans l'échantillon ; l'intervalle de cette différence inclut zéro. Elle est en revanche meilleure que celle de l'estimateur de SA6, avec un intervalle qui exclut zéro ([-0,075 ; -0,006]).
+- **Fait.** La moyenne de r²/q vaut 1,106 : les carrés des rendements dépassent en moyenne normalisée les variances prévues. Cela ne signifie pas mécaniquement une sous-prévision de 10,6 % (une moyenne de rapports n'est pas un rapport de moyennes).
+- **Fait.** +73,4 % contre +94,8 % pour le fonds ; sommet retrouvé le 2026-01-06, 321 jours après, contre 229 pour le fonds.
+- **Fait.** L'alpha de +0,39 % par an est une estimation ponctuelle sans intervalle. Son avance sur SA6 n'a pas été testée.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Du 2025-02-19 au 2025-04-09, le témoin perd -15,4 % contre -21,6 % pour le fonds, avec 72 % d'exposition moyenne. Comme les autres il est presque pleinement investi au départ (97 %). Sa mémoire, plus longue que celle du GARCH et plus courte que celle de la volatilité 60 jours, le garde vers 67 % fin mars : il aborde le choc d'avril moins exposé que SA11 (78 %) et se réexpose ensuite un peu plus vite que SA6.
+**Fait.** Du 2025-02-19 au 2025-04-09 le témoin perd -15,45 % contre -21,64 % pour le fonds, avec un poids de clôture allant de 97 % à 34 %. Le 2 avril, avant la seconde vague, il détient 67,2 %, contre 77,7 % pour SA11 et 65,0 % pour SA6. **Lecture.** Dans cet épisode l'EWMA reste moins exposée que SA11 avant le choc d'avril. On ne peut pas en déduire que sa mémoire est en général plus longue que celle d'un GARCH : le poids d'un choc y décroît de 0,94 par observation, soit une demi-vie d'environ 11 observations, et la réponse d'un GARCH réestimé dépend de plusieurs paramètres et du chemin des rendements.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Sa plus forte hausse couvre presque toute la période (2021-05-19 au 2026-10-06, +78,1 % contre +100,3 %). Son meilleur trimestre, du 2023-10-30 au 2024-01-30 (+15,4 % contre +15,6 %), est une hausse calme : volatilité sous la cible, exposition de 99 %, presque aucun ordre.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur couvre presque toute la période (2021-05-19 au 2026-10-06, +78,1 % contre +100,2 %). Sur les 63 meilleurs rendements consécutifs (2023-10-30 au 2024-01-30, +15,40 % contre +15,58 %), le poids de clôture ne descend pas sous 91,2 % ; la volatilité prévue dépasse 12 % à six valorisations, jusqu'à 13,2 %. Trois ordres, 18 EUR de coûts.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Choc soudain en marché calme : exposition proche de 100 % au moment du choc.
-- Rebond en V : l'exposition reste basse plusieurs semaines après la panique (35 à 44 % jusqu'à la mi-mai 2025).
-- Régime de volatilité durablement au-dessus de 12 % dans un marché qui monte.
+- **Observé.** Choc soudain en marché calme : poids proche de 100 % au moment du choc.
+- **Observé.** Rebond rapide après une panique : le poids reste entre 30 % et 44 % du 2025-04-15 au 2025-05-19.
+- **Plausible.** Régime de volatilité durablement au-dessus de 12 % dans un marché qui monte.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- Un bootstrap apparié de la différence de Sharpe avec SA6, si l'on veut choisir entre les deux témoins.
+- Une sensibilité descriptive à quelques coefficients fixés d'avance (0,90, 0,97), sans chercher après coup le meilleur sur ce même historique.
+- Regardé après coup comme témoin, il n'a pas été préinscrit comme candidat : le retenir serait une nouvelle hypothèse à écrire.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

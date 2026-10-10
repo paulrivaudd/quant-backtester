@@ -81,7 +81,38 @@ Mois : **41 positifs, 26 négatifs, 0 sans variation** sur 67 (mois incomplets :
 
 Activité : une position est détenue à la clôture de **1415 valorisations sur 1416** ; le poids total détenu y va de 99.6% à 100.0% (moyenne sur toutes les valorisations : 99.8%).
 
-_Aucun commentaire n'a été rédigé pour cette stratégie : seuls les faits mesurés ci-dessus sont disponibles._
+### En résumé
+
+La seconde référence : ETF_WORLD et ETF_SP500_PEA à poids égaux, redemandés à chaque décision. Elle n'est pas une stratégie du catalogue et n'est pas comptée comme un essai, mais elle est notée, et elle est première du classement commun (77,9 %). C'est le contrôle indispensable de SA2 et de SA5, qui détiennent les deux mêmes fonds.
+
+### Points forts
+
+- **Fait.** +103,35 % net, Sharpe de 0,96, alpha de +0,51 % par an contre le fonds monde (sans intervalle) pour un bêta de 1,02.
+- **Fait.** 617 ordres mais de très petite taille : 736 EUR de coûts, rotation de 0,18 fois l'actif par an ; +102,7 % dans le second run à coûts doublés.
+- **Fait.** Au-dessus du fonds monde en 2021 (partielle), 2023, 2024 et 2026 (partielle) ; en dessous en 2022 et en 2025.
+
+### Points faibles
+
+- **Fait.** Aucune réduction du risque : perte maximale de -22,47 %, un peu plus profonde que celle du fonds monde, et volatilité de 14,2 %.
+- **Fait.** Derrière le fonds monde en 2025 (+5,0 % contre +6,6 %) ; son plus fort retard relatif va du 2024-12-24 au 2026-02-27 (écart relatif de -2,8 %).
+- **Lecture.** Son avance vient de la moitié placée sur le S&P 500 pendant une période favorable aux actions américaines : c'est un choix de panier fait avant l'étude, pas un signal, et rien ne dit qu'il se répétera.
+
+### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
+
+**Fait.** Du 2025-02-19 au 2025-04-09 le panier perd -22,47 % contre -21,64 % pour le fonds monde, le fonds S&P 500 perdant -23,3 % en clôture. Sommet retrouvé le 2025-10-09, 232 jours après.
+
+### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
+
+**Fait.** Sa plus forte avance relative sur le fonds monde va du 2021-06-16 au 2024-12-24 : +61,2 % contre +52,2 %, écart relatif de +5,9 %. Les 63 meilleurs rendements consécutifs (2025-04-09 au 2025-07-10) font +19,30 %, comme le fonds monde.
+
+### Situations de marché les plus risquées pour cette stratégie
+
+- **Observé.** Toute baisse du marché actions, subie en entier.
+- **Plausible.** Sous-performance durable des actions américaines ou baisse du dollar : la moitié du panier y est exposée.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- Premier du classement sans être une stratégie : cela dit surtout qu'aucune règle du catalogue ne bat un panier passif des mêmes fonds sur cette période.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

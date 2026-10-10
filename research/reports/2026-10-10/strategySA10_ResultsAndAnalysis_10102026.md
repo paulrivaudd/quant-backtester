@@ -83,33 +83,41 @@ Activité : une position est détenue à la clôture de **1415 valorisations sur
 
 ### En résumé
 
-L'ensemble : cinq règles (momentum, moyennes lissées, repli, inclinaison relative, détente du VIX) avec des budgets fixes et un contrôle de risque commun. Les fonds de style et monétaire ne sont pas enregistrés, donc leurs budgets (30 % du capital pour les fonds de style) restent en cash. +32,1 % net, Sharpe 0,86, la plus faible perte maximale des règles investies.
+SA10 sans facteurs ni monétaire : cinq règles (momentum, moyennes lissées, repli, inclinaison relative, détente du VIX) avec des budgets fixes et un contrôle de risque commun. Cette version partielle réduit fortement le risque et le rendement par son exposition limitée ; pendant avril 2025 l'exposition baisse encore, donc la protection ne vient pas uniquement d'un cash statique. L'apport propre de la diversification entre règles reste à isoler. +32,1 % net, Sharpe 0,86. Ce run ne permet pas de juger la version complète.
 
 ### Points forts
 
-- Le meilleur profil de risque des règles réellement investies : volatilité de 6,0 %, perte maximale de -11,8 % (bloc risque à 0,96), bêta de 0,41.
-- Sharpe de 0,86, proche du fonds détenu, avec moins de la moitié de son exposition : la diversification entre règles lisse les erreurs de chacune.
-- Coûts modérés (1 986 EUR) et 42 mois positifs sur 67 ; quatrième du classement commun (51,1 %).
+- **Fait.** Volatilité de 6,0 % et perte maximale de -11,76 %, inférieures à celles de toutes les stratégies largement exposées aux actions de cette étude ; bêta de 0,41.
+- **Fait.** Sharpe de 0,86 pour un poids de clôture moyen de 42,4 %. Avec un cash non rémunéré et un taux sans risque nul, réduire l'échelle des rendements conserve à peu près le Sharpe : ce chiffre ne prouve pas que la diversification entre règles lisse leurs erreurs.
+- **Fait.** 1 986 EUR de coûts ; 42 mois positifs et 25 négatifs sur 67 ; quatrième du classement commun (51,1 %).
 
 ### Points faibles
 
-- Sous-investie par construction : 42 % d'exposition moyenne, 56 % au maximum, parce que les budgets des règles sans instrument dorment en cash non rémunéré.
-- Rendement total de +32,1 % contre +94,8 % : en marché haussier le retard est mécanique, et l'alpha est nul (-0,1 % par an).
-- 465 ordres pour une petite exposition : le Sharpe passe de 0,86 à 0,80 à coûts doublés, et le score recule de 51 % à 44 %.
+- **Fait.** 57,6 % de cash en moyenne, et jamais plus de 55,9 % investi. Le budget des fonds de style (30 % du capital) n'est pas alloué faute d'instruments ; le reste du cash vient des règles inactives, des plafonds et du contrôle de risque. La poche monétaire, absente elle aussi, aurait placé le capital résiduel.
+- **Fait.** +32,1 % contre +94,8 % ; alpha de -0,12 % par an, proche de zéro, sans intervalle.
+- **Fait.** La baisse est peu profonde mais longue : sommet du 2025-02-19 retrouvé le 2026-05-07, 442 jours après, contre 229 pour le fonds.
+- **Fait.** 465 ordres : Sharpe de 0,80 et score de 44 % dans le second run à coûts doublés.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Du 2025-02-19 au 2025-04-09, l'ensemble perd -11,8 % contre -21,6 % pour le fonds, avec 50 % d'exposition moyenne. Ses composantes de tendance (momentum, moyennes 50/200) sont pleinement investies au début du krach, puisque le marché sort de plus hauts, et aucune ne réagit en sept semaines ; seule la moitié du capital laissée en cash limite la perte. L'année 2025 se termine à -1,7 % : les règles de tendance ont ensuite réduit pendant le rebond.
+**Fait.** Du 2025-02-19 au 2025-04-09 l'ensemble perd -11,76 % contre -21,64 % pour le fonds. Le poids de clôture total est d'environ 50 % au début, 49,2 % le 2 avril, 35,1 % le 9 avril, puis 28,0 % le 22 avril et 16,0 % le 19 mai. **Lecture.** Le cash de départ explique une partie de la protection, la réduction en cours de route une autre ; leur part respective, et celle du contrôle de risque commun, ne sont pas séparées ici. **Fait.** L'exposition continue de baisser après le creux du fonds et l'année 2025 se termine à -1,7 % contre +6,6 %.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Sa plus forte hausse couvre presque toute la période (+33,9 % du 2021-05-19 au 2026-10-06). Le meilleur trimestre, du 2026-03-31 au 2026-07-01 (+8,6 %, la moitié des +16,3 % du fonds), est une hausse régulière : les règles de tendance sont à leur budget maximal, l'exposition est stable autour de 52 % et l'ensemble capte la moitié du mouvement.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur couvre presque toute la période (2021-05-19 au 2026-10-06, +33,9 %). Sur les 63 meilleurs rendements consécutifs (2026-03-31 au 2026-07-01), l'ensemble fait +8,6 % contre +16,3 % pour le fonds, avec un poids de clôture entre 49 % et 56 %. **Lecture.** Il capte à peu près la moitié du mouvement parce qu'il en détient à peu près la moitié.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Krach rapide depuis des plus hauts : toutes les règles de tendance sont investies en même temps, la diversification entre règles disparaît.
-- Long marché haussier : le cash structurel coûte chaque jour.
-- Rebond en V : les composantes lentes sortent après la baisse et reviennent après la reprise, comme SA3 en 2025.
+- **Observé.** Chute rapide partie de plus hauts (2025) : l'exposition est à son niveau habituel au départ et baisse surtout après le début de la chute.
+- **Observé.** Marché haussier long : le cash, non rémunéré ici, est un coût d'opportunité permanent.
+- **Observé.** Reprise après une panique : l'exposition est au plus bas (16 % le 2025-05-19) pendant le rebond.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- La décomposition des cibles avant et après agrégation, plafonds et facteur de réduction du risque : le code calcule ce diagnostic, le rapport ne l'exploite pas.
+- Des ablations règle par règle, et la même combinaison sans contrôle de risque.
+- Une allocation simple aux deux fonds à exposition ou volatilité comparable, avant de conclure à la valeur de l'ensemble.
+- La version complète, quand les instruments de SA7 et SA8 seront enregistrés.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

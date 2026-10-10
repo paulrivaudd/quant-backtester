@@ -83,33 +83,39 @@ Activité : une position est détenue à la clôture de **1084 valorisations sur
 
 ### En résumé
 
-Exposition à ETF_WORLD proportionnelle à l'écart entre ses moyennes mobiles 50 et 200 jours : cash quand la MM50 est sous la MM200, 100 % à partir de 2 % d'écart. +57,9 % net, Sharpe 0,79, et la règle la moins chère du catalogue.
+Exposition à ETF_WORLD proportionnelle à l'écart entre ses moyennes mobiles 50 et 200 jours : cash quand la MM50 est sous la MM200, 100 % à partir de 2 % d'écart, de façon continue entre les deux. En 2025 la règle subit presque toute la baisse jusqu'au 9 avril, réduit ensuite progressivement du 11 au 22 avril, puis reste en cash 84 séances : pas de protection de la chute, puis une faible participation au rebond. +57,9 % net, et la règle la moins chère du catalogue.
 
 ### Points forts
 
-- Très peu d'ordres : 78 en cinq ans et demi, 680 EUR de coûts, une rotation inférieure à une fois l'actif par an. Le résultat ne bouge presque pas à coûts doublés (+56,9 %).
-- Protège dans un marché baissier lent : -9,2 % en 2022 contre -13,7 % pour le fonds, avec 22 % d'exposition moyenne ; entre le 2022-04-05 et le 2022-06-17 elle est en cash pendant que le fonds perd -15,0 %.
-- Fait exactement le rendement du fonds quand la tendance est installée (2021, 2024, 2026) et un alpha légèrement positif (+0,4 % par an) pour un bêta de 0,65.
+- **Fait.** 78 ordres en cinq ans et demi, 680 EUR de coûts, une rotation de 0,98 fois l'actif par an ; +56,9 % dans le second run à coûts doublés.
+- **Fait.** -9,1 % en 2022 contre -13,7 % pour le fonds ; du 2022-04-05 au 2022-06-17 elle est en cash pendant que le fonds perd -15,0 %.
+- **Fait.** Alpha de +0,4 % par an pour un bêta de 0,65 : une estimation ponctuelle, sans intervalle, qui ne démontre pas une prime.
 
 ### Points faibles
 
-- Aucune protection contre un krach rapide : perte maximale de -21,6 %, identique à celle du fonds.
-- Prend la baisse puis rate la reprise : -9,6 % en 2025 alors que le fonds finit à +6,6 %.
-- Revient tard après 2022 : +8,6 % en 2023 contre +19,6 %.
+- **Fait.** Perte maximale de -21,64 %, la même que le fonds, mais récupérée le 2026-08-13 seulement : 540 jours après le sommet, contre 229 pour le fonds. C'est son point faible le plus instructif.
+- **Fait.** -9,6 % en 2025 alors que le fonds finit à +6,6 % ; avril 2025 est son pire mois (-8,0 % contre -3,9 %).
+- **Fait.** +8,6 % en 2023 contre +19,6 % ; 748 jours sous le sommet du 2022-01-04.
+- **Fait.** 12 mois sur 67 sans aucune variation : la règle passe de longues périodes entièrement en cash.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Du 2025-02-19 au 2025-04-09, la stratégie perd -21,6 %, investie à 100 % : la MM50 est très au-dessus de la MM200 quand le marché décroche, et deux moyennes aussi lentes ne bougent pas en 36 séances. Le pire vient ensuite : la MM50 passe sous la MM200 après la chute, la règle sort au plus bas et reste largement en cash pendant le rebond. Avril 2025 est son pire mois (-8,0 % contre -3,9 % pour le fonds) et l'année se termine à -9,6 %, seize points derrière le fonds.
+**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -21,64 %, avec un poids de clôture de 100 %. Les deux moyennes bougent pendant ces 35 rendements, mais leur écart reste au-dessus du seuil : le 9 avril il vaut encore +1,94 %, donc la cible reste proche de 100 % et la bande garde la position. La sortie est progressive et vient après le creux : poids de clôture de 99,9 % le 10 avril, 80,1 % le 11, 62,1 % le 14, 46,1 % le 15, 30,5 % le 16, 14,9 % le 17, 0 % le 22. La cible baisse avant le croisement, constaté le 17 avril (écart de -0,05 %). Le portefeuille reste ensuite à zéro pendant 84 séances, du 2025-04-22 au 2025-08-18, rentre à 2,7 % le 19 août et ne revient vers 100 % que fin septembre. Entre les clôtures du 22 avril et du 19 août le fonds monte de +18,1 % : c'est un mouvement du sous-jacent, pas une perte comptable de SA3.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Sa plus forte hausse couvre presque toute la période (2021-05-19 au 2026-10-06, +62,2 % contre +100,3 % pour le fonds). Son meilleur trimestre, du 2026-03-31 au 2026-07-01 (+16,25 %), est celui du fonds : tendance haussière établie, MM50 nettement au-dessus de la MM200, exposition de 100 % sans un seul ordre. La règle gagne quand il n'y a rien à faire.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur couvre presque toute la période (2021-05-19 au 2026-10-06, +62,2 % contre +100,2 % pour le fonds) : une durée libre qui contient les sorties de 2022 et de 2025. Les 63 meilleurs rendements consécutifs (2026-03-31 au 2026-07-01, +16,25 %) ont un poids de clôture de 99,7 % en moyenne, aucun ordre exécuté, et un rendement presque égal à celui du fonds (+16,29 %). **Lecture.** La règle gagne quand il n'y a rien à faire.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Krach en V depuis des plus hauts (2025) : c'est son pire cas, elle subit toute la baisse puis sort avant la reprise.
-- Marché en range où les deux moyennes se croisent : l'exposition oscille entre 0 et 100 % autour d'un écart nul.
-- Reprise brutale après un long marché baissier : le croisement arrive des mois après le point bas.
+- **Observé.** Chute rapide partie de plus hauts puis rebond (2025) : toute la baisse est subie, la sortie se fait après le creux, le retour après la reprise ; la récupération s'en trouve allongée de dix mois par rapport au fonds.
+- **Plausible.** Écart des moyennes oscillant près de zéro : la règle étant continue (0,1 % d'écart donne 5 % d'exposition avant bande), elle n'alterne pas entre 0 et 100 %, mais de petits ajustements répétés peuvent coûter.
+- **Observé.** Reprise après un marché baissier long (2023) : le retour à l'exposition vient plusieurs mois après le point bas.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- Comparer à un fonds détenu à exposition constante de 71,5 % : c'est ce qui dirait si le timing ajoute quelque chose à la simple réduction d'exposition. Un tel contrôle, choisi après coup, resterait descriptif.
+- Le coût et le résultat de la séquence de sortie du 11 au 22 avril 2025, à partir des exécutions.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

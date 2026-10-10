@@ -83,34 +83,40 @@ Activité : une position est détenue à la clôture de **1415 valorisations sur
 
 ### En résumé
 
-Détenir ETF_WORLD à hauteur de 12 % / max(vol 20 jours, vol 60 jours), plafonné à 100 %. La règle simple de contrôle du risque et le comparateur de SA11 : +67,4 % net, Sharpe 0,90, perte maximale réduite de 21,6 % à 15,7 %.
+Détenir ETF_WORLD à hauteur de min(1, 12 % / max(vol 20 jours, vol 60 jours, 5 %)). Sur cet historique la règle diminue le risque au prix d'une exposition et d'un rendement plus faibles : +67,4 % net, Sharpe 0,90, perte maximale de -15,7 % au lieu de -21,6 %. Son avantage sur SA11 tient ici à un retour au risque plus lent et à des coûts plus faibles, sans preuve générale de supériorité.
 
 ### Points forts
 
-- Réduit la perte maximale de près de six points (-15,7 % contre -21,6 %) et la volatilité de 13,8 % à 10,9 %, pour un Sharpe (0,90) proche de celui du fonds (0,93).
-- Peu d'ordres pour une règle quotidienne : 180 ordres, 1 445 EUR de coûts, une rotation de 2,1 fois l'actif par an. Le résultat tient à coûts doublés (+65,5 %, Sharpe 0,88).
-- Le maximum de deux volatilités empêche de reconstruire l'exposition juste après un choc : fin mars 2025, entre les deux vagues de baisse, elle n'est remontée qu'à 60-65 % quand SA11 était revenue à 80 %.
-- Troisième du classement commun (52,0 %), devant SA11.
+- **Fait.** Perte maximale de -15,72 % contre -21,64 % pour le fonds, volatilité de 10,9 % contre 13,8 %, Sharpe de 0,90 contre 0,93.
+- **Fait.** 180 ordres, 1 445 EUR de coûts, rotation de 2,1 fois l'actif par an ; +65,5 % et Sharpe de 0,88 dans le second run à coûts doublés.
+- **Fait.** Le 2025-04-02, à la veille de la seconde vague, son poids de clôture est de 65,0 %, contre 77,7 % pour SA11 et 67,2 % pour le témoin EWMA.
+- **Fait.** Troisième du classement commun (52,0 %). L'écart avec le témoin EWMA (53,6 %) et SA11 (48,6 %) n'est pas un test de supériorité.
 
 ### Points faibles
 
-- Elle rend 27 points de rendement au fonds détenu (+67,4 % contre +94,8 %) : la volatilité du fonds est en moyenne au-dessus de la cible de 12 %, donc la règle est structurellement sous-investie (85 % d'exposition moyenne).
-- Lente à se réexposer : la volatilité 60 jours garde la mémoire du choc pendant trois mois. En 2025 elle fait +1,6 % contre +6,6 % pour le fonds.
-- Ne prévoit rien : elle est à 100 % le jour où le krach commence (volatilité estimée à 11 % le 2025-02-19).
+- **Fait.** +67,4 % contre +94,8 % pour le fonds : poids de clôture moyen de 84,7 %. L'alpha de +0,03 % par an est pratiquement nul et sans intervalle : c'est un outil de réduction du risque, pas une création d'alpha démontrée.
+- **Fait.** La baisse est moins profonde mais plus longue à effacer : sommet retrouvé le 2026-01-15, 330 jours après, contre 229 jours pour le fonds.
+- **Fait.** +1,6 % en 2025 contre +6,6 % : le poids de clôture reste entre 28 % et 41 % du 2025-04-15 au 2025-05-19, pendant la reprise.
+- **Lecture.** La règle ne prévoit ni le sens du marché ni le déclenchement d'un choc : la volatilité réalisée passée sert d'estimateur du risque à venir, et l'ajustement est réactif. Le 2025-02-19 la plus grande des deux estimations vaut 11,1 % et le poids est de 99,7 %.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-Du 2025-02-19 au 2025-04-09, la stratégie perd -15,7 % contre -21,6 % pour le fonds, avec 72 % d'exposition moyenne (de 100 % à 36 %). La baisse part d'un marché calme : la règle est pleinement investie et encaisse la première vague, ne réduit qu'à partir du 7 mars (72 %), puis descend à 60 % fin mars. Le choc du 3 au 7 avril la trouve à 65 % : elle a amorti environ un quart de la chute. Sur les 63 pires séances (2025-01-21 au 2025-04-22) elle perd -12,65 % contre -16,8 %.
+**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -15,72 % contre -21,64 % pour le fonds, avec un poids de clôture allant de 100 % à 36 %. La première réduction suit le signal du 4 mars (cible de 72,7 %) et apparaît dans le portefeuille le 5 mars (72,6 % au lieu de 99,7 %). Le poids descend ensuite vers 60 % fin mars, est de 65,0 % le 2 avril et de 41,3 % le 7 avril. Sur les 63 pires rendements consécutifs (2025-01-21 au 2025-04-22) elle perd -12,65 % contre -16,75 % pour le fonds. **Lecture.** La mémoire de l'estimateur long freine le retour au risque après le premier choc, ce qui protège avant la seconde vague et limite ensuite la participation au rebond ; elle ne l'empêche pas, les observations sortant progressivement de la fenêtre.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-Sa plus forte hausse couvre presque toute la période (2021-05-19 au 2026-10-06, +72,0 % contre +100,3 %). Son meilleur trimestre, du 2023-10-30 au 2024-01-30 (+15,1 % contre +15,6 % pour le fonds), est une hausse régulière à faible volatilité : les deux estimations sont sous 12 %, l'exposition reste à 98 % en moyenne et la règle laisse passer le rendement du fonds presque intact.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur couvre presque toute la période (2021-05-19 au 2026-10-06, +72,0 % contre +100,2 %). Sur les 63 meilleurs rendements consécutifs (2023-10-30 au 2024-01-30, +15,08 % contre +15,58 %), le poids de clôture est de 98 % en moyenne et descend à 85,0 % ; l'estimation courte monte jusqu'à 14,2 % et la plus grande des deux dépasse 12 % à 14 valorisations. Cinq ordres y sont exécutés, pour 29 EUR de coûts. **Lecture.** Un risque estimé généralement assez faible pour garder une exposition élevée.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
-- Choc soudain en marché calme : exposition à 100 % au moment du choc, la réduction vient après la perte.
-- Rebond en V après une panique : la volatilité 60 jours reste élevée et l'exposition reste basse (30 à 40 % jusqu'en mai 2025) pendant la reprise.
-- Long régime de volatilité moyenne (13 à 20 %) avec un marché qui monte : la règle est durablement sous-investie.
+- **Observé.** Choc soudain en marché calme : poids proche de 100 % au moment du choc, la réduction est exécutée après la première perte.
+- **Observé.** Rebond rapide après une panique : le poids reste bas plusieurs semaines pendant la reprise, et la récupération est plus longue que celle du fonds.
+- **Plausible.** Long régime de volatilité au-dessus de 12 % dans un marché qui monte : sous-investissement durable.
+
+### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+
+- Comparer la réduction de la perte, la volatilité et le délai de récupération à un fonds détenu à risque équivalent (exposition constante choisie d'avance).
+- Un bootstrap apparié SA6 contre le témoin EWMA, si l'on veut choisir entre les deux : l'étude ne teste que SA11 contre chacun.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
