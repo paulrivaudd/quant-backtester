@@ -21,6 +21,18 @@ distinction entre fait mesuré et lecture, l'ajout de la récupération des
 baisses, des mois sans variation, des périodes partielles, du contrôle 50/50,
 des deux rapports de référence et d'un intervalle sur les écarts de QLIKE.
 
+**Version 3 des analyses.** Une vérification indépendante faite sur le commit
+`ad310bc` (`verification_resultats_corriges_10102026.md`) a retrouvé les
+chiffres globaux et les historiques, et demandé de borner plusieurs lectures.
+Les chiffres globaux n'ont pas changé. Ont changé : le résidu de l'attribution
+de `SA2` et `SA5` n'est plus appelé « exécution » ; les témoins sont dits « à
+cible constante » et la comparaison ne prétend plus isoler le timing ; l'écart
+de prix clôture-ouverture est remesuré à quantités données et n'est plus
+présenté comme un coût ; le séjour encore ouvert de `SA1` est compté à part ;
+`ML1` est rejoué à coûts doublés avec son modèle figé ; les contradictions
+relevées dans les textes de `SA2`, `SA3`, `SA4`, `SA9`, `SA10`, `SA11`, de
+l'EWMA et de `ML1` sont corrigées.
+
 ## Comment lire
 
 - Une décision est prise le soir de la séance t (signal et poids cible de la
@@ -183,7 +195,8 @@ serait une nouvelle hypothèse.
   2026-10-09 (+13,4 % contre +24,5 % pour le fonds, Sharpe 0,76 contre 0,93).
   Son score, déflaté pour un seul essai, ne se compare pas à ceux du tableau.
   Le test d'origine (jusqu'au 2026-09-30) a déjà été lu le 2026-10-04 ; les
-  graines 43 et 44 et la variante à coûts doublés sont dans les diagnostics.
+  graines 43 et 44 et les deux runs à coûts doublés (modèle figé, modèle
+  recalibré) sont dans les diagnostics.
 
 ## SA7 et SA8 : non exécutées
 
@@ -201,34 +214,48 @@ que ce n'est pas fait.
 ## Diagnostics complémentaires
 
 [diagnostics_10102026.md](diagnostics_10102026.md) mesure ce que les analyses
-listaient comme restant à mesurer. Tout y est **descriptif** : les témoins sont
-construits sur des poids constatés après coup, et aucune variante n'est
-candidate. Ce qu'on y lit :
+listaient comme restant à mesurer ; c'est sa version 2, recalculée après la
+vérification. Tout y est **descriptif** : les témoins sont construits sur des
+poids constatés après coup, et aucune variante n'est candidate. Ce qu'on y lit :
 
-- **Aucune règle à exposition variable ne bat nettement la même exposition
-  tenue constante.** `SA3` (Sharpe 0,79) et `SA10` (0,86) font moins bien que
-  leur témoin à poids constants (0,93 chacun), y compris en perte maximale.
-  `SA6` (0,90) et `SA11` (0,87) réduisent la perte maximale d'environ trois
-  points par rapport au leur, pour un Sharpe plus bas ; seule l'EWMA égale le
-  sien (0,93 contre 0,92) avec quatre points de perte maximale en moins.
-- **`SA2` et `SA5` contre le 50/50** : le retard de `SA2` vient de ses périodes
-  en cash (-0,140 en rendement logarithmique), pas du choix entre fonds
-  (+0,004). L'inclinaison de `SA5` n'ajoute rien (+0,003) et son signal n'est
-  pas corrélé au rendement relatif qui suit ; son retard vient des coûts
-  (-0,112) et de l'exécution (-0,060).
-- **Le délai clôture → ouverture** a coûté 14 359 EUR à `SA1`, autant que ses
-  coûts explicites, et 4 852 EUR à `SA9`, plus du double des siens. `SA4` est
-  la seule règle qu'il a aidée (+2 291 EUR).
-- **Par séjour dans le marché** : `SA1` gagne 40 % du temps, `SA4` 66 % (gain
-  net moyen de 0,06 %), `SA9` 9 fois sur 21, soit 4 paniques gagnantes sur 7.
-- **`SA10`** : retirer son contrôle de risque ne change presque rien, et aucune
-  de ses règles ne porte son Sharpe.
+- **Aucune règle à exposition variable ne bat nettement son témoin à cible
+  constante.** Ce témoin vise les poids moyens de la règle, avec la même bande
+  de 3 points ; son exposition réalisée est de 0,7 à 2,4 points plus haute. La
+  comparaison décrit donc deux règles exécutables et n'isole pas la valeur du
+  timing à exposition identique. `SA3` (Sharpe 0,79) et `SA10` (0,86) font
+  moins bien que le leur (0,93 chacun), y compris en perte maximale. `SA6`
+  (0,90) et `SA11` (0,87) ont une perte maximale inférieure d'environ trois
+  points à celle du leur, pour un Sharpe plus bas ; seule l'EWMA égale le sien
+  (0,93 contre 0,92) avec quatre points de perte maximale en moins.
+- **`SA2` et `SA5` contre le 50/50** : une attribution approchée, qui valorise
+  les poids de la clôture précédente au rendement de clôture à clôture. Pour
+  `SA2` la contribution de l'exposition y est négative (-0,140 en rendement
+  logarithmique) et celle du choix entre fonds presque nulle (+0,004). Pour
+  `SA5` le choix entre fonds pèse +0,003, les coûts -0,112 et le résidu -0,060.
+  Ce résidu n'est pas une mesure de l'exécution : il contient aussi le
+  rendement de la journée sur ce qui a été traité le matin même, donc une
+  partie de l'effet du signal. L'apport de l'inclinaison de `SA5` n'est pas
+  isolé ; les corrélations de son signal avec le rendement relatif qui suit
+  sont proches de zéro (+0,03 à +0,06, sans intervalle).
+- **L'écart de prix signé clôture → ouverture, à quantités données**, vaut
+  -14 568 EUR pour `SA1`, du même ordre que ses coûts explicites, et -4 944 EUR
+  pour `SA9`, plus du double des siens ; `SA4` est le seul livre où il est
+  positif (+2 303 EUR). Ce n'est ni un coût payé ni le résultat d'un backtest
+  exécuté à la clôture : le signal lit cette clôture.
+- **Par séjour dans le marché** : `SA1` a 71 séjours clos, dont 39 % gagnants,
+  et un séjour encore ouvert ; `SA4` a 66 % de séjours gagnants (gain net moyen
+  de 0,06 %) ; `SA9` en a 9 sur 21, soit 4 groupes de séjours gagnants sur 7,
+  des groupes formés par une convention de 20 valorisations et non sept
+  paniques indépendantes.
+- **`SA10`** : l'effet agrégé de son contrôle de risque est faible sur ce run,
+  sans que sa fréquence soit exportée, et aucune de ses règles ne porte son
+  Sharpe.
 - **`SA6` contre l'EWMA** : différence de Sharpe de -0,036, intervalle
   [-0,104 ; +0,027] ; les deux témoins ne sont pas départagés.
-- **`ML1`** fait moins bien que ses propres poids moyens tenus constants
-  (Sharpe 0,76 contre 0,93) ; les graines 43 et 44 et la variante à coûts
-  doublés échouent comme la graine 42 (Sharpe 0,68 à 0,71 contre 0,86 pour le
-  fonds, score sous 50 %).
+- **`ML1`** fait moins bien que son témoin à cible constante (Sharpe 0,76
+  contre 0,93) ; les graines 43 et 44 échouent comme la graine 42 (Sharpe 0,68
+  à 0,71 contre 0,86 pour le fonds, score sous 50 %), et à coûts doublés le
+  modèle figé (0,64) comme le modèle recalibré (0,69) restent sous le fonds.
 
 ## Ce que ces fichiers ne contiennent pas
 
@@ -237,8 +264,11 @@ Les ordres, prix d'exécution, coûts par séance, rejets et courbes brutes sont
 dans les exports de l'étude (`results/garch_study/`), et le détail des
 diagnostics dans `results/review_diagnostics/` (séjours un par un, entrées de
 `ML1`, tables des témoins). Ces dossiers ne sont pas commités : ils se
-reproduisent. Restent non produits : la décomposition des cibles de `SA10`
-règle par règle à chaque décision, et une analyse des entrées de `ML1`.
+reproduisent. Restent non produits : une attribution exacte de `SA2` et `SA5`
+aux quantités et aux prix d'ouverture ; un témoin à exposition ou à risque
+réellement rapprochés ; la décomposition des cibles de `SA10` règle par règle
+à chaque décision, et le facteur de réduction de son contrôle de risque ; une
+analyse des entrées de `ML1`.
 
 ## Reproduire
 
@@ -246,6 +276,8 @@ règle par règle à chaque décision, et une analyse des entrées de `ML1`.
 uv sync --extra ml --extra stats
 uv run python scripts/update_market_data.py
 uv run python scripts/run_garch_study.py --output results/garch_study
+# les diagnostics chargent d'abord le modèle de ML1 : il doit exister
+uv run python scripts/run_neural_strategy.py --seed 42 --calibrate-only
 uv run python scripts/run_review_diagnostics.py
 uv run python scripts/write_strategy_reports.py \
     --study results/garch_study --output research/reports/2026-10-10
@@ -263,6 +295,12 @@ OMP_NUM_THREADS=1 uv run python scripts/run_signature_study.py \
 uv run python scripts/write_strategy_reports.py \
     --study results/signature_study --output research/reports/2026-10-10 --only SA13
 ```
+
+Cette recette refait la procédure, pas forcément les mêmes nombres : relancer
+`update_market_data.py` ne garantit pas de retrouver le magasin `750c23dfffc3`,
+et une calibration refaite sur des données révisées n'est pas le modèle publié
+(`d9bfd125bf69`). Les diagnostics refusent de mettre un run à côté des exports
+d'une étude faite sur un autre magasin, un autre capital ou d'autres coûts.
 
 Le commentaire rédigé est dans [commentary.toml](commentary.toml) ; les
 tableaux et les faits mesurés sont recalculés à chaque exécution. Tout est une
