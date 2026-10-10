@@ -278,3 +278,137 @@ def compare_forecasts(
             kept = frame.loc[list(origins)]
         evaluations[name] = evaluate_forecasts(kept, variance_floor=variance_floor)
     return evaluations
+
+
+@dataclass(frozen=True, slots=True)
+class LossDifference:
+    """The mean difference of two forecasts' losses on shared origins, and how far it moves.
+
+    Attributes
+    ----------
+    estimate : float
+        Mean loss of the first forecast less the second's: negative when the
+        first is the better one.
+    low, high : float
+        The equal-tailed percentile interval of the resampled mean differences.
+    level : float
+        Its coverage.
+    pairs : int
+        Shared origins the difference was measured on.
+    block, draws, seed : int
+        The moving-block bootstrap it came from.
+    """
+
+    estimate: float
+    low: float
+    high: float
+    level: float
+    pairs: int
+    block: int
+    draws: int
+    seed: int
+
+    @property
+    def excludes_zero(self) -> bool:
+        """Return whether the interval lies entirely on one side of zero."""
+        return self.low > 0.0 or self.high < 0.0
+
+    def definition(self) -> dict[str, object]:
+        """Return the result and everything it depends on, as it is recorded."""
+        return {
+            "estimate": self.estimate,
+            "low": self.low,
+            "high": self.high,
+            "level": self.level,
+            "pairs": self.pairs,
+            "block": self.block,
+            "draws": self.draws,
+            "seed": self.seed,
+            "excludes_zero": self.excludes_zero,
+        }
+
+
+def qlike_losses(pairs: pd.DataFrame, *, variance_floor: float) -> pd.Series:  # type: ignore[type-arg]
+    """Return the QLIKE loss of each pair, indexed by origin."""
+    losses = [
+        qlike_loss(variance, outcome, variance_floor=variance_floor)
+        for variance, outcome in zip(
+            pairs["forecast_variance"], pairs["realised_return"], strict=True
+        )
+    ]
+    return pd.Series(losses, index=pairs.index, dtype="float64")
+
+
+def paired_loss_difference(
+    first: pd.Series,  # type: ignore[type-arg]
+    second: pd.Series,  # type: ignore[type-arg]
+    *,
+    block: int,
+    draws: int,
+    seed: int,
+    level: float,
+) -> LossDifference:
+    """Resample the mean difference of two series of losses, in blocks of shared origins.
+
+    Parameters
+    ----------
+    first, second : pd.Series
+        Losses of two forecasts, indexed by origin. Only the origins both
+        hold are used, in the order of ``first``.
+    block : int
+        Length of the blocks of consecutive origins drawn: losses of
+        neighbouring sessions are not independent.
+    draws : int
+        Number of resamples.
+    seed : int
+        Seed of the generator; the same seed gives the same draws.
+    level : float
+        Coverage of the interval, in ``(0, 1)``.
+
+    Returns
+    -------
+    LossDifference
+        ``mean(first - second)`` and its interval.
+
+    Raises
+    ------
+    ValueError
+        If fewer than two origins are shared, or a parameter is out of range.
+
+    Notes
+    -----
+    A moving-block bootstrap of the paired differences, the same blocks for
+    both forecasts since the difference is taken first. It is conditional on
+    the forecasts examined: it carries neither the choice of the models nor
+    that of the loss.
+    """
+    shared = [origin for origin in first.index if origin in second.index]
+    count = len(shared)
+    if count < 2:
+        raise ValueError("a difference of losses needs at least two shared origins")
+    if not 1 <= block <= count:
+        raise ValueError(f"a block of {block} does not fit {count} pairs")
+    if draws < 100:
+        raise ValueError(f"{draws} draws are too few to read a tail from")
+    if not 0.0 < level < 1.0:
+        raise ValueError(f"level is a coverage in (0, 1), got {level}")
+    difference = (first.loc[shared] - second.loc[shared]).to_numpy(dtype="float64")
+    generator = np.random.default_rng(seed)
+    blocks_needed = math.ceil(count / block)
+    offsets = np.arange(block)
+    resampled = np.empty(draws, dtype="float64")
+    for draw in range(draws):
+        starts = generator.integers(0, count - block + 1, size=blocks_needed)
+        indices = (starts[:, None] + offsets[None, :]).ravel()[:count]
+        resampled[draw] = float(np.mean(difference[indices]))
+    tail = (1.0 - level) / 2.0
+    return LossDifference(
+        estimate=float(np.mean(difference)),
+        low=float(np.quantile(resampled, tail)),
+        high=float(np.quantile(resampled, 1.0 - tail)),
+        level=level,
+        pairs=count,
+        block=block,
+        draws=draws,
+        seed=seed,
+    )

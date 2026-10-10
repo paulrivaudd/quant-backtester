@@ -368,3 +368,26 @@ def test_reading_a_run_back_on_a_revised_store_is_refused(
 
     with pytest.raises(StoreChanged, match="no longer holds"):
         SCRIPT.forecast_diagnostics(result, SHORT)
+
+
+def test_a_lower_qlike_is_given_an_interval_before_it_is_called_better() -> None:
+    days = [date(2024, 1, 1) + timedelta(days=i) for i in range(301)]
+    rng = np.random.default_rng(5)
+    outcome = rng.normal(0.0, 0.01, 300)
+
+    def pairs(variance: float) -> pd.DataFrame:
+        return pd.DataFrame(
+            {"target": days[1:], "forecast_variance": variance, "realised_return": outcome},
+            index=pd.Index(days[:-1], dtype="object", name="origin"),
+        )
+
+    table = SCRIPT.qlike_difference_frame(
+        {"GARCH accepted": pairs(1e-4), "EWMA 0.94": pairs(1e-4), "SA6 estimator": pairs(25e-4)}
+    )
+
+    assert list(zip(table["first"], table["second"], strict=True)) == list(SCRIPT.QLIKE_COMPARISONS)
+    same, better = table.iloc[0], table.iloc[1]
+    assert same["estimate"] == 0.0 and not same["excludes_zero"]
+    # A variance 25 times too high is worse on every pair: the interval says so.
+    assert better["estimate"] < 0.0 and better["high"] < 0.0 and better["excludes_zero"]
+    assert set(table["block"]) == {20} and set(table["seed"]) == {20261010}

@@ -33,7 +33,8 @@ exercises. The ranking is exploratory in that sense.
 
 What is written: ``summary.csv``, ``quality_details.csv``,
 ``forecast_diagnostics.csv``, ``forecast_evaluation.csv``,
-``forecast_evaluation_summary.csv``, ``comparison.csv``, ``yearly.csv``,
+``forecast_evaluation_summary.csv``, ``forecast_qlike_differences.csv``,
+``comparison.csv``, ``yearly.csv``,
 ``equity.csv``, ``fills.csv``, one ``history_<book>.csv`` per book (the closes,
 the signals it read, its weights and its value at every session),
 ``config.json``, ``study.md`` and five figures.
@@ -99,7 +100,9 @@ from quant_backtester.analytics.volatility_forecast import (
     ForecastEvaluation,
     compare_forecasts,
     pair_forecasts,
+    paired_loss_difference,
     qlike_loss,
+    qlike_losses,
 )
 from quant_backtester.backtest.runner import StrategyResult, StrategyRunner
 from quant_backtester.execution.costs import CostModel
@@ -647,6 +650,45 @@ def evaluation_summary(pairs: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+QLIKE_COMPARISONS = (
+    ("GARCH accepted", "EWMA 0.94"),
+    ("GARCH accepted", "SA6 estimator"),
+    ("EWMA 0.94", "SA6 estimator"),
+)
+"""The pairs of forecasts whose difference of mean QLIKE is given an interval."""
+
+
+def qlike_difference_frame(pairs: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
+    """Return the difference of mean QLIKE between forecasts, with a bootstrap interval.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per pair of :data:`QLIKE_COMPARISONS`, on the origins both
+        forecasts have: the mean of the paired differences (negative when the
+        first forecast is the better one) and its moving-block bootstrap
+        interval, under the conventions of the Sharpe bootstrap. A lower mean
+        QLIKE whose interval includes zero is an observed difference, not a
+        demonstrated one.
+    """
+    losses = {
+        name: qlike_losses(frame, variance_floor=QLIKE_VARIANCE_FLOOR)
+        for name, frame in pairs.items()
+    }
+    rows = []
+    for first, second in QLIKE_COMPARISONS:
+        measured = paired_loss_difference(
+            losses[first],
+            losses[second],
+            block=BOOTSTRAP_BLOCK,
+            draws=BOOTSTRAP_DRAWS,
+            seed=BOOTSTRAP_SEED,
+            level=BOOTSTRAP_LEVEL,
+        )
+        rows.append({"first": first, "second": second, **measured.definition()})
+    return pd.DataFrame(rows)
+
+
 # --- the economic test -------------------------------------------------------------------
 
 
@@ -909,6 +951,7 @@ def study_markdown(
     stressed_summary: pd.DataFrame,
     comparison: pd.DataFrame,
     evaluation: pd.DataFrame,
+    qlike_differences: pd.DataFrame,
     fallback: Mapping[str, object],
     yearly: pd.DataFrame,
     register: Mapping[str, object],
@@ -916,6 +959,9 @@ def study_markdown(
 ) -> str:
     """Return the written study: ranking, dedicated comparison, forecasts, decision, limits."""
     outcome, reasons = verdict(comparison)
+    differences = qlike_differences.set_index(
+        qlike_differences["first"].astype(str) + " - " + qlike_differences["second"].astype(str)
+    ).rename_axis("difference of mean QLIKE")
     first, last = summary["first_session"].iloc[0], summary["last_session"].iloc[0]
     ranked = [
         ("rank", "rank", "{}"),
@@ -1008,7 +1054,25 @@ def study_markdown(
         "QLIKE = log(q) + r2/q, lower is better; q is floored at "
         f"{QLIKE_VARIANCE_FLOOR:g} for the metric only. One squared daily return is a very "
         "noisy proxy of a variance. QLIKE measures the close-to-close forecast, not the "
-        "profit of an allocation filled at the open.",
+        "profit of an allocation filled at the open. It is a loss, negative here because "
+        "the variances are far below one; it is not a return.",
+        "",
+        markdown_table(
+            differences,
+            [
+                ("pairs", "pairs", "{:.0f}"),
+                ("estimate", "mean difference", "{:+.4f}"),
+                ("low", "95% low", "{:+.4f}"),
+                ("high", "95% high", "{:+.4f}"),
+                ("excludes_zero", "excludes zero", "{}"),
+            ],
+        ),
+        "",
+        "Paired differences of QLIKE on shared origins, negative when the first forecast is "
+        f"the better one; moving-block bootstrap, blocks of {BOOTSTRAP_BLOCK} origins, "
+        f"{BOOTSTRAP_DRAWS} draws, seed {BOOTSTRAP_SEED}. A lowest mean QLIKE whose interval "
+        "includes zero is the best one observed, not a demonstrated superiority. The "
+        "standardised residuals keep fat tails under every forecast (kurtosis above 3).",
         "",
         "## Fallback",
         "",
@@ -1041,8 +1105,14 @@ def study_markdown(
         *[f"- {reason}" for reason in reasons],
         "",
         (
-            "GARCH did not clearly beat the simple rules after costs: the simple rule is kept. "
-            "A better likelihood or a better QLIKE alone does not justify the strategy."
+            "`REFUTED` is an operational verdict: a criterion of refutation written before "
+            "the run is met - a net Sharpe ratio not above a control's, or a deeper maximum "
+            "drawdown. It is not a statistical proof that this configuration is inferior: "
+            "where an interval of a Sharpe difference includes zero, the two books are not "
+            "told apart at that level, and the lines above say where that is the case. Nor "
+            "does it say anything of GARCH models in general. GARCH did not clearly beat "
+            "the simple rules after costs, so the simple rules are kept; a better likelihood "
+            "or a lower QLIKE alone does not justify the strategy."
             if outcome != "SUPPORTED"
             else "SA11 beat both controls after costs, at both cost levels, with intervals "
             "that exclude zero."
@@ -1166,6 +1236,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     session_returns = np.log(adjusted / adjusted.shift(1)).dropna()
     pairs = forecast_pairs(diagnostics, histories, session_returns)
     evaluation = evaluation_summary(pairs)
+    qlike_differences = qlike_difference_frame(pairs)
     comparison = comparison_frame(base, stressed)
     fallback = fallback_summary(diagnostics)
     yearly = yearly_frame({name: result.equity() for name, result in base.items()})
@@ -1185,6 +1256,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     diagnostics.to_csv(output / "forecast_diagnostics.csv", index=False)
     evaluation_frame(pairs).to_csv(output / "forecast_evaluation.csv")
     evaluation.to_csv(output / "forecast_evaluation_summary.csv", index=False)
+    qlike_differences.to_csv(output / "forecast_qlike_differences.csv", index=False)
     comparison.to_csv(output / "comparison.csv", index=False)
     yearly.to_csv(output / "yearly.csv")
     equity = {name: result.equity() for name, result in base.items()}
@@ -1203,7 +1275,15 @@ def main(arguments: Sequence[str] | None = None) -> int:
     )
     (output / "study.md").write_text(
         study_markdown(
-            summary, stressed_summary, comparison, evaluation, fallback, yearly, register, timings
+            summary,
+            stressed_summary,
+            comparison,
+            evaluation,
+            qlike_differences,
+            fallback,
+            yearly,
+            register,
+            timings,
         ),
         encoding="utf-8",
     )

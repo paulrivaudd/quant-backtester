@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import math
-from datetime import date
+from datetime import date, timedelta
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -12,7 +13,9 @@ from quant_backtester.analytics.volatility_forecast import (
     compare_forecasts,
     evaluate_forecasts,
     pair_forecasts,
+    paired_loss_difference,
     qlike_loss,
+    qlike_losses,
 )
 
 SESSIONS = [date(2026, 9, day) for day in (1, 2, 3, 4, 7, 8)]
@@ -140,3 +143,63 @@ def test_a_comparison_on_shared_origins_is_on_exactly_those_origins() -> None:
     assert same["wide"].qlike == same["narrow"].qlike
     with pytest.raises(ValueError, match="no pair for 1 of the shared origins"):
         compare_forecasts({"narrow": narrow}, variance_floor=FLOOR, origins=list(wide.index))
+
+
+def losses(values: list[float]) -> pd.Series:
+    """Return losses indexed by consecutive days."""
+    days = [date(2024, 1, 1) + timedelta(days=index) for index in range(len(values))]
+    return pd.Series(values, index=pd.Index(days, dtype="object"), dtype="float64")
+
+
+def test_the_losses_of_a_frame_are_its_qlike_pair_by_pair() -> None:
+    frame = pairs_of([(1e-4, 0.01), (4e-4, 0.02)])
+
+    assert list(qlike_losses(frame, variance_floor=FLOOR)) == [
+        qlike_loss(1e-4, 0.01, variance_floor=FLOOR),
+        qlike_loss(4e-4, 0.02, variance_floor=FLOOR),
+    ]
+
+
+def test_a_loss_difference_is_the_mean_of_the_paired_differences_with_its_interval() -> None:
+    rng = np.random.default_rng(3)
+    base = rng.normal(0.0, 1.0, 300)
+    clearly_worse = losses(list(base + 0.5 + rng.normal(0.0, 0.1, 300)))
+    same = losses(list(base + rng.normal(0.0, 1.0, 300)))
+    reference = losses(list(base))
+    settings = {"block": 20, "draws": 500, "seed": 7, "level": 0.95}
+
+    worse = paired_loss_difference(clearly_worse, reference, **settings)
+    unclear = paired_loss_difference(same, reference, **settings)
+
+    assert worse.estimate == pytest.approx(float((clearly_worse - reference).mean()))
+    assert worse.low <= worse.estimate <= worse.high
+    assert worse.excludes_zero and worse.low > 0.0
+    assert not unclear.excludes_zero
+    assert worse == paired_loss_difference(clearly_worse, reference, **settings)  # seeded
+    assert worse.definition()["pairs"] == 300
+
+
+def test_a_loss_difference_uses_only_the_origins_both_forecasts_have() -> None:
+    long, short = losses([1.0, 2.0, 3.0, 4.0]), losses([0.0, 0.0, 0.0])
+
+    measured = paired_loss_difference(long, short, block=1, draws=100, seed=1, level=0.9)
+
+    assert measured.pairs == 3
+    assert measured.estimate == pytest.approx(2.0)
+
+
+@pytest.mark.parametrize(
+    ("settings", "match"),
+    [
+        ({"block": 0}, "block"),
+        ({"block": 9}, "block"),
+        ({"draws": 10}, "draws"),
+        ({"level": 1.0}, "level"),
+    ],
+)
+def test_a_bootstrap_that_cannot_be_read_is_refused(settings: dict, match: str) -> None:
+    parameters = {"block": 2, "draws": 100, "seed": 1, "level": 0.9} | settings
+    with pytest.raises(ValueError, match=match):
+        paired_loss_difference(losses([1.0, 2.0, 3.0, 4.0]), losses([0.0] * 4), **parameters)
+    with pytest.raises(ValueError, match="two shared origins"):
+        paired_loss_difference(losses([1.0]), losses([0.0]), block=1, draws=100, seed=1, level=0.9)
