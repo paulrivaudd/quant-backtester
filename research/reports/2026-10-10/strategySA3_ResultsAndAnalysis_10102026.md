@@ -112,10 +112,15 @@ Exposition à ETF_WORLD proportionnelle à l'écart entre ses moyennes mobiles 5
 - **Plausible.** Écart des moyennes oscillant près de zéro : la règle étant continue (0,1 % d'écart donne 5 % d'exposition avant bande), elle n'alterne pas entre 0 et 100 %, mais de petits ajustements répétés peuvent coûter.
 - **Observé.** Reprise après un marché baissier long (2023) : le retour à l'exposition vient plusieurs mois après le point bas.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** À côté d'un fonds détenu à poids constant de 71,5 % (son poids moyen), avec la même bande et les mêmes coûts : le témoin fait +63,2 % net, Sharpe 0,93, perte maximale -15,9 %, sommet retrouvé en 226 jours, 7 ordres et 94 EUR de coûts ; SA3 fait +57,9 %, Sharpe 0,79, -21,6 %, 540 jours.
+- **Lecture.** Sur cette période le timing des deux moyennes a retiré de la valeur par rapport à la même exposition tenue constante, en rendement comme en risque. Le témoin est choisi après coup : c'est un constat, pas une règle qu'on aurait pu fixer à l'avance.
+- **Fait.** Effet du délai clôture-ouverture : -626 EUR nets, le plus faible des règles actives.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- Comparer à un fonds détenu à exposition constante de 71,5 % : c'est ce qui dirait si le timing ajoute quelque chose à la simple réduction d'exposition. Un tel contrôle, choisi après coup, resterait descriptif.
-- Le coût et le résultat de la séquence de sortie du 11 au 22 avril 2025, à partir des exécutions.
+- Le résultat de la seule séquence de sortie du 11 au 22 avril 2025 n'est pas isolé du reste.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

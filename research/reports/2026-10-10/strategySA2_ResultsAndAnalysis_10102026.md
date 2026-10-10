@@ -113,11 +113,16 @@ Répartir entre ETF_WORLD et ETF_SP500_PEA selon l'écart de leurs momentums 6 e
 - **Observé.** Reprise après une baisse (début 2023, mai 2025) : la règle est en cash ou sous-investie quand le marché remonte.
 - **Plausible.** Inversion du leadership entre les États-Unis et le reste du monde : l'inclinaison suit le fonds qui a le mieux monté.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** Écart au panier 50/50, en rendements logarithmiques sur la période : panier +0,727 ; timing de l'exposition totale -0,140 ; choix entre les deux fonds +0,004 ; exécution (résidu des prix d'ouverture, de la bande et des lots) -0,039 ; coûts -0,027 ; soit +0,526 pour la stratégie, contre +0,710 pour le panier exécuté par le moteur.
+- **Lecture.** Le retard sur le 50/50 vient presque entièrement des périodes passées en cash ou sous-investie ; le choix entre les fonds, qui est l'objet du momentum relatif, n'ajoute pratiquement rien, et les coûts ne pèsent que 2,7 points logarithmiques.
+- **Fait.** Effet du délai clôture-ouverture : -1 848 EUR nets.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- L'écart net au panier 50/50, régime par régime : c'est lui, et non le fonds monde, qui isole ce que le momentum ajoute.
-- Séparer le choix entre les deux fonds du timing de l'exposition totale, avec les dates d'éligibilité de chaque fonds.
-- Les 34 points de retard sur le 50/50 ne sont pas attribués : coûts, périodes en cash et inclinaison y contribuent dans des proportions non mesurées.
+- Les trois premières lignes de cette attribution sont calculées sur des clôtures, pas sur les prix d'exécution : le résidu « exécution » dit ce que cette approximation laisse de côté.
+- Les dates d'éligibilité de chaque fonds, pour dater les sorties en cash une à une.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

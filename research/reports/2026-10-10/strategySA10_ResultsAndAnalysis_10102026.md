@@ -112,12 +112,19 @@ SA10 sans facteurs ni monétaire : cinq règles (momentum, moyennes lissées, re
 - **Observé.** Marché haussier long : le cash, non rémunéré ici, est un coût d'opportunité permanent.
 - **Observé.** Reprise après une panique : l'exposition est au plus bas (16 % le 2025-05-19) pendant le rebond.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** À côté d'un panier à poids constants de 15,3 % de fonds S&P 500 et 27,1 % de fonds monde (ses poids moyens) : le témoin fait +37,1 % net, Sharpe 0,93, perte maximale -10,0 %, sommet retrouvé en 231 jours, 61 EUR de coûts ; SA10 fait +32,1 %, Sharpe 0,86, -11,8 %, 442 jours.
+- **Lecture.** Sur cette période l'ensemble ne fait pas mieux qu'un panier constant de même taille, y compris en perte maximale : sa protection est celle de sa faible exposition.
+- **Fait.** Sans son contrôle de risque, l'ensemble fait +32,6 %, Sharpe 0,85, perte maximale -11,9 % : presque rien ne change. Le contrôle de risque n'a donc presque jamais mordu, et ce n'est pas lui qui a protégé en 2025.
+- **Fait.** En retirant une règle à la fois (son budget restant en cash) : sans momentum +18,9 % (exposition 25 %, Sharpe 0,88) ; sans moyennes lissées +20,4 % (28 %, 0,83) ; sans inclinaison relative +23,9 % (33 %, 0,82) ; sans repli +31,5 % (0,85) ; sans détente du VIX +32,6 % (0,87). Le Sharpe reste entre 0,82 et 0,88 dans tous les cas.
+- **Lecture.** Aucune règle ne porte le Sharpe de l'ensemble : en retirer une réduit surtout l'exposition et le rendement dans la même proportion. Les poches de repli et de détente du VIX ne contribuent presque à rien.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- La décomposition des cibles avant et après agrégation, plafonds et facteur de réduction du risque : le code calcule ce diagnostic, le rapport ne l'exploite pas.
-- Des ablations règle par règle, et la même combinaison sans contrôle de risque.
-- Une allocation simple aux deux fonds à exposition ou volatilité comparable, avant de conclure à la valeur de l'ensemble.
+- La décomposition des cibles règle par règle à chaque décision, que le code sait calculer et qui n'est pas exportée.
 - La version complète, quand les instruments de SA7 et SA8 seront enregistrés.
+- Ces ablations sont des variantes regardées après coup : aucune n'est candidate.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

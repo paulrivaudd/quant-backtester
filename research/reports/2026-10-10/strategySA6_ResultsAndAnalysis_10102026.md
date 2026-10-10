@@ -113,10 +113,16 @@ Détenir ETF_WORLD à hauteur de min(1, 12 % / max(vol 20 jours, vol 60 jours, 5
 - **Observé.** Rebond rapide après une panique : le poids reste bas plusieurs semaines pendant la reprise, et la récupération est plus longue que celle du fonds.
 - **Plausible.** Long régime de volatilité au-dessus de 12 % dans un marché qui monte : sous-investissement durable.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** À côté d'un fonds détenu à poids constant de 84,7 % : le témoin fait +78,0 % net, Sharpe 0,93, perte maximale -18,5 %, sommet retrouvé en 229 jours, 97 EUR de coûts ; SA6 fait +67,4 %, Sharpe 0,90, -15,7 %, 330 jours.
+- **Lecture.** Faire varier l'exposition a réduit la perte maximale de 2,8 points par rapport à la même exposition tenue constante, au prix de 10,6 points de rendement, d'un Sharpe un peu plus bas et d'une récupération plus longue de cent jours. Le témoin est choisi après coup.
+- **Fait.** SA6 contre le témoin EWMA : différence de Sharpe de -0,036, intervalle bootstrap à 95 % [-0,104 ; +0,027]. Les deux ne sont pas départagés.
+- **Fait.** Effet du délai clôture-ouverture : -2 428 EUR nets.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- Comparer la réduction de la perte, la volatilité et le délai de récupération à un fonds détenu à risque équivalent (exposition constante choisie d'avance).
-- Un bootstrap apparié SA6 contre le témoin EWMA, si l'on veut choisir entre les deux : l'étude ne teste que SA11 contre chacun.
+- Un témoin à risque équivalent fixé à l'avance, plutôt qu'au poids moyen constaté.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

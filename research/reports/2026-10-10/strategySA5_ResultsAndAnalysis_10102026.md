@@ -112,10 +112,16 @@ Détenir les deux fonds autour d'une répartition 50/50 et pencher, jusqu'à 25 
 - **Observé.** Frais et spread : avec près d'un ordre par séance, le résultat y est très sensible.
 - **Plausible.** Divergence durable entre les deux fonds (leadership, change) : un résidu qui ne revient pas fait pencher du mauvais côté tant qu'il dure.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** Écart au panier 50/50, en rendements logarithmiques : panier +0,727 ; exposition totale -0,011 ; choix entre les fonds, c'est-à-dire l'inclinaison, +0,003 ; exécution -0,060 ; coûts -0,112 ; soit +0,547, contre +0,710 pour le panier exécuté.
+- **Fait.** Le résidu change de signe 293 fois, soit un signe tenu 4,8 valorisations en moyenne. Sa corrélation avec le rendement relatif monde moins S&P 500 est de +0,03 sur la séance suivante, +0,03 sur la première séance entière après l'exécution et +0,06 sur cinq séances (Pearson) ; en rangs (Spearman) elle est de +0,03, 0,00 et 0,01.
+- **Lecture.** L'inclinaison n'ajoute pratiquement rien au panier neutre, et rien dans ces corrélations ne montre qu'elle prévoit le rendement relatif sur lequel elle mise. Le retard sur le 50/50 vient des coûts et de l'exécution d'un rebalancement presque quotidien.
+- **Fait.** Effet du délai clôture-ouverture : -2 631 EUR nets, sur des gaps favorables et défavorables de plus de 44 000 EUR chacun.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- L'attribution par rapport au panier 50/50 : résultat incrémental des écarts de poids, frais, contraintes d'exécution. Sans elle le signal ne peut pas être jugé.
-- Le nombre d'inversions de l'inclinaison, la durée de vie du résidu, et la corrélation entre le signal et le rendement relatif des séances suivantes.
+- Ces corrélations sont données sans intervalle, et l'attribution est calculée sur des clôtures.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

@@ -116,11 +116,18 @@ Détenir ETF_WORLD à hauteur de w = min(1, 12 % / max(σ, 5 %)), où σ est la 
 - **Plausible.** Prévision oscillant autour de la cible de 12 % : la bande de 3 points est franchie plus souvent qu'avec un estimateur plus lisse, ce qui est cohérent avec ses 508 ordres.
 - **Observé.** Marché baissier lent (2022) : -13,2 % contre -13,7 % pour le fonds, avec un poids moyen de 70 % ; la protection y est presque nulle.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** À côté d'un fonds détenu à poids constant de 87,5 % : le témoin fait +81,2 % net, Sharpe 0,92, perte maximale -19,5 %, sommet retrouvé en 229 jours, 96 EUR de coûts ; SA11 fait +66,0 %, Sharpe 0,87, -16,5 %, 324 jours.
+- **Lecture.** Faire varier l'exposition avec la prévision GARCH a réduit la perte maximale de 3,0 points par rapport à la même exposition tenue constante, au prix de 15 points de rendement et d'un Sharpe plus bas. Le témoin est choisi après coup.
+- **Fait.** Effet du délai clôture-ouverture : -2 772 EUR nets (gaps favorables +10 108 EUR, défavorables -12 880 EUR).
+- **Fait.** La même règle sur une EWMA plus réactive (0,90) fait un Sharpe de 0,90 avec 366 ordres ; sur une EWMA plus lente (0,97), 0,97 avec 127 ordres. Sur cet historique, plus l'estimateur est lent, meilleur est le résultat net, ce qui va dans le même sens que le classement GARCH, EWMA 0,94.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
 - Le statut REFUTED est opérationnel : un critère écrit avant le run est atteint. Ce n'est pas une preuve statistique d'infériorité de cette configuration, encore moins des modèles GARCH.
-- La distribution des paramètres estimés (persistance, ν) et des diagnostics de fit dans le temps, au-delà de leurs médianes.
-- Le GARCH peut mieux prévoir la variance de clôture à clôture et moins bien allouer après l'ouverture suivante, la bande, les coûts et le plafond : la part de chacun de ces éléments dans l'écart avec les témoins n'est pas mesurée.
+- La distribution dans le temps des paramètres estimés est exportée (`forecast_diagnostics.csv`) mais n'est pas analysée ici.
+- Les coefficients 0,90 et 0,97 sont des variantes regardées après coup : en retenir un serait une nouvelle hypothèse.
 - La vérification prospective, configuration figée, commence à la première séance XPAR après le 2026-10-10.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie

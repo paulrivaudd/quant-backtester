@@ -113,9 +113,15 @@ Acheter ETF_WORLD, à hauteur de 50 % au plus, après une baisse de cinq séance
 - **Plausible.** Baisse par gaps de nuit successifs : la vente est exécutée après le gap.
 - **Observé.** Frais : à coûts doublés le gain disparaît.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** Par séjour : 71 séjours de 2,8 valorisations en moyenne, 47 gagnants et 24 perdants (66 %) ; net moyen +0,06 %, net médian +0,04 %, pire -2,92 %, meilleur +1,85 %. Les replis achetés ont donc été payés deux fois sur trois, pour un gain net moyen de six points de base par séjour après 64 EUR de coûts.
+- **Fait.** C'est la seule règle que le délai d'exécution a aidée : +2 291 EUR nets (gaps favorables +14 645 EUR, défavorables -12 354 EUR).
+- **Lecture.** Une prime de repli existe dans ces chiffres, mais elle est mince : la moitié du gain brut part en coûts, et le pire séjour efface près de cinquante séjours moyens.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- Le résultat par épisode d'activité (taux de réussite, gain net moyen) sur les 198 clôtures investies : une régression agrégée ne répond pas à la question de savoir si les replis sont payés.
+- Ces fréquences sont données sans intervalle ; 71 séjours concentrés sur quelques années ne font pas un échantillon indépendant.
 - La règle comme poche d'un portefeuille déjà investi, plutôt que seule face au cash.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie

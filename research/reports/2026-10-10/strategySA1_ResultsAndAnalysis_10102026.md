@@ -114,11 +114,16 @@ Détenir ETF_WORLD au-dessus de sa moyenne mobile 20 jours, être en cash en des
 - **Plausible.** Rebond rapide après un krach : la règle est en cash au point bas et ne rachète qu'une fois le cours repassé au-dessus de sa moyenne.
 - **Observé.** Hausse des coûts d'exécution : à coûts doublés le gain disparaît presque entièrement.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** Par séjour dans le marché : 72 séjours, 29 gagnants et 43 perdants (40 % de gagnants) ; net moyen +0,31 %, net médian -0,28 %, pire -6,14 %, meilleur +17,48 %, pour 13 valorisations en moyenne. Le résultat tient à quelques longs séjours gagnants, pas à la fréquence des bons signaux.
+- **Fait.** Le délai entre la clôture de la décision et l'exécution à l'ouverture a coûté 14 359 EUR nets, soit 14,4 % du capital initial (gaps favorables +28 256 EUR, défavorables -42 615 EUR). C'est du même ordre que ses coûts explicites (15 730 EUR), et de loin l'effet le plus fort de toutes les règles : la mesure est de premier ordre, sur les prix cotés.
+- **Lecture.** Les gaps de nuit jouent dans les deux sens, mais leur solde est nettement défavorable ici : une règle qui achète après une clôture au-dessus de sa moyenne et vend après une clôture en dessous exécute en moyenne après une partie du mouvement.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- Le résultat et les frais de chaque passage cash/fonds, à partir des exécutions : c'est ce qui dirait si la perte de 2021-2022 vient des signaux ou des coûts.
-- La contribution des gaps de nuit, favorable ou défavorable.
-- L'alpha de -1,6 % par an est une estimation ponctuelle, sans intervalle.
+- Le détail des 72 séjours est dans `episodes_sa1.csv` (dossier des diagnostics) ; le sous-ensemble 2021-2022 n'est pas commenté séparément.
+- L'alpha de -1,6 % par an reste une estimation ponctuelle, sans intervalle.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

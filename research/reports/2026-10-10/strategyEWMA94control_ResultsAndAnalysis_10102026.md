@@ -113,11 +113,18 @@ Le témoin de SA11 : la même règle d'allocation, la même fenêtre et la même
 - **Observé.** Rebond rapide après une panique : le poids reste entre 30 % et 44 % du 2025-04-15 au 2025-05-19.
 - **Plausible.** Régime de volatilité durablement au-dessus de 12 % dans un marché qui monte.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** À côté d'un fonds détenu à poids constant de 87,8 % : le témoin constant fait +81,6 % net, Sharpe 0,92, perte maximale -19,5 %, sommet retrouvé en 229 jours ; l'EWMA fait +73,4 %, Sharpe 0,93, -15,4 %, 321 jours.
+- **Lecture.** C'est le seul des trois contrôles de volatilité dont le Sharpe égale celui de la même exposition tenue constante, avec quatre points de perte maximale en moins et huit points de rendement en moins.
+- **Fait.** Contre SA6 : différence de Sharpe de +0,036 en sa faveur, intervalle bootstrap à 95 % [-0,027 ; +0,104], qui inclut zéro.
+- **Fait.** Aux coefficients 0,90 et 0,97, fixés avant leur run : Sharpe de 0,90 (366 ordres, 2 686 EUR de coûts, perte maximale -14,6 %) et de 0,97 (127 ordres, 769 EUR, -17,1 %).
+- **Fait.** Effet du délai clôture-ouverture : -3 016 EUR nets.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- Un bootstrap apparié de la différence de Sharpe avec SA6, si l'on veut choisir entre les deux témoins.
-- Une sensibilité descriptive à quelques coefficients fixés d'avance (0,90, 0,97), sans chercher après coup le meilleur sur ce même historique.
-- Regardé après coup comme témoin, il n'a pas été préinscrit comme candidat : le retenir serait une nouvelle hypothèse à écrire.
+- Le coefficient 0,97 fait mieux ici ; le retenir pour cela serait choisir un paramètre sur l'historique qui l'a désigné.
+- Regardé après coup comme témoin, l'EWMA n'a pas été préinscrite comme candidate : la retenir serait une nouvelle hypothèse à écrire.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

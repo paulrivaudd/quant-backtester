@@ -2,7 +2,7 @@
 
 Période de test 2025-01-02 → 2026-10-09 (après la date limite d'information du modèle, 2024-12-31) · modèle figé `d9bfd125bf69` (graine 42) · mêmes capital, coûts et conventions que les autres stratégies.
 
-Source : commit `950dc00df5dc` (CLEAN), magasin `750c23dfffc3`. **Période différente de celle des stratégies SA** (qui commence en 2021) : ces chiffres ne se comparent pas aux leurs, et ML1 n'a pas de rang dans le classement commun. Le test a déjà été lu une fois le 2026-10-04 jusqu'au 2026-09-30 ; ce run le prolonge avec le même modèle. Le score est déflaté pour un seul essai.
+Source : commit `9ee2707f5215` (CLEAN), magasin `750c23dfffc3`. **Période différente de celle des stratégies SA** (qui commence en 2021) : ces chiffres ne se comparent pas aux leurs, et ML1 n'a pas de rang dans le classement commun. Le test a déjà été lu une fois le 2026-10-04 jusqu'au 2026-09-30 ; ce run le prolonge avec le même modèle. Le score est déflaté pour un seul essai.
 
 ## 1. Indicateurs de résultat globaux
 
@@ -109,12 +109,19 @@ Un petit réseau de neurones, entraîné sur 2019-2023 et sélectionné sur 2024
 - **Observé.** Chute rapide suivie d'un rebond (avril 2025) : réduction pendant la baisse, retour au risque avant le second creux du portefeuille.
 - **Plausible.** Régime absent de son apprentissage (2019-2023) : la sortie softmax et les plafonds bornent toujours les poids, mais rien n'assure leur pertinence économique si les entrées dérivent ; l'artefact n'est pas réentraîné.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** À côté d'une allocation constante de 36,3 % de fonds S&P 500 et 30,3 % de fonds monde (ses poids moyens), sur les mêmes dates, avec la même bande et les mêmes coûts : l'allocation constante fait +17,2 % net, Sharpe 0,93, perte maximale -15,2 %, sommet retrouvé en 225 jours, 76 EUR de coûts ; ML1 fait +13,4 %, Sharpe 0,76, -16,1 %, 251 jours.
+- **Lecture.** Sur ces dates le timing du réseau a retiré de la valeur par rapport à ses propres poids moyens tenus constants : c'est un mauvais timing, pas une absence de timing. L'allocation constante est choisie après coup.
+- **Fait.** La part du fonds S&P 500 dans ce qui est investi va de 33 % à 66 % (moyenne 55 %) : le réseau déplace aussi la répartition entre les deux fonds.
+- **Fait.** Sensibilités annoncées, sur la période d'origine (jusqu'au 2026-09-30) : graine 42, score 44,5 % et Sharpe 0,68 ; graine 43, 45,9 % et 0,70 ; graine 44, 45,6 % et 0,71 ; coûts doublés, 44,3 % et 0,69. Le Sharpe du fonds détenu y est de 0,86. Dans chaque variante le Sharpe reste sous celui du fonds et le score sous 50 %.
+- **Fait.** La variante à coûts doublés est recalibrée sous ces coûts et retient l'époque 15 au lieu de 20 : c'est un autre modèle, pas le modèle de la graine 42 rejoué plus cher.
+- **Fait.** Les 319 caractéristiques lues par le réseau à chacune des 453 décisions sont exportées (`ml1_inputs.csv`) ; toutes les décisions ont un vecteur complet.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- Une allocation fixe exécutable aux deux fonds et au cash, sur les mêmes dates et les mêmes coûts : multiplier 65 % par le rendement du fonds ne la remplace pas. Choisie après coup, elle resterait descriptive.
-- L'effet des changements de répartition entre fonds monde et fonds S&P 500, séparé de celui de l'exposition totale.
-- Les caractéristiques d'entrée du réseau et leurs statuts de disponibilité, séance par séance : l'historique ci-dessous ne contient que ses sorties.
-- Une seule graine et 453 valorisations déjà regardées : rien ne permet de conclure sur le modèle lui-même.
+- Les entrées sont exportées mais pas analysées : rien ici ne dit quelles caractéristiques expliquent les réallocations d'avril 2025.
+- Trois graines qui échouent de la même façon ne font pas un test indépendant : même données, même période, déjà regardée.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

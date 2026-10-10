@@ -112,9 +112,15 @@ Acheter le fonds S&P 500 à 50 % quand le VIX est retombé à 80 % ou moins d'un
 - **Plausible.** Panique dont le pic reste sous 30 : la règle ne s'active pas.
 - **Plausible.** Série publiée avec un jour de retard : un VIX trop ancien envoie la règle en cash.
 
+### Mesures complémentaires (voir diagnostics_10102026.md)
+
+- **Fait.** Par séjour : 21 séjours de 5 valorisations en moyenne, 9 gagnants et 12 perdants ; net moyen -0,02 %, net médian -0,70 %, pire -2,64 % (le faux départ d'avril 2025), meilleur +3,64 %.
+- **Fait.** Regroupés en 7 paniques : trois perdantes (décembre 2021 à février 2022, -2,07 % en cinq séjours ; mai à juillet 2022, -2,50 % en cinq séjours ; octobre-novembre 2022, -2,22 %) et quatre gagnantes (mars-avril 2022, +0,30 % ; août 2024, +1,75 % ; avril-mai 2025, +0,90 % faux départ compris ; avril 2026, +3,30 %).
+- **Fait.** Le délai d'exécution a coûté 4 852 EUR nets, soit 4,9 % du capital initial et plus du double de ses coûts explicites (2 041 EUR).
+- **Lecture.** Sept paniques ne permettent aucune conclusion statistique. Les trois perdantes sont celles où la règle est entrée plusieurs fois : un apaisement suivi d'une rechute se répète avant de se résoudre.
+
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- Le résultat net de chacune des 21 séquences, et leur regroupement par panique : c'est la seule unité d'analyse pertinente pour une règle aussi rare.
 - La règle comme poche d'un portefeuille, plutôt que seule face au cash.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
