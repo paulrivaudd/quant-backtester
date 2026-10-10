@@ -76,3 +76,35 @@ Adding distributing ETFs or equities needs, first, a model of corporate
 actions on held positions (today a split or a dividend on a held line stops
 the run), and a universe whose history is point-in-time, dead names included.
 A larger universe does not compensate for events booked wrongly.
+
+## 6. Models estimated inside a study (SA11, SA12, SA13)
+
+Written on 2026-10-10, before the first run of SA12 and SA13.
+
+A model re-estimated at every decision (the GARCH of `SA11`, the ARIMA and the
+GARCH of `SA12`) or every month (the networks of `SA13`) gives forecasts that
+are out of their estimation window. The *design* of the strategy on a history
+already looked at is still retrospective: the last third of such a period is a
+sub-period of robustness, never a validation sample.
+
+- **The hypothesis, its parameters, its controls and its statuses are written
+  in `research/hypotheses.toml` before the first fit on the store**, and the
+  commit that holds them comes before the code that tests them.
+- **A control is not a candidate.** `D0`, `D1`, `D2` of `SA12`, `C0` and the
+  other variants of `SA13`, and the EWMA control of `SA11` carry research
+  identifiers and no catalogue code. Each is a trial in the register that
+  deflates a Sharpe ratio. None replaces the strategy after its test is read;
+  adopting one is a new hypothesis.
+- **Statuses.** An economic hypothesis ends as `INSUFFICIENT_EVIDENCE`,
+  `NOT_SUPPORTED`, `UNCERTAIN` or `SUPPORTED_RETROSPECTIVE`, sufficiency of the
+  sample and operational quality being judged first. They answer the question
+  that was registered and nothing wider.
+- **Doubled costs are a second real run**, with the policy and the models
+  unchanged - thresholds included.
+- **A fitted artifact is used only after its information cutoff and its
+  availability.** A monthly schedule of models is built before the backtest;
+  a decision never loads "the latest model in the folder".
+- **Prospective observation.** After the implementation, its configuration
+  and the store are frozen, a strategy kept for observation starts at the first
+  XPAR session after its code is actually available, with no real money, and
+  is not read before 252 sessions. That start is never antedated.

@@ -24,6 +24,12 @@ ml = [
 ]
 stats = [
     "arch>=8.0.0",
+    "statsmodels>=0.15.0",
+]
+signatures = [
+    "esig>=1.0.0",
+    "roughpy>=0.3.0",
+    "scikit-learn>=1.9.1",
 ]
 
 [build-system]
