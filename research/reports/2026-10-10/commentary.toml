@@ -1,0 +1,240 @@
+# Commentaire rédigé de chaque stratégie, lu par scripts/write_strategy_reports.py.
+#
+# Écrit le 2026-10-10 d'après les exports de results/garch_study (commit ee7ff0c,
+# magasin 750c23dfffc3, période commune 2021-04-01 -> 2026-10-09) et, pour ML1,
+# d'après son run de test 2025-01-02 -> 2026-10-09. Les chiffres cités viennent
+# de ces exports ; l'interprétation est une lecture, pas une mesure. Une
+# évaluation rétrospective : aucune de ces périodes n'est un échantillon vierge.
+#
+# Repères communs : ETF_WORLD détenu fait +94,8 % net (Sharpe 0,93, volatilité
+# 13,8 %), avec une perte maximale de -21,6 % en 36 séances, du 2025-02-19 au
+# 2025-04-09, et une année 2022 à -13,7 %.
+
+[SA1]
+summary = "Détenir ETF_WORLD au-dessus de sa moyenne mobile 20 jours, être en cash en dessous. C'est l'étalon historique des règles SA, et la règle la plus chère à exécuter : +20,5 % net contre +94,8 % pour le fonds détenu."
+strengths = [
+  "Évite l'essentiel d'un krach rapide : pendant la chute du fonds de février-avril 2025 (-21,6 %), la règle ne perd que -6,6 %, avec 22 % d'exposition moyenne.",
+  "Volatilité de 8,9 % contre 13,8 % pour le fonds, et bêta de 0,41 seulement.",
+  "Règle lisible, sans paramètre estimé : un seul indicateur, la distance du cours à sa MM20.",
+]
+weaknesses = [
+  "Les coûts mangent le résultat : 143 ordres portant chacun sur tout le portefeuille, une rotation de 25,5 fois l'actif par an, 15 730 EUR de coûts. Le rendement brut est de +36,2 %, le net de +20,5 %, et de +4,4 % seulement quand les coûts sont doublés.",
+  "Investie 66 % du temps, elle capte moins d'un quart de la hausse du fonds : alpha de -1,6 % par an et score de qualité nul (blocs robustesse et implémentation à zéro).",
+  "L'ordre part le soir et s'exécute à l'ouverture suivante : la règle vend après la baisse et rachète après la hausse, et le gap de nuit est à sa charge.",
+  "2026 est une année blanche (-0,04 %) alors que le fonds gagne +17,7 % : en marché haussier sans tendance nette au pas de 20 jours, les faux signaux annulent le gain.",
+]
+worst = "Du 2021-11-22 au 2022-07-14 (167 séances), la stratégie perd -18,95 % alors que le fonds ne perd que -12,0 %, avec 36 % d'exposition moyenne. C'est le marché baissier en dents de scie de 2022 : chaque rebond repasse au-dessus de la MM20 et déclenche un achat à 100 %, chaque rechute déclenche une vente quelques jours plus tard, plus bas. La règle n'a donc pas été protégée par son cash : elle a été investie pendant les rechutes et absente pendant une partie des rebonds, en payant les coûts de chaque aller-retour. Avril 2022 est son pire mois (-5,1 % contre -2,7 % pour le fonds)."
+best = "Sa plus forte hausse va du 2022-07-14 au 2025-11-03 (+37,3 %, contre +59,1 % pour le fonds, 70 % d'exposition). Ses 63 meilleures séances, du 2023-11-10 au 2024-02-12 (+13,5 %), sont une hausse régulière pendant laquelle le cours reste au-dessus de sa MM20 : la règle est investie à 100 % tout du long, ne passe aucun ordre et fait exactement le rendement du fonds. C'est le seul régime où elle ne coûte rien."
+risks = [
+  "Marché sans tendance ou baissier en dents de scie (2022, 2026) : le cours croise sa MM20 sans arrêt, et chaque croisement coûte un aller-retour et un gap de nuit.",
+  "Rebond en V après un krach : la règle est en cash au point bas et ne rachète qu'une fois le cours repassé au-dessus de sa moyenne.",
+  "Toute hausse des coûts d'exécution : à coûts doublés le gain disparaît presque entièrement.",
+]
+
+[SA2]
+summary = "Répartir entre ETF_WORLD et ETF_SP500_PEA selon l'écart de leurs momentums 6 et 12 mois (les 21 dernières séances exclues), et sortir d'un fonds dont le momentum 12 mois est négatif. +69,2 % net, Sharpe 0,78, sans réduction de la perte maximale."
+strengths = [
+  "Bat le fonds détenu les années de hausse portée par les actions américaines : +21,2 % en 2021 (fonds +18,4 %) et +30,7 % en 2024 (fonds +27,1 %).",
+  "Ses 63 meilleures séances (2026-03-31 au 2026-07-01, +17,2 %) dépassent celles du fonds (+16,3 %).",
+  "Reste investie à 100 % quand la tendance est installée : pas de cash inutile en 2024 ni en 2026.",
+]
+weaknesses = [
+  "N'offre aucune protection contre une chute rapide : perte maximale de -22,8 %, plus profonde que celle du fonds (-21,6 %).",
+  "Sort tard et rentre tard autour d'un marché baissier : -17,6 % en 2022 (fonds -13,7 %), puis +9,1 % en 2023 (fonds +19,6 %).",
+  "317 ordres et 4 629 EUR de coûts, une rotation de 6,8 fois l'actif par an ; alpha de -1,0 % par an contre le fonds, et un Sharpe qui passe de 0,78 à 0,72 à coûts doublés.",
+]
+worst = "Du 2025-02-19 au 2025-04-09 (36 séances), la stratégie perd -22,8 %, investie à 100 % du début à la fin. Le krach part des plus hauts : les momentums 6 et 12 mois sont encore largement positifs, donc la règle ne voit rien, et son inclinaison vers le fonds S&P 500, qui baisse davantage en euros, creuse l'écart avec le fonds monde. Un momentum à 12 mois ne peut pas réagir à une chute de sept semaines."
+best = "Sa plus forte hausse va du 2023-05-04 au 2026-10-06 (+74,3 %, 96 % d'exposition). Le meilleur trimestre, du 2026-03-31 au 2026-07-01 (+17,2 % contre +16,3 % pour le fonds), est une hausse régulière avec les deux momentums positifs : la règle est pleinement investie et surpondère le fonds le plus fort. Son plus fort retard relatif court du 2022-07-14 au 2025-05-16 (+18,1 % contre +43,8 %) : c'est le prix de la sortie tardive de 2022 et du retour tardif de 2023."
+risks = [
+  "Krach rapide depuis des plus hauts (février-avril 2025) : les momentums longs restent positifs, l'exposition reste à 100 %.",
+  "Reprise après un marché baissier (début 2023) : le momentum 12 mois est encore négatif et la règle regarde le rebond depuis le cash.",
+  "Inversion de leadership entre les États-Unis et le reste du monde : l'inclinaison suit le gagnant d'hier.",
+]
+
+[SA3]
+summary = "Exposition à ETF_WORLD proportionnelle à l'écart entre ses moyennes mobiles 50 et 200 jours : cash quand la MM50 est sous la MM200, 100 % à partir de 2 % d'écart. +57,9 % net, Sharpe 0,79, et la règle la moins chère du catalogue."
+strengths = [
+  "Très peu d'ordres : 78 en cinq ans et demi, 680 EUR de coûts, une rotation inférieure à une fois l'actif par an. Le résultat ne bouge presque pas à coûts doublés (+56,9 %).",
+  "Protège dans un marché baissier lent : -9,2 % en 2022 contre -13,7 % pour le fonds, avec 22 % d'exposition moyenne ; entre le 2022-04-05 et le 2022-06-17 elle est en cash pendant que le fonds perd -15,0 %.",
+  "Fait exactement le rendement du fonds quand la tendance est installée (2021, 2024, 2026) et un alpha légèrement positif (+0,4 % par an) pour un bêta de 0,65.",
+]
+weaknesses = [
+  "Aucune protection contre un krach rapide : perte maximale de -21,6 %, identique à celle du fonds.",
+  "Prend la baisse puis rate la reprise : -9,6 % en 2025 alors que le fonds finit à +6,6 %.",
+  "Revient tard après 2022 : +8,6 % en 2023 contre +19,6 %.",
+]
+worst = "Du 2025-02-19 au 2025-04-09, la stratégie perd -21,6 %, investie à 100 % : la MM50 est très au-dessus de la MM200 quand le marché décroche, et deux moyennes aussi lentes ne bougent pas en 36 séances. Le pire vient ensuite : la MM50 passe sous la MM200 après la chute, la règle sort au plus bas et reste largement en cash pendant le rebond. Avril 2025 est son pire mois (-8,0 % contre -3,9 % pour le fonds) et l'année se termine à -9,6 %, seize points derrière le fonds."
+best = "Sa plus forte hausse couvre presque toute la période (2021-05-19 au 2026-10-06, +62,2 % contre +100,3 % pour le fonds). Son meilleur trimestre, du 2026-03-31 au 2026-07-01 (+16,25 %), est celui du fonds : tendance haussière établie, MM50 nettement au-dessus de la MM200, exposition de 100 % sans un seul ordre. La règle gagne quand il n'y a rien à faire."
+risks = [
+  "Krach en V depuis des plus hauts (2025) : c'est son pire cas, elle subit toute la baisse puis sort avant la reprise.",
+  "Marché en range où les deux moyennes se croisent : l'exposition oscille entre 0 et 100 % autour d'un écart nul.",
+  "Reprise brutale après un long marché baissier : le croisement arrive des mois après le point bas.",
+]
+
+[SA4]
+summary = "Acheter ETF_WORLD, à hauteur de 50 % au plus, après une baisse de cinq séances inhabituelle par rapport à sa volatilité, seulement au-dessus de sa moyenne 200 jours. Une stratégie presque toujours en cash : +4,4 % net en cinq ans et demi."
+strengths = [
+  "Risque très faible : volatilité de 1,9 %, perte maximale de -3,4 %, bêta de 0,05.",
+  "Pendant le krach de 2025 elle ne perd que -2,9 % quand le fonds perd -21,6 % : le filtre de tendance coupe les achats dès que le cours passe sous sa MM200.",
+  "Alpha légèrement positif (+0,2 % par an) : les replis achetés en tendance haussière ont été payés en moyenne.",
+]
+weaknesses = [
+  "Exposition moyenne de 3,8 % : le capital dort en cash non rémunéré, et la règle passe à côté de la quasi-totalité de la hausse du fonds.",
+  "Les coûts prennent la moitié du gain : +9,0 % brut, +4,4 % net, pour 237 ordres et 4 572 EUR. À coûts doublés le résultat est négatif (-0,2 %).",
+  "Score de qualité nul et Sharpe de 0,41 ; seulement 28 mois positifs sur 67.",
+]
+worst = "Du 2025-02-27 au 2025-03-07 (7 séances), la stratégie perd -3,4 % avec jusqu'à 50 % d'exposition, pendant que le fonds perd -7,0 %. Le cours est encore au-dessus de sa MM200 : le premier décrochage ressemble à un repli ordinaire, la règle l'achète à pleine taille, et la baisse continue. Elle ne sort qu'une fois le signal éteint ou le cours passé sous sa moyenne longue. C'est le défaut classique d'un achat de repli : il ne distingue pas un repli du début d'une tendance baissière."
+best = "Du 2024-04-19 au 2025-02-27 (221 séances), la stratégie gagne +6,1 % avec 6 % d'exposition moyenne, pendant que le fonds gagne +20,7 %. Dans une tendance haussière régulière, chaque repli de quelques séances est suivi d'un retour vers les plus hauts : la règle achète le creux, revend à mesure que le signal s'éteint, et encaisse de petits gains répétés. Son meilleur trimestre (2024-09-06 au 2024-12-04, +2,9 %) est de cette nature."
+risks = [
+  "Début d'un vrai retournement, quand le cours est encore au-dessus de sa MM200 : le premier repli est acheté à 50 % et se prolonge.",
+  "Baisse par gaps de nuit successifs : l'ordre de vente est exécuté à l'ouverture suivante, après le gap.",
+  "Hausse sans repli : la règle n'a rien à acheter et reste en cash.",
+]
+
+[SA5]
+summary = "Détenir les deux fonds autour d'une répartition 50/50 et pencher, jusqu'à 25 points, vers celui qui a pris du retard sur l'autre ces cinq derniers jours. Toujours investie à 100 % : un fonds détenu avec des frais en plus."
+strengths = [
+  "Brut, elle égale le fonds détenu : +93,4 % contre +94,9 %.",
+  "Jamais en cash : elle participe à toutes les hausses, et ses 63 meilleures séances (2025-04-09 au 2025-07-10, +18,4 %) sont celles du rebond d'avril 2025.",
+  "Quelques épisodes où le retour à la moyenne a payé : +13,2 % du 2022-05-24 au 2022-08-22 contre +11,7 % pour le fonds.",
+]
+weaknesses = [
+  "La règle la plus chère en valeur : 1 904 ordres, une rotation de 29 fois l'actif par an, 20 517 EUR de coûts. Les coûts prennent 21 points de rendement (+93,4 % brut, +72,8 % net).",
+  "Ne tient pas à coûts doublés : +46,4 % net, Sharpe de 0,55 et score de qualité à zéro.",
+  "Aucune réduction du risque : bêta de 1,03, volatilité de 14,2 % (plus que le fonds), perte maximale de -22,9 %, alpha de -2,4 % par an.",
+]
+worst = "Du 2025-02-19 au 2025-04-09, la stratégie perd -22,9 %, investie à 100 %. Rien dans la règle ne réduit l'exposition : elle ne choisit qu'entre deux fonds d'actions très corrélés. Pendant la chute, le fonds S&P 500 baisse plus que le fonds monde ; la règle penche vers celui qui vient de sous-performer, donc vers le plus faible, et finit un peu en dessous du fonds détenu."
+best = "Sa plus forte hausse va du 2022-06-16 au 2026-10-06 (+78,6 % contre +96,6 % pour le fonds) : elle suit le marché, les coûts en moins. Le meilleur trimestre est le rebond du 2025-04-09 au 2025-07-10 (+18,4 %, le fonds +19,3 %). Ce n'est pas l'inclinaison qui gagne, c'est le fait d'être restée investie pendant la reprise, que les règles à cash ont en partie ratée."
+risks = [
+  "Tout marché baissier : l'exposition reste à 100 %.",
+  "Divergence durable entre les deux fonds (leadership américain ou change euro-dollar) : la règle renforce le perdant tant que l'écart se creuse.",
+  "Hausse des coûts ou du spread : le rebalancement quasi quotidien rend le résultat proportionnel aux frais.",
+]
+
+[SA6]
+summary = "Détenir ETF_WORLD à hauteur de 12 % / max(vol 20 jours, vol 60 jours), plafonné à 100 %. La règle simple de contrôle du risque et le comparateur de SA11 : +67,4 % net, Sharpe 0,90, perte maximale réduite de 21,6 % à 15,7 %."
+strengths = [
+  "Réduit la perte maximale de près de six points (-15,7 % contre -21,6 %) et la volatilité de 13,8 % à 10,9 %, pour un Sharpe (0,90) proche de celui du fonds (0,93).",
+  "Peu d'ordres pour une règle quotidienne : 180 ordres, 1 445 EUR de coûts, une rotation de 2,1 fois l'actif par an. Le résultat tient à coûts doublés (+65,5 %, Sharpe 0,88).",
+  "Le maximum de deux volatilités empêche de reconstruire l'exposition juste après un choc : fin mars 2025, entre les deux vagues de baisse, elle n'est remontée qu'à 60-65 % quand SA11 était revenue à 80 %.",
+  "Troisième du classement commun (52,0 %), devant SA11.",
+]
+weaknesses = [
+  "Elle rend 27 points de rendement au fonds détenu (+67,4 % contre +94,8 %) : la volatilité du fonds est en moyenne au-dessus de la cible de 12 %, donc la règle est structurellement sous-investie (85 % d'exposition moyenne).",
+  "Lente à se réexposer : la volatilité 60 jours garde la mémoire du choc pendant trois mois. En 2025 elle fait +1,6 % contre +6,6 % pour le fonds.",
+  "Ne prévoit rien : elle est à 100 % le jour où le krach commence (volatilité estimée à 11 % le 2025-02-19).",
+]
+worst = "Du 2025-02-19 au 2025-04-09, la stratégie perd -15,7 % contre -21,6 % pour le fonds, avec 72 % d'exposition moyenne (de 100 % à 36 %). La baisse part d'un marché calme : la règle est pleinement investie et encaisse la première vague, ne réduit qu'à partir du 7 mars (72 %), puis descend à 60 % fin mars. Le choc du 3 au 7 avril la trouve à 65 % : elle a amorti environ un quart de la chute. Sur les 63 pires séances (2025-01-21 au 2025-04-22) elle perd -12,65 % contre -16,8 %."
+best = "Sa plus forte hausse couvre presque toute la période (2021-05-19 au 2026-10-06, +72,0 % contre +100,3 %). Son meilleur trimestre, du 2023-10-30 au 2024-01-30 (+15,1 % contre +15,6 % pour le fonds), est une hausse régulière à faible volatilité : les deux estimations sont sous 12 %, l'exposition reste à 98 % en moyenne et la règle laisse passer le rendement du fonds presque intact."
+risks = [
+  "Choc soudain en marché calme : exposition à 100 % au moment du choc, la réduction vient après la perte.",
+  "Rebond en V après une panique : la volatilité 60 jours reste élevée et l'exposition reste basse (30 à 40 % jusqu'en mai 2025) pendant la reprise.",
+  "Long régime de volatilité moyenne (13 à 20 %) avec un marché qui monte : la règle est durablement sous-investie.",
+]
+
+[SA9]
+summary = "Acheter le fonds S&P 500 à 50 % quand le VIX est retombé à 80 % ou moins d'un pic de panique récent (au moins 30) et que le fonds remonte sur cinq séances. La règle se déclenche rarement et n'a rien gagné : -0,7 % net."
+strengths = [
+  "Presque toujours en cash : volatilité de 2,3 %, bêta de 0,05, et aucune perte pendant le krach de février-avril 2025.",
+  "Son cas d'école a fonctionné : après la panique d'avril 2025 elle gagne +4,1 % en 63 séances (2025-04-28 au 2025-07-25) et +7,5 % jusqu'au 2026-04-29.",
+  "Peu d'ordres (42).",
+]
+weaknesses = [
+  "Perd de l'argent sur la période : -0,7 % net, +1,3 % brut. Les 2 041 EUR de coûts, sur des positions de 50 % ouvertes et fermées en quelques jours, dépassent le gain brut.",
+  "Seulement 8 mois positifs sur 67 ; Sharpe négatif (-0,04), score de qualité nul, et -2,8 % à coûts doublés.",
+  "Trop peu d'épisodes pour juger : la règle repose sur une poignée de paniques, et celles de 2022 ont mal tourné.",
+]
+worst = "Sa perte maximale de -8,0 % s'étale du 2022-03-29 au 2025-04-28 (788 séances, 3 % d'exposition moyenne) : ce sont des pertes prises par à-coups, jamais rattrapées faute d'occasions. Le cœur en est le printemps 2022 (2022-03-31 au 2022-06-30, -4,8 %) : dans un marché baissier, chaque détente du VIX est suivie d'une nouvelle vague de baisse. La règle achète le soulagement à 50 %, le fonds rechute, elle revend plus bas, et recommence."
+best = "Du 2025-04-28 au 2026-04-29, la stratégie gagne +7,5 %, dont +4,1 % sur les 63 premières séances. Après la panique d'avril 2025, le VIX retombe nettement sous son pic alors que le fonds repart : les deux conditions sont réunies, la règle entre à 50 % et le rebond se poursuit sans seconde vague. C'est la seule panique de la période qui se soit résorbée d'un coup."
+risks = [
+  "Marché baissier à plusieurs vagues (2022) : une détente du VIX précède une rechute, et la règle achète chaque faux soulagement.",
+  "Panique sans pic au-dessus de 30 : la règle ne voit rien et reste en cash, ce qui n'est pas une perte mais pas un gain non plus.",
+  "Série publiée avec un jour de retard : un VIX trop ancien envoie la règle en cash, parfois au moment où le signal serait utile.",
+]
+
+[SA10]
+summary = "L'ensemble : cinq règles (momentum, moyennes lissées, repli, inclinaison relative, détente du VIX) avec des budgets fixes et un contrôle de risque commun. Les fonds de style et monétaire ne sont pas enregistrés, donc leurs budgets (30 % du capital pour les fonds de style) restent en cash. +32,1 % net, Sharpe 0,86, la plus faible perte maximale des règles investies."
+strengths = [
+  "Le meilleur profil de risque des règles réellement investies : volatilité de 6,0 %, perte maximale de -11,8 % (bloc risque à 0,96), bêta de 0,41.",
+  "Sharpe de 0,86, proche du fonds détenu, avec moins de la moitié de son exposition : la diversification entre règles lisse les erreurs de chacune.",
+  "Coûts modérés (1 986 EUR) et 42 mois positifs sur 67 ; quatrième du classement commun (51,1 %).",
+]
+weaknesses = [
+  "Sous-investie par construction : 42 % d'exposition moyenne, 56 % au maximum, parce que les budgets des règles sans instrument dorment en cash non rémunéré.",
+  "Rendement total de +32,1 % contre +94,8 % : en marché haussier le retard est mécanique, et l'alpha est nul (-0,1 % par an).",
+  "465 ordres pour une petite exposition : le Sharpe passe de 0,86 à 0,80 à coûts doublés, et le score recule de 51 % à 44 %.",
+]
+worst = "Du 2025-02-19 au 2025-04-09, l'ensemble perd -11,8 % contre -21,6 % pour le fonds, avec 50 % d'exposition moyenne. Ses composantes de tendance (momentum, moyennes 50/200) sont pleinement investies au début du krach, puisque le marché sort de plus hauts, et aucune ne réagit en sept semaines ; seule la moitié du capital laissée en cash limite la perte. L'année 2025 se termine à -1,7 % : les règles de tendance ont ensuite réduit pendant le rebond."
+best = "Sa plus forte hausse couvre presque toute la période (+33,9 % du 2021-05-19 au 2026-10-06). Le meilleur trimestre, du 2026-03-31 au 2026-07-01 (+8,6 %, la moitié des +16,3 % du fonds), est une hausse régulière : les règles de tendance sont à leur budget maximal, l'exposition est stable autour de 52 % et l'ensemble capte la moitié du mouvement."
+risks = [
+  "Krach rapide depuis des plus hauts : toutes les règles de tendance sont investies en même temps, la diversification entre règles disparaît.",
+  "Long marché haussier : le cash structurel coûte chaque jour.",
+  "Rebond en V : les composantes lentes sortent après la baisse et reviennent après la reprise, comme SA3 en 2025.",
+]
+
+[SA11]
+summary = "Détenir ETF_WORLD à hauteur de 12 % / max(σ, 5 %), où σ est la volatilité prévue à une séance par un GARCH(1,1) à innovations de Student, réestimé chaque soir sur les 756 derniers rendements. La prévision est la meilleure des trois, mais l'allocation qui en découle ne bat ni SA6 ni le témoin EWMA : l'hypothèse préinscrite est réfutée et la règle simple est conservée."
+strengths = [
+  "Meilleure prévision de variance des trois estimateurs : QLIKE de -8,6225 contre -8,6033 pour l'EWMA 0,94 et -8,5649 pour l'estimateur de SA6, sur 1 415 paires prévision-réalisation.",
+  "Estimation robuste : les 1 416 décisions ont un fit accepté, aucun repli EWMA n'a été nécessaire (persistance médiane 0,975, ν médian 5,2).",
+  "Réduit le risque par rapport au fonds détenu : perte maximale de -16,5 % contre -21,6 %, volatilité de 11,1 % contre 13,8 %.",
+  "Réagit vite dans les deux sens : c'est elle qui coupe le plus au pic de la panique (29 % le 2025-04-10) et qui se réexpose le plus tôt ensuite (58 % le 2025-05-19, contre 41 % pour SA6).",
+]
+weaknesses = [
+  "Ne bat pas ses témoins : Sharpe net de 0,87 contre 0,90 pour SA6 et 0,93 pour l'EWMA, et une perte maximale plus profonde (-16,5 % contre -15,7 % et -15,4 %).",
+  "Trade deux fois et demie plus : 508 ordres, une rotation de 5,5 fois l'actif par an et 3 749 EUR de coûts, contre 180 ordres et 1 445 EUR pour SA6. Le poids cible bouge de 2,3 points par jour en moyenne, contre 0,9.",
+  "L'écart se creuse à coûts doublés : Sharpe de 0,82 contre 0,91 pour l'EWMA, avec un intervalle bootstrap à 95 % de la différence [-0,172 ; -0,014] qui exclut zéro du mauvais côté.",
+  "Rend 29 points de rendement au fonds détenu (+66,0 % contre +94,8 %), alpha de -0,4 % par an : comme SA6, elle est sous-investie dès que la volatilité dépasse 12 %.",
+  "Sixième du classement commun (48,6 %), derrière SA6 (52,0 %) et le témoin EWMA (53,6 %).",
+]
+worst = "Du 2025-02-19 au 2025-04-09 (36 séances), la stratégie perd -16,5 % contre -21,6 % pour le fonds, avec 76 % d'exposition moyenne. Le krach part d'un marché calme : la volatilité prévue est de 10,9 % le 19 février et l'exposition de 100 %. La première vague est bien traitée (61 % à la mi-mars). L'erreur vient entre les deux vagues : le GARCH revient vite vers sa moyenne, la volatilité prévue retombe à 15 % dès le 20 mars alors que l'EWMA est encore à 17 % et SA6 à 20 %, et la règle remonte à 80 % d'exposition. Le choc du 3 au 7 avril la trouve à 78 %, contre 65 % pour SA6 et 67 % pour l'EWMA. Elle coupe ensuite à 29 % le 10 avril, au plus bas, quand la volatilité prévue atteint 45 %. C'est exactement la différence avec ses témoins : une prévision qui oublie plus vite se réexpose avant la seconde jambe."
+best = "Sa plus forte hausse va du 2022-06-17 au 2026-10-06 (+70,2 % contre +96,7 % pour le fonds, 90 % d'exposition). Son meilleur trimestre, du 2023-10-30 au 2024-01-30 (+15,3 % contre +15,6 %), est une hausse régulière avec une volatilité prévue sous la cible de 12 % : l'exposition reste à 99 % en moyenne, la bande de 3 points absorbe les petites variations de la prévision, et la règle ne passe presque aucun ordre. Dans ce régime GARCH, EWMA et SA6 font la même chose, et le GARCH ne coûte rien."
+risks = [
+  "Baisse en deux temps avec une accalmie entre les deux (mars-avril 2025) : le retour rapide du GARCH vers sa moyenne reconstruit l'exposition juste avant la seconde vague. C'est la situation la plus dangereuse pour cette règle par rapport à ses témoins.",
+  "Choc soudain en marché calme : aucun modèle de volatilité ne le prévoit, l'exposition est à 100 % et la réduction vient après la perte, exécutée à l'ouverture suivante après le gap.",
+  "Volatilité qui oscille autour de la cible de 12 % : la prévision franchit sans cesse le seuil, la bande de 3 points est dépassée et la règle paie des coûts sans changer de régime.",
+  "Marché baissier lent et régulier (2022, -13,2 % contre -13,7 % pour le fonds) : la volatilité reste modérée, l'exposition reste à 70 % et la protection est presque nulle.",
+  "Rebond en V : la règle est à son exposition minimale au point bas. Elle se réexpose plus vite que SA6, mais après le premier rebond.",
+]
+
+[EWMA94control]
+summary = "Le témoin de SA11 : la même règle d'allocation, la même fenêtre de 756 rendements et la même bande, sur une variance EWMA de coefficient 0,94 sans rien estimer. Il n'a pas de code de catalogue. C'est lui qui gagne la comparaison dédiée : +73,4 % net, Sharpe 0,93."
+strengths = [
+  "Le meilleur des trois contrôles de volatilité : Sharpe de 0,934, égal à celui du fonds détenu (0,930), avec une perte maximale de -15,4 % au lieu de -21,6 %.",
+  "Alpha positif contre le fonds (+0,4 % par an) pour un bêta de 0,78 ; deuxième du classement commun (53,6 %).",
+  "Aussi peu coûteux que SA6 : 220 ordres, 1 519 EUR, une rotation de 2,1 fois l'actif par an ; tient à coûts doublés (+70,9 %, Sharpe 0,91).",
+  "Aucun paramètre estimé, aucune dépendance, aucun risque de non-convergence.",
+]
+weaknesses = [
+  "Prévision moins bonne que le GARCH (QLIKE -8,6033 contre -8,6225) et trop basse en moyenne : le rapport r²/q vaut 1,11.",
+  "Rend 21 points de rendement au fonds détenu (+73,4 % contre +94,8 %) : sous-investi dès que la volatilité dépasse 12 %.",
+  "Son avance sur SA6 est faible et non testée comme hypothèse : c'est un témoin, regardé après coup.",
+]
+worst = "Du 2025-02-19 au 2025-04-09, le témoin perd -15,4 % contre -21,6 % pour le fonds, avec 72 % d'exposition moyenne. Comme les autres il est presque pleinement investi au départ (97 %). Sa mémoire, plus longue que celle du GARCH et plus courte que celle de la volatilité 60 jours, le garde vers 67 % fin mars : il aborde le choc d'avril moins exposé que SA11 (78 %) et se réexpose ensuite un peu plus vite que SA6."
+best = "Sa plus forte hausse couvre presque toute la période (2021-05-19 au 2026-10-06, +78,1 % contre +100,3 %). Son meilleur trimestre, du 2023-10-30 au 2024-01-30 (+15,4 % contre +15,6 %), est une hausse calme : volatilité sous la cible, exposition de 99 %, presque aucun ordre."
+risks = [
+  "Choc soudain en marché calme : exposition proche de 100 % au moment du choc.",
+  "Rebond en V : l'exposition reste basse plusieurs semaines après la panique (35 à 44 % jusqu'à la mi-mai 2025).",
+  "Régime de volatilité durablement au-dessus de 12 % dans un marché qui monte.",
+]
+
+[ML1]
+summary = "Un petit réseau de neurones, entraîné sur 2019-2023 et sélectionné sur 2024, propose chaque soir des poids entre ETF_WORLD, ETF_SP500_PEA et le cash. Sur sa période de test (2025-01-02 au 2026-10-09) il fait +13,4 % contre +24,5 % pour le fonds détenu : la prédiction de son hypothèse n'est pas vérifiée."
+strengths = [
+  "Moins de risque que le fonds détenu : volatilité de 9,9 % contre 14,3 %, perte maximale de -16,1 % contre -21,5 %.",
+  "Peu coûteux : 270 ordres mais de petite taille, 756 EUR de coûts.",
+  "Comportement stable : l'exposition reste entre 47 % et 87 %, sans décision extrême.",
+]
+weaknesses = [
+  "Ne bat pas le fonds : Sharpe de 0,76 contre 0,93, alpha de -1,4 % par an pour un bêta de 0,67.",
+  "Score de qualité de 45,8 %, sous le seuil de 50 % de son hypothèse, et Sharpe sous celui du fonds : les deux critères de réfutation sont atteints, comme lors du premier test du 2026-10-04.",
+  "Se comporte comme un portefeuille dilué à poids presque constants (67 % d'exposition moyenne) : la baisse du risque vient du cash, pas d'un choix du moment.",
+  "Une seule graine, une seule période de test de 453 séances, déjà regardée : rien ne permet de conclure sur le modèle lui-même.",
+]
+worst = "Du 2025-02-19 au 2025-04-22 (43 séances), la stratégie perd -16,1 % avec 64 % d'exposition moyenne, alors que le fonds perd -18,7 %. Le réseau ne réduit presque pas pendant le krach : son exposition reste entre 47 % et 79 %. Il perd donc un peu plus que ce que perdrait un portefeuille à 65 % d'actions, sa part de fonds S&P 500 baissant davantage que le fonds monde (-23,3 % contre -21,7 % jusqu'au 9 avril), et son creux arrive deux semaines après celui du fonds."
+best = "Du 2025-04-22 au 2026-10-06 (374 séances), la stratégie gagne +32,9 % contre +48,1 % pour le fonds, avec 68 % d'exposition. Ses 63 meilleures séances (2025-04-22 au 2025-07-21, +13,0 % contre +15,4 %) sont le rebond qui suit la panique d'avril : le réseau monte son exposition vers 80 % et capte la plus grande partie de la reprise. Il gagne quand le marché monte, à proportion de ce qu'il détient."
+risks = [
+  "Long marché haussier : un tiers du capital en cash non rémunéré coûte chaque jour.",
+  "Krach rapide : le réseau ne coupe pas, il reste investi aux deux tiers.",
+  "Régime de marché absent de son apprentissage (2019-2023) : rien ne garantit que ses poids restent raisonnables, et l'artefact n'est jamais réentraîné.",
+]
