@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import ast
 import importlib
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -232,6 +234,16 @@ ML_INFERENCE = ("config.py", "features.py", "network.py", "artifacts.py")
 TORCH_MODULES = (ML, SIGNALS / "ml", STRATEGIES / "ml")
 """The only places PyTorch, an optional dependency, may be imported from."""
 
+SIGNATURE_INFERENCE = ("config.py", "models.py", "artifacts.py")
+"""What the signal and the strategy of a signature model import from ``ml/signatures``."""
+
+TORCH_FREE_SIGNALS = ("quant_backtester.signals.ml.signature_return",)
+"""Signals of a fitted model that are written without PyTorch: their models are
+plain arrays at inference, so a rule-based strategy may read them."""
+
+OPTIONAL_PACKAGES = ("torch", "esig", "roughpy", "sklearn", "arch", "statsmodels")
+"""What the extras bring; importing a catalogued strategy must load none of them."""
+
 
 @pytest.mark.parametrize("name", ML_INFERENCE)
 def test_what_a_model_needs_to_decide_reads_nothing_above_the_signals(name: str):
@@ -252,7 +264,11 @@ def test_what_a_model_needs_to_decide_reads_nothing_above_the_signals(name: str)
 
 def test_no_layer_imports_the_training_of_a_model():
     """A model is trained before a run, by a script: no decision can start a training."""
-    offline = ("quant_backtester.ml.training", "quant_backtester.ml.dataset")
+    offline = (
+        "quant_backtester.ml.training",
+        "quant_backtester.ml.dataset",
+        "quant_backtester.ml.signatures.training",
+    )
     for layer in LAYERS:
         for path in (PACKAGE / layer).rglob("*.py"):
             reaching = sorted(name for name in imported_modules(path) if name in offline)
@@ -269,17 +285,70 @@ def test_pytorch_is_imported_by_the_model_code_only():
         reaching = sorted(
             name
             for name in imported_modules(path)
-            if name.startswith(
+            if name not in TORCH_FREE_SIGNALS
+            and name.startswith(
                 (
                     "quant_backtester.ml.network",
                     "quant_backtester.ml.artifacts",
                     "quant_backtester.ml.training",
+                    "quant_backtester.ml.signatures.training",
                     "quant_backtester.signals.ml.",
                     "quant_backtester.strategies.ml.",
                 )
             )
         )
         assert not reaching, f"{path.relative_to(PACKAGE)} imports {', '.join(reaching)}"
+
+
+@pytest.mark.parametrize("name", SIGNATURE_INFERENCE)
+def test_what_a_signature_model_needs_to_decide_reads_nothing_above_the_signals(name: str):
+    """``SA13`` and its signal import these: no PyTorch, and nothing above the signals."""
+    imported = imported_modules(ML / "signatures" / name)
+    above = sorted(
+        module
+        for module in imported
+        if (layer := _layer_of(module)) is not None and LAYER_RANK[layer] > LAYER_RANK["signals"]
+    )
+
+    assert not above, f"ml/signatures/{name} imports {', '.join(above)}"
+    assert "torch" not in {module.split(".")[0] for module in imported}
+    assert "quant_backtester.ml.signatures.training" not in imported
+
+
+def test_a_signal_excused_from_the_pytorch_rule_really_imports_none():
+    """The exception is a fact about the file, checked, not a name on a list."""
+    for module in TORCH_FREE_SIGNALS:
+        path = PACKAGE.joinpath(*module.split(".")[1:]).with_suffix(".py")
+        reached = imported_modules(path)
+
+        assert "torch" not in {name.split(".")[0] for name in reached}
+        assert not {
+            name
+            for name in reached
+            if name.startswith(("quant_backtester.ml.network", "quant_backtester.ml.training"))
+        }
+
+
+def test_every_catalogued_rule_imports_without_any_optional_package():
+    """Listing and loading the statistical family loads none of the extras.
+
+    Checked in a fresh interpreter: an optional package already imported by
+    another test of this session would hide a leak.
+    """
+    program = (
+        "import sys\n"
+        "from quant_backtester.strategies.catalogue import Family, family\n"
+        "for item in family(Family.SA):\n"
+        "    item.load()\n"
+        f"loaded = [name for name in {OPTIONAL_PACKAGES!r} if name in sys.modules]\n"
+        "assert not loaded, loaded\n"
+    )
+
+    done = subprocess.run(
+        [sys.executable, "-c", program], capture_output=True, text=True, check=False
+    )
+
+    assert done.returncode == 0, done.stderr
 
 
 def test_the_model_code_downloads_nothing():

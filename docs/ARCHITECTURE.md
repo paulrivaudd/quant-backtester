@@ -81,7 +81,7 @@ Trois règles supplémentaires sont vérifiées par les mêmes tests :
 | `backtest/` | Le temps | `config` (`BacktestConfig`), `engine`, `timetable`, `schedule`, `context` (`StrategyContext`), `market`, `records` (`BacktestRecord`), `result` (`BacktestResult`), `runner` (`StrategyRunner`, `StrategyResult`) |
 | `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (score 0-100 % contre le marché, règles versionnées `QUALITY_V1`), `volatility_forecast` (qualité ex post d'une prévision de variance : QLIKE), `return_forecast` (prévision de rendement à deux séances : moyenne, signe, perte jointe) |
 | `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1`, `ML1`…), `examples/`, `adaptive/`, `ml/` |
-| `ml/` | Les modèles ajustés (hors couches, voir ci-dessous) | `config` (`NeuralStrategyConfig`), `features` (`NeuralFeatureBuilder`, `FeatureScaler`), `network` (`NeuralAllocator`), `artifacts` (`NeuralArtifact`), `dataset` (`ForwardOpenReturnBuilder`, purge), `training` (`calibrate_neural_strategy`) |
+| `ml/` | Les modèles ajustés (hors couches, voir ci-dessous) | `config` (`NeuralStrategyConfig`), `features` (`NeuralFeatureBuilder`, `FeatureScaler`), `network` (`NeuralAllocator`), `artifacts` (`NeuralArtifact`), `dataset` (`ForwardOpenReturnBuilder`, purge), `training` (`calibrate_neural_strategy`), `signatures/` (`SignatureVariant`, `SignatureArtifact`, `SignatureModelSchedule`, `calibrate_month`) |
 | `research/` | La discipline de recherche | `hypotheses`, `registry`, `archive`, `paper`, `journal` |
 
 `provenance.py` (état git du code qui a produit un résultat) et `numbers.py`
@@ -94,7 +94,10 @@ lisent rien au-dessus de `signals/` : ce sont eux qu'importent le signal
 lecteur, le runner et la stratégie, comme `backtest/runner.py`, et aucune
 couche ne les importe. PyTorch est une dépendance optionnelle
 (`uv sync --extra ml`) que seuls ces trois dossiers importent ; les tests de
-`tests/test_package_structure.py` vérifient les trois règles.
+`tests/test_package_structure.py` vérifient les trois règles. `ml/signatures/`
+suit le même partage : `config`, `models` et `artifacts` n'importent que NumPy
+et `signals/` - c'est ce que lisent `signals/ml/signature_return.py` et la
+stratégie `SA13` - et seul `training` importe PyTorch et le lecteur.
 
 ## 3. Une séance, trois instants
 
@@ -238,7 +241,9 @@ Signaux disponibles : `ReturnSignal`, `MomentumSignal`, `MeanReversionSignal`,
 `CurrentDrawdownSignal` (risque), `LevelChangeSignal`, `LevelZScoreSignal`
 (séries publiées), `CrossSectionalRank` (classement), `GarchVolatilitySignal`
 et `EwmaVolatilitySignal` (modèles, `signals/models/garch.py`),
-`ArimaGarchForecastSignal` (`signals/models/arima_garch.py`).
+`ArimaGarchForecastSignal` (`signals/models/arima_garch.py`),
+`SignatureReturnSignal` (`signals/ml/signature_return.py`, features de
+`signals/signatures/`).
 
 ## 7. Stratégie et contexte de décision
 
@@ -320,8 +325,9 @@ Familles : `SA` (règles statistiques sur prix et séries publiées) et `ML`
 l'ordre d'adoption, et n'est jamais réutilisé ; le libellé peut être reformulé.
 `SA1` à `SA10` sont les dix règles ETF du 2026-10-03 (numérotées 0 à 9 dans
 leur spécification : `SA1` est le benchmark MA20, `SA10` l'ensemble), `SA11`
-le contrôle de volatilité GARCH et `SA12` l'ARIMA-GARCH du 2026-10-10 (libellé
-sans tiret), `ML1` l'allocation neuronale. Les exemples et exercices antérieurs ne sont pas
+le contrôle de volatilité GARCH, `SA12` l'ARIMA-GARCH et `SA13` les
+signatures neuronales du 2026-10-10 (libellés sans tiret), `ML1` l'allocation
+neuronale. Les exemples et exercices antérieurs ne sont pas
 catalogués. `entry("SA3")`, `entry_of(strategy)` et `family(Family.SA)`
 donnent une entrée ; `entry.load()` importe la classe à la demande.
 
@@ -411,6 +417,49 @@ dimensionné par la variance de ce rendement.
 `analytics/return_forecast.py` apparie une prévision à l'origine `t` avec le
 rendement de l'ouverture `t+1` à l'ouverture `t+2` et mesure la moyenne (MSE,
 signe avec ses dénominateurs) et la perte jointe `log v + e²/v`.
+
+### SA13, signatures neuronales (`strategies/examples/signatures_neurons.py`)
+
+`SignaturesNeurons` détient `ETF_WORLD` tant qu'un modèle additif, lisant la
+log-signature de ses 60 dernières séances, prévoit un rendement simple positif
+de l'ouverture `t+1` à l'ouverture `t+2`.
+
+- **Chemin** (`signals/signatures/path.py`). 61 points `(P, U, T)` : log-rendement
+  cumulé × 100 sur clôtures ajustées, activité notionnelle cumulée (clôture
+  brute × volume brut) rapportée à la médiane des 60 séances précédentes, temps
+  de séance. 120 séances consécutives exigées, âge nul ; un volume absent rend
+  la fenêtre inutilisable, un volume nul observé est conservé et compté.
+- **Log-signature** (`signals/signatures/logsignature.py`). Ordre 3, `esig`
+  avec le backend `roughpy`, base de Hall vérifiée clé par clé (14 coefficients,
+  13 après retrait du seul déplacement constant du temps). `FeatureSpec` nomme
+  la représentation (log-signature, neuf indicateurs classiques, trajectoire
+  brute) et les processus explicatifs, concaténés par blocs et qualifiés
+  (`ETF_WORLD:[1,2]`) ; un bloc manquant rend toute la variante inutilisable.
+- **Modèle** (`ml/signatures/`). Un petit réseau `tanh` de 4 unités par
+  coefficient, centré en zéro, sommé avec un biais (157 paramètres) : la
+  prévision est exactement `référence + Σ contributions`, en rendement décimal.
+  Régression Ridge de contrôle. L'inférence est écrite en NumPy (`models.py`) ;
+  seul l'ajustement (`training.py`) importe PyTorch.
+- **Réestimation mensuelle** (`calibrate_month`). 126 origines de validation se
+  terminant à la dernière séance du mois précédent, 1 008 d'apprentissage avant
+  elles, purge aux deux frontières par les dates de fin de label ; les features
+  de chaque origine sont celles construites à son propre instant ; le scaler et
+  les poids ne voient que l'apprentissage, la validation choisit l'époque. Un
+  mois sans assez d'exemples valides n'a pas de modèle et dit pourquoi.
+- **Artefacts** (`artifacts.py`). `SignatureArtifact` est identifié par son
+  contenu (poids, scaler, noms et ordre des features, définition de la
+  variante, périodes, cutoff, environnement) ; tableaux NumPy sans pickle et
+  manifeste JSON. `SignatureModelSchedule`, immuable, donne à chaque décision
+  le modèle prévu pour son mois et lève `ModelCausalityError` si son cutoff ou
+  sa disponibilité ne précèdent pas la décision.
+- **Règle.** Entrée si la prévision dépasse 20 pb, maintien si elle est
+  strictement positive, sortie à zéro inclus, lus sur la position détenue ;
+  `w = g · min(1, 12 % / max(σ20, σ60, 5 %))` ; bande de 3 points. Le
+  portefeuille est continu d'un mois à l'autre.
+- **Contrôles** (sans code de catalogue) : C0 mêmes modèles sans filtre, C1
+  Ridge, C2 ordre 2, C3 sans volume, C4 indicateurs classiques, C5 trajectoire
+  brute, C6/C7 contexte World + S&P 500. `scripts/run_signature_study.py`
+  calibre, exécute, exporte les contributions et attribue le statut.
 
 ## 8. Portefeuille et exécution
 
@@ -531,6 +580,7 @@ La couche `research/` porte la discipline de recherche décrite dans
 | `scripts/sensitivity.py` | la référence sous `AT_AUCTION` / `AT_DECISION`, avec coûts ×1 et ×2 | non |
 | `scripts/paper_trade.py` | vérifier et prolonger les plans de paper trading | non |
 | `scripts/run_etf_strategies_comparison.py` | les règles `SA` sur les mêmes dates et coûts (`--start`, `--end` ; `SA11` omise avec la mention « dependency missing » sans l'extra `stats`) ; `quality_details.csv` | non |
+| `scripts/run_signature_study.py` | l'étude `SA13` : calibrations mensuelles, contrôles C0 à C7, contributions, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`, extras `ml stats signatures`) | non |
 | `scripts/run_arima_garch_study.py` | l'étude `SA12` : contrôles D0/D1/D2, prévisions à deux pas, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`) | non |
 | `scripts/run_garch_study.py` | l'étude `SA11` sur la période commune : classement, témoins `SA6`/EWMA, QLIKE, bootstrap, coûts ×2, historiques par stratégie | non |
 | `scripts/write_strategy_reports.py` | un fichier `strategy<code>_ResultsAndAnalysis_<date>.md` par stratégie, depuis les exports de l'étude | non |

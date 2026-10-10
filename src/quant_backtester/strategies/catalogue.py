@@ -148,6 +148,12 @@ CATALOGUE: tuple[CatalogueEntry, ...] = (
     ),
     CatalogueEntry(Family.SA, 12, "ARIMA GARCH", f"{_EXAMPLES}.arima_garch:ArimaGarch"),
     CatalogueEntry(
+        Family.SA,
+        13,
+        "Signatures Neurons",
+        f"{_EXAMPLES}.signatures_neurons:SignaturesNeurons",
+    ),
+    CatalogueEntry(
         Family.ML,
         1,
         "neural allocation",
@@ -162,7 +168,10 @@ their specification: ``SA1`` is its benchmark 0, the fund held above its
 volatility control of 2026-10-10; its estimator is an optional dependency (the
 ``stats`` extra) that its module imports only when a fit is asked for, so the
 entry loads without it. ``SA12`` is the ARIMA-GARCH of the same day, on the same
-extra (the label takes no hyphen). ``ML1`` is the neural allocation of 2026-10-04. The
+extra (the label takes no hyphen). ``SA13`` is the signature model of the same
+day: it keeps an SA code although its forecasts come from a small network, runs
+on a schedule of models calibrated before the backtest, and is built with
+``SignaturesNeurons.from_schedule``. ``ML1`` is the neural allocation of 2026-10-04. The
 exercises and the baselines that came before are not catalogued: they are
 examples of how a strategy is written.
 """

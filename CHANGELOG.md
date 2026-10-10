@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### SA13 - Signatures Neurons (specification of 2026-10-10)
+- **New strategy `SA13`** (`SignaturesNeurons`): `ETF_WORLD` is held while a
+  neural additive model reading the 13 coefficients of the order-3
+  log-signature of its last 60 sessions - cumulative log return, cumulative
+  relative turnover, session time, the constant displacement of time removed -
+  forecasts a positive simple return from the next open to the one after it.
+  Entry above 20 bp, hold above zero, read on the position actually held; the
+  weight is that of `SA6` (larger of the 20- and 60-return volatilities).
+- **`signals/signatures/`**: the path (`path.py`) and the log-signature
+  (`logsignature.py`, `esig` with the `roughpy` backend, Hall basis checked
+  key by key), the nine classical indicators and the raw trajectory of the
+  controls, several explanatory processes concatenated by blocks.
+- **`ml/signatures/`**: configurations, models written in NumPy for inference
+  (`models.py`), frozen artifacts identified by content and the monthly
+  `SignatureModelSchedule` (`artifacts.py`), the monthly calibration with its
+  purge at both boundaries (`training.py`, PyTorch).
+- **New signal** `SignatureReturnSignal`: the forecast of the month's model,
+  used only after its information cutoff and its availability; a month
+  without a model is a status and a reason, a model of the future stops the
+  run.
+- **`scripts/run_signature_study.py`**: the calibrations, `SA13`, its eight
+  controls (same risk without the filter, Ridge, order 2, no volume, classical
+  indicators, raw trajectory, two context variants), every comparable book
+  re-run on the same months, the forecasts, their composition and the status
+  of the registered hypothesis.
+- **New extra `signatures`**: `esig`, `roughpy`, `scikit-learn`. Every import
+  is lazy: the catalogue and the other strategies need none of them.
+
 ### SA12 - ARIMA GARCH (specification of 2026-10-10)
 - **New strategy `SA12`** (`ArimaGarch`): `ETF_WORLD` is held while an
   ARIMA(1,0,1) on adjusted open-to-open log returns forecasts a positive

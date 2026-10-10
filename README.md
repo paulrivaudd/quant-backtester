@@ -350,7 +350,8 @@ provide; importing the store there fails with a message saying so.
 ```bash
 uv sync                          # create the environment from uv.lock
 uv sync --extra ml               # the same, with PyTorch (CPU) for the ML strategies
-uv sync --extra stats            # the same, with arch for SA11 (GARCH); --extra ml --extra stats for both
+uv sync --extra stats            # the same, with arch and statsmodels for SA11 and SA12
+uv sync --extra ml --extra stats --extra signatures   # everything, SA13 (log-signatures) included
 git config core.hooksPath .githooks   # once per clone: the commit-message hook
 uv run pytest                    # offline suite
 uv run pytest -m network         # the live provider checks, opt in

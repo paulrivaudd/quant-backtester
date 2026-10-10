@@ -29,8 +29,9 @@ def test_a_code_gives_the_three_spellings_of_a_name() -> None:
         entry("SA99")
 
 
-def test_the_statistical_rules_are_sa1_to_sa12_and_the_network_is_ml1() -> None:
-    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 13)]
+def test_the_statistical_rules_are_sa1_to_sa13_and_the_network_is_ml1() -> None:
+    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 14)]
+    assert entry("SA13").display_name == "SA13 - Signatures Neurons"
     assert entry("SA12").display_name == "SA12 - ARIMA GARCH"
     assert entry("SA11").display_name == "SA11 - GARCH vol control"
     assert [item.code for item in family(Family.ML)] == ["ML1"]

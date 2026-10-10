@@ -23,7 +23,7 @@ override these.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -58,10 +58,24 @@ from quant_backtester.demo import checked_bars_frame
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel, Sizing
 from quant_backtester.ml.config import NeuralStrategyConfig
+from quant_backtester.ml.signatures.artifacts import (
+    ScheduleEntry,
+    SignatureArtifact,
+    SignatureModelSchedule,
+)
+from quant_backtester.ml.signatures.config import (
+    ModelKind,
+    SignatureModelConfig,
+    SignatureTrainingConfig,
+    SignatureVariant,
+)
+from quant_backtester.ml.signatures.models import LinearWeights
 from quant_backtester.portfolio.holdings import Holding
 from quant_backtester.portfolio.state import PortfolioState
 from quant_backtester.portfolio.view import PortfolioView
 from quant_backtester.signals.context import SignalContext
+from quant_backtester.signals.signatures.logsignature import FeatureKind, FeatureSpec
+from quant_backtester.signals.signatures.path import SignaturePathConfig
 from quant_backtester.signals.snapshot import SignalSnapshot
 
 
@@ -775,3 +789,230 @@ def neural_artifact(neural_config: NeuralStrategyConfig):
         information_cutoff=paris(neural_config.calibration_end, 23, 0),
         selected_epoch=0,
     )
+
+
+# --- the market a signature model reads -----------------------------------------------
+#
+# A log-signature needs a window of closes and of volumes, and a calibration
+# needs months of them: the tests of the signature models run on two Paris
+# funds drawn from a seed over every session of 2026, with an open apart from
+# the close and a volume that changes every session. The path is kept short -
+# ten increments after ten sessions of reference - so that a calibration still
+# has room for a training and a validation block inside one year.
+
+SIGNATURE_FUNDS = ("ETF_EU", "ETF_OTHER")
+"""The fund a test model forecasts, and the one a context variant also reads."""
+
+SIGNATURE_PATH = SignaturePathConfig(
+    steps=10,
+    volume_reference_sessions=10,
+    price_scale=100.0,
+    use_volume=True,
+    max_age_sessions=0,
+)
+"""Ten increments described after ten sessions of reference: twenty sessions of history."""
+
+SIGNATURE_CUT = SignatureTrainingConfig(
+    training_candidate_origins=80,
+    validation_candidate_origins=30,
+    minimum_training_examples=60,
+    minimum_validation_examples=20,
+    minimum_valid_share=0.9,
+)
+"""Blocks a year of sessions can hold several of."""
+
+SignatureMarketBuilder = Callable[..., MarketDataReader]
+SignatureMutation = Callable[[dict[str, pd.DataFrame]], None]
+
+
+def signature_frames(calendar: TradingCalendar, seed: int) -> dict[str, pd.DataFrame]:
+    """Return the drawn bars of the two funds, with a volume of their own each session."""
+    rng = np.random.default_rng(seed)
+    sessions = [day.session_date for day in calendar.sessions(date(2026, 1, 5), date(2026, 12, 31))]
+    frames: dict[str, pd.DataFrame] = {}
+    for name, start in zip(SIGNATURE_FUNDS, (100.0, 40.0), strict=True):
+        close = start
+        drawn = {}
+        volumes = []
+        for session in sessions:
+            overnight, intraday, activity = rng.standard_normal(3)
+            opening = close * float(np.exp(0.004 * overnight))
+            close = opening * float(np.exp(0.0004 + 0.008 * intraday))
+            drawn[session] = (opening, max(opening, close), min(opening, close), close)
+            volumes.append(float(round(5_000.0 * float(np.exp(0.5 * activity)))))
+        frame = checked_bars_frame(name, calendar, drawn)
+        frame["volume"] = volumes
+        frames[name] = frame
+    return frames
+
+
+def signature_model(kind: ModelKind = ModelKind.NEURAL_ADDITIVE) -> SignatureModelConfig:
+    """Return the model of the specification, with a short fit."""
+    return SignatureModelConfig(
+        kind=kind,
+        hidden_units=4,
+        learning_rate=1e-3,
+        weight_decay=1e-3,
+        max_epochs=40,
+        patience=10,
+        minimum_improvement=1e-6,
+        gradient_clip_norm=1.0,
+        seed=20261010,
+        input_clip=5.0,
+        target_scale=100.0,
+        ridge_alpha=10.0,
+    )
+
+
+def signature_variant(
+    variant_id: str = "test_logsig3",
+    *,
+    kind: ModelKind = ModelKind.RIDGE,
+    features: FeatureKind = FeatureKind.LOGSIGNATURE,
+    depth: int = 3,
+    instruments: tuple[str, ...] = ("ETF_EU",),
+    path: SignaturePathConfig = SIGNATURE_PATH,
+) -> SignatureVariant:
+    """Return a small variant forecasting ``ETF_EU``."""
+    return SignatureVariant(
+        variant_id=variant_id,
+        instrument_id="ETF_EU",
+        features=FeatureSpec(features, path, depth, instruments),
+        model=signature_model(kind),
+        training=SIGNATURE_CUT,
+    )
+
+
+@pytest.fixture
+def make_signature_market(
+    tmp_path: Path,
+    instruments: InstrumentRegistry,
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+    rng_seed: int,
+) -> SignatureMarketBuilder:
+    """Return a builder of a store of its own holding the two drawn funds.
+
+    ``mutate`` receives the frames of bars before they are written: that is
+    how a test changes a price or a volume after a date, on a second store,
+    and compares what two decisions or two calibrations made of it.
+    """
+
+    def build(
+        name: str = "signatures", *, mutate: SignatureMutation | None = None
+    ) -> MarketDataReader:
+        root = tmp_path / name
+        for subdir in ("metadata", "raw", "clean", "validation"):
+            (root / subdir).mkdir(parents=True)
+        frames = signature_frames(xpar, rng_seed)
+        if mutate is not None:
+            mutate(frames)
+        repository = MarketDataRepository(root)
+        for instrument_id, frame in frames.items():
+            repository.save_checked_bars(instrument_id, frame)
+        return MarketDataReader(
+            repository=repository,
+            instruments=instruments,
+            calendars=calendars,
+            reference_calendar_id="XPAR",
+        )
+
+    return build
+
+
+def linear_artifact(
+    variant: SignatureVariant,
+    month: str,
+    cutoff: datetime,
+    *,
+    coefficients: Sequence[float] | None = None,
+    bias: float = 0.0,
+    available_after: timedelta = timedelta(hours=12),
+) -> SignatureArtifact:
+    """Return a hand-written linear model of a variant, with an identity scaler.
+
+    Enough to test what is read, forecast, decided and stored: none of that
+    depends on a model being any good.
+    """
+    names = variant.features.names()
+    weights = LinearWeights(
+        np.asarray(
+            [0.0] * len(names) if coefficients is None else list(coefficients), dtype=np.float64
+        ),
+        bias,
+    )
+    return SignatureArtifact(
+        variant=variant.definition(),
+        weights=weights,
+        scaler_mean=np.zeros(len(names)),
+        scaler_std=np.ones(len(names)),
+        feature_names=names,
+        month=month,
+        information_cutoff=cutoff,
+        available_at=cutoff + available_after,
+        training_start=date(2026, 1, 5),
+        training_end=date(2026, 6, 30),
+        validation_start=date(2026, 7, 1),
+        validation_end=date(2026, 8, 31),
+        training_examples=100,
+        validation_examples=30,
+        selected_epoch=None,
+        training_label_mean=0.0004,
+        environment={"backend": "test"},
+    )
+
+
+@pytest.fixture
+def signature_path() -> SignaturePathConfig:
+    """Return the short path of the signature tests: ten increments after ten of reference."""
+    return SIGNATURE_PATH
+
+
+@pytest.fixture
+def signature_variant_of() -> Callable[..., SignatureVariant]:
+    """Return the builder of a small variant forecasting ``ETF_EU``."""
+    return signature_variant
+
+
+@pytest.fixture
+def signature_model_of() -> Callable[..., SignatureModelConfig]:
+    """Return the builder of the model of the specification, with a short fit."""
+    return signature_model
+
+
+@pytest.fixture
+def linear_artifact_of() -> Callable[..., SignatureArtifact]:
+    """Return the builder of a hand-written linear model of a variant."""
+    return linear_artifact
+
+
+def signature_schedule(
+    variant: SignatureVariant, months: Mapping[str, float | Sequence[float] | str]
+) -> SignatureModelSchedule:
+    """Return a schedule of hand-written linear models over months of 2026.
+
+    Each month is given a number - the bias of a model without coefficients,
+    in percentage points, so ``0.5`` forecasts fifty basis points every evening
+    - or the coefficients of a model without bias, or the reason it has no
+    model. A model's information stops at 23:00 in Paris on the last day
+    before its month, and it is ready twelve hours later.
+    """
+    entries = []
+    for month, written in months.items():
+        if isinstance(written, str):
+            entries.append(ScheduleEntry(month, None, written))
+            continue
+        first = date(int(month[:4]), int(month[5:]), 1)
+        cutoff = paris(first - timedelta(days=1), 23, 0)
+        if isinstance(written, float | int):
+            artifact = linear_artifact(variant, month, cutoff, bias=float(written))
+        else:
+            artifact = linear_artifact(variant, month, cutoff, coefficients=written)
+        entries.append(ScheduleEntry(month, artifact))
+    return SignatureModelSchedule(variant.variant_id, "Europe/Paris", tuple(entries))
+
+
+@pytest.fixture
+def signature_schedule_of() -> Callable[..., SignatureModelSchedule]:
+    """Return the builder of a schedule of hand-written models over months of 2026."""
+    return signature_schedule
