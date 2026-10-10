@@ -2,7 +2,7 @@
 
 Période de test 2025-01-02 → 2026-10-09 (après la date limite d'information du modèle, 2024-12-31) · modèle figé `d9bfd125bf69` (graine 42) · mêmes capital, coûts et conventions que les autres stratégies.
 
-Source : commit `9ee2707f5215` (CLEAN), magasin `750c23dfffc3`. **Période différente de celle des stratégies SA** (qui commence en 2021) : ces chiffres ne se comparent pas aux leurs, et ML1 n'a pas de rang dans le classement commun. Le test a déjà été lu une fois le 2026-10-04 jusqu'au 2026-09-30 ; ce run le prolonge avec le même modèle. Le score est déflaté pour un seul essai.
+Source : commit `62bdab596854` (CLEAN), magasin `750c23dfffc3`. **Période différente de celle des stratégies SA** (qui commence en 2021) : ces chiffres ne se comparent pas aux leurs, et ML1 n'a pas de rang dans le classement commun. Le test a déjà été lu une fois le 2026-10-04 jusqu'au 2026-09-30 ; ce run le prolonge avec le même modèle. Le score est déflaté pour un seul essai.
 
 ## 1. Indicateurs de résultat globaux
 
