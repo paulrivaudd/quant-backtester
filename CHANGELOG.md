@@ -49,6 +49,15 @@
   study gives an interval on the differences of QLIKE and says that `REFUTED`
   is the registered criteria not being met, not a proof of inferiority. No
   global figure changed.
+- **Diagnostics the review left open.** `scripts/run_review_diagnostics.py`
+  measures the result of each stay in the market (`SA1`, `SA4`, `SA9`), what
+  filling at the next open was worth, `SA2` and `SA5` split against the even
+  split of their funds, each exposure-moving rule beside a constant-weight
+  control (new strategy `FixedWeights`), `SA10` without each rule and without
+  its risk control, `SA6` against the EWMA control, and `ML1` beside a
+  constant allocation with its announced sensitivities. All descriptive: none
+  of these variants is a candidate. Written to
+  `research/reports/2026-10-10/diagnostics_10102026.md`.
 - **Result.** On 2021-04-01 to 2026-10-09 the hypothesis is refuted: `SA11`
   has the best variance forecast (QLIKE) and a net Sharpe ratio of 0.87,
   below `SA6` (0.90) and the EWMA control (0.93), with a deeper drawdown and

@@ -15,7 +15,7 @@ nouvelle hypothèse, à écrire avant son run, et chacune compterait comme un
 essai dans le registre qui déflate les Sharpe. Les estimations sont ponctuelles
 sauf mention d'un intervalle. Rien ici n'est un échantillon vierge.
 
-Exports de l'étude : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`. Runs de ce document : commit `822c4320e93d` (CLEAN).
+Exports de l'étude : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`. Runs de ce document : commit `16f52742c696` (CLEAN).
 
 ## 1. Résultat par séjour dans le marché (SA1, SA4, SA9)
 
@@ -144,14 +144,14 @@ Sur ces dates, hors la première séance, le poids total détenu par ML1 va de 4
 
 ### Sensibilités annoncées par l'hypothèse (période de test d'origine, 2025-01-02 → 2026-09-30)
 
-| Variante | Score | Net | Sharpe | Sharpe du fonds détenu | Perte max. | Expo. moy. | Coûts EUR |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| graine 42, coûts x1 (le test préinscrit) | 44.5% | +11.71% | +0.68 | +0.86 | -16.11% | 66.6% | 752 |
-| graine 43, coûts x1 | 45.9% | +11.78% | +0.70 | +0.86 | -15.33% | 61.8% | 683 |
-| graine 44, coûts x1 | 45.6% | +12.26% | +0.71 | +0.86 | -15.96% | 68.3% | 654 |
-| graine 42, coûts x2 | 44.3% | +11.78% | +0.69 | +0.86 | -15.65% | 66.0% | 1,037 |
+| Variante | Modèle | Époque retenue | Score | Net | Sharpe | Sharpe du fonds détenu | Perte max. | Expo. moy. | Coûts EUR |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| graine 42, coûts x1 (le test préinscrit) | `d9bfd125bf69` | 20 | 44.5% | +11.71% | +0.68 | +0.86 | -16.11% | 66.6% | 752 |
+| graine 43, coûts x1 | `84d056424fc7` | 5 | 45.9% | +11.78% | +0.70 | +0.86 | -15.33% | 61.8% | 683 |
+| graine 44, coûts x1 | `8c9eaf9f5e92` | 15 | 45.6% | +12.26% | +0.71 | +0.86 | -15.96% | 68.3% | 654 |
+| graine 42, coûts x2 | `a5afb76183eb` | 15 | 44.3% | +11.78% | +0.69 | +0.86 | -15.65% | 66.0% | 1,037 |
 
-Les graines 43 et 44 et les coûts doublés sont rapportés à côté de la graine 42 et ne la remplacent pas : une graine n'est jamais choisie sur son résultat de test. Chaque variante est calibrée par `scripts/run_neural_strategy.py` avec son propre artefact, puis testée une fois sur la période d'origine.
+Les graines 43 et 44 et les coûts doublés sont rapportés à côté de la graine 42 et ne la remplacent pas : une graine n'est jamais choisie sur son résultat de test. Chaque variante est calibrée par `scripts/run_neural_strategy.py` avec son propre artefact, puis testée une fois sur la période d'origine. La variante à coûts doublés est donc **recalibrée** sous ces coûts : sa validation peut retenir une autre époque, et c'est alors un autre modèle, pas le modèle de la graine 42 rejoué plus cher. Dans chaque variante le Sharpe reste sous celui du fonds détenu et le score sous 50 %.
 
 ### Entrées du réseau
 

@@ -93,7 +93,7 @@ GARCH en général. Détail : [SA11_study_10102026.md](SA11_study_10102026.md).
   2026-10-09 (+13,4 % contre +24,5 % pour le fonds, Sharpe 0,76 contre 0,93).
   Son score, déflaté pour un seul essai, ne se compare pas à ceux du tableau.
   Le test d'origine (jusqu'au 2026-09-30) a déjà été lu le 2026-10-04 ; les
-  graines 43 et 44 et le run à coûts doublés ne sont pas présentés ici.
+  graines 43 et 44 et la variante à coûts doublés sont dans les diagnostics.
 
 ## SA7 et SA8 : non exécutées
 
@@ -108,17 +108,47 @@ ici. Pour les exécuter : enregistrer les instruments, archiver leur historique
 run, puis les ajouter au comparateur. `SA10` reste une version partielle tant
 que ce n'est pas fait.
 
+## Diagnostics complémentaires
+
+[diagnostics_10102026.md](diagnostics_10102026.md) mesure ce que les analyses
+listaient comme restant à mesurer. Tout y est **descriptif** : les témoins sont
+construits sur des poids constatés après coup, et aucune variante n'est
+candidate. Ce qu'on y lit :
+
+- **Aucune règle à exposition variable ne bat nettement la même exposition
+  tenue constante.** `SA3` (Sharpe 0,79) et `SA10` (0,86) font moins bien que
+  leur témoin à poids constants (0,93 chacun), y compris en perte maximale.
+  `SA6` (0,90) et `SA11` (0,87) réduisent la perte maximale d'environ trois
+  points par rapport au leur, pour un Sharpe plus bas ; seule l'EWMA égale le
+  sien (0,93 contre 0,92) avec quatre points de perte maximale en moins.
+- **`SA2` et `SA5` contre le 50/50** : le retard de `SA2` vient de ses périodes
+  en cash (-0,140 en rendement logarithmique), pas du choix entre fonds
+  (+0,004). L'inclinaison de `SA5` n'ajoute rien (+0,003) et son signal n'est
+  pas corrélé au rendement relatif qui suit ; son retard vient des coûts
+  (-0,112) et de l'exécution (-0,060).
+- **Le délai clôture → ouverture** a coûté 14 359 EUR à `SA1`, autant que ses
+  coûts explicites, et 4 852 EUR à `SA9`, plus du double des siens. `SA4` est
+  la seule règle qu'il a aidée (+2 291 EUR).
+- **Par séjour dans le marché** : `SA1` gagne 40 % du temps, `SA4` 66 % (gain
+  net moyen de 0,06 %), `SA9` 9 fois sur 21, soit 4 paniques gagnantes sur 7.
+- **`SA10`** : retirer son contrôle de risque ne change presque rien, et aucune
+  de ses règles ne porte son Sharpe.
+- **`SA6` contre l'EWMA** : différence de Sharpe de -0,036, intervalle
+  [-0,104 ; +0,027] ; les deux témoins ne sont pas départagés.
+- **`ML1`** fait moins bien que ses propres poids moyens tenus constants
+  (Sharpe 0,76 contre 0,93) ; les graines 43 et 44 et la variante à coûts
+  doublés échouent comme la graine 42 (Sharpe 0,68 à 0,71 contre 0,86 pour le
+  fonds, score sous 50 %).
+
 ## Ce que ces fichiers ne contiennent pas
 
 Les rapports couvrent toutes les séances mais ne sont pas l'archive d'un run.
 Les ordres, prix d'exécution, coûts par séance, rejets et courbes brutes sont
-dans les exports de l'étude (`results/garch_study/`, non commité car
-reproductible) : `fills.csv`, `equity.csv`, `forecast_diagnostics.csv`
-(paramètres et diagnostics de chaque fit), `forecast_evaluation.csv` (pertes
-appariées), `forecast_qlike_differences.csv`. Ne sont produits nulle part
-aujourd'hui : la décomposition des cibles de `SA10` par règle, les
-caractéristiques d'entrée de `ML1` séance par séance, et le résultat de chaque
-épisode d'activité de `SA4` et `SA9`.
+dans les exports de l'étude (`results/garch_study/`), et le détail des
+diagnostics dans `results/review_diagnostics/` (séjours un par un, entrées de
+`ML1`, tables des témoins). Ces dossiers ne sont pas commités : ils se
+reproduisent. Restent non produits : la décomposition des cibles de `SA10`
+règle par règle à chaque décision, et une analyse des entrées de `ML1`.
 
 ## Reproduire
 
@@ -126,6 +156,7 @@ caractéristiques d'entrée de `ML1` séance par séance, et le résultat de cha
 uv sync --extra ml --extra stats
 uv run python scripts/update_market_data.py
 uv run python scripts/run_garch_study.py --output results/garch_study
+uv run python scripts/run_review_diagnostics.py
 uv run python scripts/write_strategy_reports.py \
     --study results/garch_study --output research/reports/2026-10-10
 ```
