@@ -114,15 +114,16 @@ SA10 sans facteurs ni monétaire : cinq règles (momentum, moyennes lissées, re
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** À côté d'un panier à poids constants de 15,3 % de fonds S&P 500 et 27,1 % de fonds monde (ses poids moyens) : le témoin fait +37,1 % net, Sharpe 0,93, perte maximale -10,0 %, sommet retrouvé en 231 jours, 61 EUR de coûts ; SA10 fait +32,1 %, Sharpe 0,86, -11,8 %, 442 jours.
-- **Lecture.** Sur cette période l'ensemble ne fait pas mieux qu'un panier constant de même taille, y compris en perte maximale : sa protection est celle de sa faible exposition.
-- **Fait.** Sans son contrôle de risque, l'ensemble fait +32,6 %, Sharpe 0,85, perte maximale -11,9 % : presque rien ne change. Le contrôle de risque n'a donc presque jamais mordu, et ce n'est pas lui qui a protégé en 2025.
+- **Fait.** À côté d'un témoin à cible constante de 15,3 % de fonds S&P 500 et 27,1 % de fonds monde (ses poids moyens), avec la même bande de 3 points et les mêmes coûts : le témoin fait +37,1 % net, Sharpe 0,93, perte maximale -10,0 %, sommet retrouvé en 231 jours, 61 EUR de coûts, pour une exposition moyenne réalisée de 44,8 % ; SA10 fait +32,1 %, Sharpe 0,86, -11,8 %, 442 jours, pour 42,4 %.
+- **Lecture.** Sur cette période l'ensemble fait moins bien que ce témoin, y compris en perte maximale. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 2,4 points d'exposition de plus en moyenne, et la composition, les coûts et la trajectoire diffèrent aussi. Ce run ne montre pas que la protection de l'ensemble vienne d'autre chose que de son niveau d'exposition.
+- **Fait.** Sans son contrôle de risque, l'ensemble fait +32,6 %, Sharpe 0,85, perte maximale -11,9 % : l'effet agrégé mesuré de ce contrôle est faible sur ce run. Cela ne dit pas combien de fois le facteur de réduction a été inférieur à 1, ni à quelles dates : ni ce facteur ni les décisions forcées par le risque du portefeuille détenu ne sont exportés.
 - **Fait.** En retirant une règle à la fois (son budget restant en cash) : sans momentum +18,9 % (exposition 25 %, Sharpe 0,88) ; sans moyennes lissées +20,4 % (28 %, 0,83) ; sans inclinaison relative +23,9 % (33 %, 0,82) ; sans repli +31,5 % (0,85) ; sans détente du VIX +32,6 % (0,87). Le Sharpe reste entre 0,82 et 0,88 dans tous les cas.
 - **Lecture.** Aucune règle ne porte le Sharpe de l'ensemble : en retirer une réduit surtout l'exposition et le rendement dans la même proportion. Les poches de repli et de détente du VIX ne contribuent presque à rien.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
 - La décomposition des cibles règle par règle à chaque décision, que le code sait calculer et qui n'est pas exportée.
+- Le facteur de réduction du contrôle de risque, les dates où il est inférieur à 1 et les décisions forcées par le risque du portefeuille détenu : tant qu'ils ne sont pas exportés, ni la fréquence de ce contrôle ni son rôle en avril 2025 ne peuvent être commentés.
 - La version complète, quand les instruments de SA7 et SA8 seront enregistrés.
 - Ces ablations sont des variantes regardées après coup : aucune n'est candidate.
 

@@ -115,10 +115,10 @@ Détenir ETF_WORLD à hauteur de min(1, 12 % / max(vol 20 jours, vol 60 jours, 5
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** À côté d'un fonds détenu à poids constant de 84,7 % : le témoin fait +78,0 % net, Sharpe 0,93, perte maximale -18,5 %, sommet retrouvé en 229 jours, 97 EUR de coûts ; SA6 fait +67,4 %, Sharpe 0,90, -15,7 %, 330 jours.
-- **Lecture.** Faire varier l'exposition a réduit la perte maximale de 2,8 points par rapport à la même exposition tenue constante, au prix de 10,6 points de rendement, d'un Sharpe un peu plus bas et d'une récupération plus longue de cent jours. Le témoin est choisi après coup.
+- **Fait.** À côté d'un témoin à cible constante de 84,7 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : le témoin fait +78,0 % net, Sharpe 0,93, perte maximale -18,5 %, sommet retrouvé en 229 jours, 97 EUR de coûts, pour une exposition moyenne réalisée de 86,1 % ; SA6 fait +67,4 %, Sharpe 0,90, -15,7 %, 330 jours, pour 84,7 %.
+- **Lecture.** À exposition comparable mais non identique, SA6 a une perte maximale inférieure de 2,8 points à celle de ce témoin, pour 10,6 points de rendement en moins, un Sharpe un peu plus bas et une récupération plus longue de cent jours. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 1,4 point d'exposition de plus en moyenne. Il est choisi après coup.
 - **Fait.** SA6 contre le témoin EWMA : différence de Sharpe de -0,036, intervalle bootstrap à 95 % [-0,104 ; +0,027]. Les deux ne sont pas départagés.
-- **Fait.** Effet du délai clôture-ouverture : -2 428 EUR nets.
+- **Fait.** Écart de prix signé clôture-ouverture, à quantités données : -2 503 EUR nets. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 

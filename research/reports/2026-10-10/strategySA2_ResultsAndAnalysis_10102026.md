@@ -93,7 +93,7 @@ Répartir entre ETF_WORLD et ETF_SP500_PEA selon l'écart de leurs momentums 6 e
 
 ### Points faibles
 
-- **Fait.** Ces deux bonnes années ne dépassent pas le panier 50/50, qui fait déjà +20,7 % et +30,2 % : l'avance sur le fonds monde peut venir du panier choisi, pas du momentum.
+- **Fait.** Ces deux bonnes années dépassent légèrement le panier 50/50, qui fait déjà +20,74 % en 2021 (partielle) et +30,19 % en 2024, contre +21,21 % et +30,73 % pour la règle : environ 0,47 et 0,54 point d'avance, sans démonstration de supériorité statistique. **Lecture.** L'avance sur le fonds monde tient donc surtout au panier détenu, qui fait déjà 2,3 et 3,1 points de mieux que lui, pas au momentum.
 - **Fait.** Sur toute la période la règle fait +69,2 % net contre +103,3 % pour le panier 50/50 ; ses 4 629 EUR de coûts n'expliquent qu'une petite partie de cet écart de 34 points.
 - **Fait.** Perte maximale de -22,78 %, plus profonde que celle du fonds (-21,64 %), récupérée le 2026-04-17 seulement, 422 jours après le sommet (229 jours pour le fonds).
 - **Fait.** -17,6 % en 2022 (fonds -13,7 %), puis +9,1 % en 2023 (fonds +19,6 %) ; sa plus longue période sous un sommet dure 807 jours, du 2022-01-04 au 2024-03-21.
@@ -115,13 +115,13 @@ Répartir entre ETF_WORLD et ETF_SP500_PEA selon l'écart de leurs momentums 6 e
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** Écart au panier 50/50, en rendements logarithmiques sur la période : panier +0,727 ; timing de l'exposition totale -0,140 ; choix entre les deux fonds +0,004 ; exécution (résidu des prix d'ouverture, de la bande et des lots) -0,039 ; coûts -0,027 ; soit +0,526 pour la stratégie, contre +0,710 pour le panier exécuté par le moteur.
-- **Lecture.** Le retard sur le 50/50 vient presque entièrement des périodes passées en cash ou sous-investie ; le choix entre les fonds, qui est l'objet du momentum relatif, n'ajoute pratiquement rien, et les coûts ne pèsent que 2,7 points logarithmiques.
-- **Fait.** Effet du délai clôture-ouverture : -1 848 EUR nets.
+- **Fait.** Attribution approchée contre le panier 50/50, en rendements logarithmiques sur la période : panier +0,727 ; exposition totale -0,140 ; choix entre les deux fonds +0,004 ; résidu de l'approximation aux poids de clôture -0,039 ; coûts -0,027 ; soit +0,526 pour la stratégie, contre +0,710 pour le panier exécuté par le moteur. Les trois premiers termes valorisent les poids détenus à la clôture précédente avec le rendement de clôture à clôture, ce qui n'est pas la façon dont le livre a traité.
+- **Lecture.** Dans cette approximation la contribution de l'exposition totale est négative et celle du choix entre les fonds, objet du momentum relatif, proche de zéro ; les coûts pèsent 2,7 points logarithmiques. Le résidu n'est pas une mesure de l'exécution : il contient aussi le rendement de la journée sur ce qui a été acheté ou vendu le matin même, donc une partie de l'effet du signal. Ces termes ne sont pas l'apport complet d'un timing, et une attribution exacte reste à faire.
+- **Fait.** Écart de prix signé clôture-ouverture, à quantités données : -1 838 EUR nets. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- Les trois premières lignes de cette attribution sont calculées sur des clôtures, pas sur les prix d'exécution : le résidu « exécution » dit ce que cette approximation laisse de côté.
+- Une attribution exacte, à partir des quantités avant et après chaque exécution et des prix d'ouverture (quantités avant fois l'écart clôture-ouverture, quantités après fois l'écart ouverture-clôture, puis les frais), comparée à celle du panier 50/50 : elle n'est pas produite ici.
 - Les dates d'éligibilité de chaque fonds, pour dater les sorties en cash une à une.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie

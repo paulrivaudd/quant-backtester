@@ -100,7 +100,7 @@ Exposition à ETF_WORLD proportionnelle à l'écart entre ses moyennes mobiles 5
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
-**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -21,64 %, avec un poids de clôture de 100 %. Les deux moyennes bougent pendant ces 35 rendements, mais leur écart reste au-dessus du seuil : le 9 avril il vaut encore +1,94 %, donc la cible reste proche de 100 % et la bande garde la position. La sortie est progressive et vient après le creux : poids de clôture de 99,9 % le 10 avril, 80,1 % le 11, 62,1 % le 14, 46,1 % le 15, 30,5 % le 16, 14,9 % le 17, 0 % le 22. La cible baisse avant le croisement, constaté le 17 avril (écart de -0,05 %). Le portefeuille reste ensuite à zéro pendant 84 séances, du 2025-04-22 au 2025-08-18, rentre à 2,7 % le 19 août et ne revient vers 100 % que fin septembre. Entre les clôtures du 22 avril et du 19 août le fonds monte de +18,1 % : c'est un mouvement du sous-jacent, pas une perte comptable de SA3.
+**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -21,64 %, avec un poids de clôture de 100 %. Les deux moyennes bougent pendant ces 35 rendements, mais leur écart reste assez proche du seuil de pleine exposition (2 %) pour que la cible reste élevée et que la bande conserve la position : le 9 avril il vaut encore +1,94 %. La sortie est progressive et vient après le creux : poids de clôture de 99,9 % le 10 avril, 80,1 % le 11, 62,1 % le 14, 46,1 % le 15, 30,5 % le 16, 14,9 % le 17, 0 % le 22. La cible baisse avant le croisement, constaté le 17 avril (écart de -0,05 %). Le portefeuille reste ensuite à zéro pendant 84 séances, du 2025-04-22 au 2025-08-18, rentre à 2,7 % le 19 août et ne revient vers 100 % que fin septembre. Entre les clôtures du 22 avril et du 19 août le fonds monte de +18,1 % : c'est un mouvement du sous-jacent, pas une perte comptable de SA3.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
@@ -114,9 +114,9 @@ Exposition à ETF_WORLD proportionnelle à l'écart entre ses moyennes mobiles 5
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** À côté d'un fonds détenu à poids constant de 71,5 % (son poids moyen), avec la même bande et les mêmes coûts : le témoin fait +63,2 % net, Sharpe 0,93, perte maximale -15,9 %, sommet retrouvé en 226 jours, 7 ordres et 94 EUR de coûts ; SA3 fait +57,9 %, Sharpe 0,79, -21,6 %, 540 jours.
-- **Lecture.** Sur cette période le timing des deux moyennes a retiré de la valeur par rapport à la même exposition tenue constante, en rendement comme en risque. Le témoin est choisi après coup : c'est un constat, pas une règle qu'on aurait pu fixer à l'avance.
-- **Fait.** Effet du délai clôture-ouverture : -626 EUR nets, le plus faible des règles actives.
+- **Fait.** À côté d'un témoin à cible constante de 71,5 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : le témoin fait +63,2 % net, Sharpe 0,93, perte maximale -15,9 %, sommet retrouvé en 226 jours, 7 ordres et 94 EUR de coûts, pour une exposition moyenne réalisée de 72,2 % ; SA3 fait +57,9 %, Sharpe 0,79, -21,6 %, 540 jours, pour 71,5 %.
+- **Lecture.** Sur cette période SA3 fait moins bien que ce témoin, en rendement comme en risque. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing des deux moyennes : le niveau d'exposition, les coûts et la trajectoire changent aussi. Le témoin est choisi après coup : c'est un constat, pas une règle qu'on aurait pu fixer à l'avance.
+- **Fait.** Écart de prix signé clôture-ouverture, à quantités données : -645 EUR nets, le plus faible de tous les livres en valeur absolue. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 

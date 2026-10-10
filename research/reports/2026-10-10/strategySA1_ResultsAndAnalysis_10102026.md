@@ -97,7 +97,7 @@ Détenir ETF_WORLD au-dessus de sa moyenne mobile 20 jours, être en cash en des
 - **Fait.** Ses 143 ordres portent presque tous sur la totalité du portefeuille : dans les exécutions, la valeur traitée va de 0,9 à 1,2 fois le capital initial par ordre.
 - **Fait.** Score de qualité nul : les blocs robustesse et implémentation sont à zéro, et un seul bloc nul suffit à annuler une moyenne géométrique. Ce zéro n'est pas une probabilité de gain nulle.
 - **Fait.** Sa pire baisse (-18,95 %) n'est récupérée que le 2024-01-25, 794 jours après le sommet du 2021-11-22 ; une deuxième, partie du 2025-11-03 (-10,1 % au creux), n'est pas récupérée au 2026-10-09.
-- **Lecture.** L'ordre décidé le soir est exécuté à l'ouverture suivante : la règle agit après le mouvement qui l'a déclenchée. Le gap de nuit peut jouer dans les deux sens ; sa contribution nette n'est pas décomposée ici.
+- **Lecture.** L'ordre décidé le soir est exécuté à l'ouverture suivante : la règle agit après le mouvement qui l'a déclenchée. Le gap de nuit peut jouer dans les deux sens ; son solde est mesuré plus bas, comme un écart de prix signé clôture-ouverture à quantités données, qui n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
@@ -116,9 +116,9 @@ Détenir ETF_WORLD au-dessus de sa moyenne mobile 20 jours, être en cash en des
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** Par séjour dans le marché : 72 séjours, 29 gagnants et 43 perdants (40 % de gagnants) ; net moyen +0,31 %, net médian -0,28 %, pire -6,14 %, meilleur +17,48 %, pour 13 valorisations en moyenne. Le résultat tient à quelques longs séjours gagnants, pas à la fréquence des bons signaux.
-- **Fait.** Le délai entre la clôture de la décision et l'exécution à l'ouverture a coûté 14 359 EUR nets, soit 14,4 % du capital initial (gaps favorables +28 256 EUR, défavorables -42 615 EUR). C'est du même ordre que ses coûts explicites (15 730 EUR), et de loin l'effet le plus fort de toutes les règles : la mesure est de premier ordre, sur les prix cotés.
-- **Lecture.** Les gaps de nuit jouent dans les deux sens, mais leur solde est nettement défavorable ici : une règle qui achète après une clôture au-dessus de sa moyenne et vend après une clôture en dessous exécute en moyenne après une partie du mouvement.
+- **Fait.** Par séjour dans le marché : 72 séjours, dont 71 clos et 1 encore ouvert. Sur les 71 clos, 28 gagnants et 43 perdants (39,4 % de gagnants). Le séjour ouvert, entré à la valorisation du 2026-09-18, vaut +2,96 % au 2026-10-09, valorisé au marché, sans vente finale ni son coût. Sur les 72, l'ouvert compris : net moyen +0,31 %, net médian -0,28 %, pire -6,14 %, meilleur +17,48 %, pour 13 valorisations en moyenne ; leur produit retrouve les +20,45 % de la stratégie. **Lecture.** Le résultat tient à quelques longs séjours gagnants, pas à la fréquence des bons signaux.
+- **Fait.** Écart de prix signé clôture-ouverture, à quantités données : -14 568 EUR nets, soit -14,6 % du capital initial (écarts favorables +28 201 EUR, défavorables -42 768 EUR), mesuré sur le prix de marché de l'ouverture, donc hors spread, slippage et commission. C'est du même ordre que ses coûts explicites (15 730 EUR) et, de loin, le solde le plus défavorable de tous les livres. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture : le signal lit cette clôture, l'ordre ne pouvait pas y être exécuté, et un autre prix d'exécution aurait changé toutes les quantités suivantes.
+- **Lecture.** Les écarts de nuit jouent dans les deux sens, mais leur solde est nettement défavorable ici : une règle qui achète après une clôture au-dessus de sa moyenne et vend après une clôture en dessous exécute en moyenne après une partie du mouvement.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 

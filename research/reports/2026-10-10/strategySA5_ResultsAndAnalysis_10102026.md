@@ -114,14 +114,15 @@ Détenir les deux fonds autour d'une répartition 50/50 et pencher, jusqu'à 25 
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** Écart au panier 50/50, en rendements logarithmiques : panier +0,727 ; exposition totale -0,011 ; choix entre les fonds, c'est-à-dire l'inclinaison, +0,003 ; exécution -0,060 ; coûts -0,112 ; soit +0,547, contre +0,710 pour le panier exécuté.
-- **Fait.** Le résidu change de signe 293 fois, soit un signe tenu 4,8 valorisations en moyenne. Sa corrélation avec le rendement relatif monde moins S&P 500 est de +0,03 sur la séance suivante, +0,03 sur la première séance entière après l'exécution et +0,06 sur cinq séances (Pearson) ; en rangs (Spearman) elle est de +0,03, 0,00 et 0,01.
-- **Lecture.** L'inclinaison n'ajoute pratiquement rien au panier neutre, et rien dans ces corrélations ne montre qu'elle prévoit le rendement relatif sur lequel elle mise. Le retard sur le 50/50 vient des coûts et de l'exécution d'un rebalancement presque quotidien.
-- **Fait.** Effet du délai clôture-ouverture : -2 631 EUR nets, sur des gaps favorables et défavorables de plus de 44 000 EUR chacun.
+- **Fait.** Attribution approchée contre le panier 50/50, en rendements logarithmiques : panier +0,727 ; exposition totale -0,011 ; choix entre les fonds +0,003 ; résidu de l'approximation aux poids de clôture -0,060 ; coûts -0,112 ; soit +0,547, contre +0,710 pour le panier exécuté. Les trois premiers termes valorisent les poids détenus à la clôture précédente avec le rendement de clôture à clôture.
+- **Fait.** Le résidu de régression qui commande l'inclinaison change de signe 293 fois, soit un signe tenu 4,8 valorisations en moyenne. Sa corrélation de Pearson avec le rendement relatif monde moins S&P 500, de clôture à clôture, est de +0,029 à la séance t + 1 (en partie avant l'exécution), +0,028 à la séance t + 2, la première entière après l'exécution, et +0,064 sur les séances t + 2 à t + 6, rendements composés (1 415, 1 414 et 1 410 paires) ; en rangs (Spearman) elle est de +0,030, +0,004 et +0,005.
+- **Lecture.** SA5 sous-performe le panier 50/50 et supporte des frais élevés. L'attribution approchée aux poids de clôture montre une faible contribution du choix entre fonds, mais laisse un résidu important, qui n'est pas une mesure de l'exécution : elle ne permet pas d'isoler complètement l'apport du signal et les effets de la réallocation à l'ouverture. Les corrélations, proches de zéro, ne montrent pas que le signal prévoit le rendement relatif sur lequel il mise ; elles n'excluent pas une relation non linéaire.
+- **Fait.** Écart de prix signé clôture-ouverture, à quantités données : -2 571 EUR nets, solde d'écarts favorables et défavorables de plus de 44 000 EUR chacun. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
-- Ces corrélations sont données sans intervalle, et l'attribution est calculée sur des clôtures.
+- Ces corrélations sont données sans intervalle, sur des clôtures : une cible définie sur l'horizon réellement porté après la décision, d'ouverture à ouverture, n'est pas calculée.
+- Une attribution exacte, à partir des quantités avant et après chaque exécution et des prix d'ouverture, n'est pas produite : elle seule séparerait l'apport de l'inclinaison de celui de la réallocation à l'ouverture.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 

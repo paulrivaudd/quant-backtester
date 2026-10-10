@@ -105,7 +105,7 @@ Acheter ETF_WORLD, à hauteur de 50 % au plus, après une baisse de cinq séance
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2024-04-19 au 2025-02-27 (+6,1 %, le fonds +20,7 %, poids moyen 6 %) : une suite d'épisodes courts, pas une position. Le meilleur trimestre glissant (2024-09-06 au 2024-12-04) fait +2,9 %. **Lecture.** Dans une hausse régulière, les replis de quelques séances ont été suivis d'un retour vers les plus hauts ; le taux de réussite et le gain net par épisode ne sont pas mesurés ici.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2024-04-19 au 2025-02-27 (+6,1 %, le fonds +20,7 %, poids moyen 6 %) : une suite d'épisodes courts, pas une position. Le meilleur trimestre glissant (2024-09-06 au 2024-12-04) fait +2,9 %. **Lecture.** Dans une hausse régulière, les replis de quelques séances ont été suivis d'un retour vers les plus hauts ; le taux de réussite et le gain net des séjours de cette seule fenêtre ne sont pas isolés ici ; ceux des 71 séjours de toute la période sont dans les mesures complémentaires.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
@@ -115,9 +115,9 @@ Acheter ETF_WORLD, à hauteur de 50 % au plus, après une baisse de cinq séance
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** Par séjour : 71 séjours de 2,8 valorisations en moyenne, 47 gagnants et 24 perdants (66 %) ; net moyen +0,06 %, net médian +0,04 %, pire -2,92 %, meilleur +1,85 %. Les replis achetés ont donc été payés deux fois sur trois, pour un gain net moyen de six points de base par séjour après 64 EUR de coûts.
-- **Fait.** C'est la seule règle que le délai d'exécution a aidée : +2 291 EUR nets (gaps favorables +14 645 EUR, défavorables -12 354 EUR).
-- **Lecture.** Une prime de repli existe dans ces chiffres, mais elle est mince : la moitié du gain brut part en coûts, et le pire séjour efface près de cinquante séjours moyens.
+- **Fait.** Par séjour : 71 séjours, tous clos, de 2,8 valorisations en moyenne, 47 gagnants et 24 perdants (66 %) ; net moyen +0,06 %, net médian +0,04 %, pire -2,92 %, meilleur +1,85 %. Les séjours ont donc été gagnants deux fois sur trois, pour un gain net moyen d'environ 6,3 points de base par séjour, après 64 EUR de coûts en moyenne.
+- **Fait.** C'est le seul livre dont l'écart de prix signé clôture-ouverture, à quantités données, est positif : +2 303 EUR nets (écarts favorables +14 660 EUR, défavorables -12 358 EUR). Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture : ce solde n'est pas un gain encaissé.
+- **Lecture.** Les séjours ont un gain net moyen historique positif, d'environ 6,3 points de base ; une prime propre au signal n'est pas établie sans contrôle d'exposition ni mesure d'incertitude. Elle serait mince : la moitié du gain brut part en coûts, et le pire séjour efface près de cinquante séjours moyens.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 

@@ -104,7 +104,7 @@ Acheter le fonds S&P 500 à 50 % quand le VIX est retombé à 80 % ou moins d'un
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
 
-**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2025-04-28 au 2026-04-29 (+7,53 %), mais ce n'est pas une position tenue un an. Elle se compose de trois morceaux : après le faux départ du 15 au 22 avril, la seconde entrée (constatée le 28 avril, sortie le 21 mai 2025) porte la valeur à 96 131 EUR, soit le +4,10 % des 63 meilleurs rendements consécutifs, entièrement acquis le 21 mai ; le portefeuille reste ensuite en cash, à 96 131,21 EUR exactement, jusqu'au 2026-04-02 ; de nouvelles positions prises en avril 2026 ajoutent +3,30 % depuis ce plateau. **Lecture.** Le creux qui sert d'origine à cette mesure est choisi après coup : le récit d'un rebond capté sans accroc efface l'échec de la semaine précédente.
+**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2025-04-28 au 2026-04-29 (+7,53 %), mais ce n'est pas une position tenue un an. Son origine, la clôture du 28 avril (92 347,82 EUR), est le premier soir de la seconde entrée et contient déjà une perte de cette entrée : le portefeuille valait 92 753,47 EUR avant elle, après le faux départ du 15 au 22 avril. Le séjour complet de cette seconde entrée, sorti le 21 mai 2025 à 96 131,21 EUR, rapporte +3,64 % ; mesuré depuis le creux du 28 avril, le même mouvement donne le +4,10 % des 63 meilleurs rendements consécutifs, entièrement acquis le 21 mai. Le portefeuille reste ensuite en cash, à 96 131,21 EUR exactement, jusqu'au 2026-04-02 ; de nouvelles positions prises en avril 2026 ajoutent +3,30 % depuis ce plateau. **Lecture.** Le creux qui sert d'origine à cette mesure est choisi après coup : le récit d'un rebond capté sans accroc efface l'échec de la semaine précédente et la perte du premier jour.
 
 ### Situations de marché les plus risquées pour cette stratégie
 
@@ -114,10 +114,10 @@ Acheter le fonds S&P 500 à 50 % quand le VIX est retombé à 80 % ou moins d'un
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** Par séjour : 21 séjours de 5 valorisations en moyenne, 9 gagnants et 12 perdants ; net moyen -0,02 %, net médian -0,70 %, pire -2,64 % (le faux départ d'avril 2025), meilleur +3,64 %.
-- **Fait.** Regroupés en 7 paniques : trois perdantes (décembre 2021 à février 2022, -2,07 % en cinq séjours ; mai à juillet 2022, -2,50 % en cinq séjours ; octobre-novembre 2022, -2,22 %) et quatre gagnantes (mars-avril 2022, +0,30 % ; août 2024, +1,75 % ; avril-mai 2025, +0,90 % faux départ compris ; avril 2026, +3,30 %).
-- **Fait.** Le délai d'exécution a coûté 4 852 EUR nets, soit 4,9 % du capital initial et plus du double de ses coûts explicites (2 041 EUR).
-- **Lecture.** Sept paniques ne permettent aucune conclusion statistique. Les trois perdantes sont celles où la règle est entrée plusieurs fois : un apaisement suivi d'une rechute se répète avant de se résoudre.
+- **Fait.** Par séjour : 21 séjours, tous clos, de 5 valorisations en moyenne, 9 gagnants et 12 perdants ; net moyen -0,02 %, net médian -0,70 %, pire -2,64 % (le faux départ d'avril 2025), meilleur +3,64 % (la seconde entrée d'avril 2025).
+- **Fait.** Regroupés par convention, deux séjours séparés par 20 valorisations ou moins allant dans le même groupe, ils forment 7 groupes : trois perdants (décembre 2021 à février 2022, -2,07 % en cinq séjours ; mai à juillet 2022, -2,50 % en cinq séjours ; octobre-novembre 2022, -2,22 % en deux séjours) et quatre gagnants (mars-avril 2022, +0,30 % en trois séjours ; août-septembre 2024, +1,75 % en deux ; avril-mai 2025, +0,90 % en deux, faux départ compris ; avril 2026, +3,30 % en deux). Ce regroupement est automatique : ce ne sont pas sept paniques indépendantes identifiées économiquement.
+- **Fait.** Écart de prix signé clôture-ouverture, à quantités données : -4 944 EUR nets, soit -4,9 % du capital initial, plus du double de ses coûts explicites en valeur absolue (2 041 EUR). Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.
+- **Lecture.** Sept groupes ne permettent aucune conclusion statistique. Chacun compte plusieurs entrées, les gagnants comme les perdants : les réentrées ne sont pas propres aux groupes perdants.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 

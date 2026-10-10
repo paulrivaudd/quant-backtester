@@ -118,10 +118,10 @@ Détenir ETF_WORLD à hauteur de w = min(1, 12 % / max(σ, 5 %)), où σ est la 
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** À côté d'un fonds détenu à poids constant de 87,5 % : le témoin fait +81,2 % net, Sharpe 0,92, perte maximale -19,5 %, sommet retrouvé en 229 jours, 96 EUR de coûts ; SA11 fait +66,0 %, Sharpe 0,87, -16,5 %, 324 jours.
-- **Lecture.** Faire varier l'exposition avec la prévision GARCH a réduit la perte maximale de 3,0 points par rapport à la même exposition tenue constante, au prix de 15 points de rendement et d'un Sharpe plus bas. Le témoin est choisi après coup.
-- **Fait.** Effet du délai clôture-ouverture : -2 772 EUR nets (gaps favorables +10 108 EUR, défavorables -12 880 EUR).
-- **Fait.** La même règle sur une EWMA plus réactive (0,90) fait un Sharpe de 0,90 avec 366 ordres ; sur une EWMA plus lente (0,97), 0,97 avec 127 ordres. Sur cet historique, plus l'estimateur est lent, meilleur est le résultat net, ce qui va dans le même sens que le classement GARCH, EWMA 0,94.
+- **Fait.** À côté d'un témoin à cible constante de 87,5 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : le témoin fait +81,2 % net, Sharpe 0,92, perte maximale -19,5 %, sommet retrouvé en 229 jours, 96 EUR de coûts, pour une exposition moyenne réalisée de 89,0 % ; SA11 fait +66,0 %, Sharpe 0,87, -16,5 %, 324 jours, pour 87,5 %.
+- **Lecture.** À exposition comparable mais non identique, SA11 a une perte maximale inférieure de 3,0 points à celle de ce témoin, pour 15 points de rendement en moins et un Sharpe plus bas. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 1,5 point d'exposition de plus en moyenne. Il est choisi après coup.
+- **Fait.** Écart de prix signé clôture-ouverture, à quantités données : -2 923 EUR nets (écarts favorables +10 066 EUR, défavorables -12 989 EUR). Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.
+- **Fait.** La même règle sur une EWMA de coefficient 0,90 fait un Sharpe de 0,90 avec 366 ordres ; à 0,94, 0,93 avec 220 ordres ; à 0,97, 0,97 avec 127 ordres. Cet ordre ne vaut que pour ces trois EWMA : il ne définit pas une « vitesse » du GARCH réestimé chaque soir et n'établit pas qu'un estimateur plus lent serait en général meilleur.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 

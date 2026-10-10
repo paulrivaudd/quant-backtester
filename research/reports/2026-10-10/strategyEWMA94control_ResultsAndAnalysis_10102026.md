@@ -97,7 +97,7 @@ Le témoin de SA11 : la même règle d'allocation, la même fenêtre et la même
 - **Fait.** QLIKE moyenne de -8,6033, moins bonne que celle du GARCH (-8,6225) dans l'échantillon ; l'intervalle de cette différence inclut zéro. Elle est en revanche meilleure que celle de l'estimateur de SA6, avec un intervalle qui exclut zéro ([-0,075 ; -0,006]).
 - **Fait.** La moyenne de r²/q vaut 1,106 : les carrés des rendements dépassent en moyenne normalisée les variances prévues. Cela ne signifie pas mécaniquement une sous-prévision de 10,6 % (une moyenne de rapports n'est pas un rapport de moyennes).
 - **Fait.** +73,4 % contre +94,8 % pour le fonds ; sommet retrouvé le 2026-01-06, 321 jours après, contre 229 pour le fonds.
-- **Fait.** L'alpha de +0,39 % par an est une estimation ponctuelle sans intervalle. Son avance sur SA6 n'a pas été testée.
+- **Fait.** L'alpha de +0,39 % par an est une estimation ponctuelle sans intervalle. Son avance sur SA6 a été testée et n'est pas concluante : l'intervalle de la différence de Sharpe inclut zéro (mesures complémentaires).
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 
@@ -115,11 +115,11 @@ Le témoin de SA11 : la même règle d'allocation, la même fenêtre et la même
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** À côté d'un fonds détenu à poids constant de 87,8 % : le témoin constant fait +81,6 % net, Sharpe 0,92, perte maximale -19,5 %, sommet retrouvé en 229 jours ; l'EWMA fait +73,4 %, Sharpe 0,93, -15,4 %, 321 jours.
-- **Lecture.** C'est le seul des trois contrôles de volatilité dont le Sharpe égale celui de la même exposition tenue constante, avec quatre points de perte maximale en moins et huit points de rendement en moins.
+- **Fait.** À côté d'un témoin à cible constante de 87,8 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : ce témoin fait +81,6 % net, Sharpe 0,92, perte maximale -19,5 %, sommet retrouvé en 229 jours, pour une exposition moyenne réalisée de 89,3 % ; l'EWMA fait +73,4 %, Sharpe 0,93, -15,4 %, 321 jours, pour 87,8 %.
+- **Lecture.** C'est le seul des trois contrôles de volatilité dont le Sharpe égale celui de son témoin à cible constante (0,93 contre 0,92), avec quatre points de perte maximale en moins et huit points de rendement en moins. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 1,5 point d'exposition de plus en moyenne.
 - **Fait.** Contre SA6 : différence de Sharpe de +0,036 en sa faveur, intervalle bootstrap à 95 % [-0,027 ; +0,104], qui inclut zéro.
 - **Fait.** Aux coefficients 0,90 et 0,97, fixés avant leur run : Sharpe de 0,90 (366 ordres, 2 686 EUR de coûts, perte maximale -14,6 %) et de 0,97 (127 ordres, 769 EUR, -17,1 %).
-- **Fait.** Effet du délai clôture-ouverture : -3 016 EUR nets.
+- **Fait.** Écart de prix signé clôture-ouverture, à quantités données : -3 076 EUR nets. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
