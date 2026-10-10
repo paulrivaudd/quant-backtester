@@ -571,6 +571,7 @@ def commentary_markdown(notes: Mapping[str, object] | None) -> str:
         ("worst", "Ce qui s'est passé pendant la période où la stratégie a le plus perdu", False),
         ("best", "Ce qui s'est passé pendant la période où la stratégie a le plus gagné", False),
         ("risks", "Situations de marché les plus risquées pour cette stratégie", True),
+        ("measured", "Mesures complémentaires (voir diagnostics_10102026.md)", True),
         ("to_test", "Ce que ces résultats n'établissent pas, et ce qui reste à mesurer", True),
     )
     lines: list[str] = []

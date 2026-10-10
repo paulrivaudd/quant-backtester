@@ -897,7 +897,18 @@ def ml1_section(
         )
         sensitivities[label] = written.loc[neural.ML1].to_dict()
         sensitivities[label]["held_sharpe"] = float(written.loc[neural.HELD, "sharpe"])
+        manifest = json.loads(
+            (artifacts / f"seed{arguments[1]}_costs_x{multiplier}" / "manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        sensitivities[label]["model"] = str(manifest["model_id"])[:12]
+        sensitivities[label]["epoch"] = manifest["selected_epoch"]
     frames["ml1_sensitivities"] = pd.DataFrame.from_dict(sensitivities, orient="index")
+    below = all(
+        float(row["sharpe"]) < float(row["held_sharpe"]) and float(row["quality"]) < 0.5  # type: ignore[arg-type]
+        for row in sensitivities.values()
+    )
 
     return [
         "## 7. ML1",
@@ -925,6 +936,8 @@ def ml1_section(
         table(
             frames["ml1_sensitivities"],
             [
+                ("model", "Modèle", "`{}`"),
+                ("epoch", "Époque retenue", "{:.0f}"),
                 ("quality", "Score", "{:.1%}"),
                 ("net_return", "Net", "{:+.2%}"),
                 ("sharpe", "Sharpe", "{:+.2f}"),
@@ -939,7 +952,16 @@ def ml1_section(
         "Les graines 43 et 44 et les coûts doublés sont rapportés à côté de la graine 42 "
         "et ne la remplacent pas : une graine n'est jamais choisie sur son résultat de "
         "test. Chaque variante est calibrée par `scripts/run_neural_strategy.py` avec "
-        "son propre artefact, puis testée une fois sur la période d'origine.",
+        "son propre artefact, puis testée une fois sur la période d'origine. La variante "
+        "à coûts doublés est donc **recalibrée** sous ces coûts : sa validation peut "
+        "retenir une autre époque, et c'est alors un autre modèle, pas le modèle de la "
+        "graine 42 rejoué plus cher. "
+        + (
+            "Dans chaque variante le Sharpe reste sous celui du fonds détenu et le score sous 50 %."
+            if below
+            else "Les variantes ne sont pas toutes sous le fonds détenu et sous 50 % : voir "
+            "le tableau."
+        ),
         "",
         "### Entrées du réseau",
         "",

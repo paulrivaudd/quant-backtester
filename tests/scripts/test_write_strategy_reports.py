@@ -181,6 +181,7 @@ def test_the_commentary_is_written_or_said_to_be_missing() -> None:
         "worst": "La baisse.",
         "best": "La hausse.",
         "risks": ["d"],
+        "measured": ["m"],
         "to_test": ["e"],
     }
 
@@ -189,7 +190,9 @@ def test_the_commentary_is_written_or_said_to_be_missing() -> None:
     assert text.index("### Points forts") < text.index("### Points faibles")
     assert "- a\n- b" in text and "La baisse." in text
     assert "Situations de marché les plus risquées" in text
-    assert text.index("Situations de marché") < text.index("Ce que ces résultats n'établissent pas")
+    measured = text.index("Mesures complémentaires")
+    assert text.index("Situations de marché") < measured
+    assert measured < text.index("Ce que ces résultats n'établissent pas")
     assert "Aucun commentaire" in SCRIPT.commentary_markdown(None)
     assert "Aucun commentaire" in SCRIPT.commentary_markdown({})
 
