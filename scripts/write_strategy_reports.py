@@ -1030,6 +1030,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 context=str((notes or {}).get("context", "")),
             ),
             control=SPLIT,
+            history_note=str(notes["history_note"])
+            if notes and notes.get("history_note")
+            else None,
             peers=peers_markdown(summary, stressed, str(name)) if selected else None,
             extra=(
                 dedicated.read_text(encoding="utf-8") if selected and dedicated.exists() else None

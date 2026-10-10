@@ -199,6 +199,8 @@ Détenir ETF_WORLD seulement quand un ARIMA(1,0,1), réestimé chaque soir sur 7
 
 Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
 
+Colonnes propres à SA12 : la prévision `mu_2`, en points de base, du rendement de l'ouverture de t + 1 à l'ouverture de t + 2 ; la volatilité annualisée prévue pour ce rendement ; le repli éventuel de la variance sur l'EWMA ; le filtre, lu sur le poids détenu ce soir-là ; le poids avant application de la bande de 3 points. Le détail de chaque ajustement est dans `sa12_forecasts.csv` de l'étude.
+
 | Séance | Clôture ETF_WORLD | Ouverture ETF_WORLD | Prévision mu_2 (pb) | Volatilité prévue (annualisée) | Repli EWMA (1 = oui) | Filtre (1 = ouvert) | Poids avant bande | Poids cible ETF_WORLD | Poids détenu ETF_WORLD | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 2021-04-01 | 363.45 | 362.70 | +5.89 | 11.0% | 0 | 0 | 0.0% | 0.0% | 0.0% | 100,000.00 |

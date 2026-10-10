@@ -123,6 +123,59 @@ ci-dessus, déflaté par 10. Détail : [SA12_study_10102026.md](SA12_study_10102
 Cela ne dit rien des modèles ARIMA-GARCH en général, et aucun contrôle n'est
 candidat : en adopter un serait une nouvelle hypothèse.
 
+## SA13 : une étude à part, sur une période de test plus courte
+
+[strategySA13_ResultsAndAnalysis_10102026.md](strategySA13_ResultsAndAnalysis_10102026.md)
+vient de sa propre étude (`scripts/run_signature_study.py`, commit `2b7d147`,
+même magasin). Un modèle par mois est calibré sur ce qui était connu au soir
+de la dernière séance du mois précédent ; le premier mois calibrable est
+janvier 2023, donc la **période de test est 2023-01-02 → 2026-10-09** (964
+séances), avec un portefeuille continu. Toutes les stratégies comparables y
+sont rejouées, avec huit contrôles sans code de catalogue (C0 à C7) : 19
+essais. **Ces chiffres ne se comparent pas à ceux du tableau du haut**, mesurés
+depuis 2021. Détail : [SA13_study_10102026.md](SA13_study_10102026.md).
+
+| Livre | Net | Net, coûts ×2 | Sharpe | Perte max. | Exposition | Coûts (EUR) |
+|---|---:|---:|---:|---:|---:|---:|
+| **SA13 - Signatures Neurons** | -3,53 % | -5,11 % | -0,10 | -18,56 % | 23 % | 1 579 |
+| C0, même risque sans filtre (identique à SA6 ici) | +62,09 % | +61,08 % | 1,25 | -15,70 % | 89 % | 924 |
+| C1, Ridge sur les mêmes 13 coefficients | +11,25 % | +10,40 % | 0,57 | -10,72 % | 16 % | 914 |
+| C2, réseau additif à l'ordre 2 | -3,75 % | -3,92 % | -0,29 | -9,02 % | 3 % | 172 |
+| C3, réseau additif sans volume | -3,47 % | -5,07 % | -0,09 | -15,68 % | 31 % | 1 534 |
+| C4, réseau additif sur indicateurs classiques | +14,05 % | +12,66 % | 0,48 | -22,98 % | 44 % | 1 291 |
+| C5, Ridge sur la trajectoire brute | -1,19 % | -25,72 % | -0,02 | -10,56 % | 31 % | 29 410 |
+| C6, réseau additif, World + S&P 500 | -2,49 % | -4,90 % | -0,09 | -15,06 % | 24 % | 2 449 |
+| C7, Ridge, World + S&P 500 | +17,87 % | +16,56 % | 0,78 | -13,95 % | 19 % | 1 337 |
+| SA11 - GARCH vol control | +65,53 % | +63,31 % | 1,27 | -16,52 % | 92 % | 1 896 |
+| SA12 - ARIMA GARCH | -1,72 % | -5,70 % | -0,16 | -6,99 % | 6 % | 4 022 |
+| ETF_WORLD détenu | +86,73 % | +86,63 % | 1,35 | -21,57 % | 99 % | 99 |
+
+- **Statut de l'hypothèse `sa13_signatures_neurons` : `INSUFFICIENT_EVIDENCE`.**
+  Les critères écrits avant le premier ajustement demandaient 30 épisodes de
+  position terminés ; il y en a 8. Le seuil n'a pas été modifié après lecture.
+  L'écart de Sharpe mesuré contre C0 est de -1,353, intervalle à 95 %
+  [-1,999 ; -0,627] (blocs de 60 séances ; négatif aussi par blocs de 20 et de
+  120), et de -1,401 ([-2,052 ; -0,678]) à coûts doublés.
+- **Couverture complète** : 46 mois sur 46 ont un modèle, 964 décisions sur 964
+  une prévision utilisable. L'échec n'est pas opérationnel.
+- **Les prévisions sont moins bonnes que la moyenne d'apprentissage** (erreur
+  quadratique 8,7648e-05 contre 8,5353e-05, écart dont l'intervalle exclut
+  zéro) **et que la Ridge sur les mêmes coefficients**. Signe juste 52,4 %
+  contre 57,1 % pour « toujours en hausse ».
+- **Le livre est investi pendant les deux baisses** (août 2024, février à avril
+  2025), où la prévision monte avec la baisse, et en cash pendant de longues
+  hausses : le fonds gagne +3,0 pb par séance quand le livre est investi et
+  +8,3 pb quand il est en cash.
+- **Ni l'ordre 3, ni le volume, ni un second processus n'abaissent l'erreur**
+  de prévision ; contre les indicateurs classiques et la trajectoire brute,
+  l'erreur de SA13 est plus basse sans que l'écart soit distingué de zéro.
+- 22 modèles sur 46 s'arrêtent au plafond de 300 époques, gelé avant le
+  premier ajustement.
+
+Cela ne dit rien des signatures de chemin en général. Les contrôles Ridge font
+mieux que `SA13` ici, mais aucun contrôle n'est candidat : en adopter un
+serait une nouvelle hypothèse.
+
 ## Hors classement
 
 - **ML1** ([rapport](strategyML1_ResultsAndAnalysis_10102026.md)) : son
@@ -202,6 +255,13 @@ OMP_NUM_THREADS=1 uv run python scripts/run_arima_garch_study.py \
     --output results/arima_garch_study
 uv run python scripts/write_strategy_reports.py \
     --study results/arima_garch_study --output research/reports/2026-10-10 --only SA12
+
+# SA13, ses calibrations mensuelles, son étude et son rapport (vingt minutes environ)
+uv sync --extra ml --extra stats --extra signatures
+OMP_NUM_THREADS=1 uv run python scripts/run_signature_study.py \
+    --output results/signature_study
+uv run python scripts/write_strategy_reports.py \
+    --study results/signature_study --output research/reports/2026-10-10 --only SA13
 ```
 
 Le commentaire rédigé est dans [commentary.toml](commentary.toml) ; les

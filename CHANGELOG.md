@@ -30,6 +30,18 @@
 - **New extra `signatures`**: `esig`, `roughpy`, `scikit-learn`. Every import
   is lazy: the catalogue and the other strategies need none of them.
 
+### Reports of SA12 and SA13 (2026-10-10)
+- **`scripts/write_strategy_reports.py --only <CODE>`** writes the report of a
+  strategy from its own study: the ranking of every book of that study, the
+  section the study wrote for it (`report_extra_<CODE>.md`), headings for the
+  columns the study adds to a history, and the period and context its
+  commentary states. A control of a later study has no report.
+- **Results.** `SA12`: -1.72% net against +64.07% for the same sizing without
+  the filter; hypothesis `INSUFFICIENT_EVIDENCE` (29 completed episodes for
+  30). `SA13`, on its test period 2023-01-02 to 2026-10-09: -3.53% net against
+  +62.09%; hypothesis `INSUFFICIENT_EVIDENCE` (8 completed episodes for 30).
+  Reports and studies in `research/reports/2026-10-10/`.
+
 ### SA12 - ARIMA GARCH (specification of 2026-10-10)
 - **New strategy `SA12`** (`ArimaGarch`): `ETF_WORLD` is held while an
   ARIMA(1,0,1) on adjusted open-to-open log returns forecasts a positive

@@ -455,7 +455,7 @@ def test_only_the_reports_asked_for_are_written_and_a_control_has_none(tmp_path:
     (output / "commentary.toml").write_text(
         '[SA12]\nsummary = "Une phrase."\nperiod_label = "Période de test"\n'
         'context = "Contexte de l\'étude."\nmeasured_source = "SA12_study_10102026.md"\n'
-        'measured = ["m"]\n',
+        'measured = ["m"]\nhistory_note = "Colonnes propres à cette étude."\n',
         encoding="utf-8",
     )
 
@@ -472,6 +472,7 @@ def test_only_the_reports_asked_for_are_written_and_a_control_has_none(tmp_path:
     assert "### Statut : **INSUFFICIENT_EVIDENCE**" in text
     assert "| Ratio de Sortino net (taux sans risque 0) | -0.17 | +1.30 |" in text
     assert "Mesures complémentaires (voir SA12_study_10102026.md)" in text
+    assert text.index("## 3. Historique") < text.index("Colonnes propres à cette étude.")
     with pytest.raises(SystemExit, match="no book for SA13"):
         SCRIPT.main(["--study", str(study), "--output", str(output), "--only", "SA13"])
 
