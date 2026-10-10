@@ -2,7 +2,7 @@
 
 Période commune 2021-04-01 → 2026-10-09 · capital 100 000 EUR · commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · 252 séances par an.
 
-Source : commit `ee7ff0c60ed1` (CLEAN), magasin `750c23dfffc3`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
+Source : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
 
 ## 1. Indicateurs de résultat globaux
 
@@ -14,7 +14,7 @@ Source : commit `ee7ff0c60ed1` (CLEAN), magasin `750c23dfffc3`, données à jour
 | - bloc marché (IR et alpha contre le fonds détenu) | 0.21 | n/a |
 | - bloc significativité (Sharpe déflaté) | 0.10 | n/a |
 | - bloc risque (drawdown relatif) | 1.00 | n/a |
-| - bloc robustesse (sous-périodes, coûts doublés) | 0.00 | n/a |
+| - bloc robustesse (sous-périodes ; stress approché des coûts) | 0.00 | n/a |
 | - bloc implémentation (poids des coûts) | 0.00 | n/a |
 | Rendement net total | -0.70% | +94.79% |
 | Rendement brut total (mêmes ordres, sans coûts) | +1.34% | +94.89% |
@@ -33,38 +33,52 @@ Source : commit `ee7ff0c60ed1` (CLEAN), magasin `750c23dfffc3`, données à jour
 | Rotation annuelle (multiple de l'actif moyen) | 3.78 | 0.13 |
 | Rendement net, deux premiers tiers | -4.73% | +57.42% |
 | Rendement net, dernier tiers | +4.23% | +23.74% |
-| Rendement net, coûts doublés (second run réel) | -2.77% | n/a |
-| Sharpe net, coûts doublés (second run réel) | -0.21 | n/a |
+| Rendement net, second run réel à coûts doublés | -2.77% | n/a |
+| Sharpe net, second run réel à coûts doublés | -0.21 | n/a |
 
-Le score QUALITY_V1 est un indice composite (marché 30 %, significativité 25 %, risque 15 %, robustesse 20 %, implémentation 10 %), pas une probabilité de gain. Le fonds détenu est l'étalon du score et n'est donc pas noté. « n/a » : la mesure n'existe pas pour cette colonne ; elle n'est jamais remplacée par zéro.
+Le score QUALITY_V1 est une **moyenne géométrique pondérée** de cinq blocs bornés entre 0 et 1 (marché 30 %, significativité 25 %, risque 15 %, robustesse 20 %, implémentation 10 %) : un seul bloc à zéro donne un score nul. Un score nul n'est donc ni une probabilité de gain nulle, ni une égalité économique entre deux stratégies ; le bloc implémentation, par exemple, tombe à zéro dès que les coûts atteignent 30 % du gain brut. Le bloc robustesse contient un **stress approché** des coûts, `net - (brut - net)` sur les mêmes ordres ; les deux dernières lignes du tableau viennent d'un **second run réel** à coûts doublés, où les quantités et la trajectoire changent, et n'entrent pas dans le score. Le score est déflaté par les essais de cette étude seulement, pas par la recherche antérieure : le classement est exploratoire, et un écart de quelques points entre deux scores n'est pas un test de supériorité. Les alphas sont des estimations ponctuelles sans intervalle, avec un taux sans risque nul ; l'alpha contre SA1 compare à une règle active, ce n'est pas un alpha de marché. Le fonds détenu est l'étalon du score et n'est pas noté. « n/a » : la mesure n'existe pas ; elle n'est jamais remplacée par zéro.
 
 ## 2. Analyse
 
 ### Faits mesurés
 
-| Période | Du | Au | Séances | Stratégie | ETF_WORLD (clôture) | Fonds détenu (net) | Exposition moyenne | Exposition min. | Exposition max. |
-|---|---|---|---|---|---|---|---|---|---|
-| Plus forte baisse de la stratégie | 2022-03-29 | 2025-04-28 | 788 | -8.00% | +18.75% | +18.74% | 3% | 0% | 51% |
-| Plus forte hausse de la stratégie | 2025-04-28 | 2026-04-29 | 257 | +7.53% | +25.01% | +24.99% | 6% | 0% | 53% |
-| Pires 63 séances de la stratégie | 2022-03-31 | 2022-06-30 | 64 | -4.84% | -11.92% | -11.91% | 13% | 0% | 51% |
-| Meilleures 63 séances de la stratégie | 2025-04-28 | 2025-07-25 | 64 | +4.10% | +11.01% | +11.01% | 13% | 0% | 53% |
-| Plus fort retard sur le fonds détenu | 2021-05-19 | 2026-10-06 | 1381 | -0.70% | +100.27% | +100.17% | 4% | 0% | 53% |
-| Plus forte avance sur le fonds détenu | 2025-02-19 | 2025-04-09 | 36 | +0.00% | -21.66% | -21.64% | 0% | 0% | 0% |
-| Plus forte baisse du fonds détenu | 2025-02-19 | 2025-04-09 | 36 | +0.00% | -21.66% | -21.64% | 0% | 0% | 0% |
-| Plus forte hausse du fonds détenu | 2021-05-19 | 2026-10-06 | 1381 | -0.70% | +100.27% | +100.17% | 4% | 0% | 53% |
+| Période | Du | Au | Valorisations | Rendements | Stratégie | ETF_WORLD (clôture) | Fonds détenu (net) | Écart relatif | Poids de clôture moyen | Poids de clôture min. | Poids de clôture max. |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Plus forte baisse (sommet → creux) | 2022-03-29 | 2025-04-28 | 788 | 787 | -8.00% | +18.75% | +18.74% | -22.52% | 3% | 0% | 51% |
+| Plus forte hausse (creux → sommet ultérieur, durée libre) | 2025-04-28 | 2026-04-29 | 257 | 256 | +7.53% | +25.01% | +24.99% | -13.97% | 6% | 0% | 53% |
+| Pires 63 rendements consécutifs | 2022-03-31 | 2022-06-30 | 64 | 63 | -4.84% | -11.92% | -11.91% | +8.03% | 13% | 0% | 51% |
+| Meilleurs 63 rendements consécutifs | 2025-04-28 | 2025-07-25 | 64 | 63 | +4.10% | +11.01% | +11.01% | -6.22% | 13% | 0% | 53% |
+| Plus fort retard relatif sur le fonds détenu | 2021-05-19 | 2026-10-06 | 1381 | 1380 | -0.70% | +100.27% | +100.17% | -50.39% | 4% | 0% | 53% |
+| Plus forte avance relative sur le fonds détenu | 2025-02-19 | 2025-04-09 | 36 | 35 | +0.00% | -21.66% | -21.64% | +27.62% | 0% | 0% | 0% |
+| Plus forte baisse du fonds détenu | 2025-02-19 | 2025-04-09 | 36 | 35 | +0.00% | -21.66% | -21.64% | +27.62% | 0% | 0% | 0% |
+| Plus forte hausse du fonds détenu | 2021-05-19 | 2026-10-06 | 1381 | 1380 | -0.70% | +100.27% | +100.17% | -50.39% | 4% | 0% | 53% |
 
-Chaque ligne va de la valeur de la séance « Du » à celle de la séance « Au ». L'exposition est la part de l'actif net détenue en fonds, le reste étant du cash non rémunéré.
+Chaque ligne va de la valeur de la séance « Du » à celle de la séance « Au » : N valorisations, donc N - 1 rendements. « Plus forte hausse » est la plus grande hausse d'un creux à un sommet ultérieur, de durée libre : ce n'est ni une position ni un trade. Les deux périodes relatives sont choisies sur le rapport de la stratégie au fonds détenu, dont l'« écart relatif » `(1 + stratégie) / (1 + fonds) - 1` est la variation. Le « poids de clôture » est la part de l'actif net détenue en fonds à la valorisation du soir, le reste étant du cash non rémunéré : il a pu dériver avec les cours, et le multiplier par le rendement du fonds ne reconstitue pas le résultat. Une décision prise le soir de t (signal et poids cible de la ligne t) est exécutée à l'ouverture de t + 1 et n'apparaît dans le poids détenu qu'à la ligne t + 1.
 
-| Année | Stratégie | Fonds détenu | Séances |
-|---|---:|---:|---:|
-| 2021 | -0.84% | +18.40% | 195 |
-| 2022 | -5.57% | -13.73% | 257 |
-| 2023 | +0.00% | +19.61% | 255 |
-| 2024 | +1.75% | +27.07% | 256 |
-| 2025 | +0.90% | +6.61% | 255 |
-| 2026 | +3.30% | +17.68% | 198 |
+### Baisses sous un sommet et retour à ce sommet
 
-Pire mois : **2025-04** (-2.68%, fonds détenu -3.89%). Meilleur mois : **2025-05** (+3.68%, fonds détenu +6.44%). Mois positifs : 8 sur 67.
+| Rang | Sommet | Creux | Profondeur | Retour au sommet | Jours calendaires |
+|---:|---|---|---:|---|---:|
+| 1 | 2022-03-29 | 2025-04-28 | -8.00% | non récupéré au 2026-10-09 | 1655 (en cours) |
+| 2 | 2021-12-07 | 2022-03-17 | -2.25% | 2022-03-28 | 111 |
+
+Drawdown au 2026-10-09 : **-1.07%** sous le plus haut de la période.
+Plus longue période sous un sommet : **1655 jours calendaires**, du 2022-03-29 au 2026-10-09 (en cours, creux à -8.00%).
+
+### Par année et par mois
+
+| Année | Stratégie | Fonds détenu | 50/50 rebalancé | Séances |
+|---|---:|---:|---:|---:|
+| 2021 (partielle, depuis le 2021-04-01) | -0.84% | +18.40% | +20.74% | 195 |
+| 2022 | -5.57% | -13.73% | -14.00% | 257 |
+| 2023 | +0.00% | +19.61% | +20.88% | 255 |
+| 2024 | +1.75% | +27.07% | +30.19% | 256 |
+| 2025 | +0.90% | +6.61% | +5.02% | 255 |
+| 2026 (partielle, au 2026-10-09) | +3.30% | +17.68% | +18.49% | 198 |
+
+Mois : **8 positifs, 7 négatifs, 52 sans variation** sur 67 (mois incomplets : 2026-10 s'arrête au 2026-10-09). Pire mois : **2025-04** (-2.68%, fonds détenu -3.89%). Meilleur mois : **2025-05** (+3.68%, fonds détenu +6.44%).
+
+Activité : une position est détenue à la clôture de **104 valorisations sur 1416** ; le poids total détenu y va de 49.3% à 52.7% (moyenne sur toutes les valorisations : 3.7%).
 
 ### En résumé
 
@@ -98,7 +112,7 @@ Du 2025-04-28 au 2026-04-29, la stratégie gagne +7,5 %, dont +4,1 % sur les 63 
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu ; l'ordre qui en découle est exécuté à l'ouverture suivante. Une case vide est un indicateur sans valeur ce jour-là.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
 
 | Séance | Clôture ETF_WORLD | Clôture ETF_SP500_PEA | `relief_20o[VIX]` | `momentum_5s_skip0[ETF_SP500_PEA]` | Poids cible ETF_SP500_PEA | Poids détenu ETF_SP500_PEA | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|
