@@ -312,6 +312,41 @@ def volatility_control_rule(
     )
 
 
+def forecast_volatility_rule(
+    instrument_id: str,
+    forecast_volatility: float | None,
+    *,
+    target_volatility: float,
+    floor: float,
+) -> RuleTarget:
+    """Scale the exposure to one forecast of the fund's volatility, never above 100%.
+
+    Parameters
+    ----------
+    instrument_id : str
+        The fund.
+    forecast_volatility : float | None
+        The annualised volatility forecast for the next session, as a fraction.
+    target_volatility : float
+        The estimated annualised risk aimed at.
+    floor : float
+        Smallest volatility the forecast may take in the allocation.
+
+    Returns
+    -------
+    RuleTarget
+        ``w = min(1, target / max(forecast, floor))``: rule 5 with a single
+        estimate in place of the larger of two. A forecast that has no value
+        leaves the rule inactive: cash.
+    """
+    if forecast_volatility is None:
+        return _missing()
+    estimate = max(forecast_volatility, floor)
+    return _settled(
+        {instrument_id: min(1.0, target_volatility / estimate)}, {"volatility": estimate}
+    )
+
+
 def factor_blend_rule(
     volatilities: Mapping[str, float | None],
     *,

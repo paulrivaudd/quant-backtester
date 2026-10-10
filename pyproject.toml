@@ -22,6 +22,9 @@ dependencies = [
 ml = [
     "torch>=2.14.1",
 ]
+stats = [
+    "arch>=8.0.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]

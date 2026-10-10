@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### SA11 - GARCH vol control (specification of 2026-10-10)
+- **New strategy `SA11`** (`GarchVolControl`): the exposure to `ETF_WORLD` is
+  `min(1, 12% / max(sigma, 5%))` with `sigma` the one-step forecast of a
+  zero-mean GARCH(1,1) with Student innovations, estimated again at every
+  decision on the 756 log returns known then. A fit refused on valid data
+  falls back on an EWMA (0.94) of the same window, and says so. Its control,
+  `EwmaVolControl`, applies the same rule to the EWMA alone and has no
+  catalogue code.
+- **New signals** `GarchVolatilitySignal` and `EwmaVolatilitySignal`
+  (`signals/models/garch.py`), with `forecast_garch`, a pure function of its
+  returns and configuration, in decimal units.
+- **New optional dependency**: the `stats` extra (`arch`). Every other
+  strategy, the catalogue and the class of `SA11` import without it; a run of
+  `SA11` without it stops at `validate()` with `MissingDependency`.
+- **New module** `analytics/volatility_forecast.py`: ex-post pairing of a
+  forecast with the next session's return, QLIKE with a counted metric floor.
+- **`scripts/run_garch_study.py`**: the common-period comparison
+  (2021-04-01 to 2026-10-09), ranked by `QUALITY_V1` with an explicit register
+  of trials, the forecast evaluation, the paired bootstrap and a second real
+  run with every cost doubled.
+- **`scripts/run_etf_strategies_comparison.py`** takes `--start` and `--end`,
+  runs `SA11` when its estimator is installed (and names it as left out
+  otherwise), and writes `quality_details.csv`. Its default period is
+  unchanged, so the table of 2026-10-04 is reproduced by the same command;
+  `SA11` holds cash there until its window is full, and the script says so.
+  `quality_scores()` is unchanged; `quality_details()` takes the number of
+  trials and their dispersion explicitly.
+- **CI** installs both extras and fails if either is missing, so that the
+  GARCH suite is executed and not skipped.
+- Hypothesis `sa11_garch_vol_control` registered before the first run.
+
 ### Audit 13 (strategies and performance), C01 to C04
 - **C01.** Returns that are constant in theory have no Sharpe ratio: the
   report gives `None` and the bootstrap raises `UndefinedStatistic`, under

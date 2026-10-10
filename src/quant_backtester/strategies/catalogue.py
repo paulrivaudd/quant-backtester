@@ -104,7 +104,8 @@ class CatalogueEntry:
         ------
         ImportError
             If the module needs an optional dependency that is not installed
-            (the ``ml`` extra for the ML family).
+            (the ``ml`` extra for the ML family). ``SA11`` loads without its
+            ``stats`` extra and refuses to run without it.
         TypeError
             If the target is not a strategy.
         """
@@ -143,6 +144,9 @@ CATALOGUE: tuple[CatalogueEntry, ...] = (
         Family.SA, 10, "ensemble", "quant_backtester.strategies.adaptive.etf_ensemble:ETFEnsemble"
     ),
     CatalogueEntry(
+        Family.SA, 11, "GARCH vol control", f"{_EXAMPLES}.garch_vol_control:GarchVolControl"
+    ),
+    CatalogueEntry(
         Family.ML,
         1,
         "neural allocation",
@@ -153,9 +157,12 @@ CATALOGUE: tuple[CatalogueEntry, ...] = (
 
 ``SA1`` to ``SA10`` are the ten ETF rules of 2026-10-03, numbered 0 to 9 in
 their specification: ``SA1`` is its benchmark 0, the fund held above its
-20-session average, and ``SA10`` its ensemble 9. ``ML1`` is the neural
-allocation of 2026-10-04. The exercises and the baselines that came before are
-not catalogued: they are examples of how a strategy is written.
+20-session average, and ``SA10`` its ensemble 9. ``SA11`` is the GARCH
+volatility control of 2026-10-10; its estimator is an optional dependency (the
+``stats`` extra) that its module imports only when a fit is asked for, so the
+entry loads without it. ``ML1`` is the neural allocation of 2026-10-04. The
+exercises and the baselines that came before are not catalogued: they are
+examples of how a strategy is written.
 """
 
 

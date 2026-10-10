@@ -20,8 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      # The ml extra brings PyTorch (CPU): without it the model tests are skipped.
-      - run: uv sync --frozen --extra ml
+      # The ml extra brings PyTorch (CPU) and the stats extra brings arch (SA11,
+      # the GARCH forecast): without them their tests are skipped, not run.
+      - run: uv sync --frozen --extra ml --extra stats
+      # The rule-based strategies must import and be listed without either extra;
+      # this fails the job if the GARCH suite was skipped instead of executed.
+      - run: uv run python -c "import arch, torch"
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pyright

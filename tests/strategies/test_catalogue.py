@@ -29,8 +29,9 @@ def test_a_code_gives_the_three_spellings_of_a_name() -> None:
         entry("SA99")
 
 
-def test_the_ten_etf_rules_are_sa1_to_sa10_and_the_network_is_ml1() -> None:
-    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 11)]
+def test_the_statistical_rules_are_sa1_to_sa11_and_the_network_is_ml1() -> None:
+    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 12)]
+    assert entry("SA11").display_name == "SA11 - GARCH vol control"
     assert [item.code for item in family(Family.ML)] == ["ML1"]
     assert len({item.strategy_id for item in CATALOGUE}) == len(CATALOGUE)
     assert entry_of(WorldMA20Benchmark).code == "SA1"

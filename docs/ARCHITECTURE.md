@@ -79,7 +79,7 @@ Trois règles supplémentaires sont vérifiées par les mêmes tests :
 | `portfolio/` | Ce qu'un livre a le droit de détenir, et ce qu'il détient | `targets` (`TargetAllocation`), `allocation` (`PortfolioModel`, `ConstrainedTarget`), `constraints`, `limits` (`PortfolioLimits`), `holdings`, `state` (`PortfolioState`), `view` |
 | `execution/` | Ce que le marché fait d'un ordre | `model` (`ExecutionModel`, `Sizing`), `costs` (`CostModel`), `rounding` (lots), `orders`, `fills` (`Fill`, `ExecutionReject`) |
 | `backtest/` | Le temps | `config` (`BacktestConfig`), `engine`, `timetable`, `schedule`, `context` (`StrategyContext`), `market`, `records` (`BacktestRecord`), `result` (`BacktestResult`), `runner` (`StrategyRunner`, `StrategyResult`) |
-| `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (score 0-100 % contre le marché, règles versionnées `QUALITY_V1`) |
+| `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (score 0-100 % contre le marché, règles versionnées `QUALITY_V1`), `volatility_forecast` (qualité ex post d'une prévision de variance : QLIKE) |
 | `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1`, `ML1`…), `examples/`, `adaptive/`, `ml/` |
 | `ml/` | Les modèles ajustés (hors couches, voir ci-dessous) | `config` (`NeuralStrategyConfig`), `features` (`NeuralFeatureBuilder`, `FeatureScaler`), `network` (`NeuralAllocator`), `artifacts` (`NeuralArtifact`), `dataset` (`ForwardOpenReturnBuilder`, purge), `training` (`calibrate_neural_strategy`) |
 | `research/` | La discipline de recherche | `hypotheses`, `registry`, `archive`, `paper`, `journal` |
@@ -236,7 +236,8 @@ Il ne décide rien : « le momentum de ce fonds est +8,1 % » est un signal,
 Signaux disponibles : `ReturnSignal`, `MomentumSignal`, `MeanReversionSignal`,
 `MovingAverageTrendSignal`, `MovingAverageCrossSignal` (prix), `RealizedVolatilitySignal`,
 `CurrentDrawdownSignal` (risque), `LevelChangeSignal`, `LevelZScoreSignal`
-(séries publiées), `CrossSectionalRank` (classement).
+(séries publiées), `CrossSectionalRank` (classement), `GarchVolatilitySignal`
+et `EwmaVolatilitySignal` (modèles, `signals/models/garch.py`).
 
 ## 7. Stratégie et contexte de décision
 
@@ -317,8 +318,8 @@ Familles : `SA` (règles statistiques sur prix et séries publiées) et `ML`
 (poids proposés par un modèle ajusté). Un code est attribué une fois, dans
 l'ordre d'adoption, et n'est jamais réutilisé ; le libellé peut être reformulé.
 `SA1` à `SA10` sont les dix règles ETF du 2026-10-03 (numérotées 0 à 9 dans
-leur spécification : `SA1` est le benchmark MA20, `SA10` l'ensemble), `ML1`
-l'allocation neuronale. Les exemples et exercices antérieurs ne sont pas
+leur spécification : `SA1` est le benchmark MA20, `SA10` l'ensemble), `SA11`
+le contrôle de volatilité GARCH du 2026-10-10, `ML1` l'allocation neuronale. Les exemples et exercices antérieurs ne sont pas
 catalogués. `entry("SA3")`, `entry_of(strategy)` et `family(Family.SA)`
 donnent une entrée ; `entry.load()` importe la classe à la demande.
 
@@ -336,6 +337,43 @@ en décision ; les rendements futurs ouverture→ouverture ne sont lus que par
 `ForwardOpenReturnBuilder`, sur un lecteur figé à la fin de l'apprentissage ;
 l'artefact porte sa date limite d'information et une décision prise avant est
 refusée (`InformationCutoffError`).
+
+### SA11, le contrôle de volatilité GARCH (`strategies/examples/garch_vol_control.py`)
+
+`GarchVolControl` détient `ETF_WORLD` à hauteur de
+`min(1, 12 % / max(σ, 5 %))`, où `σ = sqrt(252 · h(t+1|t))` est la prévision à
+une séance d'un GARCH(1,1) de moyenne nulle à innovations de Student. Le modèle
+est **réestimé à chaque décision** sur les 756 rendements logarithmiques
+(757 clôtures ajustées, séances consécutives) connus à cet instant ; rien n'est
+conservé d'une décision à l'autre, ni modèle, ni point de départ, ni cache.
+La bande de 3 points, la cible et le plancher sont ceux de `SA6`, son
+comparateur.
+
+- **Unités.** Les rendements sont multipliés par 100 pour l'optimiseur
+  seulement ; tout ce qui sort de `forecast_garch` est en unités décimales
+  (variance quotidienne, `ω` divisé par 10 000, volatilité de 20 % écrite
+  `0.20`).
+- **Repli.** Un fit non convergé, inadmissible (`α + β ≥ 1`, `ν ≤ 2`…) ou à
+  prévision invalide est remplacé par une EWMA (0,94, amorcée sur 60
+  rendements) de la **même fenêtre valide**. Le signal reste `OK` : la valeur
+  est exploitable, ce qui ne veut pas dire que GARCH a convergé ;
+  `GarchVolatilitySignal.diagnose()` donne la source et le motif. Une fenêtre
+  courte, trouée, périmée ou invalide ne déclenche ni fit ni repli : cash.
+- **Ce que couvre la prévision.** Le rendement clôture → clôture ; l'ordre est
+  exécuté à l'ouverture suivante. C'est un proxy du risque de la position.
+- **Dépendance.** L'estimation est faite par `arch`, dépendance optionnelle
+  (extra `stats`), importée au moment du fit. Le module, la classe et le
+  catalogue s'importent sans elle ; `validate()`, appelé par tout run, lève
+  `MissingDependency`.
+- **Témoin.** `EwmaVolControl` applique la même règle à l'EWMA seule, sous un
+  identifiant de recherche (`research_ewma94_vol_control`), sans code de
+  catalogue.
+
+`analytics/volatility_forecast.py` juge la prévision **ex post** : appariement
+origine → séance suivante, QLIKE (`log q + r²/q`, plancher de métrique à 1e-12
+compté), erreur quadratique, résidus standardisés. `scripts/run_garch_study.py`
+tient séparés le classement commun, la qualité de la prévision et le test
+économique de l'hypothèse (bootstrap apparié, second run réel à coûts doublés).
 
 ## 8. Portefeuille et exécution
 
@@ -455,6 +493,9 @@ La couche `research/` porte la discipline de recherche décrite dans
 | `scripts/run_baselines.py` | suites nommées (`--suite readme|baselines|all`, `--period`, `--records`, `--keep`, `--register`) | non |
 | `scripts/sensitivity.py` | la référence sous `AT_AUCTION` / `AT_DECISION`, avec coûts ×1 et ×2 | non |
 | `scripts/paper_trade.py` | vérifier et prolonger les plans de paper trading | non |
+| `scripts/run_etf_strategies_comparison.py` | les règles `SA` sur les mêmes dates et coûts (`--start`, `--end` ; `SA11` omise avec la mention « dependency missing » sans l'extra `stats`) ; `quality_details.csv` | non |
+| `scripts/run_garch_study.py` | l'étude `SA11` sur la période commune : classement, témoins `SA6`/EWMA, QLIKE, bootstrap, coûts ×2, historiques par stratégie | non |
+| `scripts/write_strategy_reports.py` | un fichier `strategy<code>_ResultsAndAnalysis_<date>.md` par stratégie, depuis les exports de l'étude | non |
 
 **Référence d'API.** Chaque module, classe et fonction publique a une docstring
 numpy qui donne les unités, le fuseau et l'instant de disponibilité. On la lit

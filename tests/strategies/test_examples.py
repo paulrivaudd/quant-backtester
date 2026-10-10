@@ -430,7 +430,9 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
     from quant_backtester.strategies import (
         BufferedDualMomentum,
         ETFEnsemble,
+        EwmaVolControl,
         FactorETFBlend,
+        GarchVolControl,
         MonetaryCarry,
         RealizedVolControl,
         RelativeResidualTilt,
@@ -469,6 +471,8 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
         TrendFilteredPullback(instrument_id="ETF_EU"),
         RelativeResidualTilt(first_id="ETF_EU", second_id="ETF_OTHER"),
         RealizedVolControl(instrument_id="ETF_EU"),
+        GarchVolControl(instrument_id="ETF_EU"),
+        EwmaVolControl(instrument_id="ETF_EU"),
         FactorETFBlend(instrument_ids=("ETF_EU", "ETF_OTHER", "ETF_LATE")),
         MonetaryCarry(instrument_id="ETF_LATE"),
         VixReliefEntry(instrument_id="ETF_OTHER", vix_id="RATE_US"),

@@ -26,6 +26,11 @@ The strategies that are kept have a code and a label in ``catalogue``:
 ``SA1 - std MA20``, ``ML1 - neural allocation``. The ML family lives in
 ``strategies.ml`` and is not imported here: it needs PyTorch, an optional
 dependency, and is reached through the catalogue or its own module.
+
+``GarchVolControl`` (``SA11``) is imported here although its estimator, the
+``arch`` package, is optional too (the ``stats`` extra): the class imports
+without it, and a run of it stops at ``validate`` with the name of what is
+missing. ``EwmaVolControl`` is its control and carries no catalogue code.
 """
 
 from __future__ import annotations
@@ -36,7 +41,9 @@ from quant_backtester.strategies.examples import (
     BufferedDualMomentum,
     BuyAndHold,
     EqualWeightRebalance,
+    EwmaVolControl,
     FactorETFBlend,
+    GarchVolControl,
     GoldenCrossETF,
     MomentumRotation,
     MomentumSingleAsset,
@@ -60,8 +67,10 @@ __all__ = [
     "BuyAndHold",
     "ETFEnsemble",
     "EqualWeightRebalance",
+    "EwmaVolControl",
     "FactorETFBlend",
     "FunctionalStrategy",
+    "GarchVolControl",
     "GoldenCrossETF",
     "MomentumRotation",
     "MomentumSingleAsset",

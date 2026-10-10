@@ -138,6 +138,15 @@ Les règles à respecter :
 - Aucun forward-fill, aucune interpolation, aucune normalisation sur tout
   l'échantillon.
 - Exportez le signal dans `signals/__init__.py`.
+- **Un modèle estimé dans la décision** (`signals/models/garch.py` en est
+  l'exemple) reste une fonction pure de sa configuration et de sa fenêtre :
+  aucun modèle gardé dans l'objet, aucun point de départ repris d'un appel
+  précédent, aucun fichier écrit dans `compute()`. Une dépendance optionnelle
+  s'importe au moment du calcul, pas en tête de module, pour que le catalogue
+  et les autres stratégies s'importent sans elle ; son absence arrête le
+  lancement (`validate()`), elle ne devient jamais un statut ni un repli. Un
+  échec numérique sur des données valides a un repli **déclaré** et tracé ;
+  des données invalides n'en ont pas.
 
 ### Tester le signal (`tests/signals/price/test_trend.py`)
 

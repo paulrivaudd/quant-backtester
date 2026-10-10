@@ -10,6 +10,13 @@ rebalanced. A strategy is named by its catalogue code and label
 
     uv run python scripts/run_etf_strategies_comparison.py --output results/etf_strategies
 
+``SA11``, the GARCH volatility control, is run when its estimator is installed
+(the ``stats`` extra) and named as left out otherwise - never scored on a
+guess. It needs 757 consecutive closes, which the default period does not hold
+at its start: ``--start`` and ``--end`` state another period, and
+:data:`COMMON_PERIOD` is the one every book has its window on from the first
+decision (``scripts/run_garch_study.py`` runs the comparison there).
+
 Each book also gets a quality score between 0 and 100%
 (:mod:`quant_backtester.analytics.quality`, version 1): how well it beat
 ``ETF_WORLD`` bought and held, and how far that can be trusted.
@@ -51,7 +58,13 @@ from matplotlib.figure import Figure
 from quant_backtester.analytics.benchmark_comparison import alpha_vs_benchmark
 from quant_backtester.analytics.config import AnalyticsConfig
 from quant_backtester.analytics.curves import Book, drawdown_curve
-from quant_backtester.analytics.quality import QUALITY_V1, quality_score, session_sharpe
+from quant_backtester.analytics.quality import (
+    BLOCKS,
+    QUALITY_V1,
+    QualityScore,
+    quality_score,
+    session_sharpe,
+)
 from quant_backtester.backtest.runner import StrategyResult, StrategyRunner
 from quant_backtester.backtest.schedule import EverySession
 from quant_backtester.data.calendars import CalendarRegistry
@@ -62,11 +75,13 @@ from quant_backtester.data.schemas import BarField
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel, Sizing
 from quant_backtester.provenance import git_source_state
+from quant_backtester.signals.models.garch import MissingDependency, require_arch
 from quant_backtester.strategies import (
     BufferedDualMomentum,
     BuyAndHold,
     EqualWeightRebalance,
     ETFEnsemble,
+    GarchVolControl,
     RealizedVolControl,
     RelativeResidualTilt,
     SmoothMovingAverage,
@@ -85,6 +100,14 @@ UNIVERSE = ("ETF_WORLD", "ETF_SP500_PEA")
 
 PERIOD = ("2019-05-02", "2026-09-30")
 """Measured period, bounds included: 253 closes of ``ETF_WORLD`` sit before it."""
+
+COMMON_PERIOD = ("2021-04-01", "2026-10-09")
+"""The period every book decides on a full window from the first session.
+
+2021-04-01 is the first XPAR session holding 757 consecutive closes of
+``ETF_WORLD`` (listed 2018-04-18), which ``SA11`` fits its model on; every
+other window is shorter. Fixed from the store's coverage on 2026-10-10, before
+any GARCH run, and without reading a performance."""
 
 INITIAL_CASH = 100_000.0
 
@@ -122,11 +145,22 @@ BUY_COLOUR, SELL_COLOUR = "#2f855a", "#c53030"
 ENSEMBLE = entry("SA10").display_name
 
 
+def garch_available() -> bool:
+    """Return whether ``SA11`` can be run here: whether its estimator is installed."""
+    try:
+        require_arch()
+    except MissingDependency:
+        return False
+    return True
+
+
 def books() -> dict[str, Strategy]:
     """Return every book of the comparison, by display name, parameters of the specification.
 
     A catalogued strategy is named ``"<code> - <label>"`` from its catalogue
-    entry; the two references keep a plain name.
+    entry; the two references keep a plain name. ``SA11`` is among them when
+    its estimator is installed and absent otherwise: :func:`main` says so
+    rather than print a row for it.
     """
     catalogued: tuple[Strategy, ...] = (
         BufferedDualMomentum(),
@@ -136,6 +170,7 @@ def books() -> dict[str, Strategy]:
         RealizedVolControl(),
         VixReliefEntry(),
         ETFEnsemble(enable_factors=False, enable_monetary=False),
+        *((GarchVolControl(),) if garch_available() else ()),
     )
     return {
         BENCHMARK: WorldMA20Benchmark(),
@@ -232,11 +267,14 @@ def summary_row(
     }
 
 
-def quality_scores(
+def quality_details(
     net: Mapping[str, pd.Series],  # type: ignore[type-arg]
     gross: Mapping[str, pd.Series],  # type: ignore[type-arg]
-) -> dict[str, float | None]:
-    """Return the version 1 quality score of every book but the market fund itself.
+    *,
+    trials: int | None = None,
+    trial_sharpe_std: float | None = None,
+) -> dict[str, QualityScore | None]:
+    """Return the version 1 quality score of every book but the market fund, with its blocks.
 
     Parameters
     ----------
@@ -244,38 +282,121 @@ def quality_scores(
         Net equity of every book, :data:`HELD` among them, on the same sessions.
     gross : Mapping[str, pd.Series]
         Gross equity of the same books.
+    trials : int | None
+        How many configurations were tried in the research the table belongs
+        to, from an explicit register, the abandoned ones included. ``None``
+        counts the catalogued strategies run here whose Sharpe ratio is
+        defined, which is what this script did before a register existed.
+    trial_sharpe_std : float | None
+        Standard deviation of those trials' per-session Sharpe ratios. ``None``
+        takes it over the same catalogued strategies. Given with ``trials``.
 
     Returns
     -------
-    dict[str, float | None]
-        A score in ``[0, 1]`` per book, measured against :data:`HELD` over the
-        whole period - no parameter was fitted on it. The Sharpe ratio is
-        deflated by the number of catalogued strategies run here and the
-        dispersion of their Sharpe ratios; the two references are not trials.
-        ``None`` for the market fund, which is the yardstick, and for a sample
-        too short to score.
+    dict[str, QualityScore | None]
+        The score, its five blocks, its measures and its diagnostics per book,
+        measured against :data:`HELD` over the whole period. ``None`` for the
+        market fund, which is the yardstick. A book on a sample too short to
+        score has a ``QualityScore`` whose ``score`` is ``None``.
+
+    Raises
+    ------
+    ValueError
+        If only one of ``trials`` and ``trial_sharpe_std`` is given.
     """
-    tried = [
-        sharpe
-        for name, curve in net.items()
-        if name not in (HELD, SPLIT) and (sharpe := session_sharpe(curve, ANALYTICS)) is not None
-    ]
-    spread = statistics.stdev(tried) if len(tried) > 1 else 0.0
-    scores: dict[str, float | None] = {}
+    if (trials is None) != (trial_sharpe_std is None):
+        raise ValueError("trials and trial_sharpe_std are given together, or neither")
+    if trials is None or trial_sharpe_std is None:
+        tried = [
+            sharpe
+            for name, curve in net.items()
+            if name not in (HELD, SPLIT)
+            and (sharpe := session_sharpe(curve, ANALYTICS)) is not None
+        ]
+        trials = max(1, len(tried))
+        trial_sharpe_std = statistics.stdev(tried) if len(tried) > 1 else 0.0
+    details: dict[str, QualityScore | None] = {}
     for name, curve in net.items():
         if name == HELD:
-            scores[name] = None
+            details[name] = None
             continue
-        scores[name] = quality_score(
+        details[name] = quality_score(
             curve,
             gross[name],
             net[HELD],
             ANALYTICS,
-            trials=max(1, len(tried)),
-            trial_sharpe_std=spread,
+            trials=trials,
+            trial_sharpe_std=trial_sharpe_std,
             rules=QUALITY_V1,
-        ).score
-    return scores
+        )
+    return details
+
+
+def quality_scores(
+    net: Mapping[str, pd.Series],  # type: ignore[type-arg]
+    gross: Mapping[str, pd.Series],  # type: ignore[type-arg]
+) -> dict[str, float | None]:
+    """Return the version 1 quality score of every book but the market fund itself.
+
+    Returns
+    -------
+    dict[str, float | None]
+        The ``score`` of :func:`quality_details` with its own count of trials:
+        the Sharpe ratio is deflated by the number of catalogued strategies
+        run here and the dispersion of their Sharpe ratios; the two references
+        are not trials. ``None`` for the market fund, and for a sample too
+        short to score.
+    """
+    return {
+        name: None if detail is None else detail.score
+        for name, detail in quality_details(net, gross).items()
+    }
+
+
+def quality_table(
+    details: Mapping[str, QualityScore | None], *, trials: int, trial_sharpe_std: float
+) -> pd.DataFrame:
+    """Return the scores as a frame: blocks, measures, diagnostics, version and trials.
+
+    Parameters
+    ----------
+    details : Mapping[str, QualityScore | None]
+        What :func:`quality_details` returned.
+    trials : int
+        The number of trials the significance block was deflated by.
+    trial_sharpe_std : float
+        The dispersion of their per-session Sharpe ratios.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per book. A book that is not scored keeps its row, with an
+        empty score: it is out of the ranking, not out of the record.
+    """
+    rows: dict[str, dict[str, object]] = {}
+    for name, detail in details.items():
+        row: dict[str, object] = {"score": None if detail is None else detail.score}
+        for block in BLOCKS:
+            row[f"block_{block}"] = None if detail is None else detail.blocks.get(block)
+        measures = {} if detail is None else dict(detail.measures)
+        for measure in (
+            "information_ratio",
+            "alpha_annualised",
+            "deflated_sharpe_probability",
+            "drawdown_ratio",
+            "subperiod_share",
+            "stress_retention",
+            "cost_drag",
+        ):
+            row[measure] = measures.get(measure)
+        row["diagnostics"] = (
+            "market_fund_not_scored" if detail is None else "|".join(detail.diagnostics)
+        )
+        row["version"] = QUALITY_V1.version
+        row["trials"] = trials
+        row["trial_sharpe_std"] = trial_sharpe_std
+        rows[name] = row
+    return pd.DataFrame.from_dict(rows, orient="index").rename_axis("book")
 
 
 def summary_table(rows: Mapping[str, Mapping[str, float | None]]) -> pd.DataFrame:
@@ -711,18 +832,39 @@ def main(arguments: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Compare the ETF strategies on the store.")
     parser.add_argument("--output", type=Path, default=Path("results/etf_strategies"))
     parser.add_argument("--store", type=Path, default=STORE)
+    parser.add_argument("--start", default=PERIOD[0], help="first measured session, ISO date")
+    parser.add_argument("--end", default=PERIOD[1], help="last measured session, ISO date")
     options = parser.parse_args(arguments)
 
+    garch = entry("SA11").display_name
+    if not garch_available():
+        print(f"{garch}: left out, dependency missing (uv sync --extra stats)", file=sys.stderr)
+    elif options.start < COMMON_PERIOD[0]:
+        print(
+            f"{garch} holds cash until its 757 closes exist ({COMMON_PERIOD[0]}); "
+            "its row is not comparable on this period. See scripts/run_garch_study.py.",
+            file=sys.stderr,
+        )
     runner = build_runner(options.store)
     results: dict[str, StrategyResult] = {}
     for name, strategy in books().items():
         print(f"running {name} ...", file=sys.stderr)
-        results[name] = runner.run(strategy, UNIVERSE, *PERIOD)
+        results[name] = runner.run(strategy, UNIVERSE, options.start, options.end)
     curves = {name: result.equity() for name, result in results.items()}
     gross = {name: result.equity(Book.GROSS) for name, result in results.items()}
-    scores = quality_scores(curves, gross)
+    tried = [
+        sharpe
+        for name, curve in curves.items()
+        if name not in (HELD, SPLIT) and (sharpe := session_sharpe(curve, ANALYTICS)) is not None
+    ]
+    trials = max(1, len(tried))
+    spread = statistics.stdev(tried) if len(tried) > 1 else 0.0
+    details = quality_details(curves, gross, trials=trials, trial_sharpe_std=spread)
     rows = {
-        name: {"quality": scores[name], **summary_row(result, curves[BENCHMARK])}
+        name: {
+            "quality": None if details[name] is None else details[name].score,  # type: ignore[union-attr]
+            **summary_row(result, curves[BENCHMARK]),
+        }
         for name, result in results.items()
     }
     table = summary_table(rows)
@@ -732,6 +874,10 @@ def main(arguments: Sequence[str] | None = None) -> int:
     print(f"{first} to {last}, {len(curves[BENCHMARK])} sessions; last third from {split}")
     print(render_summary(table))
     written = save_outputs(options.output, table, curves) + save_orders(options.output, results)
+    quality_table(details, trials=trials, trial_sharpe_std=spread).to_csv(
+        options.output / "quality_details.csv"
+    )
+    written.append(options.output / "quality_details.csv")
     for path in written:
         print(f"wrote {path}")
     return 0
