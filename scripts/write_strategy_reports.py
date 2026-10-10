@@ -86,6 +86,7 @@ GLOBAL_ROWS: tuple[tuple[str, str, str], ...] = (
     ("annualised_return", "Rendement net annualisé", "{:+.2%}"),
     ("volatility", "Volatilité annualisée", "{:.2%}"),
     ("sharpe", "Ratio de Sharpe net (taux sans risque 0)", "{:+.2f}"),
+    ("sortino", "Ratio de Sortino net (taux sans risque 0)", "{:+.2f}"),
     ("max_drawdown", "Perte maximale (max drawdown)", "{:.2%}"),
     ("alpha_vs_market", "Alpha annualisé contre le fonds détenu", "{:+.2%}"),
     ("beta_vs_market", "Bêta contre le fonds détenu", "{:.2f}"),
@@ -102,6 +103,40 @@ GLOBAL_ROWS: tuple[tuple[str, str, str], ...] = (
     ("sharpe_costs_x2", "Sharpe net, second run réel à coûts doublés", "{:+.2f}"),
 )
 """The global indicators, in order: column of the study, French label, format."""
+
+OPTIONAL_ROWS = frozenset({"sortino"})
+"""Indicators only some studies measure: shown when the study exports them, left
+out - not printed as missing - when it does not."""
+
+PEER_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("rank", "Rang", "{:.0f}"),
+    ("quality", "Score", "{:.1%}"),
+    ("net_return", "Net", "{:+.2%}"),
+    ("net_return_costs_x2", "Net, coûts x2", "{:+.2%}"),
+    ("sharpe", "Sharpe", "{:+.2f}"),
+    ("max_drawdown", "Perte max.", "{:.2%}"),
+    ("alpha_vs_market", "Alpha/an", "{:+.2%}"),
+    ("average_exposure", "Exposition", "{:.0%}"),
+    ("costs_eur", "Coûts (EUR)", "{:,.0f}"),
+)
+"""The columns of the table of every book of a study: column, French label, format."""
+
+HISTORY_COLUMNS: dict[str, tuple[str, str]] = {
+    "mu_h2_bp": ("Prévision mu_2 (pb)", "{:+.2f}"),
+    "forecast_volatility": ("Volatilité prévue (annualisée)", "{:.1%}"),
+    "ewma_fallback": ("Repli EWMA (1 = oui)", "{:.0f}"),
+    "gate": ("Filtre (1 = ouvert)", "{:.0f}"),
+    "theoretical_weight": ("Poids avant bande", "{:.1%}"),
+    "model_month": ("Modèle du mois (AAAAMM)", "{:.0f}"),
+    "forecast_bp": ("Prévision (pb)", "{:+.2f}"),
+    "reference_bp": ("Référence (pb)", "{:+.2f}"),
+    "displacements_bp": ("Déplacements (pb)", "{:+.2f}"),
+    "price_volume_bp": ("Prix-volume (pb)", "{:+.2f}"),
+    "price_time_bp": ("Prix-temps (pb)", "{:+.2f}"),
+    "volume_time_bp": ("Volume-temps (pb)", "{:+.2f}"),
+    "order_3_bp": ("Ordre 3 (pb)", "{:+.2f}"),
+}
+"""The columns a study adds to a history beside the signals: heading and format."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -387,6 +422,8 @@ def global_table(
         f"({int(float(own['sessions']))} séances) | idem |",  # type: ignore[arg-type]
     ]
     for key, label, pattern in GLOBAL_ROWS:
+        if key in OPTIONAL_ROWS and key not in own:
+            continue
         lines.append(
             f"| {label} | {_cell(own.get(key), pattern)} | {_cell(other.get(key), pattern)} |"
         )
@@ -530,11 +567,17 @@ def history_markdown(history: pd.DataFrame) -> str:
             return f"Poids détenu {column.removeprefix('held_')}"
         if column.startswith("proposed_"):
             return f"Poids proposé {column.removeprefix('proposed_')}"
+        if column.startswith("open_"):
+            return f"Ouverture {column.removeprefix('open_')}"
+        if column in HISTORY_COLUMNS:
+            return HISTORY_COLUMNS[column][0]
         return f"`{column}`"
 
     def pattern(column: str) -> str:
-        if column.startswith("close_"):
+        if column.startswith(("close_", "open_")):
             return "{:.2f}"
+        if column in HISTORY_COLUMNS:
+            return HISTORY_COLUMNS[column][1]
         if column == "net_equity":
             return "{:,.2f}"
         if column.startswith(("target_", "held_", "proposed_")):
@@ -564,6 +607,7 @@ def commentary_markdown(notes: Mapping[str, object] | None) -> str:
             "_Aucun commentaire n'a été rédigé pour cette stratégie : seuls les faits "
             "mesurés ci-dessus sont disponibles._"
         )
+    source = notes.get("measured_source", "diagnostics_10102026.md")
     sections = (
         ("summary", "En résumé", False),
         ("strengths", "Points forts", True),
@@ -571,7 +615,7 @@ def commentary_markdown(notes: Mapping[str, object] | None) -> str:
         ("worst", "Ce qui s'est passé pendant la période où la stratégie a le plus perdu", False),
         ("best", "Ce qui s'est passé pendant la période où la stratégie a le plus gagné", False),
         ("risks", "Situations de marché les plus risquées pour cette stratégie", True),
-        ("measured", "Mesures complémentaires (voir diagnostics_10102026.md)", True),
+        ("measured", f"Mesures complémentaires (voir {source})", True),
         ("to_test", "Ce que ces résultats n'établissent pas, et ce qui reste à mesurer", True),
     )
     lines: list[str] = []
@@ -587,6 +631,43 @@ def commentary_markdown(notes: Mapping[str, object] | None) -> str:
             lines.append(str(content).strip())
         lines.append("")
     return "\n".join(lines).rstrip()
+
+
+def peers_markdown(summary: pd.DataFrame, stressed: pd.DataFrame | None, name: str) -> str:
+    """Return every book of the study in the order of its ranking, the strategy in bold.
+
+    Parameters
+    ----------
+    summary : pd.DataFrame
+        The common table of the study, a row per book, already ordered.
+    stressed : pd.DataFrame | None
+        The same table of the second real run at doubled costs.
+    name : str
+        The book the report is about.
+
+    Returns
+    -------
+    str
+        One row per book - the controls and the references among them, which
+        are not candidates - on the period and under the costs of this study
+        only: a figure of another study, measured from another date, is not
+        comparable with these.
+    """
+    columns = [column for column in PEER_COLUMNS if column[0] != "net_return_costs_x2"]
+    if stressed is not None:
+        columns = list(PEER_COLUMNS)
+    lines = [
+        "| Livre | " + " | ".join(label for _, label, _ in columns) + " |",
+        "|---|" + "---:|" * len(columns),
+    ]
+    for book in summary.index:
+        row = summary.loc[book].to_dict()
+        if stressed is not None and book in stressed.index:
+            row["net_return_costs_x2"] = stressed.loc[book, "net_return"]
+        cells = [_cell(row.get(key), pattern) for key, _, pattern in columns]
+        label = f"**{book}**" if str(book) == name else str(book)
+        lines.append(f"| {label} | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
 
 
 SCORE_NOTE = (
@@ -606,6 +687,14 @@ SCORE_NOTE = (
     "noté. « n/a » : la mesure n'existe pas ; elle n'est jamais remplacée par zéro."
 )
 """What the score and the alphas of the first table do and do not say."""
+
+PEERS_NOTE = (
+    "Tous ces livres sont exécutés par le même moteur, sur la même période, avec les mêmes "
+    "coûts. Les contrôles (noms commençant par D ou C) et les deux références ne sont pas des "
+    "candidats. Ces chiffres ne se comparent pas à ceux d'une autre étude, mesurés depuis une "
+    "autre date ; un rang n'est pas une probabilité de succès."
+)
+"""How the table of the peers is to be read."""
 
 READING_NOTE = (
     "Chaque ligne va de la valeur de la séance « Du » à celle de la séance « Au » : N "
@@ -635,6 +724,8 @@ def report(
     *,
     control: str | None = None,
     history_note: str | None = None,
+    peers: str | None = None,
+    extra: str | None = None,
 ) -> str:
     """Return the whole report of one strategy: indicators, analysis, then history.
 
@@ -661,6 +752,12 @@ def report(
     history_note : str | None
         A sentence added above the history, for a book whose columns are not
         the signals it read.
+    peers : str | None
+        The table of every book of the study, shown under the indicators.
+    extra : str | None
+        The section only the study of this strategy can write - its forecasts,
+        its controls, the status of its hypothesis - placed in the analysis,
+        above the commentary.
     """
     equity = pd.Series(history["net_equity"])
     return "\n".join(
@@ -674,6 +771,18 @@ def report(
             global_table(row, market_row, stressed),
             "",
             SCORE_NOTE,
+            *(
+                []
+                if peers is None
+                else [
+                    "",
+                    "### Classement de tous les livres de l'étude, sur la même période",
+                    "",
+                    peers,
+                    "",
+                    PEERS_NOTE,
+                ]
+            ),
             "",
             "## 2. Analyse",
             "",
@@ -693,6 +802,7 @@ def report(
             "",
             activity_markdown(history),
             "",
+            *([] if extra is None else [extra.rstrip(), ""]),
             commentary_markdown(notes),
             "",
             "## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie",
@@ -735,13 +845,39 @@ def read_history(study: Path, name: str) -> pd.DataFrame:
     return frame.rename_axis("session_date")
 
 
-def study_provenance(config: Mapping[str, object]) -> list[str]:
-    """Return the lines saying what a report of the study was produced from."""
+def study_provenance(
+    config: Mapping[str, object], *, period_label: str = "Période commune", context: str = ""
+) -> list[str]:
+    """Return the lines saying what a report of the study was produced from.
+
+    Parameters
+    ----------
+    config : Mapping[str, object]
+        The study's ``config.json``.
+    period_label : str
+        What the period is called: a test period is not a common period.
+    context : str
+        A sentence the commentary adds about this study - why its period is
+        what it is, what was calibrated - appended to the lines.
+    """
     source = config["source"]
     period = config["period"]
     assert isinstance(source, dict) and isinstance(period, dict)
     return [
-        f"Période commune {period['start']} → {period['end']} · capital 100 000 EUR · "
+        *study_lines(source, period, config, period_label),
+        *(["", context.strip()] if context.strip() else []),
+    ]
+
+
+def study_lines(
+    source: Mapping[str, object],
+    period: Mapping[str, object],
+    config: Mapping[str, object],
+    period_label: str,
+) -> list[str]:
+    """Return the two lines every report of a study starts with."""
+    return [
+        f"{period_label} {period['start']} → {period['end']} · capital 100 000 EUR · "
         "commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités "
         "fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · "
         "252 séances par an.",
@@ -848,6 +984,13 @@ def main(arguments: Sequence[str] | None = None) -> int:
     parser.add_argument("--store", type=Path, default=Path("market_data"))
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts/neural/world_vix"))
     parser.add_argument("--skip-ml1", action="store_true")
+    parser.add_argument(
+        "--only",
+        nargs="+",
+        metavar="CODE",
+        help="write these reports only (SA12, SA13 ...), with the ranking of the study and "
+        "the section the study wrote for them; ML1 is then left alone",
+    )
     options = parser.parse_args(arguments)
 
     inputs = study_inputs(options.study)
@@ -864,8 +1007,14 @@ def main(arguments: Sequence[str] | None = None) -> int:
     written: dict[str, str] = {}
     for name in summary.index:
         # The control and the two references carry no catalogue code: a name of their own.
-        code = names.get(str(name)) or UNCATALOGUED[str(name)]
+        # The controls of a later study (D0, C0 ...) have neither, and no report.
+        code = names.get(str(name)) or UNCATALOGUED.get(str(name))
+        if code is None or (options.only and code not in options.only):
+            continue
         notes = commentary.get(code)
+        notes = notes if isinstance(notes, dict) else None
+        dedicated = options.study / f"report_extra_{code}.md"
+        selected = bool(options.only)
         written[file_name(code, options.stamp)] = report(
             str(name),
             summary.loc[name].to_dict(),
@@ -874,11 +1023,23 @@ def main(arguments: Sequence[str] | None = None) -> int:
             read_history(options.study, str(name)),
             market,
             yearly,
-            notes if isinstance(notes, dict) else None,
-            study_provenance(config),
+            notes,
+            study_provenance(
+                config,
+                period_label=str((notes or {}).get("period_label", "Période commune")),
+                context=str((notes or {}).get("context", "")),
+            ),
             control=SPLIT,
+            peers=peers_markdown(summary, stressed, str(name)) if selected else None,
+            extra=(
+                dedicated.read_text(encoding="utf-8") if selected and dedicated.exists() else None
+            ),
         )
-    if not options.skip_ml1:
+    if options.only:
+        missing = sorted(set(options.only) - {target.split("_")[0][8:] for target in written})
+        if missing:
+            raise SystemExit(f"the study has no book for {', '.join(missing)}")
+    if not options.skip_ml1 and not options.only:
         notes = commentary.get("ML1")
         period = config["period"]
         assert isinstance(period, dict)

@@ -86,6 +86,43 @@ bande et coûts (2,5 fois ceux de `SA6`). Les témoins simples sont conservés ;
 `SA11` reste au catalogue comme référence fixe. Cela ne dit rien des modèles
 GARCH en général. Détail : [SA11_study_10102026.md](SA11_study_10102026.md).
 
+## SA12 : une étude à part, sur la même période
+
+[strategySA12_ResultsAndAnalysis_10102026.md](strategySA12_ResultsAndAnalysis_10102026.md)
+vient de sa propre étude (`scripts/run_arima_garch_study.py`, commit `10f6d90`,
+même magasin, même période 2021-04-01 → 2026-10-09), qui exécute aussi trois
+contrôles sans code de catalogue : D0 (même ARIMA et même variance, filtre de
+direction toujours ouvert), D1 (variance EWMA), D2 (moyenne constante). Son
+registre compte 14 essais : ses scores ne se lisent pas dans le tableau
+ci-dessus, déflaté par 10. Détail : [SA12_study_10102026.md](SA12_study_10102026.md).
+
+| Livre | Net | Net, coûts ×2 | Sharpe | Perte max. | Exposition | Coûts (EUR) |
+|---|---:|---:|---:|---:|---:|---:|
+| **SA12 - ARIMA GARCH** | -1,72 % | -5,70 % | -0,14 | -6,99 % | 4 % | 4 022 |
+| D0, même risque sans filtre | +64,07 % | +56,33 % | 0,85 | -17,77 % | 86 % | 5 788 |
+| D1, ARIMA et variance EWMA | -2,46 % | -6,52 % | -0,20 | -7,32 % | 4 % | 4 126 |
+| D2, moyenne constante et GARCH | 0,00 % | 0,00 % | n/a | 0,00 % | 0 % | 0 |
+| SA6 - vol control | +67,43 % | +65,50 % | 0,90 | -15,72 % | 85 % | 1 445 |
+| ETF_WORLD détenu | +94,79 % | +94,34 % | 0,93 | -21,64 % | 100 % | 100 |
+
+- **Statut de l'hypothèse `sa12_arima_garch` : `INSUFFICIENT_EVIDENCE`.** Les
+  critères écrits avant le run demandaient 30 épisodes de position terminés ;
+  il y en a 29. Le seuil n'a pas été modifié après lecture. L'écart de Sharpe
+  mesuré contre D0 est de -0,987 (intervalle à 95 % [-2,101 ; +0,252]) aux
+  coûts de base et de -1,241 ([-2,335 ; -0,032]) à coûts doublés.
+- **La prévision ne franchit le seuil de 20 pb que 31 soirs sur 1 413**, tous à
+  partir du 2025-04-10 : le livre reste en cash quatre ans, puis prend 29
+  positions dont 22 ne durent qu'une valorisation. Les coûts (4 022 EUR)
+  dépassent le gain brut (+2,30 %).
+- **La moyenne prévue ne bat pas deux prévisions naïves** (erreur quadratique
+  9,2497e-05 contre 9,2133e-05 pour zéro et 9,2002e-05 pour la moyenne de la
+  fenêtre ; signe juste 56,1 % contre 56,7 % pour « toujours en hausse »).
+- **GARCH et EWMA ne sont pas départagés** (écart de Sharpe contre D1 +0,061,
+  intervalle [-0,037 ; +0,170]) ; D2 n'a jamais pris de position.
+
+Cela ne dit rien des modèles ARIMA-GARCH en général, et aucun contrôle n'est
+candidat : en adopter un serait une nouvelle hypothèse.
+
 ## Hors classement
 
 - **ML1** ([rapport](strategyML1_ResultsAndAnalysis_10102026.md)) : son
@@ -159,6 +196,12 @@ uv run python scripts/run_garch_study.py --output results/garch_study
 uv run python scripts/run_review_diagnostics.py
 uv run python scripts/write_strategy_reports.py \
     --study results/garch_study --output research/reports/2026-10-10
+
+# SA12, son étude et son rapport (une heure environ, un seul fil de calcul)
+OMP_NUM_THREADS=1 uv run python scripts/run_arima_garch_study.py \
+    --output results/arima_garch_study
+uv run python scripts/write_strategy_reports.py \
+    --study results/arima_garch_study --output research/reports/2026-10-10 --only SA12
 ```
 
 Le commentaire rédigé est dans [commentary.toml](commentary.toml) ; les

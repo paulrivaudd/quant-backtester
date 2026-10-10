@@ -418,3 +418,60 @@ risks = [
 to_test = [
   "Premier du classement sans être une stratégie : cela dit surtout qu'aucune règle du catalogue ne bat un panier passif des mêmes fonds sur cette période.",
 ]
+
+# --- SA12 et SA13 : études dédiées, ajoutées le 2026-10-10 après les rapports ci-dessus ---
+#
+# Les deux tables suivantes ne viennent pas de results/garch_study. « Fait » y
+# désigne ce qui est relu dans les exports de l'étude de la stratégie :
+# - SA12 : results/arima_garch_study (scripts/run_arima_garch_study.py), run du
+#   commit 10f6d90 sur le magasin 750c23dfffc3, période 2021-04-01 -> 2026-10-09 ;
+# - SA13 : results/signature_study (scripts/run_signature_study.py), période de
+#   test 2023-01-02 -> 2026-10-09, un modèle par mois.
+# Leurs hypothèses, leurs contrôles et leurs statuts ont été écrits avant le
+# premier ajustement (research/hypotheses.toml, commit b0b2d7e). Les contrôles
+# (D0 à D2, C0 à C7) ne sont pas des candidats. Les chiffres de SA13, mesurés
+# depuis 2023, ne se comparent pas à ceux des rapports mesurés depuis 2021.
+
+[SA12]
+period_label = "Période commune"
+context = "Étude dédiée (`scripts/run_arima_garch_study.py`) : les livres de la comparaison, le témoin EWMA de SA11 et trois contrôles de SA12 sans code de catalogue (D0, D1, D2), exécutés par le même moteur. L'ARIMA et le GARCH sont réestimés chaque soir sur 756 rendements d'ouverture à ouverture, avec un seul fil de calcul. L'hypothèse `sa12_arima_garch`, ses contrôles et ses statuts ont été écrits avant le premier ajustement."
+measured_source = "SA12_study_10102026.md"
+summary = "Détenir ETF_WORLD seulement quand un ARIMA(1,0,1), réestimé chaque soir sur 756 rendements d'ouverture à ouverture, prévoit plus de 20 pb pour le rendement de l'ouverture de t + 1 à l'ouverture de t + 2 (la position est gardée tant que la prévision reste strictement positive), au poids min(1, 12 % / max(σ, 5 %)) où σ vient d'un GARCH(1,1) ajusté sur les innovations de l'ARIMA. Sur cet historique la prévision ne franchit le seuil que 31 soirs sur 1 413, tous à partir du 10 avril 2025 : le livre reste en cash pendant quatre ans, puis prend 29 positions courtes qui, ensemble, perdent 1,72 % net, quand le même dimensionnement sans filtre (D0) gagne 64,07 %. Le statut préinscrit est INSUFFICIENT_EVIDENCE parce qu'il manque un épisode terminé (29 pour 30 requis) ; l'écart de Sharpe mesuré contre D0 est de -0,99. Cela ne dit rien des modèles ARIMA-GARCH en général."
+strengths = [
+  "**Fait.** La chaîne de calcul fonctionne : prévision jointe utilisable à 1 415 décisions sur 1 416 (99,93 %), un seul ARIMA non convergé, aucun repli EWMA de la variance.",
+  "**Fait.** Perte maximale de -6,99 % contre -21,64 % pour le fonds et -17,77 % pour D0, volatilité de 2,1 %. **Lecture.** C'est la conséquence d'une exposition moyenne de 4,0 % (une position à la clôture de 69 valorisations sur 1 416), pas d'un choix heureux des séances.",
+  "**Fait.** Le livre est en cash pendant toute la baisse du fonds du 2025-02-19 au 2025-04-09 (-21,64 %). **Lecture.** Ce n'est pas une protection décidée par le modèle : avant le 10 avril 2025 la prévision n'a jamais dépassé 18,2 pb (13,5 pb de 2021 à 2024), quel que soit le marché, et aucune position n'avait encore été prise.",
+  "**Fait.** Brut de coûts, les 29 épisodes rapportent +2,30 %.",
+  "**Fait.** Sur la même moyenne, la variance GARCH a une perte jointe moyenne un peu plus basse que la variance EWMA (-8,4848 contre -8,4737) ; l'écart apparié, -0,011, a un intervalle à 95 % de [-0,065 ; +0,045], qui contient zéro.",
+]
+weaknesses = [
+  "**Fait.** -1,72 % net sur la période, contre +64,07 % pour D0, +67,43 % pour SA6 et +94,79 % pour le fonds ; Sharpe -0,14. Dans le second run à coûts doublés : -5,70 %, Sharpe -0,47.",
+  "**Fait.** La prévision de la moyenne n'est pas meilleure que deux prévisions naïves : erreur quadratique moyenne de 9,2497e-05, contre 9,2133e-05 pour la prévision nulle et 9,2002e-05 pour la moyenne de la fenêtre (les intervalles des deux écarts contiennent zéro) ; corrélation avec le rendement réalisé +0,018 ; signe juste 56,1 % contre 56,7 % pour « toujours en hausse ».",
+  "**Fait.** Les 31 signaux d'entrée ne sélectionnent pas de meilleures séances : le rendement réalisé moyen après un signal est de +0,046 %, contre +0,047 % sur toutes les origines, et 15 signaux sur 31 sont suivis d'une hausse.",
+  "**Fait.** 22 épisodes sur 29 ne durent qu'une valorisation : achat à l'ouverture, prévision redevenue négative ou nulle le soir même, vente à l'ouverture suivante. 75 ordres et 4 022 EUR de coûts pour environ 2 300 EUR de gain brut : les coûts dépassent le gain brut.",
+  "**Fait.** 10 épisodes gagnants sur 29, résultat net moyen de -0,05 % par épisode.",
+  "**Fait.** Le sommet du 2025-05-13 n'est pas retrouvé au 2026-10-09, 514 jours plus tard (-2,36 % sous ce sommet).",
+  "**Fait.** Score nul au classement de l'étude : les blocs robustesse et implémentation sont à zéro. Un score nul n'est pas une égalité économique avec les autres livres à zéro.",
+]
+worst = "**Fait.** La plus forte baisse va du sommet du 2025-05-13 (100 648,6 EUR) au creux du 2026-03-26 (93 610,0 EUR) : -6,99 %, pendant que le fonds gagne +8,47 %. Elle n'est pas continue : c'est la somme de 16 épisodes, dont 3 gagnants, qui coûtent 2 443 EUR de frais. Les plus lourds : le soir du 2025-07-31 la prévision vaut +20,6 pb et la cible 89,5 % ; l'achat est exécuté à l'ouverture du 2025-08-01 (568,04), le fonds clôture à 556,13, la prévision du soir tombe à -21,4 pb et la vente est exécutée à l'ouverture du 2025-08-04 (557,91) : -1,75 % sur le livre. Le soir du 2026-03-05 la prévision vaut +21,2 pb et la cible 98,8 % ; 156 parts sont achetées à l'ouverture du 2026-03-06 (617,43) ; la prévision du soir est de -6,3 pb et la vente est exécutée à l'ouverture du lundi 2026-03-09 (601,27), 2,65 % plus bas : -2,78 % sur le livre, le plus mauvais épisode. Le soir du 2026-03-18 (+21,7 pb, cible 96,1 %) conduit de même à un achat à l'ouverture du 19 et à une vente à celle du 20 (-0,87 %). Les 31 signaux d'entrée de la période suivent tous un rendement d'ouverture à ouverture positif, de +1,73 % en moyenne quand l'amplitude moyenne de ce rendement est de 0,65 % sur l'ensemble des séances ; depuis le 10 avril 2025 la corrélation entre ce dernier rendement et la prévision est de +0,82. **Lecture.** Le livre achète donc au lendemain d'une forte hausse à l'ouverture et revend le plus souvent une séance plus tard ; que ce mécanisme explique la perte, plutôt que le hasard de 16 épisodes, n'est pas établi."
+best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2026-03-26 au 2026-08-05 : +5,46 %, contre +17,56 % pour le fonds, avec un poids de clôture moyen de 26 %. Elle tient à six épisodes dont quatre gagnants. Le principal : le soir du 2026-04-14 la prévision vaut +22,2 pb et la cible 84,8 % ; l'achat est exécuté à l'ouverture du 2026-04-15 (622,67) ; la prévision reste ensuite strictement positive treize soirs de suite (entre +0,6 et +23,3 pb) et la position est gardée, entre 80 % et 99 % du livre ; le soir du 2026-05-05 elle passe à -3,8 pb et la vente est exécutée à l'ouverture du 2026-05-06 (645,95) : +3,13 % sur le livre en 14 valorisations, l'épisode le plus long. Puis le soir du 2026-07-31 (+29,6 pb, cible 89,6 %) : achat à l'ouverture du 2026-08-03 (682,22), vente à l'ouverture du 2026-08-07 (697,95) après une prévision de -2,6 pb le soir du 6 : +1,91 %. **Lecture.** Les gains viennent des rares épisodes tenus plusieurs séances dans une hausse du fonds ; le livre n'en capte qu'une fraction."
+risks = [
+  "**Observé.** Marché heurté, où un fort rendement d'ouverture à ouverture est suivi d'un mouvement contraire : la prévision change de signe d'un soir à l'autre (+148,7 pb le 2025-04-10, -183,9 pb le 2025-04-11, +125,0 pb le 2025-04-14, -46,0 pb le 2025-04-15) ; le livre achète et revend à chaque fois et paie deux fois les coûts.",
+  "**Observé.** Entrée la veille d'un gap baissier : acheté à l'ouverture du 2026-03-06, revendu à celle du 2026-03-09, 2,65 % plus bas, avec 98,8 % du livre.",
+  "**Observé.** Hausse régulière du fonds avec des rendements quotidiens modestes (2021, 2023, 2024) : la prévision reste sous le seuil et le livre reste en cash pendant que le fonds gagne +18,4 %, +19,6 % et +27,1 %.",
+  "**Plausible.** Coefficients ARIMA qui changent d'une fenêtre à l'autre : la moyenne annuelle du coefficient autorégressif estimé passe de -0,17 en 2021 et 2022 à -0,44 en 2025 et -0,67 en 2026, celle du coefficient de moyenne mobile de +0,09 à +0,48. Les prévisions deviennent alors plus amples, ce qui coïncide avec l'apparition des signaux ; l'effet sur la décision n'est pas isolé ici.",
+]
+measured = [
+  "**Fait.** SA12 contre D0 (même ARIMA, même variance, filtre toujours ouvert) : écart de Sharpe de -0,987, intervalle bootstrap à 95 % [-2,101 ; +0,252] aux coûts de base ; -1,241, intervalle [-2,335 ; -0,032], dans le second run à coûts doublés.",
+  "**Fait.** SA12 contre D1 (même ARIMA, variance EWMA) : écart de Sharpe de +0,061, intervalle [-0,037 ; +0,170] ; D1 fait -2,46 % net. GARCH et EWMA ne sont pas départagés.",
+  "**Fait.** D2 (moyenne constante et GARCH) n'a pris aucune position : une moyenne constante estimée sur 756 rendements ne dépasse jamais 20 pb par séance.",
+  "**Fait.** Résidus standardisés de la prévision jointe : écart-type 1,04, kurtosis 11,1, autocorrélation de leurs carrés +0,24. La variance prévue ne rend compte ni de toutes les queues ni de toute la persistance.",
+  "**Lecture.** Le filtre de direction a surtout retiré de l'exposition : D0, investi à 86 % en moyenne, a suivi la hausse du fonds ; SA12, investi à 4 %, ne l'a pas suivie. Avec un intervalle aussi large aux coûts de base, cet écart reste une mesure sur ce chemin.",
+]
+to_test = [
+  "Le statut INSUFFICIENT_EVIDENCE est celui des critères écrits avant le run : 29 épisodes terminés pour 30 requis. Le seuil n'a pas été modifié après lecture. Il ne dit ni que le filtre est utile ni qu'il est nuisible ; l'écart mesuré contre D0 est négatif, et son intervalle aux coûts de base contient zéro.",
+  "Le seuil d'entrée de 20 pb reprend un coût aller-retour de référence ; il a laissé la stratégie inactive pendant quatre ans. L'abaisser après avoir lu ce résultat serait une nouvelle variante, à préinscrire.",
+  "L'évolution des coefficients ARIMA dans le temps est exportée (`sa12_forecasts.csv`) mais n'est pas analysée au-delà des moyennes annuelles citées.",
+  "La moyenne et la variance sont estimées en deux étapes, et la variance à deux pas ignore l'incertitude des paramètres.",
+  "La vérification prospective, configuration figée, commence à la première séance XPAR après le 2026-10-10.",
+]
