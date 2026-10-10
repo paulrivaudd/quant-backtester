@@ -20,6 +20,7 @@ from quant_backtester.strategies.examples.buffered_dual_momentum import Buffered
 from quant_backtester.strategies.examples.buy_and_hold import BuyAndHold
 from quant_backtester.strategies.examples.equal_weight import EqualWeightRebalance
 from quant_backtester.strategies.examples.factor_etf_blend import FactorETFBlend
+from quant_backtester.strategies.examples.fixed_weights import FixedWeights
 from quant_backtester.strategies.examples.garch_vol_control import EwmaVolControl, GarchVolControl
 from quant_backtester.strategies.examples.golden_cross_etf import GoldenCrossETF
 from quant_backtester.strategies.examples.momentum_rotation import MomentumRotation
@@ -45,6 +46,7 @@ __all__ = [
     "EqualWeightRebalance",
     "EwmaVolControl",
     "FactorETFBlend",
+    "FixedWeights",
     "GarchVolControl",
     "GoldenCrossETF",
     "MomentumRotation",
