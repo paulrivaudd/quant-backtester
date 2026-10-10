@@ -32,6 +32,17 @@
 - **CI** installs both extras and fails if either is missing, so that the
   GARCH suite is executed and not skipped.
 - Hypothesis `sa11_garch_vol_control` registered before the first run.
+- **`scripts/write_strategy_reports.py`** writes one
+  `strategy<CODE>_ResultsAndAnalysis_<DDMMYYYY>.md` per strategy from the
+  study's exports: the global indicators, an analysis (measured stretches,
+  then a written commentary read from `commentary.toml`) and the session by
+  session history of the closes, the signals read, the weights and the value.
+  The reports of 2026-10-10 are in `research/reports/2026-10-10/`.
+- **Result.** On 2021-04-01 to 2026-10-09 the hypothesis is refuted: `SA11`
+  has the best variance forecast (QLIKE) and a net Sharpe ratio of 0.87,
+  below `SA6` (0.90) and the EWMA control (0.93), with a deeper drawdown and
+  2.5 times the costs. The simple rule is kept; `SA11` stays in the catalogue
+  as a fixed reference.
 
 ### Audit 13 (strategies and performance), C01 to C04
 - **C01.** Returns that are constant in theory have no Sharpe ratio: the
