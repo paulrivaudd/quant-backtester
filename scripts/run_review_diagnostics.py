@@ -7,18 +7,21 @@ engine on the same period, cash and costs:
 
 - the result and the costs of each **episode** a rarely invested rule was in
   the market (``SA1``, ``SA4``, ``SA9``);
-- the effect of the **delay** between a decision's close and its fill at the
-  next open, for every book;
-- the **attribution** of ``SA2`` and ``SA5`` against the even split of the same
-  two funds - exposure, choice between the funds, execution, costs - and how
-  the tilt of ``SA5`` relates to what the funds did next;
-- each exposure-moving rule beside a **constant-weight control** holding the
+- the signed **price gap** between a decision's close and its fill at the next
+  open, at the quantities filled, for every book;
+- an approximate **attribution** of ``SA2`` and ``SA5`` against the even split
+  of the same two funds - exposure, choice between the funds, the residual of
+  the approximation, costs - and how the tilt of ``SA5`` relates to what the
+  funds did next;
+- each exposure-moving rule beside a **constant-target control** aiming at the
   average weights that rule was seen to hold;
 - ``SA10`` **without each of its rules**, and without its risk control;
 - ``SA6`` against the EWMA control (paired bootstrap), and the EWMA rule at two
   other decays fixed here in advance (0.90 and 0.97);
-- ``ML1`` beside a constant allocation, its announced sensitivities (seeds 43
-  and 44, doubled costs), and the inputs its network read.
+- ``ML1`` beside a constant-target allocation, its announced sensitivities
+  (seeds 43 and 44, doubled costs - the frozen model run dearer, and the model
+  recalibrated under those costs, two different questions), and the inputs
+  its network read.
 
 From the repository root, after the study:
 
@@ -33,8 +36,14 @@ would be a new hypothesis, written before its run, and each would count as a
 trial in the register that deflates a Sharpe ratio.
 
 The closes used to split a return into exposure and choice are closing
-prices: such a split ignores that orders are filled at the open, and says so
-in a residual line rather than hiding it.
+prices: such a split ignores that orders are filled at the open, and leaves
+what it cannot place in a residual line. That residual is not a measure of
+execution: it also holds the day's return on whatever was bought or sold that
+morning, which is part of what the signal did.
+
+The new runs are compared with the exports of the study only when they read
+the same store, the same cash and the same costs: :func:`require_same_provenance`
+refuses anything else.
 
 The tests are in ``tests/scripts/test_run_review_diagnostics.py``.
 """
@@ -44,6 +53,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
@@ -60,7 +70,7 @@ from run_etf_strategies_comparison import (
     UNIVERSE,
     build_runner,
 )
-from run_garch_study import EWMA, FUND, GARCH, VOL_CONTROL, sharpe_difference
+from run_garch_study import COST_STRESS, EWMA, FUND, GARCH, VOL_CONTROL, sharpe_difference
 from scipy.stats import pearsonr, spearmanr
 from write_strategy_reports import (
     OTHER_FUND,
@@ -90,17 +100,28 @@ CONTROLLED_BOOKS = (
     GARCH,
     EWMA,
 )
-"""The rules that move their exposure, each given a constant-weight control."""
+"""The rules that move their exposure, each given a constant-target control."""
 
 ENSEMBLE = entry("SA10").display_name
 ENSEMBLE_RULES = ("momentum", "trend", "pullback", "relative", "relief")
 """The budgeted rules of the ensemble as it is run here, each removed in turn."""
+
+COST_TERMS = ("commission_rate", "minimum_commission", "half_spread_rate", "slippage_rate")
+"""The terms of a cost model: what two runs must share to be compared."""
+
+_COST_TERM = re.compile(r"'(\w+)': ([0-9.eE+-]+)")
+"""One ``'name': number`` of a cost model written out as text."""
 
 EWMA_DECAYS = (0.90, 0.97)
 """The other decays of the EWMA rule, fixed here before their runs."""
 
 PANIC_GAP_SESSIONS = 20
 """Stays of ``SA9`` closer than this many valuations belong to one panic."""
+
+FROZEN = "graine 42, modèle figé du test, coûts x2 (moteur seul)"
+RECALIBRATED = "graine 42, recalibrée sous coûts x2"
+"""The two rows of ``ML1`` at doubled costs: the same artifact run dearer, and
+the calibration redone under those costs. Two questions, two labels."""
 
 NO_RISK_CONTROL_TARGET = 10.0
 """A risk target no book reaches: the ensemble's control then never scales."""
@@ -196,15 +217,35 @@ def panics(stays: pd.DataFrame, history: pd.DataFrame) -> pd.DataFrame:
 
 
 def episode_summary(stays: pd.DataFrame) -> dict[str, object]:
-    """Return the count, the share of gains and the spread of a set of stays."""
+    """Return the count, the share of gains and the spread of a set of stays.
+
+    Returns
+    -------
+    dict[str, object]
+        Over every stay - one still running at the last session is marked to
+        that session's value, with no final sale: ``stays``, ``gains``,
+        ``losses``, ``share_of_gains``, the mean, median, worst, best and
+        ``compounded`` net return, which reconstitutes the whole curve. And
+        over the stays that were closed, the only ones that hold both of their
+        fills: ``completed``, ``open``, ``completed_gains``,
+        ``completed_losses`` and ``completed_share_of_gains`` (``None``
+        without a closed stay).
+    """
     if stays.empty:
         return {"stays": 0}
     returns = stays["net_return"].to_numpy(dtype="float64")
+    running = stays["open"].to_numpy(dtype=bool)
+    closed = returns[~running]
     return {
         "stays": len(returns),
+        "completed": len(closed),
+        "open": int(running.sum()),
         "gains": int((returns > 0.0).sum()),
         "losses": int((returns < 0.0).sum()),
         "share_of_gains": float((returns > 0.0).mean()),
+        "completed_gains": int((closed > 0.0).sum()),
+        "completed_losses": int((closed < 0.0).sum()),
+        "completed_share_of_gains": float((closed > 0.0).mean()) if len(closed) else None,
         "mean_net_return": float(returns.mean()),
         "median_net_return": float(np.median(returns)),
         "worst": float(returns.min()),
@@ -219,8 +260,14 @@ def episode_summary(stays: pd.DataFrame) -> dict[str, object]:
 # --- the delay between the decision and the fill ----------------------------------------
 
 
-def delay_effect(history: pd.DataFrame, fills: pd.DataFrame, initial_cash: float) -> dict:  # type: ignore[type-arg]
-    """Return what filling at the next open, and not at the decision's close, was worth.
+def delay_effect(
+    history: pd.DataFrame,
+    fills: pd.DataFrame,
+    initial_cash: float,
+    *,
+    ex_dates: Mapping[str, frozenset[date]] | None = None,
+) -> dict[str, object]:
+    """Return the signed close-to-open price gap of a book's orders, at the quantities filled.
 
     Parameters
     ----------
@@ -228,30 +275,46 @@ def delay_effect(history: pd.DataFrame, fills: pd.DataFrame, initial_cash: float
         The book's history, for the raw closes of the funds.
     fills : pd.DataFrame
         Its executions: ``session_date``, ``instrument_id``, ``side``,
-        ``market_price`` (the open it was filled at) and ``traded_value``.
+        ``quantity`` and ``market_price`` (the open it was filled at, before
+        spread and slippage).
     initial_cash : float
-        What the run started with, to state the effect as a share of it.
+        What the run started with, to state the gap as a share of it.
+    ex_dates : Mapping[str, frozenset[date]] | None
+        Per fund, the ex-dates of its corporate actions. An order filled on
+        one is left out and counted: the raw close before and the raw open
+        after are not on one basis.
 
     Returns
     -------
-    dict
-        ``orders``; ``effect_eur``, the sum over the orders of ``-sign * value
-        * (open / previous close - 1)`` with ``sign`` +1 for a buy and -1 for
-        a sell - positive when the overnight move helped; the same split into
-        ``helped_eur`` and ``hurt_eur``; and ``effect_share`` of the initial
-        cash. A first-order figure on quoted prices: it ignores that another
-        fill price would have changed the quantities that followed.
+    dict[str, object]
+        ``orders`` counted; ``effect_eur``, the sum over them of ``-sign *
+        quantity * (open - previous close)`` with ``sign`` +1 for a buy and -1
+        for a sell - positive when the overnight move went the order's way;
+        the same split into ``helped_eur`` and ``hurt_eur``; ``effect_share``
+        of the initial cash; ``excluded_ex_date``.
+
+    Notes
+    -----
+    A price gap at given quantities, the explicit costs left apart - the
+    market price is used, not the fill price that carries the spread and the
+    slippage. It is not the result of another backtest filled at the close:
+    the signal reads that close, and another fill price would have changed
+    every quantity that followed.
     """
     total = helped = hurt = 0.0
-    counted = 0
+    counted = excluded = 0
     for record in fills.to_dict(orient="records"):
-        closes = history[f"close_{record['instrument_id']}"]
+        instrument = str(record["instrument_id"])
+        if ex_dates is not None and record["session_date"] in ex_dates.get(instrument, ()):
+            excluded += 1
+            continue
+        closes = history[f"close_{instrument}"]
         before = closes.loc[closes.index < record["session_date"]].dropna()
         if before.empty:
             continue
-        gap = float(record["market_price"]) / float(before.iloc[-1]) - 1.0
         sign = 1.0 if record["side"] == "BUY" else -1.0
-        effect = -sign * float(record["traded_value"]) * gap
+        gap = float(record["market_price"]) - float(before.iloc[-1])
+        effect = -sign * float(record["quantity"]) * gap
         total += effect
         helped += max(effect, 0.0)
         hurt += min(effect, 0.0)
@@ -262,6 +325,7 @@ def delay_effect(history: pd.DataFrame, fills: pd.DataFrame, initial_cash: float
         "helped_eur": helped,
         "hurt_eur": hurt,
         "effect_share": total / initial_cash,
+        "excluded_ex_date": excluded,
     }
 
 
@@ -300,17 +364,25 @@ def basket_attribution(
         day before in that basket adds to it: the timing of the exposure;
         ``choice`` - what holding the book's own closing weights *by fund*
         adds to that: the choice between the funds;
-        ``execution`` - the book's gross equity less that close-based figure:
-        fills at the open, the band, whole shares;
+        ``residual`` - the book's gross equity less that close-based figure:
+        what the approximation on closing weights cannot place;
         ``costs`` - net less gross;
         ``book_net`` - the sum of the five; and ``basket_net``, for the
         comparison with the engine's own run of the basket.
 
     Notes
     -----
-    The first three lines are computed on closing prices and closing weights,
-    which is not how the book traded; the residual of that approximation is
-    the ``execution`` line, shown rather than spread over the others.
+    The first three lines are computed on closing prices and on the weights
+    held at the close of the day before, which is not how the book traded.
+    The ``residual`` is what that leaves over, and it is **not** a measure of
+    execution: besides the gap between the close and the fill, the band and
+    whole shares, it holds the day's return on whatever was bought or sold
+    that morning - a book in cash that buys at the open, at the price of the
+    close before, and gains 10% by the close has that whole gain in its
+    residual. Part of what the signal did is therefore in this line, and
+    neither ``exposure`` nor ``choice`` is the whole contribution of a
+    timing. An exact attribution needs the quantities before and after each
+    fill and the opens; it is not computed here.
     """
     funds = list(basket)
     returns = close_returns(history, funds)
@@ -333,7 +405,7 @@ def basket_attribution(
         "basket_closes": base,
         "exposure": exposure - base,
         "choice": choice - exposure,
-        "execution": gross_log - choice,
+        "residual": gross_log - choice,
         "costs": net_log - gross_log,
         "book_net": net_log,
         "basket_net": None if basket_net is None else math.log1p(basket_net),
@@ -356,16 +428,28 @@ def tilt_diagnostics(history: pd.DataFrame, signal: str, first: str, second: str
     -------
     dict
         ``decisions`` with a value; ``sign_changes`` of the signal and the
-        ``mean_run`` of valuations it keeps one sign for; then, for the return
-        of ``first`` less that of ``second`` over the session after the
-        decision (``next_1`` - partly before the fill at the open), the one
-        after it (``after_fill_1``) and the five after the fill
-        (``after_fill_5``), the Pearson and the Spearman correlation with the
-        signal. A signal that predicted the relative return it leans on would
-        show a positive one.
+        ``mean_run`` of valuations it keeps one sign for; then the Pearson and
+        the Spearman correlation of the signal of ``t`` with the return of
+        ``first`` less that of ``second``, close to close, over three
+        horizons, each with its count of pairs: the session ``t + 1``
+        (``next_1`` - partly before the fill at its open), the session ``t +
+        2`` (``after_fill_1``), and the five sessions ``t + 2`` to ``t + 6``
+        (``after_fill_5``), each fund's return compounded over them. A signal
+        that predicted the relative return it leans on would show a positive
+        one.
+
+    Notes
+    -----
+    Every decision that has its future closes makes a pair, the first one
+    included. The returns are close to close: they are not the open-to-open
+    interval an order decided at ``t`` is actually held over, which this
+    function does not measure. A linear or a rank correlation near zero does
+    not rule out every other relation.
     """
-    returns = close_returns(history, (first, second))
-    relative = returns[first] - returns[second]
+    closes = history[[f"close_{first}", f"close_{second}"]]
+    daily = closes / closes.shift(1) - 1.0
+    relative = daily[f"close_{first}"] - daily[f"close_{second}"]
+    five = closes.shift(-6) / closes.shift(-1) - 1.0
     value = history[signal]
     signs = np.sign(value.dropna().to_numpy(dtype="float64"))
     signs = signs[signs != 0.0]
@@ -373,7 +457,7 @@ def tilt_diagnostics(history: pd.DataFrame, signal: str, first: str, second: str
     horizons = {
         "next_1": relative.shift(-1),
         "after_fill_1": relative.shift(-2),
-        "after_fill_5": relative.rolling(5).sum().shift(-6),
+        "after_fill_5": five[f"close_{first}"] - five[f"close_{second}"],
     }
     outcome: dict[str, object] = {
         "decisions": len(signs),
@@ -381,11 +465,72 @@ def tilt_diagnostics(history: pd.DataFrame, signal: str, first: str, second: str
         "mean_run": len(signs) / (changes + 1),
     }
     for name, ahead in horizons.items():
-        pair = pd.concat([value, ahead], axis=1).dropna().to_numpy(dtype="float64")
+        paired = pd.concat([value, ahead], axis=1).dropna()
+        pair = paired.to_numpy(dtype="float64")
         outcome[f"pearson_{name}"] = float(np.asarray(pearsonr(pair[:, 0], pair[:, 1]))[0])
         outcome[f"spearman_{name}"] = float(np.asarray(spearmanr(pair[:, 0], pair[:, 1]))[0])
         outcome[f"pairs_{name}"] = len(pair)
+        outcome[f"first_pair_{name}"] = paired.index[0]
+        outcome[f"last_pair_{name}"] = paired.index[-1]
     return outcome
+
+
+def require_same_provenance(
+    config: Mapping[str, object], result: StrategyResult, *, same_period: bool = True
+) -> None:
+    """Raise unless a new run can be put beside the exports of the study.
+
+    Parameters
+    ----------
+    config : Mapping[str, object]
+        The study's ``config.json``.
+    result : StrategyResult
+        A run made by this script.
+    same_period : bool
+        ``False`` for a run that is on another period by design - ``ML1`` on
+        its test period - whose store and cash must still be the study's.
+
+    Raises
+    ------
+    RuntimeError
+        If the store read is not the one the study read, or the cash, the
+        costs or - when asked - the dates differ: a table would then set side
+        by side figures that do not follow from the same data.
+    """
+    problems: list[str] = []
+    digest = result.data_state.digest
+    if str(config["data_state"]) != digest:
+        problems.append(
+            f"the study read the store {str(config['data_state'])[:12]} and this run {digest[:12]}"
+        )
+    cash = result.configuration.get("initial_cash")
+    if cash is None or float(config["initial_cash"]) != float(cash):  # type: ignore[arg-type]
+        problems.append(f"initial cash {config['initial_cash']} in the study, {cash} here")
+    if same_period:
+        period = config["period"]
+        assert isinstance(period, Mapping)
+        if (str(period["start"]), str(period["end"])) != (str(result.start), str(result.end)):
+            problems.append(
+                f"period {period['start']} to {period['end']} in the study, "
+                f"{result.start} to {result.end} here"
+            )
+        if cost_terms(result.configuration["execution"]) != cost_terms(config["execution"]):
+            problems.append("the execution costs are not those of the study")
+    if problems:
+        raise RuntimeError(
+            "this run does not compare with the exports of the study: " + "; ".join(problems)
+        )
+
+
+def cost_terms(execution: object) -> dict[str, float]:
+    """Return the four cost terms of a recorded execution model.
+
+    A run holds them in a mapping; a study's ``config.json`` holds the same
+    mapping written out as text. Both are read through their text, so that
+    the two can be compared.
+    """
+    found = dict(_COST_TERM.findall(str(execution)))
+    return {name: float(found[name]) for name in COST_TERMS if name in found}
 
 
 # --- measured rows of a run --------------------------------------------------------------
@@ -448,7 +593,7 @@ def mean_weights(history: pd.DataFrame) -> tuple[tuple[str, float], ...]:
 
 
 def control_of(name: str, history: pd.DataFrame) -> FixedWeights:
-    """Return the constant-weight control of a book: the weights it held on average."""
+    """Return the constant-target control of a book: aimed at the weights it held on average."""
     slug = "".join(character if character.isalnum() else "_" for character in name.lower())
     return FixedWeights(weights=mean_weights(history), strategy_id=f"research_control_{slug}")
 
@@ -504,6 +649,22 @@ def table(frame: pd.DataFrame, columns: Sequence[tuple[str, str, str]], index: s
     return "\n".join(lines)
 
 
+def open_stays_lines(frames: Mapping[str, pd.DataFrame]) -> list[str]:
+    """Return one sentence per stay still running at the last session, by strategy."""
+    lines: list[str] = []
+    for name in EPISODE_BOOKS:
+        stays = frames[f"episodes_{name.split(' - ')[0].lower()}"]
+        if stays.empty:
+            continue
+        for row in stays.loc[stays["open"]].to_dict(orient="records"):
+            lines.append(
+                f"- {name} : un séjour encore ouvert, entré à la valorisation du "
+                f"{row['entry']}, valorisé {float(row['net_return']):+.2%} au "
+                f"{row['exit']}, sans vente finale."
+            )
+    return [*lines, ""] if lines else []
+
+
 RUN_COLUMNS = (
     ("net_return", "Net", "{:+.2%}"),
     ("annualised_return", "Net/an", "{:+.2%}"),
@@ -525,14 +686,25 @@ mesurer », à la demande de la revue indépendante du 10 octobre. Il est écrit
 quelques runs supplémentaires du même moteur, sur la même période
 (2021-04-01 → 2026-10-09), avec le même capital et les mêmes coûts.
 
-**Tout ce qui suit est descriptif.** Un témoin à poids constants construit sur
-les poids qu'une règle a détenus en moyenne est choisi après coup : il décrit
+**Tout ce qui suit est descriptif.** Un témoin à cible constante, dont la cible
+est le poids qu'une règle a détenu en moyenne, est choisi après coup : il décrit
 le passé de cette règle, ce n'est pas un paramètre qu'on aurait pu fixer à
-l'avance. Une ablation de `SA10` ou un autre coefficient d'EWMA est une variante
+l'avance, et son exposition réalisée n'est pas celle de la règle. Une ablation
+de `SA10` ou un autre coefficient d'EWMA est une variante
 regardée après un backtest. Aucune n'est candidate : en retenir une serait une
 nouvelle hypothèse, à écrire avant son run, et chacune compterait comme un
 essai dans le registre qui déflate les Sharpe. Les estimations sont ponctuelles
 sauf mention d'un intervalle. Rien ici n'est un échantillon vierge.
+
+Version 2 du 10 octobre 2026, après la vérification indépendante faite sur le
+commit `ad310bc`. Ont changé : l'écart de prix clôture-ouverture est mesuré à
+quantités données, sur le prix de marché et non sur le montant exécuté ; la
+colonne « exécution » de l'attribution est renommée en résidu, parce qu'elle
+n'isole pas l'exécution ; les séjours clos et le séjour encore ouvert sont
+comptés à part ; les corrélations de `SA5` gardent leur première décision et
+composent leurs rendements à cinq séances ; les témoins sont dits « à cible
+constante » ; `ML1` est rejoué avec son modèle figé à coûts doublés ; un run
+n'est comparé aux exports que s'il a lu le même magasin.
 """
 
 
@@ -575,9 +747,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
             frames["episodes_summary"],
             [
                 ("stays", "Séjours", "{:.0f}"),
-                ("gains", "Gagnants", "{:.0f}"),
-                ("losses", "Perdants", "{:.0f}"),
-                ("share_of_gains", "Part gagnante", "{:.0%}"),
+                ("completed", "Clos", "{:.0f}"),
+                ("open", "Ouvert", "{:.0f}"),
+                ("completed_gains", "Clos gagnants", "{:.0f}"),
+                ("completed_losses", "Clos perdants", "{:.0f}"),
+                ("completed_share_of_gains", "Part gagnante (clos)", "{:.1%}"),
                 ("mean_net_return", "Net moyen", "{:+.2%}"),
                 ("median_net_return", "Net médian", "{:+.2%}"),
                 ("worst", "Pire", "{:+.2%}"),
@@ -589,18 +763,24 @@ def main(arguments: Sequence[str] | None = None) -> int:
             "Stratégie",
         ),
         "",
-        "Un séjour est une suite de valorisations où une position est détenue. Son "
-        "résultat net va de la valorisation qui précède l'entrée à la première "
-        "valorisation revenue en cash : les deux exécutions et leurs coûts sont dedans. "
-        "« Composé » est le produit des séjours et retrouve le rendement net de la "
-        "stratégie, puisque le cash ne rapporte rien.",
+        "Un séjour est une suite de valorisations où une position est détenue. Le "
+        "résultat net d'un séjour **clos** va de la valorisation qui précède l'entrée à "
+        "la première valorisation revenue en cash : ses deux exécutions et leurs coûts "
+        "sont dedans. Un séjour **ouvert** court encore à la dernière séance : il est "
+        "valorisé au marché à cette séance, sans vente finale ni son coût. Les gagnants "
+        "et les perdants sont comptés sur les seuls séjours clos. Le net moyen, le "
+        "médian, le pire, le meilleur et « Composé » portent sur tous les séjours, "
+        "l'ouvert compris : « Composé » en est le produit et retrouve le rendement net "
+        "de la stratégie, puisque le cash ne rapporte rien.",
         "",
+        *open_stays_lines(frames),
     ]
     relief = entry("SA9").display_name
     grouped = panics(frames["episodes_sa9"], histories[relief])
     frames["episodes_sa9_panics"] = grouped
     sections += [
-        f"### SA9 : ses {len(frames['episodes_sa9'])} séjours regroupés en {len(grouped)} paniques",
+        f"### SA9 : ses {len(frames['episodes_sa9'])} séjours en {len(grouped)} groupes "
+        f"(convention : {PANIC_GAP_SESSIONS} valorisations)",
         "",
         table(
             grouped.set_index("first_entry"),
@@ -614,35 +794,52 @@ def main(arguments: Sequence[str] | None = None) -> int:
         ),
         "",
         f"Deux séjours séparés par {PANIC_GAP_SESSIONS} valorisations ou moins sont "
-        "rattachés à la même panique.",
+        "rattachés au même groupe. C'est un regroupement automatique par cette "
+        "convention, pas l'identification économique d'autant de paniques "
+        "indépendantes ; un groupe gagnant peut compter plusieurs entrées, comme un "
+        "groupe perdant.",
         "",
     ]
 
-    # 2. The delay between the decision and the fill.
+    # 2. The price gap between the decision's close and the fill at the open.
+    runner = build_runner(options.store)
+    config = json.loads((study / "config.json").read_text(encoding="utf-8"))
+    last_decision = runner.timetable.decision_instant(date.fromisoformat(COMMON_PERIOD[1]))
+    market = runner.reader.at(last_decision)
+    ex_dates = {fund: frozenset(market.corporate_actions(fund)["ex_date"]) for fund in UNIVERSE}
     delays = {
-        name: delay_effect(history, fills.loc[fills["book"] == name], initial)
+        name: delay_effect(history, fills.loc[fills["book"] == name], initial, ex_dates=ex_dates)
         for name, history in histories.items()
     }
     frames["delay_effect"] = pd.DataFrame.from_dict(delays, orient="index")
     sections += [
-        "## 2. Effet du délai entre la clôture de la décision et l'exécution à l'ouverture",
+        "## 2. Écart de prix signé clôture-ouverture, à quantités données",
         "",
         table(
             frames["delay_effect"],
             [
                 ("orders", "Ordres", "{:.0f}"),
-                ("helped_eur", "Gaps favorables EUR", "{:+,.0f}"),
-                ("hurt_eur", "Gaps défavorables EUR", "{:+,.0f}"),
-                ("effect_eur", "Effet net EUR", "{:+,.0f}"),
+                ("helped_eur", "Écarts favorables EUR", "{:+,.0f}"),
+                ("hurt_eur", "Écarts défavorables EUR", "{:+,.0f}"),
+                ("effect_eur", "Écart net EUR", "{:+,.0f}"),
                 ("effect_share", "En % du capital initial", "{:+.2%}"),
+                ("excluded_ex_date", "Ordres exclus (date de détachement)", "{:.0f}"),
             ],
             "Livre",
         ),
         "",
-        "Pour chaque ordre : `-signe x montant x (ouverture / clôture précédente - 1)`, "
-        "signe +1 pour un achat. Positif : le mouvement de la nuit a aidé. C'est une "
-        "mesure de premier ordre sur les prix cotés ; elle ne rejoue pas les quantités "
-        "qu'un autre prix d'exécution aurait données.",
+        "Pour chaque ordre : `-signe x quantité x (ouverture - clôture précédente)`, "
+        "signe +1 pour un achat, sur le prix de marché de l'ouverture et non sur le prix "
+        "exécuté : le spread, le slippage et la commission restent dans les coûts. "
+        "Positif : le mouvement de la nuit est allé dans le sens de l'ordre. Un ordre "
+        "exécuté à une date de détachement est exclu, les deux prix n'étant pas sur la "
+        "même base.",
+        "",
+        "C'est un **écart de prix à quantités données**, pas le résultat d'un autre "
+        "backtest exécuté à la clôture : le signal lit cette clôture, donc l'ordre ne "
+        "pouvait pas y être exécuté, et un autre prix d'exécution aurait changé toutes "
+        "les quantités suivantes. Il ne se lit ni comme un coût payé ni comme un manque "
+        "à gagner exact.",
         "",
     ]
 
@@ -662,7 +859,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 ("basket_closes", "Panier (clôtures)", "{:+.4f}"),
                 ("exposure", "Exposition totale", "{:+.4f}"),
                 ("choice", "Choix entre fonds", "{:+.4f}"),
-                ("execution", "Exécution (résidu)", "{:+.4f}"),
+                ("residual", "Résidu de l'approximation aux poids de clôture", "{:+.4f}"),
                 ("costs", "Coûts", "{:+.4f}"),
                 ("book_net", "= Net de la stratégie", "{:+.4f}"),
                 ("basket_net", "Panier 50/50 exécuté, net", "{:+.4f}"),
@@ -672,10 +869,22 @@ def main(arguments: Sequence[str] | None = None) -> int:
         "",
         "Rendements logarithmiques sur la période, qui s'additionnent ligne à ligne. "
         "« Exposition totale » : ce que détenir le poids total de la veille dans le "
-        "panier ajoute au panier (le timing de l'exposition). « Choix entre fonds » : ce "
-        "que détenir les poids par fonds de la veille ajoute à cela. Ces trois premières "
-        "colonnes sont calculées sur des clôtures, pas sur les prix d'exécution : l'écart "
-        "avec la comptabilité brute du moteur est laissé visible dans « exécution ».",
+        "panier ajoute au panier. « Choix entre fonds » : ce que détenir les poids par "
+        "fonds de la veille ajoute à cela. Ces trois premières colonnes sont une "
+        "**approximation** : elles valorisent les poids détenus à la clôture précédente "
+        "avec le rendement de clôture à clôture, ce qui n'est pas la façon dont le livre "
+        "a traité.",
+        "",
+        "Le **résidu** est l'écart entre cette approximation et la comptabilité brute du "
+        "moteur. Ce n'est pas une mesure de l'exécution : outre l'écart entre la clôture "
+        "et le prix exécuté, la bande et les quantités entières, il contient le rendement "
+        "de la journée sur ce qui a été acheté ou vendu le matin même - une partie de "
+        "l'effet du signal. Un livre en cash qui achète à l'ouverture, au prix de la "
+        "clôture précédente, et gagne 10 % dans la journée voit tout ce gain dans le "
+        "résidu, avec une « exposition » négative d'autant. Les colonnes « exposition » "
+        "et « choix » ne sont donc pas l'apport complet d'un timing, et le résidu n'est "
+        "pas un handicap d'exécution. Une attribution exacte demande les quantités avant "
+        "et après chaque exécution et les prix d'ouverture ; elle n'est pas produite ici.",
         "",
     ]
     tilt_book = entry("SA5").display_name
@@ -697,20 +906,21 @@ def main(arguments: Sequence[str] | None = None) -> int:
             f"| {label} | {tilt[f'pearson_{key}']:+.3f} | {tilt[f'spearman_{key}']:+.3f} | "
             f"{tilt[f'pairs_{key}']} |"
             for key, label in (
-                ("next_1", "séance suivant la décision (en partie avant l'exécution)"),
-                ("after_fill_1", "première séance entière après l'exécution"),
-                ("after_fill_5", "cinq séances après l'exécution"),
+                ("next_1", "séance t + 1 (en partie avant l'exécution à son ouverture)"),
+                ("after_fill_1", "séance t + 2, la première entière après l'exécution"),
+                ("after_fill_5", "séances t + 2 à t + 6, rendements composés"),
             )
         ],
         "",
         "Un signal qui prévoirait le rendement relatif sur lequel il mise montrerait une "
-        "corrélation positive. Ces coefficients sont donnés sans intervalle.",
+        "corrélation positive. Ces coefficients sont donnés sans intervalle, sur des "
+        "rendements de clôture à clôture : ils ne mesurent pas l'intervalle d'ouverture à "
+        "ouverture réellement porté après la décision, qui n'est pas calculé ici, et une "
+        "corrélation proche de zéro n'exclut pas toute relation non linéaire.",
         "",
     ]
 
-    # 4. More runs: constant-weight controls, ablations, other decays.
-    runner = build_runner(options.store)
-    config = json.loads((study / "config.json").read_text(encoding="utf-8"))
+    # 4. More runs: constant-target controls, ablations, other decays.
     source = runner.source.definition()
     sections.insert(
         1,
@@ -722,21 +932,27 @@ def main(arguments: Sequence[str] | None = None) -> int:
     controls: dict[str, dict[str, object]] = {}
     for name in CONTROLLED_BOOKS:
         control = control_of(name, histories[name])
-        print(f"running the constant-weight control of {name} ...", file=sys.stderr)
+        print(f"running the constant-target control of {name} ...", file=sys.stderr)
         result = runner.run(control, UNIVERSE, *COMMON_PERIOD)
+        require_same_provenance(config, result)
         weights = ", ".join(f"{fund} {weight:.1%}" for fund, weight in control.weights)
         controls[name] = history_row(histories[name], summary.loc[name].to_dict())
-        controls[f"↳ poids constants ({weights})"] = run_row(result)
+        controls[f"↳ témoin à cible constante ({weights})"] = run_row(result)
     frames["constant_weight_controls"] = pd.DataFrame.from_dict(controls, orient="index")
     sections += [
-        "## 4. Chaque règle à exposition variable à côté d'un témoin à poids constants",
+        "## 4. Chaque règle à exposition variable à côté d'un témoin à cible constante",
         "",
         table(frames["constant_weight_controls"], RUN_COLUMNS, "Livre"),
         "",
-        "Le témoin détient en permanence les poids que la règle a détenus en moyenne, "
-        "avec la même bande de 3 points et les mêmes coûts. Une règle qui ne fait pas "
-        "mieux que lui n'a rien gagné à faire varier son exposition sur cette période. "
-        "Ces poids étant connus après coup, la comparaison est descriptive.",
+        "Témoin à **cible constante** égale aux poids moyens historiques de la règle, "
+        "avec la même bande de rééquilibrage de 3 points et les mêmes coûts : il ne "
+        "traite que lorsque la dérive des cours l'écarte de sa cible de 3 points. Son "
+        "exposition **réalisée** diffère donc de celle de la règle, comme la colonne "
+        "« Expo. moy. » le montre (un point et demi à deux points et demi de plus ici). "
+        "La comparaison décrit le résultat de deux règles exécutables ; elle n'isole pas, "
+        "à exposition exactement identique, la valeur du timing : le niveau d'exposition, "
+        "la composition, les coûts et la trajectoire changent aussi. Ces poids étant "
+        "connus après coup, elle est descriptive.",
         "",
     ]
 
@@ -745,7 +961,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
     }
     for label, strategy in ensemble_variants().items():
         print(f"running SA10 {label} ...", file=sys.stderr)
-        variants[f"SA10 {label}"] = run_row(runner.run(strategy, UNIVERSE, *COMMON_PERIOD))
+        ablated = runner.run(strategy, UNIVERSE, *COMMON_PERIOD)
+        require_same_provenance(config, ablated)
+        variants[f"SA10 {label}"] = run_row(ablated)
     frames["sa10_ablations"] = pd.DataFrame.from_dict(variants, orient="index")
     sections += [
         "## 5. SA10 sans chacune de ses règles, et sans son contrôle de risque",
@@ -757,6 +975,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
         "risque à un niveau jamais atteint, donc le facteur de réduction vaut toujours "
         "1. Toutes ces versions sont, comme SA10 ici, sans fonds de style ni monétaire.",
         "",
+        "L'écart entre SA10 et sa version sans contrôle de risque mesure l'**effet "
+        "agrégé** de ce contrôle sur ce run. Il ne dit pas combien de fois le facteur de "
+        "réduction a été inférieur à 1, ni à quelles dates : ce facteur et les décisions "
+        "forcées par le risque du portefeuille détenu ne sont pas exportés.",
+        "",
     ]
 
     decays: dict[str, dict[str, object]] = {
@@ -765,7 +988,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
     }
     for label, strategy in ewma_variants().items():
         print(f"running {label} ...", file=sys.stderr)
-        decays[label] = run_row(runner.run(strategy, UNIVERSE, *COMMON_PERIOD))
+        slower = runner.run(strategy, UNIVERSE, *COMMON_PERIOD)
+        require_same_provenance(config, slower)
+        decays[label] = run_row(slower)
     frames["ewma_decays"] = pd.DataFrame.from_dict(decays, orient="index")
     curves = pd.read_csv(study / "equity.csv", index_col="session_date")
     measured = sharpe_difference(pd.Series(curves[VOL_CONTROL]), pd.Series(curves[EWMA]))
@@ -790,12 +1015,15 @@ def main(arguments: Sequence[str] | None = None) -> int:
         "",
         "Les coefficients 0,90 et 0,97 ont été fixés dans le script avant leur run, de "
         "part et d'autre de 0,94 ; ils ne sont pas le résultat d'une recherche du "
-        "meilleur coefficient, et ne doivent pas le devenir sur ce même historique.",
+        "meilleur coefficient, et ne doivent pas le devenir sur ce même historique. "
+        "L'ordre de ces trois EWMA ne vaut que pour elles : il ne définit pas une "
+        "« vitesse » du GARCH réestimé chaque soir et n'établit pas une règle générale "
+        "selon laquelle un estimateur plus lent serait meilleur.",
         "",
     ]
 
     if not options.skip_ml1:
-        sections += ml1_section(options.store, options.artifacts, COMMON_PERIOD[1], frames)
+        sections += ml1_section(options.store, options.artifacts, COMMON_PERIOD[1], frames, config)
 
     output.mkdir(parents=True, exist_ok=True)
     for name, frame in frames.items():
@@ -807,14 +1035,20 @@ def main(arguments: Sequence[str] | None = None) -> int:
 
 
 def ml1_section(
-    store: Path, artifacts: Path, end: str, frames: dict[str, pd.DataFrame]
+    store: Path,
+    artifacts: Path,
+    end: str,
+    frames: dict[str, pd.DataFrame],
+    study: Mapping[str, object],
 ) -> list[str]:
-    """Return the section on ML1: a constant allocation, its sensitivities, its inputs.
+    """Return the section on ML1: a constant-target allocation, its sensitivities, its inputs.
 
     Raises
     ------
     ImportError
         If the ``ml`` extra is not installed.
+    RuntimeError
+        If the store read is not the one the exports of the study were made from.
     """
     # Imported on use: the script and the model need PyTorch, an optional dependency.
     import run_neural_strategy as neural
@@ -831,6 +1065,7 @@ def ml1_section(
     neural.validate_test_period(strategy, runner, start, last)
     print(f"running {neural.ML1} on {start} to {last} ...", file=sys.stderr)
     result = runner.run(strategy, neural.TRADABLE, start, last)
+    require_same_provenance(study, result, same_period=False)
     held = result.weights().fillna(0.0)
     weights = tuple(
         (str(fund), round(float(weight), 4)) for fund, weight in held.mean().items() if weight > 0
@@ -840,7 +1075,7 @@ def ml1_section(
     fixed = runner.run(control, neural.TRADABLE, start, last)
     rows = {
         neural.ML1: run_row(result),
-        "↳ allocation constante ("
+        "↳ témoin à cible constante ("
         + ", ".join(f"{fund} {weight:.1%}" for fund, weight in weights)
         + ")": run_row(fixed),
         HELD: run_row(runner.run(neural.references()[neural.HELD], neural.TRADABLE, start, last)),
@@ -876,7 +1111,7 @@ def ml1_section(
         ("graine 42, coûts x1 (le test préinscrit)", ["--seed", "42"]),
         ("graine 43, coûts x1", ["--seed", "43"]),
         ("graine 44, coûts x1", ["--seed", "44"]),
-        ("graine 42, coûts x2", ["--seed", "42", "--cost-multiplier", "2"]),
+        (RECALIBRATED, ["--seed", "42", "--cost-multiplier", "2"]),
     ):
         target = Path("results/ml1_sensitivities")
         print(f"ML1 sensitivity: {label} ...", file=sys.stderr)
@@ -904,6 +1139,35 @@ def ml1_section(
         )
         sensitivities[label]["model"] = str(manifest["model_id"])[:12]
         sensitivities[label]["epoch"] = manifest["selected_epoch"]
+    # The same frozen model, its normalisation, its weights and its epoch unchanged, with
+    # only the costs of the engine doubled: what the first model becomes when it is dearer
+    # to trade - another question than a recalibration under those costs.
+    dearer: StrategyRunner = neural.build_runner(store, COST_STRESS)
+    neural.validate_test_period(strategy, dearer, *neural.TEST_PERIOD)
+    print(f"ML1 sensitivity: {FROZEN} ...", file=sys.stderr)
+    frozen = {
+        name: dearer.run(book, neural.TRADABLE, *neural.TEST_PERIOD)
+        for name, book in {neural.ML1: strategy, **neural.references()}.items()
+    }
+    require_same_provenance(study, frozen[neural.ML1], same_period=False)
+    same_model: dict[str, object] = dict(
+        neural.summary_row(
+            frozen[neural.ML1],
+            frozen[neural.SA1].equity(),
+            None,
+            frozen[neural.HELD].equity(),
+        )
+    )
+    same_model["held_sharpe"] = frozen[neural.HELD].report().net.sharpe_ratio
+    same_model["model"] = artifact.model_id[:12]
+    same_model["epoch"] = artifact.selected_epoch
+    # The frozen model sits just above its recalibration, the two never under one label.
+    ordered: dict[str, dict[str, object]] = {}
+    for label, found in sensitivities.items():
+        if label == RECALIBRATED:
+            ordered[FROZEN] = same_model
+        ordered[label] = found
+    sensitivities = ordered
     frames["ml1_sensitivities"] = pd.DataFrame.from_dict(sensitivities, orient="index")
     below = all(
         float(row["sharpe"]) < float(row["held_sharpe"]) and float(row["quality"]) < 0.5  # type: ignore[arg-type]
@@ -919,10 +1183,12 @@ def ml1_section(
         "",
         table(frames["ml1_constant_allocation"], RUN_COLUMNS, "Livre"),
         "",
-        "L'allocation constante détient les poids moyens de ML1 sur ces dates, avec la "
-        "même bande et les mêmes coûts : c'est le témoin exécutable que le produit "
-        "« 65 % fois le rendement du fonds » ne remplaçait pas. Choisie après coup, elle est "
-        "descriptive.",
+        "Témoin à cible constante égale aux poids moyens de ML1 sur ces dates, avec la "
+        "même bande de 3 points et les mêmes coûts : c'est le témoin exécutable que le "
+        "produit « 65 % fois le rendement du fonds » ne remplaçait pas. Son exposition "
+        "réalisée n'est pas exactement celle de ML1 (colonne « Expo. moy. ») : la "
+        "comparaison décrit deux règles exécutables et n'isole pas la valeur du timing à "
+        "exposition identique. Choisi après coup, il est descriptif.",
         "",
         f"Sur ces dates, hors la première séance, le poids total détenu par ML1 va de "
         f"{float(exposure.min()):.1%} à {float(exposure.max()):.1%} (écart-type "
@@ -951,11 +1217,14 @@ def ml1_section(
         "",
         "Les graines 43 et 44 et les coûts doublés sont rapportés à côté de la graine 42 "
         "et ne la remplacent pas : une graine n'est jamais choisie sur son résultat de "
-        "test. Chaque variante est calibrée par `scripts/run_neural_strategy.py` avec "
-        "son propre artefact, puis testée une fois sur la période d'origine. La variante "
-        "à coûts doublés est donc **recalibrée** sous ces coûts : sa validation peut "
-        "retenir une autre époque, et c'est alors un autre modèle, pas le modèle de la "
-        "graine 42 rejoué plus cher. "
+        "test. Toutes les lignes portent sur la même période d'origine. Deux lignes à "
+        "coûts doublés répondent à deux questions différentes. « Modèle figé » rejoue le "
+        "**même artefact** que le test préinscrit - même normalisation, mêmes poids, même "
+        "époque - en doublant seulement les coûts du moteur : ce que devient le modèle "
+        "initial s'il coûte deux fois plus cher à exécuter. « Recalibrée » refait la "
+        "calibration de `scripts/run_neural_strategy.py` sous ces coûts : sa validation "
+        "peut retenir une autre époque, et c'est alors un autre modèle - ce que produit "
+        "la procédure de calibration sous un autre coût. "
         + (
             "Dans chaque variante le Sharpe reste sous celui du fonds détenu et le score sous 50 %."
             if below

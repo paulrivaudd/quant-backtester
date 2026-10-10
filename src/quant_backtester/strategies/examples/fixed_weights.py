@@ -1,4 +1,4 @@
-"""Hold constant weights, traded back inside the common rebalancing band."""
+"""Aim at constant weights, traded back when they leave the common rebalancing band."""
 
 from __future__ import annotations
 
@@ -37,10 +37,18 @@ class FixedWeights(Strategy):
 
     Notes
     -----
-    The control of a rule that moves its exposure: the same funds, the same
-    costs and the same band, at a constant exposure. A rule that only did as
-    well as this one earned nothing from its timing. It reads no signal, so it
-    is never without something to decide on.
+    A constant target with a band, not a constant exposure: between two
+    orders the weights held drift with the prices, and an order is sent only
+    when one of them is three points from its target. The exposure realised is
+    therefore neither exactly the target nor that of a rule this book is set
+    beside.
+
+    Used as the control of a rule that moves its exposure - the same funds,
+    the same costs, the same band - it gives the result of another executable
+    rule. The comparison does not isolate, at an identical exposure, what the
+    timing of the rule was worth: the level of exposure, the composition, the
+    costs and the path differ as well. It reads no signal, so it is never
+    without something to decide on.
 
     A weight taken from the average a strategy was *seen* to hold is chosen
     after the fact: such a control describes that strategy's past, it is not
