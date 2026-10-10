@@ -324,6 +324,22 @@ def test_a_control_holds_the_average_weights_a_book_was_seen_to_hold() -> None:
     assert control.rebalance_band == 0.03
 
 
+def test_the_gap_of_exposure_is_read_control_minus_rule_at_its_two_extremes() -> None:
+    controls = pd.DataFrame(
+        {"average_exposure": [0.715, 0.722, 0.424, 0.448, 0.90, 0.88]},
+        index=["rule a", "↳ a", "rule b", "↳ b", "rule c", "↳ c"],
+    )
+
+    low, high = SCRIPT.exposure_gaps(controls)
+
+    assert low == pytest.approx(-2.0)
+    assert high == pytest.approx(2.4)
+    with pytest.raises(ValueError, match="followed by its control"):
+        SCRIPT.exposure_gaps(controls.iloc[:3])
+    with pytest.raises(ValueError, match="followed by its control"):
+        SCRIPT.exposure_gaps(controls.iloc[:0])
+
+
 def test_the_recovery_is_counted_from_the_peak_and_left_open_when_it_has_not_come() -> None:
     recovered = pd.Series([100.0, 90.0, 100.0], index=pd.Index(DAYS[:3], dtype="object"))
     still_under = pd.Series([100.0, 90.0, 95.0], index=pd.Index(DAYS[:3], dtype="object"))

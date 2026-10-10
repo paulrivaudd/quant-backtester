@@ -598,6 +598,32 @@ def control_of(name: str, history: pd.DataFrame) -> FixedWeights:
     return FixedWeights(weights=mean_weights(history), strategy_id=f"research_control_{slug}")
 
 
+def exposure_gaps(controls: pd.DataFrame) -> tuple[float, float]:
+    """Return the smallest and the largest gap of realised exposure, control minus rule.
+
+    Parameters
+    ----------
+    controls : pd.DataFrame
+        The table of the controls: a rule, then its control, row after row, with
+        the ``average_exposure`` of each as a fraction of the book.
+
+    Returns
+    -------
+    tuple[float, float]
+        The two extremes of ``control - rule``, in points of exposure.
+
+    Raises
+    ------
+    ValueError
+        If the table is empty or leaves a rule without its control.
+    """
+    exposure = controls["average_exposure"].to_numpy(dtype="float64")
+    if exposure.size == 0 or exposure.size % 2:
+        raise ValueError("each rule must be followed by its control")
+    gaps = (exposure[1::2] - exposure[0::2]) * 100.0
+    return float(gaps.min()), float(gaps.max())
+
+
 def ensemble_variants() -> dict[str, Strategy]:
     """Return the ensemble without each of its rules, and without its risk control."""
     base = ETFEnsemble(enable_factors=False, enable_monetary=False)
@@ -939,6 +965,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
         controls[name] = history_row(histories[name], summary.loc[name].to_dict())
         controls[f"↳ témoin à cible constante ({weights})"] = run_row(result)
     frames["constant_weight_controls"] = pd.DataFrame.from_dict(controls, orient="index")
+    low, high = exposure_gaps(frames["constant_weight_controls"])
     sections += [
         "## 4. Chaque règle à exposition variable à côté d'un témoin à cible constante",
         "",
@@ -948,7 +975,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         "avec la même bande de rééquilibrage de 3 points et les mêmes coûts : il ne "
         "traite que lorsque la dérive des cours l'écarte de sa cible de 3 points. Son "
         "exposition **réalisée** diffère donc de celle de la règle, comme la colonne "
-        "« Expo. moy. » le montre (un point et demi à deux points et demi de plus ici). "
+        f"« Expo. moy. » le montre (témoin moins règle : de {low:+.1f} à {high:+.1f} "
+        "points ici). "
         "La comparaison décrit le résultat de deux règles exécutables ; elle n'isole pas, "
         "à exposition exactement identique, la valeur du timing : le niveau d'exposition, "
         "la composition, les coûts et la trajectoire changent aussi. Ces poids étant "
