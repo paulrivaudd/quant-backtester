@@ -109,14 +109,18 @@ def test_the_facts_give_the_book_the_fund_and_the_exposure_over_each_stretch() -
 
     facts = SCRIPT.facts_table(history(), market).set_index("Période")
 
-    worst = facts.loc["Plus forte baisse de la stratégie"]
-    assert (worst["Du"], worst["Au"], worst["Séances"]) == (DAYS[1], DAYS[2], 2)
+    worst = facts.loc["Plus forte baisse (sommet → creux)"]
+    assert (worst["Du"], worst["Au"]) == (DAYS[1], DAYS[2])
+    # Two valuations are one return: the two are never confused.
+    assert (worst["Valorisations"], worst["Rendements"]) == (2, 1)
     assert worst["Stratégie"] == pytest.approx(-0.10)
     assert worst["ETF_WORLD (clôture)"] == pytest.approx(-0.20)
-    assert worst["Exposition moyenne"] == pytest.approx(0.5)
-    best = facts.loc["Plus forte hausse de la stratégie"]
+    # The relative return is geometric: 0.90 / 0.80 - 1, not -10% + 20%.
+    assert worst["Écart relatif"] == pytest.approx(0.125)
+    assert worst["Poids de clôture moyen"] == pytest.approx(0.5)
+    best = facts.loc["Plus forte hausse (creux → sommet ultérieur, durée libre)"]
     assert (best["Du"], best["Au"]) == (DAYS[2], DAYS[4])
-    assert best["Exposition max."] == 1.0
+    assert best["Poids de clôture max."] == 1.0
     assert len(facts) == 8
     text = SCRIPT.facts_markdown(facts.reset_index())
     assert "-10.00%" in text and "| 50% |" in text
@@ -141,7 +145,7 @@ def test_the_global_table_shows_the_strategy_beside_the_fund_and_never_a_zero_fo
     assert "| Période mesurée | 2021-04-01 → 2026-10-09 (1416 séances) | idem |" in text
     assert "| Score de qualité QUALITY_V1 (0-100 %) | 48.6% | n/a |" in text
     assert "| Rendement net total | +66.00% | +94.80% |" in text
-    assert "| Rendement net, coûts doublés (second run réel) | +61.00% | n/a |" in text
+    assert "| Rendement net, second run réel à coûts doublés | +61.00% | n/a |" in text
     assert "| Coûts payés (EUR) | n/a | n/a |" in text
     assert text.count("\n") == 2 + len(SCRIPT.GLOBAL_ROWS)
 
@@ -177,6 +181,7 @@ def test_the_commentary_is_written_or_said_to_be_missing() -> None:
         "worst": "La baisse.",
         "best": "La hausse.",
         "risks": ["d"],
+        "to_test": ["e"],
     }
 
     text = SCRIPT.commentary_markdown(notes)
@@ -184,6 +189,7 @@ def test_the_commentary_is_written_or_said_to_be_missing() -> None:
     assert text.index("### Points forts") < text.index("### Points faibles")
     assert "- a\n- b" in text and "La baisse." in text
     assert "Situations de marché les plus risquées" in text
+    assert text.index("Situations de marché") < text.index("Ce que ces résultats n'établissent pas")
     assert "Aucun commentaire" in SCRIPT.commentary_markdown(None)
     assert "Aucun commentaire" in SCRIPT.commentary_markdown({})
 
@@ -204,10 +210,76 @@ def test_a_report_has_its_three_sections_with_the_analysis_above_the_history() -
     second = text.index("## 2. Analyse")
     third = text.index("## 3. Historique")
     assert first < second < third
-    assert "| 2026 | +21.00% | +20.00% | 6 |" in text
+    assert "| 2026 (partielle, depuis le 2026-01-29) (partielle, au 2026-03-02) | +21.00% " in text
     assert "Pire mois : **2026-03**" in text
+    assert "moyenne géométrique pondérée" in text and "stress approché" in text
+    assert text.index("### Faits mesurés") < text.index("### Baisses sous un sommet") < third
     assert text[third:].count("\n| 2026-0") == len(DAYS)
 
 
 def test_a_report_is_named_by_its_code_and_its_date() -> None:
     assert SCRIPT.file_name("SA11", "10102026") == "strategySA11_ResultsAndAnalysis_10102026.md"
+
+
+def test_a_drawdown_is_reported_with_the_day_its_peak_was_reached_again() -> None:
+    values = curve([100.0, 110.0, 88.0, 99.0, 132.0, 120.0])
+
+    first, second = SCRIPT.underwater_episodes(values)
+    text = SCRIPT.drawdown_markdown(values)
+
+    assert (first.peak, first.trough, first.recovery) == (DAYS[1], DAYS[2], DAYS[4])
+    assert first.depth == pytest.approx(-0.20)
+    # The last fall is not recovered when the curve ends: censored, not closed.
+    assert (second.peak, second.trough, second.recovery) == (DAYS[4], DAYS[5], None)
+    assert "| 1 | 2026-01-30 | 2026-02-02 | -20.00% | 2026-02-04 | 5 |" in text
+    assert (
+        "| 2 | 2026-02-04 | 2026-03-02 | -9.09% | non récupéré au 2026-03-02 | 26 (en cours) |"
+        in text
+    )
+    assert "Drawdown au 2026-03-02 : **-9.09%**" in text
+    assert "Plus longue période sous un sommet : **26 jours calendaires**" in text
+    assert "(en cours" in text
+
+
+def test_a_curve_that_never_falls_has_no_drawdown_to_recover() -> None:
+    text = SCRIPT.drawdown_markdown(curve([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]))
+
+    assert SCRIPT.underwater_episodes(curve([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])) == []
+    assert "aucune baisse sous un sommet" in text and "**0.00%**" in text
+
+
+def test_months_are_counted_by_sign_and_an_idle_month_is_not_a_losing_one() -> None:
+    flat = curve([100.0, 100.0, 100.0, 100.0, 100.0, 90.0])
+    market = curve([100.0, 110.0, 88.0, 99.0, 132.0, 120.0])
+    yearly = pd.DataFrame(
+        {"2026": {"a": -0.10, "buy & hold World": 0.20, "50/50 rebalanced": 0.25, "sessions": 6.0}}
+    )
+
+    text = SCRIPT.calendar_markdown(flat, market, yearly, "a", "50/50 rebalanced")
+
+    assert "**0 positifs, 1 négatifs, 2 sans variation** sur 3" in text
+    assert (
+        "mois incomplets : 2026-01 commence le 2026-01-29 ; 2026-03 s'arrête au 2026-03-02" in text
+    )
+    assert "| Année | Stratégie | Fonds détenu | 50/50 rebalancé | Séances |" in text
+    assert "| -10.00% | +20.00% | +25.00% | 6 |" in text
+    # The even split is not shown beside itself.
+    own = SCRIPT.calendar_markdown(flat, market, yearly, "50/50 rebalanced", "50/50 rebalanced")
+    assert "50/50 rebalancé" not in own
+
+
+def test_the_activity_says_how_often_anything_was_held() -> None:
+    text = SCRIPT.activity_markdown(history())
+    idle = history()
+    idle["held_ETF_WORLD"] = 0.0
+
+    assert "**5 valorisations sur 6**" in text and "de 50.0% à 100.0%" in text
+    assert "aucune position détenue" in SCRIPT.activity_markdown(idle)
+
+
+def test_the_control_and_the_references_get_a_report_under_a_name_of_their_own() -> None:
+    assert SCRIPT.UNCATALOGUED == {
+        "EWMA 0.94 control": "EWMA94control",
+        "buy & hold World": "REF_WorldBuyHold",
+        "50/50 rebalanced": "REF_5050Rebalanced",
+    }

@@ -38,6 +38,17 @@
   then a written commentary read from `commentary.toml`) and the session by
   session history of the closes, the signals read, the weights and the value.
   The reports of 2026-10-10 are in `research/reports/2026-10-10/`.
+- **Review of the analyses (2026-10-10).** The commentaries were rewritten
+  after an independent review of commit `4e04eae`: positions are told by the
+  dates, signals and weights the histories publish, each point says whether it
+  is a measured fact or a reading, and causal claims nobody measured are gone
+  or listed as open. The reports now give the day each drawdown's peak was
+  reached again, months by sign (idle months apart), partial years, valuations
+  and returns as two counts, the geometric relative return, the even split
+  beside the fund held, and a report for each of the two references. The
+  study gives an interval on the differences of QLIKE and says that `REFUTED`
+  is the registered criteria not being met, not a proof of inferiority. No
+  global figure changed.
 - **Result.** On 2021-04-01 to 2026-10-09 the hypothesis is refuted: `SA11`
   has the best variance forecast (QLIKE) and a net Sharpe ratio of 0.87,
   below `SA6` (0.90) and the EWMA control (0.93), with a deeper drawdown and

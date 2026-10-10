@@ -1,11 +1,15 @@
 """Write one results-and-analysis report per strategy, from the exports of the SA11 study.
 
 Each catalogued strategy that was run gets a Markdown file
-``strategy<CODE>_ResultsAndAnalysis_<DDMMYYYY>.md`` with three sections:
+``strategy<CODE>_ResultsAndAnalysis_<DDMMYYYY>.md``; so do the control of
+``SA11`` and the two references - the fund held and the even split - since a
+strategy holding both funds cannot be read without the second. Three sections:
 
 1. every global indicator, beside the fund bought and held;
-2. an analysis - the measured facts of its worst and best stretches, then the
-   strengths, the weaknesses and the market situations that hurt it most;
+2. an analysis - the measured facts of its worst and best stretches, its
+   drawdowns with the date each peak was reached again, its years and months,
+   then the strengths, the weaknesses and the market situations that hurt it
+   most;
 3. the history: the closes of the funds, the signals the strategy read, the
    weights it targeted and held, and its value, session by session.
 
@@ -40,12 +44,13 @@ import sys
 import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
 from run_etf_strategies_comparison import (
     HELD,
+    SPLIT,
     closes_of,
     quality_details,
     slug,
@@ -55,8 +60,15 @@ from run_garch_study import EWMA, FUND, summary_frame, yearly_frame
 from quant_backtester.analytics.curves import Book
 from quant_backtester.strategies.catalogue import CATALOGUE
 
+UNCATALOGUED = {EWMA: "EWMA94control", HELD: "REF_WorldBuyHold", SPLIT: "REF_5050Rebalanced"}
+"""The code, in a file name, of each book that has no catalogue code: the control of
+``SA11`` and the two references every strategy is read against."""
+
 OTHER_FUND = "ETF_SP500_PEA"
 """The second fund some strategies hold."""
+
+MONTH_TOLERANCE = 1e-12
+"""Monthly return at or under which, in absolute value, a month is counted as unchanged."""
 
 WINDOW_SESSIONS = 63
 """Length of the rolling window the best and worst stretches are also measured on: a quarter."""
@@ -67,7 +79,7 @@ GLOBAL_ROWS: tuple[tuple[str, str, str], ...] = (
     ("block_market", "- bloc marché (IR et alpha contre le fonds détenu)", "{:.2f}"),
     ("block_significance", "- bloc significativité (Sharpe déflaté)", "{:.2f}"),
     ("block_risk", "- bloc risque (drawdown relatif)", "{:.2f}"),
-    ("block_robustness", "- bloc robustesse (sous-périodes, coûts doublés)", "{:.2f}"),
+    ("block_robustness", "- bloc robustesse (sous-périodes ; stress approché des coûts)", "{:.2f}"),
     ("block_implementation", "- bloc implémentation (poids des coûts)", "{:.2f}"),
     ("net_return", "Rendement net total", "{:+.2%}"),
     ("gross_return", "Rendement brut total (mêmes ordres, sans coûts)", "{:+.2%}"),
@@ -86,8 +98,8 @@ GLOBAL_ROWS: tuple[tuple[str, str, str], ...] = (
     ("turnover_per_year", "Rotation annuelle (multiple de l'actif moyen)", "{:.2f}"),
     ("net_return_first_two_thirds", "Rendement net, deux premiers tiers", "{:+.2%}"),
     ("net_return_last_third", "Rendement net, dernier tiers", "{:+.2%}"),
-    ("net_return_costs_x2", "Rendement net, coûts doublés (second run réel)", "{:+.2%}"),
-    ("sharpe_costs_x2", "Sharpe net, coûts doublés (second run réel)", "{:+.2f}"),
+    ("net_return_costs_x2", "Rendement net, second run réel à coûts doublés", "{:+.2%}"),
+    ("sharpe_costs_x2", "Sharpe net, second run réel à coûts doublés", "{:+.2f}"),
 )
 """The global indicators, in order: column of the study, French label, format."""
 
@@ -171,6 +183,92 @@ def extreme_window(curve: pd.Series, sessions: int, *, best: bool) -> Episode:  
     return chosen
 
 
+@dataclass(frozen=True, slots=True)
+class Underwater:
+    """A stretch a curve spent under one of its peaks.
+
+    Attributes
+    ----------
+    peak : date
+        The session of the peak the curve fell from.
+    trough : date
+        The session of its lowest value before that peak was reached again.
+    depth : float
+        ``value(trough) / value(peak) - 1``.
+    recovery : date | None
+        The first session whose value is at or above the peak's; ``None``
+        when the curve ends before it is reached.
+    """
+
+    peak: date
+    trough: date
+    depth: float
+    recovery: date | None
+
+
+def underwater_episodes(curve: pd.Series) -> list[Underwater]:  # type: ignore[type-arg]
+    """Return every stretch a curve spent under a peak, oldest first."""
+    values = points(curve)
+    peak_day, peak = values[0]
+    trough_day, trough = values[0]
+    under = False
+    episodes: list[Underwater] = []
+    for day, value in values[1:]:
+        if value >= peak:
+            if under:
+                episodes.append(Underwater(peak_day, trough_day, trough / peak - 1.0, day))
+            peak_day, peak, trough_day, trough, under = day, value, day, value, False
+        else:
+            under = True
+            if value < trough:
+                trough_day, trough = day, value
+    if under:
+        episodes.append(Underwater(peak_day, trough_day, trough / peak - 1.0, None))
+    return episodes
+
+
+def drawdown_markdown(curve: pd.Series, *, episodes: int = 3) -> str:  # type: ignore[type-arg]
+    """Return the deepest drawdowns of a curve with their recovery, and where it stands now.
+
+    The deepest stretches under a peak, each with the first valuation back at
+    that peak and the calendar days from the peak to it; then the drawdown at
+    the last session and the longest stretch spent under a peak. A stretch not
+    recovered at the last session is said to be so, and its length is counted
+    to that session.
+    """
+    values = points(curve)
+    last_day = values[-1][0]
+    found = underwater_episodes(curve)
+    lines = [
+        "| Rang | Sommet | Creux | Profondeur | Retour au sommet | Jours calendaires |",
+        "|---:|---|---|---:|---|---:|",
+    ]
+    for rank, episode in enumerate(sorted(found, key=lambda item: item.depth)[:episodes], 1):
+        end = last_day if episode.recovery is None else episode.recovery
+        back = f"non récupéré au {last_day}" if episode.recovery is None else str(episode.recovery)
+        length = f"{(end - episode.peak).days}" + (
+            " (en cours)" if episode.recovery is None else ""
+        )
+        lines.append(
+            f"| {rank} | {episode.peak} | {episode.trough} | {episode.depth:.2%} | {back} | "
+            f"{length} |"
+        )
+    if not found:
+        lines.append("| - | - | - | 0.00% | aucune baisse sous un sommet | 0 |")
+    peak = max(value for _, value in values)
+    current = values[-1][1] / peak - 1.0
+    lines += ["", f"Drawdown au {last_day} : **{current:.2%}** sous le plus haut de la période."]
+    if found:
+        longest = max(found, key=lambda item: ((item.recovery or last_day) - item.peak).days)
+        end = longest.recovery or last_day
+        state = "en cours" if longest.recovery is None else "récupérée"
+        lines.append(
+            f"Plus longue période sous un sommet : **{(end - longest.peak).days} jours "
+            f"calendaires**, du {longest.peak} au {end} ({state}, creux à {longest.depth:.2%})."
+        )
+    return "\n".join(lines)
+
+
 def change_over(curve: pd.Series, episode: Episode) -> float:  # type: ignore[type-arg]
     """Return the change of a curve between the two sessions of an episode."""
     return float(curve.loc[episode.end]) / float(curve.loc[episode.start]) - 1.0
@@ -203,17 +301,21 @@ def episode_facts(
     """Return one row of the table of facts: the strategy, the fund and the exposure over it."""
     inside = history.loc[episode.start : episode.end]
     exposure = exposure_of(inside)
+    own = change_over(pd.Series(history["net_equity"]), episode)
+    held = change_over(market, episode)
     return {
         "Période": label,
         "Du": episode.start,
         "Au": episode.end,
-        "Séances": len(inside),
-        "Stratégie": change_over(pd.Series(history["net_equity"]), episode),
+        "Valorisations": len(inside),
+        "Rendements": len(inside) - 1,
+        "Stratégie": own,
         f"{FUND} (clôture)": change_over(pd.Series(history[f"close_{FUND}"]), episode),
-        "Fonds détenu (net)": change_over(market, episode),
-        "Exposition moyenne": float(exposure.mean()),
-        "Exposition min.": float(exposure.min()),
-        "Exposition max.": float(exposure.max()),
+        "Fonds détenu (net)": held,
+        "Écart relatif": (1.0 + own) / (1.0 + held) - 1.0,
+        "Poids de clôture moyen": float(exposure.mean()),
+        "Poids de clôture min.": float(exposure.min()),
+        "Poids de clôture max.": float(exposure.max()),
     }
 
 
@@ -234,24 +336,26 @@ def facts_table(history: pd.DataFrame, market: pd.Series) -> pd.DataFrame:  # ty
         worst and best windows of :data:`WINDOW_SESSIONS` sessions, the
         stretch over which it lost most ground to the fund held, the one over
         which it gained most on it, and the market's own deepest fall and
-        largest rise - with the book's return, the fund's, and the exposure
-        held.
+        largest rise - with the number of valuations and of returns it holds,
+        the book's return, the fund's, their geometric relative return
+        ``(1 + book) / (1 + fund) - 1`` - what the two relative stretches are
+        selected on - and the weight held in funds at the closes.
     """
     equity = pd.Series(history["net_equity"])
     relative = pd.Series(equity / market)
     stretches = (
-        ("Plus forte baisse de la stratégie", deepest_fall(equity)),
-        ("Plus forte hausse de la stratégie", largest_rise(equity)),
+        ("Plus forte baisse (sommet → creux)", deepest_fall(equity)),
+        ("Plus forte hausse (creux → sommet ultérieur, durée libre)", largest_rise(equity)),
         (
-            f"Pires {WINDOW_SESSIONS} séances de la stratégie",
+            f"Pires {WINDOW_SESSIONS} rendements consécutifs",
             extreme_window(equity, WINDOW_SESSIONS, best=False),
         ),
         (
-            f"Meilleures {WINDOW_SESSIONS} séances de la stratégie",
+            f"Meilleurs {WINDOW_SESSIONS} rendements consécutifs",
             extreme_window(equity, WINDOW_SESSIONS, best=True),
         ),
-        ("Plus fort retard sur le fonds détenu", deepest_fall(relative)),
-        ("Plus forte avance sur le fonds détenu", largest_rise(relative)),
+        ("Plus fort retard relatif sur le fonds détenu", deepest_fall(relative)),
+        ("Plus forte avance relative sur le fonds détenu", largest_rise(relative)),
         ("Plus forte baisse du fonds détenu", deepest_fall(market)),
         ("Plus forte hausse du fonds détenu", largest_rise(market)),
     )
@@ -298,9 +402,10 @@ def facts_markdown(facts: pd.DataFrame) -> str:
         "Stratégie": "{:+.2%}",
         f"{FUND} (clôture)": "{:+.2%}",
         "Fonds détenu (net)": "{:+.2%}",
-        "Exposition moyenne": "{:.0%}",
-        "Exposition min.": "{:.0%}",
-        "Exposition max.": "{:.0%}",
+        "Écart relatif": "{:+.2%}",
+        "Poids de clôture moyen": "{:.0%}",
+        "Poids de clôture min.": "{:.0%}",
+        "Poids de clôture max.": "{:.0%}",
     }
     columns = list(facts.columns)
     lines = ["| " + " | ".join(columns) + " |", "|" + "---|" * len(columns)]
@@ -311,28 +416,87 @@ def facts_markdown(facts: pd.DataFrame) -> str:
 
 
 def calendar_markdown(
-    equity: pd.Series,
-    market: pd.Series,
+    equity: pd.Series,  # type: ignore[type-arg]
+    market: pd.Series,  # type: ignore[type-arg]
     yearly: pd.DataFrame,
-    name: str,  # type: ignore[type-arg]
+    name: str,
+    control: str | None,
 ) -> str:
-    """Return the yearly returns beside the fund's, and the best and worst months."""
-    lines = ["| Année | Stratégie | Fonds détenu | Séances |", "|---|---:|---:|---:|"]
+    """Return the yearly returns beside the references', and the months by sign.
+
+    Parameters
+    ----------
+    equity, market : pd.Series
+        Net equity of the book and of the fund held.
+    yearly : pd.DataFrame
+        Returns by calendar year, a row per book and a ``sessions`` row.
+    name : str
+        The book's row.
+    control : str | None
+        A second reference's row - the even split of the two funds - shown
+        beside the fund held when it is given and is not the book itself.
+
+    Notes
+    -----
+    A first year that starts after the first days of January and a last year
+    that stops before the end of December are marked as partial, with the
+    session they start or stop at; so is an unfinished last month. A month in
+    which the value did not move is counted apart: for a rule that is rarely
+    invested it says "nothing happened", not "nothing was earned".
+    """
+    days = [day for day, _ in points(equity)]
+    first, last = days[0], days[-1]
+    shown = control is not None and control != name and control in yearly.index
+    head = "| Année | Stratégie | Fonds détenu |" + (" 50/50 rebalancé |" if shown else "")
+    lines = [head + " Séances |", "|---|---:|---:|" + ("---:|" if shown else "") + "---:|"]
     for year in yearly.columns:
-        lines.append(
-            f"| {year} | {_cell(yearly.loc[name, year], '{:+.2%}')} | "
-            f"{_cell(yearly.loc[HELD, year], '{:+.2%}')} | "
-            f"{_cell(yearly.loc['sessions', year], '{:.0f}')} |"
-        )
+        label = str(year)
+        if int(year) == first.year and (first.month, first.day) > (1, 7):
+            label += f" (partielle, depuis le {first})"
+        if int(year) == last.year and (last.month, last.day) < (12, 24):
+            label += f" (partielle, au {last})"
+        cells = [
+            _cell(yearly.loc[name, year], "{:+.2%}"),
+            _cell(yearly.loc[HELD, year], "{:+.2%}"),
+            *([_cell(yearly.loc[control, year], "{:+.2%}")] if shown else []),
+            _cell(yearly.loc["sessions", year], "{:.0f}"),
+        ]
+        lines.append(f"| {label} | " + " | ".join(cells) + " |")
     months, reference = monthly_returns(equity), monthly_returns(market)
-    worst, best = months.idxmin(), months.idxmax()
+    worst, best = str(months.idxmin()), str(months.idxmax())
+    positive = int((months > MONTH_TOLERANCE).sum())
+    negative = int((months < -MONTH_TOLERANCE).sum())
+    partial = []
+    if first.day > 7:
+        partial.append(f"{first.year}-{first.month:02d} commence le {first}")
+    if (last + timedelta(days=4)).month == last.month:
+        partial.append(f"{last.year}-{last.month:02d} s'arrête au {last}")
     lines += [
         "",
-        f"Pire mois : **{worst}** ({months[worst]:+.2%}, fonds détenu {reference[worst]:+.2%}). "
-        f"Meilleur mois : **{best}** ({months[best]:+.2%}, fonds détenu {reference[best]:+.2%}). "
-        f"Mois positifs : {int((months > 0).sum())} sur {len(months)}.",
+        f"Mois : **{positive} positifs, {negative} négatifs, "
+        f"{len(months) - positive - negative} sans variation** sur {len(months)}"
+        + (f" (mois incomplets : {' ; '.join(partial)})" if partial else "")
+        + f". Pire mois : **{worst}** ({months[worst]:+.2%}, fonds détenu "
+        f"{reference[worst]:+.2%}). Meilleur mois : **{best}** ({months[best]:+.2%}, fonds "
+        f"détenu {reference[best]:+.2%}).",
     ]
     return "\n".join(lines)
+
+
+def activity_markdown(history: pd.DataFrame) -> str:
+    """Return how often the book held anything at a close, and between which weights."""
+    exposure = [float(value) for value in exposure_of(history)]
+    invested = [value for value in exposure if value > 0.0]
+    if not invested:
+        return (
+            f"Activité : aucune position détenue à une clôture sur {len(exposure)} valorisations."
+        )
+    return (
+        f"Activité : une position est détenue à la clôture de **{len(invested)} valorisations "
+        f"sur {len(exposure)}** ; le poids total détenu y va de {min(invested):.1%} à "
+        f"{max(invested):.1%} (moyenne sur toutes les valorisations : "
+        f"{math.fsum(exposure) / len(exposure):.1%})."
+    )
 
 
 def history_markdown(history: pd.DataFrame) -> str:
@@ -407,6 +571,7 @@ def commentary_markdown(notes: Mapping[str, object] | None) -> str:
         ("worst", "Ce qui s'est passé pendant la période où la stratégie a le plus perdu", False),
         ("best", "Ce qui s'est passé pendant la période où la stratégie a le plus gagné", False),
         ("risks", "Situations de marché les plus risquées pour cette stratégie", True),
+        ("to_test", "Ce que ces résultats n'établissent pas, et ce qui reste à mesurer", True),
     )
     lines: list[str] = []
     for key, title, as_list in sections:
@@ -423,6 +588,39 @@ def commentary_markdown(notes: Mapping[str, object] | None) -> str:
     return "\n".join(lines).rstrip()
 
 
+SCORE_NOTE = (
+    "Le score QUALITY_V1 est une **moyenne géométrique pondérée** de cinq blocs bornés entre 0 "
+    "et 1 (marché 30 %, significativité 25 %, risque 15 %, robustesse 20 %, implémentation "
+    "10 %) : un seul bloc à zéro donne un score nul. Un score nul n'est donc ni une probabilité "
+    "de gain nulle, ni une égalité économique entre deux stratégies ; le bloc implémentation, "
+    "par exemple, tombe à zéro dès que les coûts atteignent 30 % du gain brut. Le bloc "
+    "robustesse contient un **stress approché** des coûts, `net - (brut - net)` sur les mêmes "
+    "ordres ; les deux dernières lignes du tableau viennent d'un **second run réel** à coûts "
+    "doublés, où les quantités et la trajectoire changent, et n'entrent pas dans le score. Le "
+    "score est déflaté par les essais de cette étude seulement, pas par la recherche "
+    "antérieure : le classement est exploratoire, et un écart de quelques points entre deux "
+    "scores n'est pas un test de supériorité. Les alphas sont des estimations ponctuelles sans "
+    "intervalle, avec un taux sans risque nul ; l'alpha contre SA1 compare à une règle active, "
+    "ce n'est pas un alpha de marché. Le fonds détenu est l'étalon du score et n'est pas "
+    "noté. « n/a » : la mesure n'existe pas ; elle n'est jamais remplacée par zéro."
+)
+"""What the score and the alphas of the first table do and do not say."""
+
+READING_NOTE = (
+    "Chaque ligne va de la valeur de la séance « Du » à celle de la séance « Au » : N "
+    "valorisations, donc N - 1 rendements. « Plus forte hausse » est la plus grande hausse "
+    "d'un creux à un sommet ultérieur, de durée libre : ce n'est ni une position ni un trade. "
+    "Les deux périodes relatives sont choisies sur le rapport de la stratégie au fonds "
+    "détenu, dont l'« écart relatif » `(1 + stratégie) / (1 + fonds) - 1` est la variation. "
+    "Le « poids de clôture » est la part de l'actif net détenue en fonds à la valorisation du "
+    "soir, le reste étant du cash non rémunéré : il a pu dériver avec les cours, et le "
+    "multiplier par le rendement du fonds ne reconstitue pas le résultat. Une décision prise "
+    "le soir de t (signal et poids cible de la ligne t) est exécutée à l'ouverture de t + 1 "
+    "et n'apparaît dans le poids détenu qu'à la ligne t + 1."
+)
+"""How the measured stretches and the weights are to be read."""
+
+
 def report(
     name: str,
     row: Mapping[str, object],
@@ -433,9 +631,37 @@ def report(
     yearly: pd.DataFrame,
     notes: Mapping[str, object] | None,
     provenance: Sequence[str],
+    *,
+    control: str | None = None,
+    history_note: str | None = None,
 ) -> str:
-    """Return the whole report of one strategy: indicators, analysis, then history."""
-    facts = facts_table(history, market)
+    """Return the whole report of one strategy: indicators, analysis, then history.
+
+    Parameters
+    ----------
+    name : str
+        The book, as the study names it.
+    row, market_row : Mapping[str, object]
+        Its row of the common table and the fund held's.
+    stressed : Mapping[str, object] | None
+        Its row in the second real run at doubled costs, when there is one.
+    history : pd.DataFrame
+        Its history by session.
+    market : pd.Series
+        Net equity of the fund held over the same sessions.
+    yearly : pd.DataFrame
+        Returns by calendar year of every book.
+    notes : Mapping[str, object] | None
+        Its written commentary.
+    provenance : Sequence[str]
+        The lines saying what it was produced from.
+    control : str | None
+        The row of ``yearly`` holding the even split of the two funds.
+    history_note : str | None
+        A sentence added above the history, for a book whose columns are not
+        the signals it read.
+    """
+    equity = pd.Series(history["net_equity"])
     return "\n".join(
         [
             f"# {name} — résultats et analyse",
@@ -446,22 +672,25 @@ def report(
             "",
             global_table(row, market_row, stressed),
             "",
-            "Le score QUALITY_V1 est un indice composite (marché 30 %, significativité 25 %, "
-            "risque 15 %, robustesse 20 %, implémentation 10 %), pas une probabilité de gain. "
-            "Le fonds détenu est l'étalon du score et n'est donc pas noté. « n/a » : la "
-            "mesure n'existe pas pour cette colonne ; elle n'est jamais remplacée par zéro.",
+            SCORE_NOTE,
             "",
             "## 2. Analyse",
             "",
             "### Faits mesurés",
             "",
-            facts_markdown(facts),
+            facts_markdown(facts_table(history, market)),
             "",
-            "Chaque ligne va de la valeur de la séance « Du » à celle de la séance « Au ». "
-            "L'exposition est la part de l'actif net détenue en fonds, le reste étant du cash "
-            "non rémunéré.",
+            READING_NOTE,
             "",
-            calendar_markdown(pd.Series(history["net_equity"]), market, yearly, name),
+            "### Baisses sous un sommet et retour à ce sommet",
+            "",
+            drawdown_markdown(equity),
+            "",
+            "### Par année et par mois",
+            "",
+            calendar_markdown(equity, market, yearly, name, control),
+            "",
+            activity_markdown(history),
             "",
             commentary_markdown(notes),
             "",
@@ -469,8 +698,12 @@ def report(
             "",
             "Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa "
             "décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin "
-            "tel que le run l'a lu ; l'ordre qui en découle est exécuté à l'ouverture suivante. "
-            "Une case vide est un indicateur sans valeur ce jour-là.",
+            "tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et "
+            "exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du "
+            "portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur "
+            "ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne "
+            "sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.",
+            *([] if history_note is None else ["", history_note]),
             "",
             history_markdown(history),
             "",
@@ -595,6 +828,12 @@ def ml1_report(
         yearly_frame(net),
         notes,
         provenance,
+        control=neural.SPLIT,
+        history_note=(
+            "Pour ML1, les colonnes « poids proposé » sont la **sortie** du réseau, pas ses "
+            "entrées : les caractéristiques qu'il lit (rendements, moyennes, volatilités des "
+            "deux fonds et du VIX sur 100 séances) ne sont pas dans ce tableau."
+        ),
     )
     return file_name("ML1", stamp), text
 
@@ -623,10 +862,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
     names = {item.display_name: item.code for item in CATALOGUE}
     written: dict[str, str] = {}
     for name in summary.index:
-        code = names.get(str(name))
-        if code is None and name != EWMA:
-            continue  # the fund held and the even split are references, not strategies
-        code = "EWMA94control" if code is None else code
+        # The control and the two references carry no catalogue code: a name of their own.
+        code = names.get(str(name)) or UNCATALOGUED[str(name)]
         notes = commentary.get(code)
         written[file_name(code, options.stamp)] = report(
             str(name),
@@ -638,6 +875,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
             yearly,
             notes if isinstance(notes, dict) else None,
             study_provenance(config),
+            control=SPLIT,
         )
     if not options.skip_ml1:
         notes = commentary.get("ML1")
