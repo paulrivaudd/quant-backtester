@@ -79,7 +79,7 @@ Trois règles supplémentaires sont vérifiées par les mêmes tests :
 | `portfolio/` | Ce qu'un livre a le droit de détenir, et ce qu'il détient | `targets` (`TargetAllocation`), `allocation` (`PortfolioModel`, `ConstrainedTarget`), `constraints`, `limits` (`PortfolioLimits`), `holdings`, `state` (`PortfolioState`), `view` |
 | `execution/` | Ce que le marché fait d'un ordre | `model` (`ExecutionModel`, `Sizing`), `costs` (`CostModel`), `rounding` (lots), `orders`, `fills` (`Fill`, `ExecutionReject`) |
 | `backtest/` | Le temps | `config` (`BacktestConfig`), `engine`, `timetable`, `schedule`, `context` (`StrategyContext`), `market`, `records` (`BacktestRecord`), `result` (`BacktestResult`), `runner` (`StrategyRunner`, `StrategyResult`) |
-| `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (score 0-100 % contre le marché, règles versionnées `QUALITY_V1`), `volatility_forecast` (qualité ex post d'une prévision de variance : QLIKE) |
+| `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (score 0-100 % contre le marché, règles versionnées `QUALITY_V1`), `volatility_forecast` (qualité ex post d'une prévision de variance : QLIKE), `return_forecast` (prévision de rendement à deux séances : moyenne, signe, perte jointe) |
 | `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1`, `ML1`…), `examples/`, `adaptive/`, `ml/` |
 | `ml/` | Les modèles ajustés (hors couches, voir ci-dessous) | `config` (`NeuralStrategyConfig`), `features` (`NeuralFeatureBuilder`, `FeatureScaler`), `network` (`NeuralAllocator`), `artifacts` (`NeuralArtifact`), `dataset` (`ForwardOpenReturnBuilder`, purge), `training` (`calibrate_neural_strategy`) |
 | `research/` | La discipline de recherche | `hypotheses`, `registry`, `archive`, `paper`, `journal` |
@@ -237,7 +237,8 @@ Signaux disponibles : `ReturnSignal`, `MomentumSignal`, `MeanReversionSignal`,
 `MovingAverageTrendSignal`, `MovingAverageCrossSignal` (prix), `RealizedVolatilitySignal`,
 `CurrentDrawdownSignal` (risque), `LevelChangeSignal`, `LevelZScoreSignal`
 (séries publiées), `CrossSectionalRank` (classement), `GarchVolatilitySignal`
-et `EwmaVolatilitySignal` (modèles, `signals/models/garch.py`).
+et `EwmaVolatilitySignal` (modèles, `signals/models/garch.py`),
+`ArimaGarchForecastSignal` (`signals/models/arima_garch.py`).
 
 ## 7. Stratégie et contexte de décision
 
@@ -319,7 +320,8 @@ Familles : `SA` (règles statistiques sur prix et séries publiées) et `ML`
 l'ordre d'adoption, et n'est jamais réutilisé ; le libellé peut être reformulé.
 `SA1` à `SA10` sont les dix règles ETF du 2026-10-03 (numérotées 0 à 9 dans
 leur spécification : `SA1` est le benchmark MA20, `SA10` l'ensemble), `SA11`
-le contrôle de volatilité GARCH du 2026-10-10, `ML1` l'allocation neuronale. Les exemples et exercices antérieurs ne sont pas
+le contrôle de volatilité GARCH et `SA12` l'ARIMA-GARCH du 2026-10-10 (libellé
+sans tiret), `ML1` l'allocation neuronale. Les exemples et exercices antérieurs ne sont pas
 catalogués. `entry("SA3")`, `entry_of(strategy)` et `family(Family.SA)`
 donnent une entrée ; `entry.load()` importe la classe à la demande.
 
@@ -374,6 +376,41 @@ origine → séance suivante, QLIKE (`log q + r²/q`, plancher de métrique à 1
 compté), erreur quadratique, résidus standardisés. `scripts/run_garch_study.py`
 tient séparés le classement commun, la qualité de la prévision et le test
 économique de l'hypothèse (bootstrap apparié, second run réel à coûts doublés).
+
+### SA12, ARIMA-GARCH (`strategies/examples/arima_garch.py`)
+
+`ArimaGarch` détient `ETF_WORLD` tant qu'un ARIMA(1,0,1) prévoit un rendement
+positif pour **la première séance qu'un ordre peut porter**, à un poids
+dimensionné par la variance de ce rendement.
+
+- **Chronologie.** Au soir de `t`, le dernier rendement connu est
+  `r_t = log(O_t / O_{t-1})` sur ouvertures ajustées ; l'ordre est exécuté à
+  `O_{t+1}`, donc le rendement visé est `r_{t+2}`, le **deuxième pas**. Les
+  ouvertures ajustées viennent de `load_adjusted_open_window` : ouverture brute
+  × clôture ajustée / clôture brute, les trois connues à l'instant de décision.
+- **Moyenne.** `mu_2` de l'état filtré (`statsmodels`, espace d'états,
+  initialisation stationnaire, un seul point de départ, réestimé chaque soir).
+- **Risque.** GARCH(1,1) Student sur les 696 innovations ARIMA restantes après
+  retrait des 60 premières : `h_1`, puis `h_2 = ω + (α + β) h_1`, et
+  `v_2 = h_2 + (φ + θ)² h_1`, la variance du *rendement* à deux pas. Repli EWMA
+  sur les mêmes innovations (`h_2 = h_1`). Estimation séquentielle en deux
+  étapes, pas une vraisemblance jointe.
+- **Règle.** Entrée depuis le cash si `mu_2 > 20 pb`, maintien si `mu_2 > 0`,
+  sortie à zéro inclus, lus sur la position **réellement détenue** ;
+  `w = g · min(1, 12 % / max(σ, 5 %))` ; bande de 3 points, une sortie et une
+  entrée depuis le cash étant toujours transmises.
+- **Un signal, un calcul.** `ArimaGarchForecastSignal` porte `mu_2` en valeur
+  et la variance, la volatilité, la source et les diagnostics en colonnes ;
+  `read_joint_forecast` lève si la colonne de volatilité manque. Un échec ARIMA
+  est `INVALID_INPUT` avec `failure_stage="ARIMA"`, jamais une donnée manquante.
+- **Contrôles** (sans code de catalogue) : D0 sans filtre de direction, D1
+  avec variance EWMA, D2 à moyenne constante. `scripts/run_arima_garch_study.py`
+  les exécute et attribue un statut à l'hypothèse (`INSUFFICIENT_EVIDENCE`,
+  `NOT_SUPPORTED`, `UNCERTAIN`, `SUPPORTED_RETROSPECTIVE`).
+
+`analytics/return_forecast.py` apparie une prévision à l'origine `t` avec le
+rendement de l'ouverture `t+1` à l'ouverture `t+2` et mesure la moyenne (MSE,
+signe avec ses dénominateurs) et la perte jointe `log v + e²/v`.
 
 ## 8. Portefeuille et exécution
 
@@ -494,6 +531,7 @@ La couche `research/` porte la discipline de recherche décrite dans
 | `scripts/sensitivity.py` | la référence sous `AT_AUCTION` / `AT_DECISION`, avec coûts ×1 et ×2 | non |
 | `scripts/paper_trade.py` | vérifier et prolonger les plans de paper trading | non |
 | `scripts/run_etf_strategies_comparison.py` | les règles `SA` sur les mêmes dates et coûts (`--start`, `--end` ; `SA11` omise avec la mention « dependency missing » sans l'extra `stats`) ; `quality_details.csv` | non |
+| `scripts/run_arima_garch_study.py` | l'étude `SA12` : contrôles D0/D1/D2, prévisions à deux pas, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`) | non |
 | `scripts/run_garch_study.py` | l'étude `SA11` sur la période commune : classement, témoins `SA6`/EWMA, QLIKE, bootstrap, coûts ×2, historiques par stratégie | non |
 | `scripts/write_strategy_reports.py` | un fichier `strategy<code>_ResultsAndAnalysis_<date>.md` par stratégie, depuis les exports de l'étude | non |
 

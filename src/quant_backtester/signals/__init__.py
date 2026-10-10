@@ -32,6 +32,7 @@ from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.level.change import LevelChangeSignal
 from quant_backtester.signals.level.vix_relief import VixReliefSignal
 from quant_backtester.signals.level.zscore import LevelZScoreSignal
+from quant_backtester.signals.models.arima_garch import ArimaGarchForecastSignal
 from quant_backtester.signals.models.garch import EwmaVolatilitySignal, GarchVolatilitySignal
 from quant_backtester.signals.price.mean_reversion import MeanReversionSignal
 from quant_backtester.signals.price.momentum import MomentumSignal
@@ -53,6 +54,7 @@ from quant_backtester.signals.types import (
 )
 
 __all__ = [
+    "ArimaGarchForecastSignal",
     "CrossSectionalRank",
     "CurrentDrawdownSignal",
     "EwmaVolatilitySignal",

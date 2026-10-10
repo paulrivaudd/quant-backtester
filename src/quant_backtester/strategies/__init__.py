@@ -38,6 +38,7 @@ from __future__ import annotations
 from quant_backtester.strategies.adaptive.etf_ensemble import ETFEnsemble
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
+    ArimaGarch,
     BufferedDualMomentum,
     BuyAndHold,
     EqualWeightRebalance,
@@ -64,6 +65,7 @@ from quant_backtester.strategies.examples import (
 from quant_backtester.strategies.functional import FunctionalStrategy, strategy
 
 __all__ = [
+    "ArimaGarch",
     "BufferedDualMomentum",
     "BuyAndHold",
     "ETFEnsemble",

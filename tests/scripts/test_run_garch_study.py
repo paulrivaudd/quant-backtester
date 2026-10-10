@@ -56,7 +56,10 @@ def test_the_participants_are_the_comparison_books_and_the_control() -> None:
 
     assert SCRIPT.GARCH == "SA11 - GARCH vol control"
     assert SCRIPT.VOL_CONTROL == "SA6 - vol control"
-    assert list(books)[:-1] == list(COMPARISON.books())
+    # The study keeps its participants: a strategy catalogued later is not added to it.
+    assert list(books)[:-1] == [
+        name for name in COMPARISON.books() if not name.startswith(("SA12", "SA13"))
+    ]
     assert list(books)[-1] == SCRIPT.EWMA
     assert isinstance(books[SCRIPT.GARCH], GarchVolControl)
     assert isinstance(books[SCRIPT.VOL_CONTROL], RealizedVolControl)
@@ -75,7 +78,8 @@ def test_without_the_estimator_sa11_is_left_out_and_the_others_still_run(
     books = COMPARISON.books()
 
     assert not COMPARISON.garch_available()
-    assert "SA11 - GARCH vol control" not in books
+    assert "SA11 - GARCH vol control" not in books and "SA12 - ARIMA GARCH" not in books
+    assert not COMPARISON.arima_available()
     assert "SA6 - vol control" in books and "SA10 - ensemble" in books
     for strategy in books.values():
         strategy.validate()

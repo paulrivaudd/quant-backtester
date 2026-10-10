@@ -146,6 +146,7 @@ CATALOGUE: tuple[CatalogueEntry, ...] = (
     CatalogueEntry(
         Family.SA, 11, "GARCH vol control", f"{_EXAMPLES}.garch_vol_control:GarchVolControl"
     ),
+    CatalogueEntry(Family.SA, 12, "ARIMA GARCH", f"{_EXAMPLES}.arima_garch:ArimaGarch"),
     CatalogueEntry(
         Family.ML,
         1,
@@ -160,7 +161,8 @@ their specification: ``SA1`` is its benchmark 0, the fund held above its
 20-session average, and ``SA10`` its ensemble 9. ``SA11`` is the GARCH
 volatility control of 2026-10-10; its estimator is an optional dependency (the
 ``stats`` extra) that its module imports only when a fit is asked for, so the
-entry loads without it. ``ML1`` is the neural allocation of 2026-10-04. The
+entry loads without it. ``SA12`` is the ARIMA-GARCH of the same day, on the same
+extra (the label takes no hyphen). ``ML1`` is the neural allocation of 2026-10-04. The
 exercises and the baselines that came before are not catalogued: they are
 examples of how a strategy is written.
 """

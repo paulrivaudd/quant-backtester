@@ -165,9 +165,23 @@ SUMMARY_COLUMNS = (
 """Columns every row of the common table carries first, in this order."""
 
 
+STUDY_CODES = ("SA1", "SA2", "SA3", "SA4", "SA5", "SA6", "SA9", "SA10", "SA11")
+"""The catalogued strategies of this study, fixed on 2026-10-10: a strategy
+catalogued later has its own study and does not enter this one's register."""
+
+
 def participants() -> dict[str, Strategy]:
-    """Return every book of the study by display name: the comparison's, and the control."""
-    return {**books(), EWMA: EwmaVolControl()}
+    """Return every book of the study by display name: the comparison's, and the control.
+
+    The comparison's books as they stood when the study was run - a strategy
+    catalogued since is left out, so that the study and its count of trials
+    stay reproducible - then the EWMA control.
+    """
+    kept = {entry(code).display_name for code in STUDY_CODES} | {HELD, SPLIT}
+    return {
+        **{name: book for name, book in books().items() if name in kept},
+        EWMA: EwmaVolControl(),
+    }
 
 
 def doubled(execution: ExecutionModel, factor: float = COST_STRESS) -> ExecutionModel:
@@ -363,7 +377,10 @@ def signal_columns(strategy: Strategy) -> list[tuple[str, SignalRequest | None, 
 
 
 def book_histories(
-    results: Mapping[str, StrategyResult], strategies: Mapping[str, Strategy]
+    results: Mapping[str, StrategyResult],
+    strategies: Mapping[str, Strategy],
+    *,
+    capture: dict[str, dict[date, dict[str, object]]] | None = None,
 ) -> dict[str, pd.DataFrame]:
     """Return, per book, the closes, the signals it read, its weights and its value by session.
 
@@ -373,6 +390,11 @@ def book_histories(
         The finished runs, all on the same sessions and the same store.
     strategies : Mapping[str, Strategy]
         The strategy of each run.
+    capture : dict[str, dict[date, dict[str, object]]] | None
+        Signal ids whose whole row - value, status and every diagnostic column
+        - is wanted, each mapped to a dictionary this function fills by
+        session. A signal that carries its diagnostics in its frame is then
+        computed once here, not once for its value and once for the rest.
 
     Returns
     -------
@@ -410,6 +432,11 @@ def book_histories(
                     key = (json.dumps(signal.definition_json(), sort_keys=True), instruments)  # type: ignore[attr-defined]
                     if key not in computed:
                         computed[key] = signal.compute(context, instruments).frame  # type: ignore[attr-defined]
+                        if capture is not None and signal_id in capture:
+                            first = computed[key].iloc[0].to_dict()
+                            capture[signal_id][record.session_date] = {
+                                str(column): value for column, value in first.items()
+                            }
                     statuses = computed[key]["status"].to_dict()
                     numbers = computed[key]["value"].to_dict()
                     for instrument_id in instruments:

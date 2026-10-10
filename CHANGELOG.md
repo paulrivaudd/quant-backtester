@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### SA12 - ARIMA GARCH (specification of 2026-10-10)
+- **New strategy `SA12`** (`ArimaGarch`): `ETF_WORLD` is held while an
+  ARIMA(1,0,1) on adjusted open-to-open log returns forecasts a positive
+  return two steps ahead - the first session an order filled at the next open
+  can be held over - at a weight sized on the two-step variance
+  `v2 = h2 + (phi + theta)^2 h1` of a GARCH(1,1) fitted on the ARIMA
+  innovations. Entry above 20 bp, hold above zero, read on the position
+  actually held. Its three controls (no filter, EWMA variance, constant mean)
+  are the same class with one parameter changed and carry no catalogue code.
+- **New signal** `ArimaGarchForecastSignal`: one joint fit per decision, the
+  mean as its value and the variance and diagnostics as columns.
+- **`load_adjusted_open_window`** in `signals/windows.py`: opens adjusted by
+  the corporate actions known at the decision.
+- **New module** `analytics/return_forecast.py`: a forecast paired with the
+  return from the open after its origin to the next one; mean, sign and joint
+  loss.
+- **`scripts/run_arima_garch_study.py`**: the study, its exports and the
+  status of the registered hypothesis. `statsmodels` is named in the `stats`
+  extra.
+- **`scripts/run_garch_study.py` keeps its participants**: a strategy
+  catalogued after 2026-10-10 does not enter the SA11 study or its register of
+  trials.
+
 ### SA11 - GARCH vol control (specification of 2026-10-10)
 - **New strategy `SA11`** (`GarchVolControl`): the exposure to `ETF_WORLD` is
   `min(1, 12% / max(sigma, 5%))` with `sigma` the one-step forecast of a

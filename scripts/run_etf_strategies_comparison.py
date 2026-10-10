@@ -75,8 +75,10 @@ from quant_backtester.data.schemas import BarField
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel, Sizing
 from quant_backtester.provenance import git_source_state
+from quant_backtester.signals.models.arima_garch import require_statsmodels
 from quant_backtester.signals.models.garch import MissingDependency, require_arch
 from quant_backtester.strategies import (
+    ArimaGarch,
     BufferedDualMomentum,
     BuyAndHold,
     EqualWeightRebalance,
@@ -154,13 +156,23 @@ def garch_available() -> bool:
     return True
 
 
+def arima_available() -> bool:
+    """Return whether ``SA12`` can be run here: whether both its estimators are installed."""
+    try:
+        require_statsmodels()
+    except MissingDependency:
+        return False
+    return garch_available()
+
+
 def books() -> dict[str, Strategy]:
     """Return every book of the comparison, by display name, parameters of the specification.
 
     A catalogued strategy is named ``"<code> - <label>"`` from its catalogue
-    entry; the two references keep a plain name. ``SA11`` is among them when
-    its estimator is installed and absent otherwise: :func:`main` says so
-    rather than print a row for it.
+    entry; the two references keep a plain name. ``SA11`` and ``SA12`` are among
+    them when their estimators are installed and absent otherwise: :func:`main`
+    says so rather than print a row for them. ``SA13`` is not: it needs a
+    schedule of calibrated models, which ``scripts/run_signature_study.py`` builds.
     """
     catalogued: tuple[Strategy, ...] = (
         BufferedDualMomentum(),
@@ -171,6 +183,7 @@ def books() -> dict[str, Strategy]:
         VixReliefEntry(),
         ETFEnsemble(enable_factors=False, enable_monetary=False),
         *((GarchVolControl(),) if garch_available() else ()),
+        *((ArimaGarch(),) if arima_available() else ()),
     )
     return {
         BENCHMARK: WorldMA20Benchmark(),
@@ -836,15 +849,16 @@ def main(arguments: Sequence[str] | None = None) -> int:
     parser.add_argument("--end", default=PERIOD[1], help="last measured session, ISO date")
     options = parser.parse_args(arguments)
 
-    garch = entry("SA11").display_name
-    if not garch_available():
-        print(f"{garch}: left out, dependency missing (uv sync --extra stats)", file=sys.stderr)
-    elif options.start < COMMON_PERIOD[0]:
-        print(
-            f"{garch} holds cash until its 757 closes exist ({COMMON_PERIOD[0]}); "
-            "its row is not comparable on this period. See scripts/run_garch_study.py.",
-            file=sys.stderr,
-        )
+    for code, available in (("SA11", garch_available()), ("SA12", arima_available())):
+        name = entry(code).display_name
+        if not available:
+            print(f"{name}: left out, dependency missing (uv sync --extra stats)", file=sys.stderr)
+        elif options.start < COMMON_PERIOD[0]:
+            print(
+                f"{name} holds cash until its 757 sessions exist ({COMMON_PERIOD[0]}); its row "
+                "is not comparable on this period. See its own study script.",
+                file=sys.stderr,
+            )
     runner = build_runner(options.store)
     results: dict[str, StrategyResult] = {}
     for name, strategy in books().items():

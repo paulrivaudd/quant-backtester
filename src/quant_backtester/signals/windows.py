@@ -171,6 +171,93 @@ def load_window(
     return LoadedWindow(status=SignalStatus.OK, points=points, dates=dates, age_sessions=age)
 
 
+ADJUSTED_OPEN_CONSTRUCTION = "RAW_OPEN_TIMES_PIT_CLOSE_ADJUSTMENT_V1"
+"""How an adjusted open is built: the raw open of a session times the ratio of
+its adjusted close to its raw close, all three as known at the decision. A
+name for metadata, not a price basis of its own."""
+
+
+def load_adjusted_open_window(
+    context: SignalContext,
+    instrument_id: str,
+    *,
+    spec: WindowSpec,
+    max_age_sessions: int,
+) -> LoadedWindow:
+    """Return a window of opens adjusted for the corporate actions known at the decision.
+
+    Parameters
+    ----------
+    context : SignalContext
+        Environment of the decision: every series is read through it, so all
+        three come from one reader fixed at one instant.
+    instrument_id : str
+        A bars instrument.
+    spec : WindowSpec
+        How many sessions, counted in which sense.
+    max_age_sessions : int
+        Largest accepted age of the freshest bar, on the reference calendar.
+
+    Returns
+    -------
+    LoadedWindow
+        ``OK`` with, for each session ``s``, ``open_s * adjusted_close_s /
+        raw_close_s``; or the status of the first of the three windows - raw
+        opens, raw closes, adjusted closes - that is refused. Windows that do
+        not hold the same dates give ``MISSING_INPUT``; a price that is not
+        finite and strictly positive gives ``INVALID_INPUT``. A refused window
+        keeps its dates and no points.
+
+    Notes
+    -----
+    The adjustment factor is the reader's own, taken at the decision instant:
+    a split not known yet is not in it, and a later restatement is not
+    reconstructed. Nothing is filled, interpolated or dropped. The raw fields
+    follow the reader's selection of source and revision; an adjusted *open*
+    is not a total-return wealth, and the construction is named
+    :data:`ADJUSTED_OPEN_CONSTRUCTION` in the definition of whatever uses it.
+    """
+    loaded = [
+        load_window(
+            context,
+            instrument_id,
+            spec=spec,
+            bar_field=bar_field,
+            basis=basis,
+            max_age_sessions=max_age_sessions,
+        )
+        for bar_field, basis in (
+            (BarField.OPEN, PriceBasis.RAW),
+            (BarField.CLOSE, PriceBasis.RAW),
+            (BarField.CLOSE, PriceBasis.ADJUSTED),
+        )
+    ]
+    for window in loaded:
+        if window.status is not SignalStatus.OK:
+            return LoadedWindow(
+                status=window.status, dates=window.dates, age_sessions=window.age_sessions
+            )
+    opens, closes, adjusted = loaded
+    if not opens.dates == closes.dates == adjusted.dates:
+        return LoadedWindow(
+            status=SignalStatus.MISSING_INPUT, dates=opens.dates, age_sessions=opens.age_sessions
+        )
+    prices = (*opens.points, *closes.points, *adjusted.points)
+    if any(not math.isfinite(price) or price <= 0.0 for price in prices):
+        return LoadedWindow(
+            status=SignalStatus.INVALID_INPUT, dates=opens.dates, age_sessions=opens.age_sessions
+        )
+    points = tuple(
+        raw_open * adjusted_close / raw_close
+        for raw_open, raw_close, adjusted_close in zip(
+            opens.points, closes.points, adjusted.points, strict=True
+        )
+    )
+    return LoadedWindow(
+        status=SignalStatus.OK, points=points, dates=opens.dates, age_sessions=opens.age_sessions
+    )
+
+
 def _is_consecutive(
     context: SignalContext, instrument: Instrument, dates: tuple[date, ...]
 ) -> bool:

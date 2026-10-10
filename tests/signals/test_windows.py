@@ -11,15 +11,22 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import date, datetime
+from itertools import pairwise
 
 import pytest
 
 from quant_backtester.data.calendars import TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
-from quant_backtester.data.schemas import BarField
+from quant_backtester.data.schemas import ActionType, BarField
+from quant_backtester.demo import checked_bars_frame
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.types import PriceBasis, SignalStatus, WindowMode, WindowSpec
-from quant_backtester.signals.windows import LoadedWindow, load_window, returns_of
+from quant_backtester.signals.windows import (
+    LoadedWindow,
+    load_adjusted_open_window,
+    load_window,
+    returns_of,
+)
 
 
 def load(
@@ -311,3 +318,122 @@ def test_the_diagnostics_reach_the_result(context: SignalContext) -> None:
     assert row["status"] is SignalStatus.INSUFFICIENT_HISTORY
     assert row["observations_used"] == 10
     assert row["input_end_date"] == date(2026, 9, 14)
+
+
+# --- adjusted opens ------------------------------------------------------------------------
+
+
+def bars_with_opens(
+    calendar: TradingCalendar,
+    sessions: tuple[date, ...],
+    *,
+    scale_from: int | None = None,
+    scale: float = 1.0,
+) -> object:
+    """Return bars opening half a point under their close, optionally rescaled from a session.
+
+    Closes rise from 100 by one a session; from ``scale_from`` on, every quoted
+    price is multiplied by ``scale``, as a split would do to them.
+    """
+    drawn = {}
+    for index, session in enumerate(sessions):
+        factor = scale if scale_from is not None and index >= scale_from else 1.0
+        close = (100.0 + index) * factor
+        opening = close - 0.5 * factor
+        drawn[session] = (opening, close, opening, close)
+    return checked_bars_frame("ETF_EU", calendar, drawn)
+
+
+def adjusted_opens(context: SignalContext, observations: int = 5) -> LoadedWindow:
+    """Load a window of adjusted opens of the decided session."""
+    return load_adjusted_open_window(
+        context, "ETF_EU", spec=WindowSpec(observations), max_age_sessions=0
+    )
+
+
+def test_without_a_corporate_action_an_adjusted_open_is_the_open(
+    make_market, make_context, evening, sessions, xpar
+) -> None:
+    market = make_market({"ETF_EU": bars_with_opens(xpar, sessions)})
+
+    window = adjusted_opens(make_context(market, evening(sessions[-1])))
+
+    assert window.status is SignalStatus.OK
+    assert window.points == (104.5, 105.5, 106.5, 107.5, 108.5)
+    assert window.dates == sessions[-5:]
+    assert window.age_sessions == 0
+
+
+def test_a_known_split_leaves_the_adjusted_opens_continuous(
+    make_market, make_actions, make_context, evening, sessions, xpar
+) -> None:
+    """The factor is the reader's own: adjusted close over raw close, session by session."""
+    split = make_actions([("ETF_EU", ActionType.SPLIT, sessions[7], 4.0, evening(sessions[6]))])
+    market = make_market(
+        {"ETF_EU": bars_with_opens(xpar, sessions, scale_from=7, scale=0.25)}, actions=split
+    )
+
+    window = adjusted_opens(make_context(market, evening(sessions[-1])))
+
+    assert window.status is SignalStatus.OK
+    # Quoted after the split; the sessions before it are divided by four.
+    assert window.points == pytest.approx((104.5 / 4, 105.5 / 4, 106.5 / 4, 107.5 / 4, 108.5 / 4))
+    ratios = [later / earlier for earlier, later in pairwise(window.points)]
+    assert max(ratios) < 1.02  # no jump of a factor four anywhere in the window
+
+
+def test_a_split_not_known_at_the_decision_is_not_in_the_window(
+    make_market, make_actions, make_context, evening, sessions, xpar
+) -> None:
+    bars = {"ETF_EU": bars_with_opens(xpar, sessions)}
+    before = adjusted_opens(make_context(make_market(bars), evening(sessions[5])))
+
+    known_later = make_actions(
+        [("ETF_EU", ActionType.SPLIT, sessions[3], 4.0, evening(sessions[-1]))]
+    )
+    after = adjusted_opens(
+        make_context(make_market(bars, actions=known_later), evening(sessions[5]))
+    )
+
+    assert after == before
+    assert before.points == (100.5, 101.5, 102.5, 103.5, 104.5)
+
+
+def test_prices_after_the_decision_do_not_reach_an_adjusted_open(
+    make_market, make_context, evening, sessions, xpar
+) -> None:
+    early = adjusted_opens(
+        make_context(make_market({"ETF_EU": bars_with_opens(xpar, sessions)}), evening(sessions[5]))
+    )
+    moved = bars_with_opens(xpar, sessions, scale_from=6, scale=3.0)
+
+    late = adjusted_opens(make_context(make_market({"ETF_EU": moved}), evening(sessions[5])))
+
+    assert late == early
+
+
+def test_a_refused_window_of_adjusted_opens_says_why_and_holds_no_price(
+    make_market, make_bars, make_context, evening, sessions, xpar
+) -> None:
+    """A hole, a stale bar, a short history and a zero are four statuses, and none is filled."""
+    whole = make_market({"ETF_EU": bars_with_opens(xpar, sessions)})
+    short = adjusted_opens(make_context(whole, evening(sessions[2])))
+    assert short.status is SignalStatus.INSUFFICIENT_HISTORY and short.points == ()
+
+    closes = {session: 100.0 + index for index, session in enumerate(sessions)}
+    holed = make_bars("ETF_EU", xpar, closes, contested={sessions[-3]: [BarField.OPEN]})
+    hole = adjusted_opens(make_context(make_market({"ETF_EU": holed}), evening(sessions[-1])))
+    assert hole.status is SignalStatus.NON_CONSECUTIVE_HISTORY and hole.points == ()
+
+    stale = bars_with_opens(xpar, sessions[:-1])
+    old = adjusted_opens(make_context(make_market({"ETF_EU": stale}), evening(sessions[-1])))
+    assert old.status in (SignalStatus.STALE_INPUT, SignalStatus.MISSING_INPUT)
+    assert old.points == ()
+
+    closes[sessions[-2]] = 0.0
+    zero = adjusted_opens(
+        make_context(
+            make_market({"ETF_EU": make_bars("ETF_EU", xpar, closes)}), evening(sessions[-1])
+        )
+    )
+    assert zero.status is SignalStatus.INVALID_INPUT and zero.points == ()

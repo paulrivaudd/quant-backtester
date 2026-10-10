@@ -59,6 +59,7 @@ def test_the_books_are_the_runnable_strategies_and_the_three_references() -> Non
         "SA10 - ensemble",
         # Run when its estimator is installed, left out - and said so - otherwise.
         *(["SA11 - GARCH vol control"] if SCRIPT.garch_available() else []),
+        *(["SA12 - ARIMA GARCH"] if SCRIPT.arima_available() else []),
     ]
     for name, strategy in list(books.items())[3:]:
         assert strategy.strategy_id.startswith(name.split(" - ")[0] + "_")

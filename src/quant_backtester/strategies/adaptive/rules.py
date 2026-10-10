@@ -347,6 +347,87 @@ def forecast_volatility_rule(
     )
 
 
+def direction_gate(
+    mean: float, *, held: bool, entry_threshold: float, exit_threshold: float
+) -> bool:
+    """Return whether a forecast mean keeps, or opens, a position: a gate with hysteresis.
+
+    Parameters
+    ----------
+    mean : float
+        The forecast return of the next period a position can be held over.
+    held : bool
+        Whether the fund is actually held at the decision - the book, not the
+        target asked for the day before.
+    entry_threshold : float
+        A book in cash enters strictly above it.
+    exit_threshold : float
+        A held position is kept strictly above it, and sold at it.
+
+    Returns
+    -------
+    bool
+        ``mean > exit_threshold`` for a position held, ``mean >
+        entry_threshold`` from cash. Equality at the entry does not buy;
+        equality at the exit sells.
+    """
+    return mean > (exit_threshold if held else entry_threshold)
+
+
+def gated_volatility_rule(
+    instrument_id: str,
+    mean: float | None,
+    volatility: float | None,
+    *,
+    held: bool,
+    entry_threshold: float,
+    exit_threshold: float,
+    target_volatility: float,
+    floor: float,
+    gated: bool,
+) -> RuleTarget:
+    """Hold a fund sized to its risk while a forecast mean lets it be held.
+
+    Parameters
+    ----------
+    instrument_id : str
+        The fund.
+    mean : float | None
+        The forecast return the gate reads, as a fraction.
+    volatility : float | None
+        The annualised volatility the position is sized on, as a fraction.
+    held : bool
+        Whether the fund is actually held at the decision.
+    entry_threshold, exit_threshold : float
+        The two thresholds of :func:`direction_gate`.
+    target_volatility : float
+        The estimated annualised risk aimed at.
+    floor : float
+        Smallest volatility the sizing may take.
+    gated : bool
+        ``False`` for the control that sizes the same risk with the gate
+        always open, whatever the mean says.
+
+    Returns
+    -------
+    RuleTarget
+        ``w = g * min(1, target / max(volatility, floor))`` with ``g`` the
+        gate. Either input missing leaves the rule inactive: cash. The mean is
+        never used to size the position.
+    """
+    if mean is None or volatility is None:
+        return _missing()
+    active = direction_gate(
+        mean, held=held, entry_threshold=entry_threshold, exit_threshold=exit_threshold
+    )
+    estimate = max(volatility, floor)
+    weight = min(1.0, target_volatility / estimate) if (active or not gated) else 0.0
+    return _settled(
+        {instrument_id: weight},
+        {"mean": mean, "volatility": estimate, "gate": 1.0 if active else 0.0},
+    )
+
+
 def factor_blend_rule(
     volatilities: Mapping[str, float | None],
     *,

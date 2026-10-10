@@ -16,6 +16,7 @@ universes at one instant.
 
 from __future__ import annotations
 
+from quant_backtester.strategies.examples.arima_garch import ArimaGarch
 from quant_backtester.strategies.examples.buffered_dual_momentum import BufferedDualMomentum
 from quant_backtester.strategies.examples.buy_and_hold import BuyAndHold
 from quant_backtester.strategies.examples.equal_weight import EqualWeightRebalance
@@ -41,6 +42,7 @@ from quant_backtester.strategies.examples.vix_relief_entry import VixReliefEntry
 from quant_backtester.strategies.examples.world_ma20_benchmark import WorldMA20Benchmark
 
 __all__ = [
+    "ArimaGarch",
     "BufferedDualMomentum",
     "BuyAndHold",
     "EqualWeightRebalance",

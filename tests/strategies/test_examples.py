@@ -428,6 +428,7 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
     """
     import quant_backtester.strategies as package
     from quant_backtester.strategies import (
+        ArimaGarch,
         BufferedDualMomentum,
         ETFEnsemble,
         EwmaVolControl,
@@ -473,6 +474,7 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
         RelativeResidualTilt(first_id="ETF_EU", second_id="ETF_OTHER"),
         RealizedVolControl(instrument_id="ETF_EU"),
         GarchVolControl(instrument_id="ETF_EU"),
+        ArimaGarch(instrument_id="ETF_EU"),
         EwmaVolControl(instrument_id="ETF_EU"),
         FixedWeights(weights=(("ETF_EU", 0.6),)),
         FactorETFBlend(instrument_ids=("ETF_EU", "ETF_OTHER", "ETF_LATE")),
