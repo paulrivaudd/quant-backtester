@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### Files of a catalogued strategy carry its code (2026-10-11)
+- **Renamed**, so that a strategy's files are found by its code. Modules:
+  `strategies/examples/SA1_world_ma20_benchmark.py`,
+  `SA2_buffered_dual_momentum.py`, `SA3_smooth_moving_average.py`,
+  `SA4_trend_filtered_pullback.py`, `SA5_relative_residual_tilt.py`,
+  `SA6_realized_vol_control.py`, `SA7_factor_etf_blend.py`,
+  `SA8_monetary_carry.py`, `SA9_vix_relief_entry.py`,
+  `SA11_garch_vol_control.py`, `SA12_arima_garch.py`,
+  `SA13_signatures_neurons.py`, `strategies/adaptive/SA10_etf_ensemble.py` and
+  `strategies/ml/ML1_neural_allocation.py`. Study scripts:
+  `scripts/SA11_run_garch_study.py`, `SA12_run_arima_garch_study.py`,
+  `SA13_run_signature_study.py`, `ML1_run_neural_strategy.py`. Their test files
+  follow (`test_SA11_garch_vol_control.py`, `test_SA11_run_garch_study.py` ...),
+  and the five figures of the `SA11` study (`SA11_equity_common.png` ...).
+- **Not renamed**: what several strategies share (`signals/`, `ml/`, the rules,
+  `run_etf_strategies_comparison.py`, `run_review_diagnostics.py`,
+  `write_strategy_reports.py`, `test_etf_strategies.py`) and the examples that
+  have no catalogue code (the baselines and the exercises). The classes and the
+  `strategy_id` of every strategy are unchanged, and
+  `from quant_backtester.strategies import ...` works as before.
+- **Fingerprints of `SA1` to `SA13` and `ML1` change**: the module path is part
+  of a strategy's `definition()`. No number of a result moves. No committed
+  record holds one of these fingerprints: the register and the two paper plans
+  are about the baselines, whose modules keep their names, and the frozen model
+  of `ML1` (`d9bfd125bf69`) loads as before. A run exported before this change
+  carries the earlier fingerprint of its strategy.
+- The entries below, the dated reports and the pre-registered hypotheses keep
+  the names their files had when they were written.
+- One test of the `SA13` study patched three scripts through `sys.modules`, and
+  passed only while its file was collected after the others: it now reaches
+  them through the functions the script holds.
+
 ### SA13 - Signatures Neurons (specification of 2026-10-10)
 - **New strategy `SA13`** (`SignaturesNeurons`): `ETF_WORLD` is held while a
   neural additive model reading the 13 coefficients of the order-3

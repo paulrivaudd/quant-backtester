@@ -9,7 +9,7 @@ fixed at the decision. The book is continuous: a new month is a new model, never
 a new portfolio. From the repository root, once the store is filled and the
 ``ml``, ``stats`` and ``signatures`` extras are installed:
 
-    OMP_NUM_THREADS=1 uv run python scripts/run_signature_study.py \
+    OMP_NUM_THREADS=1 uv run python scripts/SA13_run_signature_study.py \
         --output results/signature_study
 
 One thread is asked for because the last digits of a fit move with the number of
@@ -57,7 +57,7 @@ What is written: ``manifest.json``, ``model_schedule.csv``,
 ``config.json``, one ``history_<book>.csv`` per book and
 ``report_extra_SA13.md``).
 
-The tests are in ``tests/scripts/test_run_signature_study.py``.
+The tests are in ``tests/scripts/test_SA13_run_signature_study.py``.
 """
 
 from __future__ import annotations
@@ -78,7 +78,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from run_arima_garch_study import RANKING_COLUMNS, THREAD_VARIABLES, sortino
 from run_etf_strategies_comparison import (
     ANALYTICS,
     BENCHMARK,
@@ -94,7 +93,8 @@ from run_etf_strategies_comparison import (
     quality_table,
     slug,
 )
-from run_garch_study import (
+from run_review_diagnostics import episode_summary, episodes
+from SA11_run_garch_study import (
     BOOTSTRAP_DRAWS,
     BOOTSTRAP_LEVEL,
     BOOTSTRAP_SEED,
@@ -109,7 +109,7 @@ from run_garch_study import (
     summary_frame,
     yearly_frame,
 )
-from run_review_diagnostics import episode_summary, episodes
+from SA12_run_arima_garch_study import RANKING_COLUMNS, THREAD_VARIABLES, sortino
 
 from quant_backtester.analytics.curves import Book
 from quant_backtester.analytics.quality import QUALITY_V1
@@ -155,7 +155,10 @@ from quant_backtester.strategies.adaptive.rules import (
 )
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.catalogue import entry
-from quant_backtester.strategies.examples.signatures_neurons import STRATEGY_ID, SignaturesNeurons
+from quant_backtester.strategies.examples.SA13_signatures_neurons import (
+    STRATEGY_ID,
+    SignaturesNeurons,
+)
 
 SA13 = entry("SA13").display_name
 """The strategy under study."""

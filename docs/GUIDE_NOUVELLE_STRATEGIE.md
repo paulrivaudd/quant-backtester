@@ -237,6 +237,15 @@ Les règles de la décision :
 - Exportez la classe dans `strategies/examples/__init__.py` et
   `strategies/__init__.py`, et ajoutez-la au test « chaque stratégie exportée
   est exécutable ».
+- **Une stratégie qui reçoit un code du catalogue le porte en tête de ses
+  fichiers** : son module (`SA11_garch_vol_control.py`), son fichier de test
+  (`test_SA11_garch_vol_control.py`, `test_` restant devant pour pytest), son
+  script d'étude (`scripts/SA11_run_garch_study.py`, et son test
+  `test_SA11_run_garch_study.py`) et les figures que ce script écrit
+  (`SA11_equity_common.png`). Un module que plusieurs stratégies partagent
+  (signaux, modèles, règles) et un exemple sans code gardent un nom simple.
+  Le chemin du module entre dans `definition()` : renommer un module change
+  l'empreinte de sa stratégie.
 
 ### Tester la stratégie (`tests/strategies/test_examples.py`)
 

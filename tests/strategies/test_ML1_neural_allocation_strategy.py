@@ -20,7 +20,7 @@ from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine
 from quant_backtester.signals.types import SignalStatus
-from quant_backtester.strategies.ml.neural_allocation import (
+from quant_backtester.strategies.ml.ML1_neural_allocation import (
     Action,
     InformationCutoffError,
     NeuralAllocationStrategy,

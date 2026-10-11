@@ -15,7 +15,7 @@ rebalanced. A strategy is named by its catalogue code and label
 guess. It needs 757 consecutive closes, which the default period does not hold
 at its start: ``--start`` and ``--end`` state another period, and
 :data:`COMMON_PERIOD` is the one every book has its window on from the first
-decision (``scripts/run_garch_study.py`` runs the comparison there).
+decision (``scripts/SA11_run_garch_study.py`` runs the comparison there).
 
 Each book also gets a quality score between 0 and 100%
 (:mod:`quant_backtester.analytics.quality`, version 1): how well it beat
@@ -172,7 +172,7 @@ def books() -> dict[str, Strategy]:
     entry; the two references keep a plain name. ``SA11`` and ``SA12`` are among
     them when their estimators are installed and absent otherwise: :func:`main`
     says so rather than print a row for them. ``SA13`` is not: it needs a
-    schedule of calibrated models, which ``scripts/run_signature_study.py`` builds.
+    schedule of calibrated models, which ``scripts/SA13_run_signature_study.py`` builds.
     """
     catalogued: tuple[Strategy, ...] = (
         BufferedDualMomentum(),

@@ -6,7 +6,7 @@ period starts after its information cutoff, and runs it once. From the
 repository root, once the store is filled and the ``ml`` extra installed
 (``uv sync --extra ml``):
 
-    uv run python scripts/run_neural_strategy.py --output results/ml1
+    uv run python scripts/ML1_run_neural_strategy.py --output results/ml1
 
 The configuration is the one the store can serve today: the two PEA funds and
 the VIX are read, the two funds are bought. Bond, oil and gold series are not
@@ -39,7 +39,7 @@ decision with the weights proposed, the target after the thresholds, the
 weights held, the action taken and its reason, so that a day in cash for want
 of data is told from a day in cash by choice.
 
-The tests are in ``tests/scripts/test_run_neural_strategy.py``.
+The tests are in ``tests/scripts/test_ML1_run_neural_strategy.py``.
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ from quant_backtester.signals.types import SignalStatus
 from quant_backtester.strategies import BuyAndHold, EqualWeightRebalance, WorldMA20Benchmark
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.catalogue import entry
-from quant_backtester.strategies.ml.neural_allocation import (
+from quant_backtester.strategies.ml.ML1_neural_allocation import (
     Action,
     NeuralAllocationStrategy,
     neural_decision,

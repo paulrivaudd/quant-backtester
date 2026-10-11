@@ -2,7 +2,7 @@
 
 ``rules`` holds each rule as a pure function of numbers: no context, no book,
 no market. The strategies of ``strategies.examples`` read their signals and
-hand the values to one rule each; ``etf_ensemble`` hands them to all of them
+hand the values to one rule each; ``SA10_etf_ensemble`` hands them to all of them
 and applies one risk control to the sum. ``inputs`` builds the signals every
 rule reads, in one place, so that two strategies asking for a sixty-return
 volatility ask for the same one.

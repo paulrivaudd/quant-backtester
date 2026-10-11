@@ -35,7 +35,7 @@ missing. ``EwmaVolControl`` is its control and carries no catalogue code.
 
 from __future__ import annotations
 
-from quant_backtester.strategies.adaptive.etf_ensemble import ETFEnsemble
+from quant_backtester.strategies.adaptive.SA10_etf_ensemble import ETFEnsemble
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
     ArimaGarch,

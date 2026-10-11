@@ -6,7 +6,7 @@ which ``SA11`` fits its model on a full window from the first decision, with
 decision. From the repository root, once the store is filled and the ``stats``
 extra installed (``uv sync --extra stats``):
 
-    uv run python scripts/run_garch_study.py --output results/garch_study
+    uv run python scripts/SA11_run_garch_study.py --output results/garch_study
 
 The participants are those of ``run_etf_strategies_comparison.py`` - ``SA1``
 to ``SA6``, ``SA9``, ``SA10``, ``SA11``, the fund held and the even split -
@@ -39,7 +39,7 @@ What is written: ``summary.csv``, ``quality_details.csv``,
 the signals it read, its weights and its value at every session),
 ``config.json``, ``study.md`` and five figures.
 
-The tests are in ``tests/scripts/test_run_garch_study.py``.
+The tests are in ``tests/scripts/test_SA11_run_garch_study.py``.
 """
 
 from __future__ import annotations
@@ -881,7 +881,7 @@ def study_figures(
         width = 2.0 if name in PALETTE else 0.9
         axes.plot(list(curve.index), list(curve), color=colour, linewidth=width, label=name)
     axes.legend(loc="upper left", fontsize=8, frameon=False, labelcolor=MUTED, ncols=2)
-    figures["equity_common.png"] = figure
+    figures["SA11_equity_common.png"] = figure
 
     figure, (axes,) = _figure(
         "Drawdown of SA11, its two controls and the fund held",
@@ -891,7 +891,7 @@ def study_figures(
         depth = drawdown_curve(results[name].equity()) * 100.0
         axes.plot(list(depth.index), list(depth), color=colour, linewidth=1.4, label=name)
     axes.legend(loc="lower left", fontsize=9, frameon=False, labelcolor=MUTED)
-    figures["drawdowns_vol_controls.png"] = figure
+    figures["SA11_drawdowns_vol_controls.png"] = figure
 
     figure, (axes,) = _figure(
         "Weight of ETF_WORLD held by SA11 and its two controls",
@@ -902,7 +902,7 @@ def study_figures(
         axes.plot(list(held.index), list(held), color=PALETTE[name], linewidth=1.2, label=name)
     axes.set_ylim(0.0, 102.0)
     axes.legend(loc="lower left", fontsize=9, frameon=False, labelcolor=MUTED)
-    figures["weights_vol_controls.png"] = figure
+    figures["SA11_weights_vol_controls.png"] = figure
 
     figure, (axes,) = _figure(
         "Annualised volatility estimated at each decision",
@@ -938,7 +938,7 @@ def study_figures(
     axes.axhline(12.0, color=MUTED, linewidth=0.8, linestyle="--")
     axes.set_ylabel("% a year", fontsize=9, color=MUTED)
     axes.legend(loc="upper right", fontsize=9, frameon=False, labelcolor=MUTED)
-    figures["volatility_estimates.png"] = figure
+    figures["SA11_volatility_estimates.png"] = figure
 
     figure, (axes,) = _figure("Cumulative costs paid by each book", "EUR, on 100 000 EUR at start.")
     for name, result in results.items():
@@ -946,7 +946,7 @@ def study_figures(
         colour = PALETTE.get(name, "#b5b4ae")
         axes.plot(list(paid.index), list(paid), color=colour, linewidth=1.3, label=name)
     axes.legend(loc="upper left", fontsize=8, frameon=False, labelcolor=MUTED, ncols=2)
-    figures["cumulative_costs.png"] = figure
+    figures["SA11_cumulative_costs.png"] = figure
     return figures
 
 

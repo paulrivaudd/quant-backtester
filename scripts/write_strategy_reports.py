@@ -13,7 +13,7 @@ strategy holding both funds cannot be read without the second. Three sections:
 3. the history: the closes of the funds, the signals the strategy read, the
    weights it targeted and held, and its value, session by session.
 
-From the repository root, after ``scripts/run_garch_study.py``:
+From the repository root, after ``scripts/SA11_run_garch_study.py``:
 
     uv run python scripts/write_strategy_reports.py \
         --study results/garch_study --output research/reports/2026-10-10
@@ -55,7 +55,7 @@ from run_etf_strategies_comparison import (
     quality_details,
     slug,
 )
-from run_garch_study import EWMA, FUND, summary_frame, yearly_frame
+from SA11_run_garch_study import EWMA, FUND, summary_frame, yearly_frame
 
 from quant_backtester.analytics.curves import Book
 from quant_backtester.strategies.catalogue import CATALOGUE
@@ -902,10 +902,10 @@ def ml1_report(
         If the calibrated artifact of seed 42 is not in ``artifacts``.
     """
     # Imported on use: the script and the model need PyTorch, an optional dependency.
-    import run_neural_strategy as neural
+    import ML1_run_neural_strategy as neural
 
     from quant_backtester.ml.artifacts import NeuralArtifact
-    from quant_backtester.strategies.ml.neural_allocation import NeuralAllocationStrategy
+    from quant_backtester.strategies.ml.ML1_neural_allocation import NeuralAllocationStrategy
 
     runner = neural.build_runner(store)
     artifact = NeuralArtifact.load(artifacts / "seed42_costs_x1", expected=neural.neural_config(42))

@@ -331,11 +331,11 @@ neuronale. Les exemples et exercices antérieurs ne sont pas
 catalogués. `entry("SA3")`, `entry_of(strategy)` et `family(Family.SA)`
 donnent une entrée ; `entry.load()` importe la classe à la demande.
 
-### ML1, l'allocation neuronale (`strategies/ml/neural_allocation.py`)
+### ML1, l'allocation neuronale (`strategies/ml/ML1_neural_allocation.py`)
 
 Un petit réseau (encodeur partagé `Linear(100, 8)`, couche cachée de 16,
 softmax sur les fonds achetables et le cash) propose chaque soir des poids. Il
-est entraîné **avant** le backtest (`scripts/run_neural_strategy.py`), puis
+est entraîné **avant** le backtest (`scripts/ML1_run_neural_strategy.py`), puis
 figé dans un artefact identifié par son contenu (`model_id`). La décision
 plafonne, retire les poids sous 1 %, puis compare au livre réellement détenu :
 `hold_positions` dans la bande de 3 points (cash compris), `weights` sinon,
@@ -346,7 +346,7 @@ en décision ; les rendements futurs ouverture→ouverture ne sont lus que par
 l'artefact porte sa date limite d'information et une décision prise avant est
 refusée (`InformationCutoffError`).
 
-### SA11, le contrôle de volatilité GARCH (`strategies/examples/garch_vol_control.py`)
+### SA11, le contrôle de volatilité GARCH (`strategies/examples/SA11_garch_vol_control.py`)
 
 `GarchVolControl` détient `ETF_WORLD` à hauteur de
 `min(1, 12 % / max(σ, 5 %))`, où `σ = sqrt(252 · h(t+1|t))` est la prévision à
@@ -379,11 +379,11 @@ comparateur.
 
 `analytics/volatility_forecast.py` juge la prévision **ex post** : appariement
 origine → séance suivante, QLIKE (`log q + r²/q`, plancher de métrique à 1e-12
-compté), erreur quadratique, résidus standardisés. `scripts/run_garch_study.py`
+compté), erreur quadratique, résidus standardisés. `scripts/SA11_run_garch_study.py`
 tient séparés le classement commun, la qualité de la prévision et le test
 économique de l'hypothèse (bootstrap apparié, second run réel à coûts doublés).
 
-### SA12, ARIMA-GARCH (`strategies/examples/arima_garch.py`)
+### SA12, ARIMA-GARCH (`strategies/examples/SA12_arima_garch.py`)
 
 `ArimaGarch` détient `ETF_WORLD` tant qu'un ARIMA(1,0,1) prévoit un rendement
 positif pour **la première séance qu'un ordre peut porter**, à un poids
@@ -410,7 +410,7 @@ dimensionné par la variance de ce rendement.
   `read_joint_forecast` lève si la colonne de volatilité manque. Un échec ARIMA
   est `INVALID_INPUT` avec `failure_stage="ARIMA"`, jamais une donnée manquante.
 - **Contrôles** (sans code de catalogue) : D0 sans filtre de direction, D1
-  avec variance EWMA, D2 à moyenne constante. `scripts/run_arima_garch_study.py`
+  avec variance EWMA, D2 à moyenne constante. `scripts/SA12_run_arima_garch_study.py`
   les exécute et attribue un statut à l'hypothèse (`INSUFFICIENT_EVIDENCE`,
   `NOT_SUPPORTED`, `UNCERTAIN`, `SUPPORTED_RETROSPECTIVE`).
 
@@ -418,7 +418,7 @@ dimensionné par la variance de ce rendement.
 rendement de l'ouverture `t+1` à l'ouverture `t+2` et mesure la moyenne (MSE,
 signe avec ses dénominateurs) et la perte jointe `log v + e²/v`.
 
-### SA13, signatures neuronales (`strategies/examples/signatures_neurons.py`)
+### SA13, signatures neuronales (`strategies/examples/SA13_signatures_neurons.py`)
 
 `SignaturesNeurons` détient `ETF_WORLD` tant qu'un modèle additif, lisant la
 log-signature de ses 60 dernières séances, prévoit un rendement simple positif
@@ -458,7 +458,7 @@ de l'ouverture `t+1` à l'ouverture `t+2`.
   portefeuille est continu d'un mois à l'autre.
 - **Contrôles** (sans code de catalogue) : C0 mêmes modèles sans filtre, C1
   Ridge, C2 ordre 2, C3 sans volume, C4 indicateurs classiques, C5 trajectoire
-  brute, C6/C7 contexte World + S&P 500. `scripts/run_signature_study.py`
+  brute, C6/C7 contexte World + S&P 500. `scripts/SA13_run_signature_study.py`
   calibre, exécute, exporte les contributions et attribue le statut.
 
 ## 8. Portefeuille et exécution
@@ -580,9 +580,9 @@ La couche `research/` porte la discipline de recherche décrite dans
 | `scripts/sensitivity.py` | la référence sous `AT_AUCTION` / `AT_DECISION`, avec coûts ×1 et ×2 | non |
 | `scripts/paper_trade.py` | vérifier et prolonger les plans de paper trading | non |
 | `scripts/run_etf_strategies_comparison.py` | les règles `SA` sur les mêmes dates et coûts (`--start`, `--end` ; `SA11` omise avec la mention « dependency missing » sans l'extra `stats`) ; `quality_details.csv` | non |
-| `scripts/run_signature_study.py` | l'étude `SA13` : calibrations mensuelles, contrôles C0 à C7, contributions, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`, extras `ml stats signatures`) | non |
-| `scripts/run_arima_garch_study.py` | l'étude `SA12` : contrôles D0/D1/D2, prévisions à deux pas, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`) | non |
-| `scripts/run_garch_study.py` | l'étude `SA11` sur la période commune : classement, témoins `SA6`/EWMA, QLIKE, bootstrap, coûts ×2, historiques par stratégie | non |
+| `scripts/SA13_run_signature_study.py` | l'étude `SA13` : calibrations mensuelles, contrôles C0 à C7, contributions, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`, extras `ml stats signatures`) | non |
+| `scripts/SA12_run_arima_garch_study.py` | l'étude `SA12` : contrôles D0/D1/D2, prévisions à deux pas, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`) | non |
+| `scripts/SA11_run_garch_study.py` | l'étude `SA11` sur la période commune : classement, témoins `SA6`/EWMA, QLIKE, bootstrap, coûts ×2, historiques par stratégie | non |
 | `scripts/write_strategy_reports.py` | un fichier `strategy<code>_ResultsAndAnalysis_<date>.md` par stratégie, depuis les exports d'une étude ; `--only SA12` écrit le rapport d'une étude dédiée, avec le classement de ses livres et la section que l'étude a écrite (`report_extra_<code>.md`) | non |
 
 **Référence d'API.** Chaque module, classe et fonction publique a une docstring

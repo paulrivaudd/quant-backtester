@@ -18,7 +18,7 @@ from quant_backtester.backtest.runner import StrategyRunner
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.ml.artifacts import ArtifactError
 from quant_backtester.ml.config import NeuralStrategyConfig
-from quant_backtester.strategies.ml.neural_allocation import (
+from quant_backtester.strategies.ml.ML1_neural_allocation import (
     InformationCutoffError,
     NeuralAllocationStrategy,
 )
@@ -28,9 +28,9 @@ TEST_START, TEST_END = date(2026, 9, 1), date(2026, 12, 18)
 
 
 def load_script() -> ModuleType:
-    """Import ``scripts/run_neural_strategy.py`` by its path."""
-    path = REPOSITORY / "scripts" / "run_neural_strategy.py"
-    spec = importlib.util.spec_from_file_location("run_neural_strategy", path)
+    """Import ``scripts/ML1_run_neural_strategy.py`` by its path."""
+    path = REPOSITORY / "scripts" / "ML1_run_neural_strategy.py"
+    spec = importlib.util.spec_from_file_location("ML1_run_neural_strategy", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

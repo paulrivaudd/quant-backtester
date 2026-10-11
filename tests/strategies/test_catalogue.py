@@ -54,7 +54,7 @@ def test_a_rule_based_strategy_is_recorded_under_its_catalogue_id(item: Catalogu
 
 def test_the_neural_strategy_is_recorded_under_its_catalogue_id() -> None:
     pytest.importorskip("torch")
-    from quant_backtester.strategies.ml.neural_allocation import STRATEGY_ID
+    from quant_backtester.strategies.ml.ML1_neural_allocation import STRATEGY_ID
 
     assert entry("ML1").strategy_id == STRATEGY_ID
     assert entry("ML1").load().__name__ == "NeuralAllocationStrategy"

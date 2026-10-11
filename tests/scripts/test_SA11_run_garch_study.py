@@ -38,7 +38,7 @@ def load_script(name: str) -> ModuleType:
 
 
 COMPARISON = load_script("run_etf_strategies_comparison")
-SCRIPT = load_script("run_garch_study")
+SCRIPT = load_script("SA11_run_garch_study")
 DAYS = [date(2024, 1, 1) + timedelta(days=i) for i in range(400)]
 
 

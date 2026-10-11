@@ -1,7 +1,7 @@
 # Résultats et analyses du 10 octobre 2026
 
 Un rapport par stratégie, écrit par `scripts/write_strategy_reports.py` à
-partir des exports de `scripts/run_garch_study.py`, après mise à jour du
+partir des exports de `scripts/SA11_run_garch_study.py`, après mise à jour du
 magasin jusqu'au 2026-10-09.
 
 Chaque fichier `strategy<CODE>_ResultsAndAnalysis_10102026.md` a trois
@@ -101,7 +101,7 @@ GARCH en général. Détail : [SA11_study_10102026.md](SA11_study_10102026.md).
 ## SA12 : une étude à part, sur la même période
 
 [strategySA12_ResultsAndAnalysis_10102026.md](strategySA12_ResultsAndAnalysis_10102026.md)
-vient de sa propre étude (`scripts/run_arima_garch_study.py`, commit `10f6d90`,
+vient de sa propre étude (`scripts/SA12_run_arima_garch_study.py`, commit `10f6d90`,
 même magasin, même période 2021-04-01 → 2026-10-09), qui exécute aussi trois
 contrôles sans code de catalogue : D0 (même ARIMA et même variance, filtre de
 direction toujours ouvert), D1 (variance EWMA), D2 (moyenne constante). Son
@@ -138,7 +138,7 @@ candidat : en adopter un serait une nouvelle hypothèse.
 ## SA13 : une étude à part, sur une période de test plus courte
 
 [strategySA13_ResultsAndAnalysis_10102026.md](strategySA13_ResultsAndAnalysis_10102026.md)
-vient de sa propre étude (`scripts/run_signature_study.py`, commit `2b7d147`,
+vient de sa propre étude (`scripts/SA13_run_signature_study.py`, commit `2b7d147`,
 même magasin). Un modèle par mois est calibré sur ce qui était connu au soir
 de la dernière séance du mois précédent ; le premier mois calibrable est
 janvier 2023, donc la **période de test est 2023-01-02 → 2026-10-09** (964
@@ -275,22 +275,22 @@ analyse des entrées de `ML1`.
 ```bash
 uv sync --extra ml --extra stats
 uv run python scripts/update_market_data.py
-uv run python scripts/run_garch_study.py --output results/garch_study
+uv run python scripts/SA11_run_garch_study.py --output results/garch_study
 # les diagnostics chargent d'abord le modèle de ML1 : il doit exister
-uv run python scripts/run_neural_strategy.py --seed 42 --calibrate-only
+uv run python scripts/ML1_run_neural_strategy.py --seed 42 --calibrate-only
 uv run python scripts/run_review_diagnostics.py
 uv run python scripts/write_strategy_reports.py \
     --study results/garch_study --output research/reports/2026-10-10
 
 # SA12, son étude et son rapport (une heure environ, un seul fil de calcul)
-OMP_NUM_THREADS=1 uv run python scripts/run_arima_garch_study.py \
+OMP_NUM_THREADS=1 uv run python scripts/SA12_run_arima_garch_study.py \
     --output results/arima_garch_study
 uv run python scripts/write_strategy_reports.py \
     --study results/arima_garch_study --output research/reports/2026-10-10 --only SA12
 
 # SA13, ses calibrations mensuelles, son étude et son rapport (vingt minutes environ)
 uv sync --extra ml --extra stats --extra signatures
-OMP_NUM_THREADS=1 uv run python scripts/run_signature_study.py \
+OMP_NUM_THREADS=1 uv run python scripts/SA13_run_signature_study.py \
     --output results/signature_study
 uv run python scripts/write_strategy_reports.py \
     --study results/signature_study --output research/reports/2026-10-10 --only SA13

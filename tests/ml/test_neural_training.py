@@ -26,7 +26,7 @@ from quant_backtester.ml.training import (
     proportional_cost_rate,
     validation_score,
 )
-from quant_backtester.strategies.ml.neural_allocation import (
+from quant_backtester.strategies.ml.ML1_neural_allocation import (
     InformationCutoffError,
     NeuralAllocationStrategy,
 )

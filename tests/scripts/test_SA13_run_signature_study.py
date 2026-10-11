@@ -46,12 +46,12 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 def load_script() -> ModuleType:
-    """Import ``scripts/run_signature_study.py``, its folder on the path as when run."""
+    """Import ``scripts/SA13_run_signature_study.py``, its folder on the path as when run."""
     scripts = REPOSITORY / "scripts"
     if str(scripts) not in sys.path:
         sys.path.insert(0, str(scripts))
-    path = scripts / "run_signature_study.py"
-    spec = importlib.util.spec_from_file_location("run_signature_study", path)
+    path = scripts / "SA13_run_signature_study.py"
+    spec = importlib.util.spec_from_file_location("SA13_run_signature_study", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -352,8 +352,12 @@ def test_the_whole_route_holds_together_and_leaks_nothing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    for name in ("run_signature_study", "run_garch_study", "run_etf_strategies_comparison"):
-        monkeypatch.setattr(sys.modules[name], "UNIVERSE", (FUND, OTHER))
+    # The three scripts are reached through the functions this one holds, not through
+    # their names: another test file may since have loaded a second copy of one of them.
+    study = SCRIPT.book_histories.__globals__
+    comparison = study["closes_of"].__globals__
+    for namespace in (vars(SCRIPT), study, comparison):
+        monkeypatch.setitem(namespace, "UNIVERSE", (FUND, OTHER))
     reader = make_signature_market()
     runner = make_neural_runner(reader)
     timetable = runner.timetable

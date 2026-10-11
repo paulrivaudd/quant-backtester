@@ -5,7 +5,13 @@ they were written in. So a strategy that is kept gets a code - a family and a
 number, ``SA3`` or ``ML1`` - and a label of two or three words, and that pair
 is its name everywhere a person reads one: ``"SA3 - smooth MA"`` in a table or
 a figure, ``SA3_smooth_ma`` as the ``strategy_id`` of a result, and
-``sa3_smooth_ma`` in a file name.
+``sa3_smooth_ma`` in the name of a file a run exports.
+
+The files written for one catalogued strategy alone carry its code first: its
+module (``SA3_smooth_moving_average.py``), its test file
+(``test_SA11_garch_vol_control.py``), its study script
+(``SA11_run_garch_study.py``) and the figures that script writes. A module
+several strategies share, and an example that has no code, keep a plain name.
 
 A code is given once and never reused: a strategy that is dropped keeps its
 number, and the next one takes the next. The label may be reworded; the code
@@ -120,44 +126,55 @@ _EXAMPLES = "quant_backtester.strategies.examples"
 
 CATALOGUE: tuple[CatalogueEntry, ...] = (
     CatalogueEntry(
-        Family.SA, 1, "std MA20", f"{_EXAMPLES}.world_ma20_benchmark:WorldMA20Benchmark"
+        Family.SA, 1, "std MA20", f"{_EXAMPLES}.SA1_world_ma20_benchmark:WorldMA20Benchmark"
     ),
     CatalogueEntry(
-        Family.SA, 2, "dual momentum", f"{_EXAMPLES}.buffered_dual_momentum:BufferedDualMomentum"
+        Family.SA,
+        2,
+        "dual momentum",
+        f"{_EXAMPLES}.SA2_buffered_dual_momentum:BufferedDualMomentum",
     ),
     CatalogueEntry(
-        Family.SA, 3, "smooth MA", f"{_EXAMPLES}.smooth_moving_average:SmoothMovingAverage"
+        Family.SA, 3, "smooth MA", f"{_EXAMPLES}.SA3_smooth_moving_average:SmoothMovingAverage"
     ),
     CatalogueEntry(
-        Family.SA, 4, "pullback", f"{_EXAMPLES}.trend_filtered_pullback:TrendFilteredPullback"
+        Family.SA, 4, "pullback", f"{_EXAMPLES}.SA4_trend_filtered_pullback:TrendFilteredPullback"
     ),
     CatalogueEntry(
-        Family.SA, 5, "relative tilt", f"{_EXAMPLES}.relative_residual_tilt:RelativeResidualTilt"
+        Family.SA,
+        5,
+        "relative tilt",
+        f"{_EXAMPLES}.SA5_relative_residual_tilt:RelativeResidualTilt",
     ),
     CatalogueEntry(
-        Family.SA, 6, "vol control", f"{_EXAMPLES}.realized_vol_control:RealizedVolControl"
-    ),
-    CatalogueEntry(Family.SA, 7, "factor blend", f"{_EXAMPLES}.factor_etf_blend:FactorETFBlend"),
-    CatalogueEntry(Family.SA, 8, "monetary carry", f"{_EXAMPLES}.monetary_carry:MonetaryCarry"),
-    CatalogueEntry(Family.SA, 9, "VIX relief", f"{_EXAMPLES}.vix_relief_entry:VixReliefEntry"),
-    CatalogueEntry(
-        Family.SA, 10, "ensemble", "quant_backtester.strategies.adaptive.etf_ensemble:ETFEnsemble"
+        Family.SA, 6, "vol control", f"{_EXAMPLES}.SA6_realized_vol_control:RealizedVolControl"
     ),
     CatalogueEntry(
-        Family.SA, 11, "GARCH vol control", f"{_EXAMPLES}.garch_vol_control:GarchVolControl"
+        Family.SA, 7, "factor blend", f"{_EXAMPLES}.SA7_factor_etf_blend:FactorETFBlend"
     ),
-    CatalogueEntry(Family.SA, 12, "ARIMA GARCH", f"{_EXAMPLES}.arima_garch:ArimaGarch"),
+    CatalogueEntry(Family.SA, 8, "monetary carry", f"{_EXAMPLES}.SA8_monetary_carry:MonetaryCarry"),
+    CatalogueEntry(Family.SA, 9, "VIX relief", f"{_EXAMPLES}.SA9_vix_relief_entry:VixReliefEntry"),
+    CatalogueEntry(
+        Family.SA,
+        10,
+        "ensemble",
+        "quant_backtester.strategies.adaptive.SA10_etf_ensemble:ETFEnsemble",
+    ),
+    CatalogueEntry(
+        Family.SA, 11, "GARCH vol control", f"{_EXAMPLES}.SA11_garch_vol_control:GarchVolControl"
+    ),
+    CatalogueEntry(Family.SA, 12, "ARIMA GARCH", f"{_EXAMPLES}.SA12_arima_garch:ArimaGarch"),
     CatalogueEntry(
         Family.SA,
         13,
         "Signatures Neurons",
-        f"{_EXAMPLES}.signatures_neurons:SignaturesNeurons",
+        f"{_EXAMPLES}.SA13_signatures_neurons:SignaturesNeurons",
     ),
     CatalogueEntry(
         Family.ML,
         1,
         "neural allocation",
-        "quant_backtester.strategies.ml.neural_allocation:NeuralAllocationStrategy",
+        "quant_backtester.strategies.ml.ML1_neural_allocation:NeuralAllocationStrategy",
     ),
 )
 """Every catalogued strategy, by family then by number.

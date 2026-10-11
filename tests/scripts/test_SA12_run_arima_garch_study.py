@@ -23,12 +23,12 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 def load_script() -> ModuleType:
-    """Import ``scripts/run_arima_garch_study.py``, its folder on the path as when run."""
+    """Import ``scripts/SA12_run_arima_garch_study.py``, its folder on the path as when run."""
     scripts = REPOSITORY / "scripts"
     if str(scripts) not in sys.path:
         sys.path.insert(0, str(scripts))
-    path = scripts / "run_arima_garch_study.py"
-    spec = importlib.util.spec_from_file_location("run_arima_garch_study", path)
+    path = scripts / "SA12_run_arima_garch_study.py"
+    spec = importlib.util.spec_from_file_location("SA12_run_arima_garch_study", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

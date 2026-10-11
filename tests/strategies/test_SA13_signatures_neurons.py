@@ -33,7 +33,7 @@ from quant_backtester.signals.signatures import logsignature
 from quant_backtester.signals.signatures.logsignature import FeatureKind
 from quant_backtester.signals.types import SignalStatus
 from quant_backtester.strategies.catalogue import entry, entry_of
-from quant_backtester.strategies.examples.signatures_neurons import (
+from quant_backtester.strategies.examples.SA13_signatures_neurons import (
     STRATEGY_ID,
     SignaturesNeurons,
 )

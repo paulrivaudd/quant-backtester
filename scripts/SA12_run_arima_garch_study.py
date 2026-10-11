@@ -6,7 +6,7 @@ with 100 000 EUR, the costs of the ETF comparison and quantities fixed at the
 decision. From the repository root, once the store is filled and the ``stats``
 extra installed (``uv sync --extra stats``):
 
-    OMP_NUM_THREADS=1 uv run python scripts/run_arima_garch_study.py \
+    OMP_NUM_THREADS=1 uv run python scripts/SA12_run_arima_garch_study.py \
         --output results/arima_garch_study
 
 One thread is asked for because the last digits of an optimiser's answer move
@@ -46,7 +46,7 @@ What is written: ``manifest.json``, ``global_metrics.csv``,
 ``fills.csv``, ``config.json``, one ``history_<book>.csv`` per book and
 ``report_extra_SA12.md``).
 
-The tests are in ``tests/scripts/test_run_arima_garch_study.py``.
+The tests are in ``tests/scripts/test_SA12_run_arima_garch_study.py``.
 """
 
 from __future__ import annotations
@@ -83,7 +83,8 @@ from run_etf_strategies_comparison import (
     sessions_of,
     slug,
 )
-from run_garch_study import (
+from run_review_diagnostics import episode_summary, episodes
+from SA11_run_garch_study import (
     BOOTSTRAP_BLOCK,
     BOOTSTRAP_DRAWS,
     BOOTSTRAP_LEVEL,
@@ -101,7 +102,6 @@ from run_garch_study import (
     summary_frame,
     yearly_frame,
 )
-from run_review_diagnostics import episode_summary, episodes
 
 from quant_backtester.analytics.curves import Book
 from quant_backtester.analytics.quality import QUALITY_V1

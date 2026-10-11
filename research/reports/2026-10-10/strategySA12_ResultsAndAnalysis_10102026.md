@@ -4,7 +4,7 @@ Période commune 2021-04-01 → 2026-10-09 · capital 100 000 EUR · commission 
 
 Source : commit `10f6d902af68` (CLEAN), magasin `750c23dfffc3`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
 
-Étude dédiée (`scripts/run_arima_garch_study.py`) : les livres de la comparaison, le témoin EWMA de SA11 et trois contrôles de SA12 sans code de catalogue (D0, D1, D2), exécutés par le même moteur. L'ARIMA et le GARCH sont réestimés chaque soir sur 756 rendements d'ouverture à ouverture, avec un seul fil de calcul. L'hypothèse `sa12_arima_garch`, ses contrôles et ses statuts ont été écrits avant le premier ajustement.
+Étude dédiée (`scripts/SA12_run_arima_garch_study.py`) : les livres de la comparaison, le témoin EWMA de SA11 et trois contrôles de SA12 sans code de catalogue (D0, D1, D2), exécutés par le même moteur. L'ARIMA et le GARCH sont réestimés chaque soir sur 756 rendements d'ouverture à ouverture, avec un seul fil de calcul. L'hypothèse `sa12_arima_garch`, ses contrôles et ses statuts ont été écrits avant le premier ajustement.
 
 ## 1. Indicateurs de résultat globaux
 

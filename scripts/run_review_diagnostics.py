@@ -2,7 +2,7 @@
 
 The analyses of ``research/reports/2026-10-10`` say, strategy by strategy, what
 their figures do not establish. This script measures those points, from the
-exports of ``scripts/run_garch_study.py`` and from a few more runs of the same
+exports of ``scripts/SA11_run_garch_study.py`` and from a few more runs of the same
 engine on the same period, cash and costs:
 
 - the result and the costs of each **episode** a rarely invested rule was in
@@ -70,7 +70,7 @@ from run_etf_strategies_comparison import (
     UNIVERSE,
     build_runner,
 )
-from run_garch_study import COST_STRESS, EWMA, FUND, GARCH, VOL_CONTROL, sharpe_difference
+from SA11_run_garch_study import COST_STRESS, EWMA, FUND, GARCH, VOL_CONTROL, sharpe_difference
 from scipy.stats import pearsonr, spearmanr
 from write_strategy_reports import (
     OTHER_FUND,
@@ -1079,11 +1079,11 @@ def ml1_section(
         If the store read is not the one the exports of the study were made from.
     """
     # Imported on use: the script and the model need PyTorch, an optional dependency.
-    import run_neural_strategy as neural
+    import ML1_run_neural_strategy as neural
 
     from quant_backtester.ml.artifacts import NeuralArtifact
     from quant_backtester.ml.features import NeuralFeatureBuilder
-    from quant_backtester.strategies.ml.neural_allocation import NeuralAllocationStrategy
+    from quant_backtester.strategies.ml.ML1_neural_allocation import NeuralAllocationStrategy
 
     runner: StrategyRunner = neural.build_runner(store)
     config = neural.neural_config(42)
@@ -1250,7 +1250,7 @@ def ml1_section(
         "**même artefact** que le test préinscrit - même normalisation, mêmes poids, même "
         "époque - en doublant seulement les coûts du moteur : ce que devient le modèle "
         "initial s'il coûte deux fois plus cher à exécuter. « Recalibrée » refait la "
-        "calibration de `scripts/run_neural_strategy.py` sous ces coûts : sa validation "
+        "calibration de `scripts/ML1_run_neural_strategy.py` sous ces coûts : sa validation "
         "peut retenir une autre époque, et c'est alors un autre modèle - ce que produit "
         "la procédure de calibration sous un autre coût. "
         + (
