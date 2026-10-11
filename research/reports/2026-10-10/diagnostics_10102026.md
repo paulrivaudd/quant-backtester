@@ -23,10 +23,10 @@ colonne « exécution » de l'attribution est renommée en résidu, parce qu'ell
 n'isole pas l'exécution ; les séjours clos et le séjour encore ouvert sont
 comptés à part ; les corrélations de `SA5` gardent leur première décision et
 composent leurs rendements à cinq séances ; les témoins sont dits « à cible
-constante » ; `ML1` est rejoué avec son modèle figé à coûts doublés ; un run
+constante » ; `SA14` est rejoué avec son modèle figé à coûts doublés ; un run
 n'est comparé aux exports que s'il a lu le même magasin.
 
-Exports de l'étude : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`. Runs de ce document : commit `08bf2ac77e0c` (CLEAN).
+Exports de l'étude : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`. Runs de ce document : commit `43bd6030d29b` (CLEAN).
 
 ## 1. Résultat par séjour dans le marché (SA1, SA4, SA9)
 
@@ -145,7 +145,7 @@ Différence de Sharpe SA6 moins EWMA 0,94 : **-0.036**, intervalle bootstrap à 
 
 Les coefficients 0,90 et 0,97 ont été fixés dans le script avant leur run, de part et d'autre de 0,94 ; ils ne sont pas le résultat d'une recherche du meilleur coefficient, et ne doivent pas le devenir sur ce même historique. L'ordre de ces trois EWMA ne vaut que pour elles : il ne définit pas une « vitesse » du GARCH réestimé chaque soir et n'établit pas une règle générale selon laquelle un estimateur plus lent serait meilleur.
 
-## 7. ML1
+## 7. SA14
 
 Période de test prolongée, 2025-01-02 → 2026-10-09, modèle figé `d9bfd125bf69`.
 
@@ -153,13 +153,13 @@ Période de test prolongée, 2025-01-02 → 2026-10-09, modèle figé `d9bfd125b
 
 | Livre | Net | Net/an | Vol. | Sharpe | Perte max. | Retour au sommet (j) | Expo. moy. | Ordres | Coûts EUR |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| ML1 - neural allocation | +13.42% | +7.39% | 9.88% | +0.76 | -16.11% | 251 | 66.6% | 270 | 756 |
+| SA14 - neural allocation | +13.42% | +7.39% | 9.88% | +0.76 | -16.11% | 251 | 66.6% | 270 | 756 |
 | ↳ témoin à cible constante (ETF_SP500_PEA 36.3%, ETF_WORLD 30.3%) | +17.16% | +9.38% | 10.01% | +0.93 | -15.20% | 225 | 68.3% | 6 | 76 |
 | buy & hold World | +24.54% | +13.23% | 14.31% | +0.93 | -21.51% | 229 | 99.1% | 1 | 99 |
 
-Témoin à cible constante égale aux poids moyens de ML1 sur ces dates, avec la même bande de 3 points et les mêmes coûts : c'est le témoin exécutable que le produit « 65 % fois le rendement du fonds » ne remplaçait pas. Son exposition réalisée n'est pas exactement celle de ML1 (colonne « Expo. moy. ») : la comparaison décrit deux règles exécutables et n'isole pas la valeur du timing à exposition identique. Choisi après coup, il est descriptif.
+Témoin à cible constante égale aux poids moyens de SA14 sur ces dates, avec la même bande de 3 points et les mêmes coûts : c'est le témoin exécutable que le produit « 65 % fois le rendement du fonds » ne remplaçait pas. Son exposition réalisée n'est pas exactement celle de SA14 (colonne « Expo. moy. ») : la comparaison décrit deux règles exécutables et n'isole pas la valeur du timing à exposition identique. Choisi après coup, il est descriptif.
 
-Sur ces dates, hors la première séance, le poids total détenu par ML1 va de 47.4% à 87.3% (écart-type 8.3%), et la part du fonds S&P 500 dans ce qui est investi va de 33.1% à 66.2% (moyenne 54.8%).
+Sur ces dates, hors la première séance, le poids total détenu par SA14 va de 47.4% à 87.3% (écart-type 8.3%), et la part du fonds S&P 500 dans ce qui est investi va de 33.1% à 66.2% (moyenne 54.8%).
 
 ### Sensibilités annoncées par l'hypothèse (période de test d'origine, 2025-01-02 → 2026-09-30)
 
@@ -171,9 +171,9 @@ Sur ces dates, hors la première séance, le poids total détenu par ML1 va de 4
 | graine 42, modèle figé du test, coûts x2 (moteur seul) | `d9bfd125bf69` | 20 | 40.7% | +11.01% | +0.64 | +0.86 | -16.21% | 66.6% | 1,434 |
 | graine 42, recalibrée sous coûts x2 | `a5afb76183eb` | 15 | 44.3% | +11.78% | +0.69 | +0.86 | -15.65% | 66.0% | 1,037 |
 
-Les graines 43 et 44 et les coûts doublés sont rapportés à côté de la graine 42 et ne la remplacent pas : une graine n'est jamais choisie sur son résultat de test. Toutes les lignes portent sur la même période d'origine. Deux lignes à coûts doublés répondent à deux questions différentes. « Modèle figé » rejoue le **même artefact** que le test préinscrit - même normalisation, mêmes poids, même époque - en doublant seulement les coûts du moteur : ce que devient le modèle initial s'il coûte deux fois plus cher à exécuter. « Recalibrée » refait la calibration de `scripts/run_neural_strategy.py` sous ces coûts : sa validation peut retenir une autre époque, et c'est alors un autre modèle - ce que produit la procédure de calibration sous un autre coût. Dans chaque variante le Sharpe reste sous celui du fonds détenu et le score sous 50 %.
+Les graines 43 et 44 et les coûts doublés sont rapportés à côté de la graine 42 et ne la remplacent pas : une graine n'est jamais choisie sur son résultat de test. Toutes les lignes portent sur la même période d'origine. Deux lignes à coûts doublés répondent à deux questions différentes. « Modèle figé » rejoue le **même artefact** que le test préinscrit - même normalisation, mêmes poids, même époque - en doublant seulement les coûts du moteur : ce que devient le modèle initial s'il coûte deux fois plus cher à exécuter. « Recalibrée » refait la calibration de `scripts/SA14_run_neural_strategy.py` sous ces coûts : sa validation peut retenir une autre époque, et c'est alors un autre modèle - ce que produit la procédure de calibration sous un autre coût. Dans chaque variante le Sharpe reste sous celui du fonds détenu et le score sous 50 %.
 
 ### Entrées du réseau
 
-Les 319 caractéristiques lues par le réseau à chacune des 453 décisions sont exportées dans `ml1_inputs.csv` (dossier des diagnostics), avec leur statut : 453 décisions ont un vecteur complet. Elles sont reconstruites par le `NeuralFeatureBuilder` du modèle sur un lecteur figé à l'instant de chaque décision.
+Les 319 caractéristiques lues par le réseau à chacune des 453 décisions sont exportées dans `sa14_inputs.csv` (dossier des diagnostics), avec leur statut : 453 décisions ont un vecteur complet. Elles sont reconstruites par le `NeuralFeatureBuilder` du modèle sur un lecteur figé à l'instant de chaque décision.
 
