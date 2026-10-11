@@ -164,3 +164,95 @@ history_note = "An ECB euro reference rate is published once a day and is not re
   [instrument.publication_rule]
   publication_time = "16:00:00"
   timezone = "Europe/Paris"
+
+# --- The four Xetra funds of SA7 and SA8 ------------------------------------
+#
+# Chosen on 2026-10-11, before any run of the two strategies. The first choice
+# was three style funds listed in Paris (BNP Paribas Easy Value, Quality and
+# Low Vol Europe: EVAE.PA, EQUA.PA, EVOE.PA) and a Paris money-market fund
+# (OBLI.PA). The validator refused all four as served by Yahoo: since 2023 one
+# bar in five of the three style funds has its close outside its own high-low
+# range (341, 298 and 232 sessions since October 2020), and four bars of the
+# money-market fund do. They are thinly traded, and their closes are not the
+# last trade of the bars they come with. Dropping that many sessions leaves no
+# window of sixty-one closes in a row, so they were given up rather than
+# repaired.
+#
+# The four below are listed on Xetra, in euros, accumulating, and pass the
+# validator. They are the first funds traded off Paris here: their sessions are
+# those of XETR, and a session Paris holds and Xetra does not is valued on the
+# last close and fills nothing. None is eligible to a PEA. No second source
+# serves them - Euronext does not list them - so every bar is SINGLE_SOURCE and
+# nothing arbitrates a doubtful one: see known_gaps.toml and
+# bar_corrections.toml for the sessions that were reviewed by hand.
+
+[[instrument]]
+id = "ETF_VALUE_WORLD"
+name = "iShares Edge MSCI World Value Factor"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "IS3S.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+# The first bar Yahoo serves. Sixty-two of the sessions of 2014 and 2015 are
+# flat with no volume - a fund nobody traded yet on some days - and nothing
+# here reads it before 2020.
+first_session = 2014-10-06
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Xetra closes of an accumulating share class with no split, as served by Yahoo on 2026-10-11. No second source: not cross-checked. The bars of 2023-12-04, 05 and 06 are flat at the close of 2023-12-01 with no volume, a provider outage kept as served."
+
+[[instrument]]
+id = "ETF_QUALITY_WORLD"
+name = "iShares Edge MSCI World Quality Factor"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "IS3Q.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2014-10-06
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Xetra closes of an accumulating share class with no split, as served by Yahoo on 2026-10-11. No second source: not cross-checked. The bars of 2023-12-04, 05 and 06 are flat at the close of 2023-12-01 with no volume, a provider outage kept as served."
+
+[[instrument]]
+id = "ETF_MINVOL_WORLD"
+name = "iShares Edge MSCI World Minimum Volatility"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "IQQ0.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+# Listed in November 2012. The declared history starts with the calendar: the
+# XETR file is checked from 2014 only.
+first_session = 2014-01-02
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Xetra closes of an accumulating share class with no split, as served by Yahoo on 2026-10-11. No second source: not cross-checked. The bars of 2023-12-04, 05 and 06 are flat at the close of 2023-12-01 with no volume, a provider outage kept as served; the placeholder of 2025-10-24 is dropped by a reviewed correction."
+
+[[instrument]]
+id = "ETF_MONETARY_EUR"
+name = "Xtrackers II EUR Overnight Rate Swap"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "XEON.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+# Listed in 2007. The declared history starts with the calendar: the XETR file
+# is checked from 2014 only.
+first_session = 2014-01-02
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Xetra closes of an accumulating share class with no split, as served by Yahoo on 2026-10-11. No second source: not cross-checked. Six bars since October 2020 are flat with no volume and kept as served (2020-10-08, 2020-10-19, 2023-12-04 to 06, 2025-10-24): each sits within a hundredth of a percent of its neighbours."

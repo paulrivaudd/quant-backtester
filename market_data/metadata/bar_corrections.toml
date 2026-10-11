@@ -24,3 +24,17 @@ sessions are ordinary and the move is not: it is the only inconsistent bar in \
 thirteen years of this series. Euronext, the second source, serves about two \
 years and cannot arbitrate a session of 2017, so the true high is not \
 knowable - the session is dropped rather than guessed at. Reviewed 2026-09-20."""
+
+[[correction]]
+instrument_id = "ETF_MINVOL_WORLD"
+source = "YAHOO"
+session_date = 2025-10-24
+defect = "FLAT_ZERO_VOLUME"
+reason = """Yahoo serves a bar flat at 73.202 with no volume, between a close \
+of 63.05 on 2025-10-23 (17 630 shares) and 63.12 on 2025-10-27 (16 767 \
+shares): sixteen percent up and fourteen down on a minimum-volatility fund, \
+on no trade. The same day it serves no bar at all for the two sister funds \
+(IS3S.DE, IS3Q.DE), a flat bar with no volume for XEON.DE, and the flat \
+placeholders the Euronext cross-check contradicted on the two Paris funds. No \
+second source serves this fund, so the close of that session is not knowable: \
+the bar is dropped, not replaced. Reviewed 2026-10-11."""

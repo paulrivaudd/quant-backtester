@@ -87,6 +87,20 @@ VENUES = (
             "# checked against an independent source: extend only after checking it."
         ),
     ),
+    Venue(
+        calendar_id="XETR",
+        title="Xetra trading calendar.",
+        timezone="Europe/Berlin",
+        covered_from=date(2014, 1, 1),
+        covered_until=date(2027, 12, 31),
+        coverage_note=(
+            "From 2014. Over 2014-2026 the four Xetra funds of the registry have a bar\n"
+            "# on every session listed here but two, and none on any other day. Before\n"
+            "# 2014 the library schedules German Unity Day (3 October 2011, 2012, 2013)\n"
+            "# as a session and the provider serves no bar on it: extend only after\n"
+            "# checking those days against an independent source."
+        ),
+    ),
 )
 
 

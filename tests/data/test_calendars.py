@@ -789,10 +789,10 @@ def test_registry_from_empty_directory_fails(tmp_path):
 
 
 def test_registry_loads_the_committed_calendars():
-    """The real calendar folder yields XNYS and XPAR."""
+    """The real calendar folder yields Xetra, New York and Paris."""
     registry = CalendarRegistry.from_directory(COMMITTED_CALENDARS)
 
-    assert [c.calendar_id for c in registry] == ["XNYS", "XPAR"]
+    assert [c.calendar_id for c in registry] == ["XETR", "XNYS", "XPAR"]
 
 
 # --- coverage: a calendar only answers for the period its holiday list covers --

@@ -171,6 +171,17 @@ def test_the_history_has_a_row_per_session_and_hides_what_the_strategy_does_not_
     assert "gross" not in lines[0] and "SP500" not in lines[0]
 
 
+def test_a_fund_of_its_own_that_a_book_holds_is_named_in_the_history() -> None:
+    frame = history().assign(close_ETF_VALUE_WORLD=47.5, held_ETF_VALUE_WORLD=0.3)
+
+    table = SCRIPT.history_markdown(frame)
+
+    header = table.splitlines()[0]
+    assert "Clôture ETF_VALUE_WORLD" in header and "Poids détenu ETF_VALUE_WORLD" in header
+    assert "`close_ETF_VALUE_WORLD`" not in header
+    assert "| 47.50 |" in table.splitlines()[2]
+
+
 def test_the_second_fund_is_shown_when_the_strategy_reads_or_holds_it() -> None:
     frame = history()
     frame["held_ETF_SP500_PEA"] = 0.25

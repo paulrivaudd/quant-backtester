@@ -9,11 +9,12 @@ extra installed (``uv sync --extra stats``):
     uv run python scripts/SA11_run_garch_study.py --output runs/garch_study
 
 The participants are those of ``run_etf_strategies_comparison.py`` - ``SA1``
-to ``SA6``, ``SA9``, ``SA10``, ``SA11``, the fund held and the even split -
-and one control without a catalogue code: the allocation rule of ``SA11`` on
-an EWMA of decay 0.94. ``SA7`` and ``SA8`` are not run: their instruments are
-not registered. ``SA14`` is not in the table: its information stops at the end
-of 2024, so a common table would have to start in 2025.
+to ``SA11``, the fund held and the even split - and one control without a
+catalogue code: the allocation rule of ``SA11`` on an EWMA of decay 0.94.
+``SA7`` and ``SA8`` joined on 2026-10-11, once their funds were registered:
+each book is run on the funds it may hold (``universe_of``). ``SA14`` is not in
+the table: its information stops at the end of 2024, so a common table would
+have to start in 2025.
 
 Three questions are kept apart, because an answer to one is not an answer to
 another:
@@ -85,6 +86,7 @@ from run_etf_strategies_comparison import (
     sessions_of,
     slug,
     summary_row,
+    universe_of,
 )
 
 from quant_backtester.analytics.curves import Book, drawdown_curve
@@ -165,9 +167,12 @@ SUMMARY_COLUMNS = (
 """Columns every row of the common table carries first, in this order."""
 
 
-STUDY_CODES = ("SA1", "SA2", "SA3", "SA4", "SA5", "SA6", "SA9", "SA10", "SA11")
-"""The catalogued strategies of this study, fixed on 2026-10-10: a strategy
-catalogued later has its own study and does not enter this one's register."""
+STUDY_CODES = ("SA1", "SA2", "SA3", "SA4", "SA5", "SA6", "SA7", "SA8", "SA9", "SA10", "SA11")
+"""The catalogued strategies of this study: a strategy catalogued later has its
+own study and does not enter this one's register. Fixed on 2026-10-10 without
+``SA7`` and ``SA8``, which were catalogued with the others but had no fund to
+run on; they joined on 2026-10-11, once their funds were registered, and the
+register counts two more trials since."""
 
 
 def participants() -> dict[str, Strategy]:
@@ -412,7 +417,17 @@ def book_histories(
         If the store no longer holds what the runs read.
     """
     any_result = next(iter(results.values()))
-    closes = closes_of(any_result)
+    # The two funds every report is read against, then the funds of its own a book holds.
+    reference = closes_of(any_result)
+    closes = {
+        name: {
+            **reference,
+            **closes_of(
+                result, [fund for fund in universe_of(strategies[name]) if fund not in reference]
+            ),
+        }
+        for name, result in results.items()
+    }
     values: dict[str, dict[date, dict[str, float]]] = {name: {} for name in results}
     with any_result.reading() as store:
         for record in any_result.records():
@@ -428,7 +443,7 @@ def book_histories(
                 row: dict[str, float] = {}
                 for signal_id, request, signal in signal_columns(strategy):
                     names = None if request is None else request.names()
-                    instruments = tuple(UNIVERSE if names is None else names)
+                    instruments = tuple(universe_of(strategy) if names is None else names)
                     key = (json.dumps(signal.definition_json(), sort_keys=True), instruments)  # type: ignore[attr-defined]
                     if key not in computed:
                         computed[key] = signal.compute(context, instruments).frame  # type: ignore[attr-defined]
@@ -449,7 +464,7 @@ def book_histories(
     for name, result in results.items():
         frame = pd.DataFrame.from_dict(values[name], orient="index")
         parts = [
-            pd.DataFrame({f"close_{fund}": series for fund, series in closes.items()}),
+            pd.DataFrame({f"close_{fund}": series for fund, series in closes[name].items()}),
             frame,
             result.target_weights().add_prefix("target_"),
             result.weights().add_prefix("held_"),
@@ -1152,7 +1167,8 @@ def study_markdown(
         "- The forecast covers close to close and orders are filled at the next open.",
         "- A prospective check starts at the first XPAR session after 2026-10-10 with this "
         "configuration frozen; it does not exist yet.",
-        "- SA7 and SA8 were not run (instruments not registered). SA14 is reported apart.",
+        "- SA7 and SA8 hold funds listed on Xetra, served by one provider and not "
+        "cross-checked; SA10 is run without them. SA14 is reported apart.",
         "",
         "## Timings",
         "",
@@ -1178,6 +1194,7 @@ def configuration(
         "period": {"start": str(reference.start), "end": str(reference.end)},
         "initial_cash": INITIAL_CASH,
         "universe": list(UNIVERSE),
+        "universes": {name: list(universe_of(strategy)) for name, strategy in strategies.items()},
         "analytics": ANALYTICS.definition(),
         "execution": reference.configuration["execution"],
         "execution_stressed": {"factor": COST_STRESS, "costs": str(stressed.costs)},
@@ -1206,7 +1223,7 @@ def run_all(runner: StrategyRunner, strategies: Mapping[str, Strategy], label: s
     results: dict[str, StrategyResult] = {}
     for name, strategy in strategies.items():
         print(f"running {name} ({label}) ...", file=sys.stderr)
-        results[name] = runner.run(strategy, UNIVERSE, *COMMON_PERIOD)
+        results[name] = runner.run(strategy, universe_of(strategy), *COMMON_PERIOD)
     return results
 
 

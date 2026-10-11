@@ -831,7 +831,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
     config = json.loads((study / "config.json").read_text(encoding="utf-8"))
     last_decision = runner.timetable.decision_instant(date.fromisoformat(COMMON_PERIOD[1]))
     market = runner.reader.at(last_decision)
-    ex_dates = {fund: frozenset(market.corporate_actions(fund)["ex_date"]) for fund in UNIVERSE}
+    traded = sorted({str(fund) for fund in fills["instrument_id"]} | set(UNIVERSE))
+    ex_dates = {fund: frozenset(market.corporate_actions(fund)["ex_date"]) for fund in traded}
     delays = {
         name: delay_effect(history, fills.loc[fills["book"] == name], initial, ex_dates=ex_dates)
         for name, history in histories.items()

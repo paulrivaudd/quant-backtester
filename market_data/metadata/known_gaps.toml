@@ -61,3 +61,64 @@ evidence = """Dropped by the entry of bar_corrections.toml. The next session, \
 consistent with something unusual on the day and settles nothing about its \
 prices. Reviewed 2026-09-26."""
 reviewed_on = 2026-09-26
+
+# The Xetra funds have no second source: a session Yahoo does not serve stays a
+# hole, and each one costs sixty sessions of any window of sixty-one closes.
+
+[[gap]]
+instrument_id = "ETF_VALUE_WORLD"
+session_date = 2025-10-24
+kind = "NO_BAR_SERVED"
+hypothesis = "provider outage: Yahoo failed on every series it serves for that session"
+evidence = """Yahoo serves 2025-10-23 (23 055 shares) and 2025-10-27 (87 999), and nothing \
+between. The same day it serves no bar for IS3Q.DE, flat bars with no volume \
+for IQQ0.DE and XEON.DE, and flat placeholders for the two Paris funds. Xetra \
+held a session. Reviewed 2026-10-11."""
+reviewed_on = 2026-10-11
+
+[[gap]]
+instrument_id = "ETF_VALUE_WORLD"
+session_date = 2026-03-06
+kind = "NO_BAR_SERVED"
+hypothesis = "provider gap on the three iShares listings"
+evidence = """Yahoo serves 2026-03-05 (85 075 shares) and 2026-03-09 (74 301), and nothing \
+between, for this fund as for IS3Q.DE and IQQ0.DE. XEON.DE has an ordinary \
+bar that day (130 980 shares): Xetra held a session. Reviewed 2026-10-11."""
+reviewed_on = 2026-10-11
+
+[[gap]]
+instrument_id = "ETF_QUALITY_WORLD"
+session_date = 2025-10-24
+kind = "NO_BAR_SERVED"
+hypothesis = "provider outage: Yahoo failed on every series it serves for that session"
+evidence = """Yahoo serves 2025-10-23 (15 545 shares) and 2025-10-27 (29 147), and nothing \
+between. Same day and same failure as ETF_VALUE_WORLD. Reviewed 2026-10-11."""
+reviewed_on = 2026-10-11
+
+[[gap]]
+instrument_id = "ETF_QUALITY_WORLD"
+session_date = 2026-03-06
+kind = "NO_BAR_SERVED"
+hypothesis = "provider gap on the three iShares listings"
+evidence = """Yahoo serves 2026-03-05 (33 624 shares) and 2026-03-09 (36 053), and nothing \
+between. Same day and same failure as ETF_VALUE_WORLD. Reviewed 2026-10-11."""
+reviewed_on = 2026-10-11
+
+[[gap]]
+instrument_id = "ETF_MINVOL_WORLD"
+session_date = 2025-10-24
+kind = "BAR_DROPPED"
+hypothesis = "provider placeholder at a price the neighbouring sessions rule out"
+evidence = """The trace of the correction of that session in bar_corrections.toml: a bar \
+flat at 73.202 with no volume between closes of 63.05 and 63.12. Reviewed \
+2026-10-11."""
+reviewed_on = 2026-10-11
+
+[[gap]]
+instrument_id = "ETF_MINVOL_WORLD"
+session_date = 2026-03-06
+kind = "NO_BAR_SERVED"
+hypothesis = "provider gap on the three iShares listings"
+evidence = """Yahoo serves 2026-03-05 (19 274 shares) and 2026-03-09 (15 805), and nothing \
+between. Same day and same failure as ETF_VALUE_WORLD. Reviewed 2026-10-11."""
+reviewed_on = 2026-10-11

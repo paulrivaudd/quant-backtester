@@ -82,6 +82,7 @@ from run_etf_strategies_comparison import (
     quality_table,
     sessions_of,
     slug,
+    universe_of,
 )
 from run_review_diagnostics import episode_summary, episodes
 from SA11_run_garch_study import (
@@ -886,7 +887,7 @@ def run_books(
     results: dict[str, StrategyResult] = {}
     for name, strategy in strategies.items():
         print(f"running {name} ({label}) ...", file=sys.stderr)
-        results[name] = runner.run(strategy, UNIVERSE, *period)
+        results[name] = runner.run(strategy, universe_of(strategy), *period)
     return results
 
 

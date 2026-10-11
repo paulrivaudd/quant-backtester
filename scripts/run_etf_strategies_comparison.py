@@ -1,11 +1,13 @@
 """Run the ETF strategies on the store, on the same dates and costs, and compare them.
 
 Every book is run by the same engine over the same period: the benchmark
-(``SA1``), ``SA2`` to ``SA6`` and ``SA9``, the ensemble (``SA10``) without its
-style funds and money-market fund - neither is registered yet, so ``SA7`` and
-``SA8`` are not run and the ensemble's factor budget stays in cash - and two
-references, ``ETF_WORLD`` bought and held and an even split of the two funds
-rebalanced. A strategy is named by its catalogue code and label
+(``SA1``), ``SA2`` to ``SA9``, the ensemble (``SA10``) without its style funds
+and money-market fund - its factor budget stays in cash, as in every run made
+of it so far - and two references, ``ETF_WORLD`` bought and held and an even
+split of the two funds rebalanced. ``SA7`` and ``SA8`` hold funds of their
+own, listed on Xetra (:data:`FACTOR_FUNDS`, :data:`MONETARY_FUND`): each book
+is run on the funds it may hold (:func:`universe_of`), under the same costs
+and the same calendar of reference. A strategy is named by its catalogue code and label
 (:mod:`quant_backtester.strategies.catalogue`). From the repository root, once the store is filled:
 
     uv run python scripts/run_etf_strategies_comparison.py --output runs/etf_strategies
@@ -83,7 +85,9 @@ from quant_backtester.strategies import (
     ArimaGarch,
     BufferedDualMomentum,
     ETFEnsemble,
+    FactorETFBlend,
     GarchVolControl,
+    MonetaryCarry,
     RealizedVolControl,
     RelativeResidualTilt,
     SmoothMovingAverage,
@@ -102,6 +106,13 @@ UNIVERSE = ("ETF_WORLD", "ETF_SP500_PEA")
 
 PERIOD = ("2019-05-02", "2026-09-30")
 """Measured period, bounds included: 253 closes of ``ETF_WORLD`` sit before it."""
+
+FACTOR_FUNDS = ("ETF_VALUE_WORLD", "ETF_QUALITY_WORLD", "ETF_MINVOL_WORLD")
+"""The value, quality and minimum-volatility funds ``SA7`` spreads its capital over:
+chosen on 2026-10-11, before its first run (``market_data/metadata/instruments.toml``)."""
+
+MONETARY_FUND = "ETF_MONETARY_EUR"
+"""The accumulating EUR money-market fund ``SA8`` places its cash in, chosen the same day."""
 
 COMMON_PERIOD = ("2021-04-01", "2026-10-09")
 """The period every book decides on a full window from the first session.
@@ -138,8 +149,18 @@ SURFACE, INK, MUTED, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 STRATEGY_COLOUR, BENCHMARK_COLOUR, HELD_COLOUR = "#2a78d6", "#eb6834", "#8a8983"
 """The book of a panel, the benchmark, and the fund held: the same in every figure."""
 
-FUND_COLOURS = {"ETF_WORLD": "#2a78d6", "ETF_SP500_PEA": "#eb6834"}
-"""The two funds, in the figures of orders: the same colour for a fund's price and weight."""
+FUND_COLOURS = {
+    "ETF_WORLD": "#2a78d6",
+    "ETF_SP500_PEA": "#eb6834",
+    "ETF_VALUE_WORLD": "#2a78d6",
+    "ETF_QUALITY_WORLD": "#eb6834",
+    "ETF_MINVOL_WORLD": "#1c9e77",
+    "ETF_MONETARY_EUR": "#2a78d6",
+}
+"""A fund's colour, the same for its price and its weight, in the order the figures
+stack them. A book holds the two funds of :data:`UNIVERSE`, the three style funds or
+the money-market fund, never a mix: the colours are told apart within each of those
+sets, and the first two serve again in the others."""
 
 BUY_COLOUR, SELL_COLOUR = "#2f855a", "#c53030"
 """A buy is a green cross and a sell a red one."""
@@ -180,6 +201,8 @@ def books() -> dict[str, Strategy]:
         TrendFilteredPullback(),
         RelativeResidualTilt(),
         RealizedVolControl(),
+        FactorETFBlend(instrument_ids=FACTOR_FUNDS),
+        MonetaryCarry(instrument_id=MONETARY_FUND),
         VixReliefEntry(),
         ETFEnsemble(enable_factors=False, enable_monetary=False),
         *((GarchVolControl(),) if garch_available() else ()),
@@ -191,6 +214,27 @@ def books() -> dict[str, Strategy]:
         SPLIT: EqualWeightRebalance(instruments=UNIVERSE),
         **{entry_of(strategy).display_name: strategy for strategy in catalogued},
     }
+
+
+def universe_of(strategy: Strategy) -> tuple[str, ...]:
+    """Return the funds a book may hold: what its run is given as a trading universe.
+
+    Parameters
+    ----------
+    strategy : Strategy
+        A book of the comparison.
+
+    Returns
+    -------
+    tuple[str, ...]
+        The three style funds for ``SA7`` and the money-market fund for ``SA8``,
+        as each was configured; :data:`UNIVERSE` for every other book.
+    """
+    if isinstance(strategy, FactorETFBlend):
+        return tuple(strategy.instrument_ids)
+    if isinstance(strategy, MonetaryCarry):
+        return (strategy.instrument_id,)
+    return tuple(UNIVERSE)
 
 
 def build_runner(root: Path) -> StrategyRunner:
@@ -926,12 +970,27 @@ def costs_figure(costs: Mapping[str, float]) -> Figure:
     return figure
 
 
-def closes_of(result: StrategyResult) -> dict[str, pd.Series]:  # type: ignore[type-arg]
-    """Return the raw closes of the tradable funds over a run, as the run could read them."""
+def closes_of(result: StrategyResult, funds: Sequence[str] | None = None) -> dict[str, pd.Series]:  # type: ignore[type-arg]
+    """Return the raw closes of funds over a run, as the run could read them.
+
+    Parameters
+    ----------
+    result : StrategyResult
+        A finished run: its store, its first and its last session.
+    funds : Sequence[str] | None
+        The funds to read; the two of :data:`UNIVERSE` when not given.
+
+    Returns
+    -------
+    dict[str, pd.Series]
+        The close of each fund on its own sessions inside the run. A fund
+        listed on another venue than the run's calendar has no close on a
+        session its venue did not hold.
+    """
     closes: dict[str, pd.Series] = {}  # type: ignore[type-arg]
     with result.reading() as store:
         reader = store.at(result.records()[-1].valuation_time)
-        for instrument_id in UNIVERSE:
+        for instrument_id in UNIVERSE if funds is None else funds:
             series = reader.history(instrument_id, BarField.CLOSE)
             inside = [
                 isinstance(day, date) and result.start <= day <= result.end for day in series.index
@@ -940,11 +999,27 @@ def closes_of(result: StrategyResult) -> dict[str, pd.Series]:  # type: ignore[t
     return closes
 
 
-def save_orders(output: Path, results: Mapping[str, StrategyResult]) -> list[Path]:
-    """Write every fill of every book, and one figure of orders per book."""
+def save_orders(
+    output: Path,
+    results: Mapping[str, StrategyResult],
+    universes: Mapping[str, Sequence[str]] | None = None,
+) -> list[Path]:
+    """Write every fill of every book, and one figure of orders per book.
+
+    Parameters
+    ----------
+    output : Path
+        The folder written to.
+    results : Mapping[str, StrategyResult]
+        The finished runs, by book.
+    universes : Mapping[str, Sequence[str]] | None
+        The funds each book could hold, when they are not those of
+        :data:`UNIVERSE`: the prices its orders are drawn on.
+    """
+    held_by = dict(universes or {})
     # Every close is read before the first file is written: a store that
     # changed since the runs stops the export whole.
-    closes = {name: closes_of(result) for name, result in results.items()}
+    closes = {name: closes_of(result, held_by.get(name)) for name, result in results.items()}
     output.mkdir(parents=True, exist_ok=True)
     frames = [result.fills().assign(book=name) for name, result in results.items()]
     written = [output / "fills.csv"]
@@ -1003,9 +1078,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
             )
     runner = build_runner(options.store)
     results: dict[str, StrategyResult] = {}
-    for name, strategy in books().items():
+    strategies = books()
+    universes = {name: universe_of(strategy) for name, strategy in strategies.items()}
+    for name, strategy in strategies.items():
         print(f"running {name} ...", file=sys.stderr)
-        results[name] = runner.run(strategy, UNIVERSE, options.start, options.end)
+        results[name] = runner.run(strategy, universes[name], options.start, options.end)
     curves = {name: result.equity() for name, result in results.items()}
     gross = {name: result.equity(Book.GROSS) for name, result in results.items()}
     tried = [
@@ -1029,7 +1106,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
     split = holdout_start(sessions_of(curves[BENCHMARK]))
     print(f"{first} to {last}, {len(curves[BENCHMARK])} sessions; last third from {split}")
     print(render_summary(table))
-    written = save_outputs(options.output, table, curves) + save_orders(options.output, results)
+    written = save_outputs(options.output, table, curves) + save_orders(
+        options.output, results, universes
+    )
     quality_table(details, trials=trials, trial_sharpe_std=spread).to_csv(
         options.output / "quality_details.csv"
     )

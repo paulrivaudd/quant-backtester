@@ -67,7 +67,9 @@ def test_the_participants_are_the_comparison_books_and_the_control() -> None:
     assert books[SCRIPT.GARCH] == GarchVolControl()  # the frozen configuration, unchanged
     for name in ("SA1 - std MA20", "buy & hold World"):
         assert name in books
-    assert not any(name.startswith(("SA7", "SA8", "SA14")) for name in books)
+    # SA7 and SA8 joined once their funds were registered; SA14 has its own period.
+    assert "SA7 - factor blend" in books and "SA8 - monetary carry" in books
+    assert not any(name.startswith("SA14") for name in books)
 
 
 def test_without_the_estimator_sa11_is_left_out_and_the_others_still_run(

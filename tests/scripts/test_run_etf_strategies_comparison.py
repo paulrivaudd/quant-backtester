@@ -55,6 +55,8 @@ def test_the_books_are_the_runnable_strategies_and_the_three_references() -> Non
         "SA4 - pullback",
         "SA5 - relative tilt",
         "SA6 - vol control",
+        "SA7 - factor blend",
+        "SA8 - monetary carry",
         "SA9 - VIX relief",
         "SA10 - ensemble",
         # Run when its estimator is installed, left out - and said so - otherwise.
@@ -255,6 +257,21 @@ def test_a_book_without_an_order_still_shows_a_price() -> None:
 
     assert len(figure.axes) == 3
     assert "0 orders" in figure.axes[0].get_title(loc="left")
+
+
+def test_a_book_is_run_on_the_funds_it_may_hold() -> None:
+    books = SCRIPT.books()
+
+    # The style funds and the money-market fund are the ones the registry declares.
+    assert SCRIPT.universe_of(books["SA7 - factor blend"]) == SCRIPT.FACTOR_FUNDS
+    assert SCRIPT.FACTOR_FUNDS == ("ETF_VALUE_WORLD", "ETF_QUALITY_WORLD", "ETF_MINVOL_WORLD")
+    assert SCRIPT.universe_of(books["SA8 - monetary carry"]) == ("ETF_MONETARY_EUR",)
+    # Every other book trades the two funds of the comparison, the references included.
+    others = [name for name in books if not name.startswith(("SA7", "SA8"))]
+    assert {SCRIPT.universe_of(books[name]) for name in others} == {SCRIPT.UNIVERSE}
+    # A fund has a colour wherever a figure may draw it.
+    assert set(SCRIPT.FACTOR_FUNDS) | {SCRIPT.MONETARY_FUND} <= set(SCRIPT.FUND_COLOURS)
+    assert len({SCRIPT.FUND_COLOURS[fund] for fund in SCRIPT.FACTOR_FUNDS}) == 3
 
 
 def test_a_fund_keeps_its_place_whatever_order_it_comes_in() -> None:

@@ -58,9 +58,10 @@ from quant_backtester.data.validator import Severity, bar_row_issues
 class BarDefect(Enum):
     """What a reviewed correction may be written for.
 
-    Only defects that make a bar arithmetically impossible. A price that looks
-    surprising is not one of these: dropping a bar because it moved a lot is
-    how a backtest quietly loses its worst days.
+    A defect the row itself shows, never a price that merely looks surprising:
+    dropping a bar because it moved a lot is how a backtest quietly loses its
+    worst days. Two of them make a bar arithmetically impossible. The third
+    does not, and is here for the one case nothing else settles.
     """
 
     OHLC_ORDER = "OHLC_ORDER"
@@ -68,6 +69,17 @@ class BarDefect(Enum):
 
     NON_POSITIVE_PRICE = "NON_POSITIVE_PRICE"
     """A price of zero or less on an instrument that cannot have one."""
+
+    FLAT_ZERO_VOLUME = "FLAT_ZERO_VOLUME"
+    """A bar flat at one price with no volume, reviewed as a provider placeholder.
+
+    The row cannot tell a placeholder from a session where nothing traded,
+    which is why the validator only warns about it and withholds nothing. On an
+    instrument with a second source the cross-check settles the question. On
+    one without, a review may: its reason has to say what shows the price was
+    never a market print - the volumes of the neighbouring sessions, a value
+    their prices rule out, the same provider failing on sister series that day.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -232,10 +244,13 @@ class BarCorrections:
             correction = self._by_key.get((instrument.id, source, row["session_date"]))
             if correction is None:
                 continue
+            # An impossible bar is an error of the row; a flat bar with no volume
+            # is only a warning of it, and still what such a review was written for.
             codes = {
                 issue.code
                 for issue in bar_row_issues(instrument, row)
                 if issue.severity is Severity.ERROR
+                or issue.code == BarDefect.FLAT_ZERO_VOLUME.value
             }
             if correction.defect.value not in codes:
                 raise ValueError(

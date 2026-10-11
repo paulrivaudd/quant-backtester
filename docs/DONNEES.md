@@ -50,7 +50,7 @@ continue. Un `TypeError` dans notre propre code de lecture arrête tout.
 
 **Calendriers** (`metadata/calendars/`, générés par
 `scripts/generate_calendars.py` depuis `exchange_calendars`, puis vérifiés
-séance par séance) : XNYS de 1990 à fin 2027, XPAR de 2002 à fin 2027. En dehors,
+séance par séance) : XNYS de 1990 à fin 2027, XPAR de 2002 à fin 2027, XETR (Xetra, pour les quatre fonds de SA7 et SA8) de 2014 à fin 2027. En dehors,
 on obtient `CalendarCoverageError`. Un jour de semaine n'est jamais supposé être
 une séance. `scripts/check_calendar_coverage.py` échoue quand il reste moins de
 90 jours de couverture.

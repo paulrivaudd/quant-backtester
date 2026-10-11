@@ -38,8 +38,17 @@ def test_the_committed_register_loads_and_agrees_with_the_bar_corrections() -> N
         date(2015, 12, 31),
         date(2017, 9, 7),
     }
-    dropped = {g.session_date for g in gaps if g.kind is GapKind.BAR_DROPPED}
-    assert dropped <= corrections.sessions("ETF_SP500_PEA")
+    # The Xetra funds have no second source: the sessions Yahoo failed on are reviewed.
+    assert gaps.sessions("ETF_VALUE_WORLD") == {date(2025, 10, 24), date(2026, 3, 6)}
+    assert gaps.sessions("ETF_QUALITY_WORLD") == gaps.sessions("ETF_VALUE_WORLD")
+    assert gaps.sessions("ETF_MINVOL_WORLD") == gaps.sessions("ETF_VALUE_WORLD")
+    # Every dropped bar is the trace of a correction of that instrument and that session.
+    dropped = [g for g in gaps if g.kind is GapKind.BAR_DROPPED]
+    assert {(g.instrument_id, g.session_date) for g in dropped} == {
+        ("ETF_SP500_PEA", date(2017, 9, 7)),
+        ("ETF_MINVOL_WORLD", date(2025, 10, 24)),
+    }
+    assert all(g.session_date in corrections.sessions(g.instrument_id) for g in dropped)
 
 
 def test_a_gap_is_reviewed_once() -> None:

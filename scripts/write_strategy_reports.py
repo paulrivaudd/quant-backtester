@@ -576,7 +576,9 @@ def history_markdown(history: pd.DataFrame) -> str:
     The closes of the funds, each signal the strategy read, the weights
     targeted and held, and the net value. A signal without a value at a
     decision is left empty. The second fund's close is shown only when the
-    strategy reads or holds it.
+    strategy reads or holds it; a fund of its own that a book holds (the style
+    funds of ``SA7``, the money-market fund of ``SA8``) is shown beside the
+    world fund, which every report is read against.
     """
     uses_other = any(
         OTHER_FUND in column for column in history.columns if not column.startswith("close_")
@@ -603,6 +605,8 @@ def history_markdown(history: pd.DataFrame) -> str:
             return f"Poids proposé {column.removeprefix('proposed_')}"
         if column.startswith("open_"):
             return f"Ouverture {column.removeprefix('open_')}"
+        if column.startswith("close_"):
+            return f"Clôture {column.removeprefix('close_')}"
         if column in HISTORY_COLUMNS:
             return HISTORY_COLUMNS[column][0]
         return f"`{column}`"

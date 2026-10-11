@@ -154,6 +154,50 @@ def test_a_correction_written_for_the_wrong_defect_is_refused(fund: Instrument, 
         )
 
 
+def placeholder(xpar) -> pd.DataFrame:
+    """Return three bars, the middle one flat with no volume at a price its neighbours rule out."""
+    frame = bars(
+        xpar,
+        {
+            date(2026, 3, 10): (63.0, 63.4, 62.8, 63.05),
+            BROKEN: (73.2, 73.2, 73.2, 73.2),
+            date(2026, 3, 12): (63.1, 63.3, 62.9, 63.12),
+        },
+    )
+    frame.loc[frame["session_date"] == BROKEN, "volume"] = 0.0
+    return frame
+
+
+def test_a_flat_bar_with_no_volume_is_dropped_when_a_review_says_it_is_a_placeholder(
+    fund: Instrument, xpar
+) -> None:
+    """The row only earns a warning: it is the review, with its evidence, that decides."""
+    reviewed = BarCorrections([correction(defect=BarDefect.FLAT_ZERO_VOLUME)])
+
+    kept, applied = reviewed.apply(fund, "YAHOO", placeholder(xpar))
+
+    assert list(kept["session_date"]) == [date(2026, 3, 10), date(2026, 3, 12)]
+    assert applied == (correction(defect=BarDefect.FLAT_ZERO_VOLUME),)
+    # Without a review the same frame keeps its three bars.
+    untouched, none = BarCorrections([]).apply(fund, "YAHOO", placeholder(xpar))
+    assert len(untouched) == 3 and none == ()
+
+
+def test_a_placeholder_the_provider_replaced_by_a_real_bar_stops_the_ingestion(
+    fund: Instrument, xpar
+) -> None:
+    """A traded bar on that session is no longer what the review described."""
+    served = placeholder(xpar)
+    served.loc[served["session_date"] == BROKEN, "volume"] = 12_000.0
+    reviewed = BarCorrections([correction(defect=BarDefect.FLAT_ZERO_VOLUME)])
+
+    with pytest.raises(ValueError, match="no longer has"):
+        reviewed.apply(fund, "YAHOO", served)
+    # Nor does the review of a placeholder excuse a bar broken in another way.
+    with pytest.raises(ValueError, match="FLAT_ZERO_VOLUME"):
+        reviewed.apply(fund, "YAHOO", impossible(xpar))
+
+
 def test_an_empty_set_of_corrections_changes_nothing(fund: Instrument, xpar) -> None:
     """The normal state of the file, and the one that must cost nothing."""
     frame = impossible(xpar)
