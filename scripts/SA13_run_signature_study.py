@@ -10,7 +10,7 @@ a new portfolio. From the repository root, once the store is filled and the
 ``ml``, ``stats`` and ``signatures`` extras are installed:
 
     OMP_NUM_THREADS=1 uv run python scripts/SA13_run_signature_study.py \
-        --output results/signature_study
+        --output runs/signature_study
 
 One thread is asked for because the last digits of a fit move with the number of
 threads the linear algebra uses; the setting is recorded in the manifest.
@@ -1893,7 +1893,7 @@ def calendar_sessions(
 def main(arguments: Sequence[str] | None = None) -> int:
     """Calibrate the models, run the study and write every export."""
     parser = argparse.ArgumentParser(description="Run the SA13 signature study.")
-    parser.add_argument("--output", type=Path, default=Path("results/signature_study"))
+    parser.add_argument("--output", type=Path, default=Path("runs/signature_study"))
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--start", default=STUDY_PERIOD[0], help="first measured session")
     parser.add_argument("--end", default=STUDY_PERIOD[1], help="last measured session")

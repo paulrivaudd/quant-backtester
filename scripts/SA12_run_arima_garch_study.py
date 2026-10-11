@@ -7,7 +7,7 @@ decision. From the repository root, once the store is filled and the ``stats``
 extra installed (``uv sync --extra stats``):
 
     OMP_NUM_THREADS=1 uv run python scripts/SA12_run_arima_garch_study.py \
-        --output results/arima_garch_study
+        --output runs/arima_garch_study
 
 One thread is asked for because the last digits of an optimiser's answer move
 with the number of threads the linear algebra uses; the setting is recorded in
@@ -893,7 +893,7 @@ def run_books(
 def main(arguments: Sequence[str] | None = None) -> int:
     """Run the study and write every export."""
     parser = argparse.ArgumentParser(description="Run the SA12 ARIMA-GARCH study.")
-    parser.add_argument("--output", type=Path, default=Path("results/arima_garch_study"))
+    parser.add_argument("--output", type=Path, default=Path("runs/arima_garch_study"))
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--start", default=COMMON_PERIOD[0], help="first measured session")
     parser.add_argument("--end", default=COMMON_PERIOD[1], help="last measured session")

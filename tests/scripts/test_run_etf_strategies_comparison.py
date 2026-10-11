@@ -257,6 +257,54 @@ def test_a_book_without_an_order_still_shows_a_price() -> None:
     assert "0 orders" in figure.axes[0].get_title(loc="left")
 
 
+def test_a_fund_keeps_its_place_whatever_order_it_comes_in() -> None:
+    assert SCRIPT.ordered_funds(["ETF_SP500_PEA", "ETF_WORLD"]) == ["ETF_WORLD", "ETF_SP500_PEA"]
+    # A fund without a colour of its own comes after those that have one, by name.
+    assert SCRIPT.ordered_funds(["ZZZ", "ETF_SP500_PEA", "AAA"]) == ["ETF_SP500_PEA", "AAA", "ZZZ"]
+    assert SCRIPT.ordered_funds([]) == []
+
+
+def test_the_weights_are_stacked_fund_by_fund_and_what_is_left_is_cash() -> None:
+    _, weights = orders_inputs()
+    # The columns come in any order: a fund keeps its place and its colour.
+    weights = weights.assign(ETF_SP500_PEA=0.3)[["ETF_SP500_PEA", "ETF_WORLD"]]
+
+    figure = SCRIPT.weights_figure("a book", weights)
+
+    axes = figure.axes[0]
+    assert axes.get_legend_handles_labels()[1] == ["ETF_WORLD", "ETF_SP500_PEA"]
+    assert axes.get_ylim() == (0.0, 100.0)
+    # The two bands add up to the 80% held: the 20 above them are cash.
+    tops = [float(band.get_paths()[0].vertices[:, 1].max()) for band in axes.collections]
+    assert tops == pytest.approx([50.0, 80.0])
+    assert axes.get_title(loc="left") == "a book: weight held in each fund"
+
+
+def test_a_book_of_one_fund_is_named_by_its_title_and_needs_no_legend() -> None:
+    _, weights = orders_inputs()
+
+    figure = SCRIPT.weights_figure("a book", weights[["ETF_WORLD"]])
+
+    assert figure.axes[0].get_legend() is None
+    assert figure.axes[0].get_title(loc="left") == "a book: weight held in ETF_WORLD"
+    with pytest.raises(ValueError, match="nothing to draw"):
+        SCRIPT.weights_figure("a book", weights.iloc[:0])
+    with pytest.raises(ValueError, match="nothing to draw"):
+        SCRIPT.weights_figure("a book", weights[[]])
+
+
+def test_the_costs_are_one_bar_per_book_with_the_dearest_on_top() -> None:
+    figure = SCRIPT.costs_figure({"cheap": 100.0, "dear": 20_517.4, "middle": 1_445.0})
+
+    axes = figure.axes[0]
+    # Bars are drawn bottom up, so the dearest book is the last one.
+    assert [tick.get_text() for tick in axes.get_yticklabels()] == ["cheap", "middle", "dear"]
+    assert [bar.get_width() for bar in axes.patches] == [100.0, 1_445.0, 20_517.4]
+    assert [note.get_text() for note in axes.texts] == ["100", "1,445", "20,517"]
+    with pytest.raises(ValueError, match="no book"):
+        SCRIPT.costs_figure({})
+
+
 def test_every_book_but_the_market_fund_is_scored_against_it() -> None:
     days = [date(2024, 1, 1) + timedelta(days=i) for i in range(400)]
     rng = np.random.default_rng(4)

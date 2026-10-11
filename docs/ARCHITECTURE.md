@@ -580,7 +580,7 @@ La couche `research/` porte la discipline de recherche décrite dans
 | `scripts/SA13_run_signature_study.py` | l'étude `SA13` : calibrations mensuelles, contrôles C0 à C7, contributions, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`, extras `ml stats signatures`) | non |
 | `scripts/SA12_run_arima_garch_study.py` | l'étude `SA12` : contrôles D0/D1/D2, prévisions à deux pas, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`) | non |
 | `scripts/SA11_run_garch_study.py` | l'étude `SA11` sur la période commune : classement, témoins `SA6`/EWMA, QLIKE, bootstrap, coûts ×2, historiques par stratégie | non |
-| `scripts/write_strategy_reports.py` | un fichier `strategy<code>_ResultsAndAnalysis_<date>.md` par stratégie, depuis les exports d'une étude ; `--only SA12` écrit le rapport d'une étude dédiée, avec le classement de ses livres et la section que l'étude a écrite (`report_extra_<code>.md`) | non |
+| `scripts/write_strategy_reports.py` | le dossier `results/` : un sous-dossier par stratégie (`analysis.md`, tableaux, figures) et `summary/` qui compare les livres, depuis les exports d'une étude rangés dans `runs/` ; `--only SA12` écrit le dossier d'une étude dédiée, avec le classement de ses livres et la section que l'étude a écrite (`report_extra_<code>.md`) | non |
 
 **Référence d'API.** Chaque module, classe et fonction publique a une docstring
 numpy qui donne les unités, le fuseau et l'instant de disponibilité. On la lit

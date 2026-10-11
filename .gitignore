@@ -15,8 +15,9 @@ dist/
 .mypy_cache/
 .ipynb_checkpoints/
 
-# Research output
-results/
+# What the study scripts export, run after run: raw, large, and reproduced by
+# running them. results/ is built from it and is committed.
+runs/
 
 # Calibrated models: derived from committed code, a committed configuration and
 # the store, like every other result.

@@ -126,6 +126,8 @@ src/quant_backtester/
 tests/           mirrors the package layout
 scripts/         command-line entry points (see docs/ARCHITECTURE.md §13)
 docs/            architecture, data layer, formulas, corporate actions, glossary (French)
+results/         one folder per strategy (SA1 ... SA14) and summary/, which compares them
+runs/            what the study scripts export, run after run; not committed
 market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
 ```
 
@@ -470,7 +472,7 @@ The report has the shape below. This one is the offline demo's
 (`uv run python scripts/demo.py`): `SA1` on invented prices, so its numbers show
 the layout and say nothing about the rule. What the catalogued strategies did on
 real data is in
-[research/reports/2026-10-10](research/reports/2026-10-10/README.md).
+[results/summary](results/summary/README.md).
 
 ```text
 255 sessions, 0.99 years, 255 sessions/year, risk-free 2.00%
@@ -840,7 +842,7 @@ between two books means anything is a question for a paired block bootstrap of
 their returns (`quant_backtester.analytics.uncertainty`). The studies of the
 catalogued strategies report one with every comparison, beside a second run at
 twice the declared costs: see
-[research/reports/2026-10-10](research/reports/2026-10-10/README.md).
+[results/summary](results/summary/README.md).
 
 The benchmark is read at the run's own decision instants, so adding data after
 the last session changes none of its figures; a session its venue did not hold

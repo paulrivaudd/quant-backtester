@@ -1,10 +1,36 @@
 # Résultats et analyses du 10 octobre 2026
 
-Un rapport par stratégie, écrit par `scripts/write_strategy_reports.py` à
-partir des exports de `scripts/SA11_run_garch_study.py`, après mise à jour du
-magasin jusqu'au 2026-10-09.
+`results/` a un dossier par stratégie, `SA1` à `SA14`, et ce dossier-ci, qui
+les compare. Tout est écrit par `scripts/write_strategy_reports.py` à partir
+des exports de `scripts/SA11_run_garch_study.py`, après mise à jour du magasin
+jusqu'au 2026-10-09 ; seul ce fichier est rédigé à la main.
 
-Chaque fichier `strategy<CODE>_ResultsAndAnalysis_10102026.md` a trois
+| Dans le dossier d'une stratégie | Ce que c'est |
+|---|---|
+| `analysis.md` | son rapport : indicateurs, analyse rédigée, historique |
+| `metrics.csv` | ses indicateurs, aux coûts déclarés et à coûts doublés |
+| `yearly.csv` | ses rendements par année, à côté du fonds détenu |
+| `history.csv` | séance par séance : cours, signaux lus, poids visés et détenus, valeur |
+| `fills.csv` | ses ordres exécutés, un par ligne, avec leur prix et leurs coûts |
+| `equity.png` | sa valeur nette et brute, contre le fonds détenu |
+| `drawdown.png` | sa baisse sous son propre sommet |
+| `weights.png` | ce qu'elle a détenu dans chaque fonds, le reste étant du cash |
+| `orders.png` | ses ordres sur les cours des fonds, ses poids et sa valeur |
+| `study.md` | pour `SA11`, `SA12` et `SA13` : le document de leur propre étude |
+
+| Dans ce dossier | Ce que c'est |
+|---|---|
+| `ranking.csv`, `ranking_costs_x2.csv` | le tableau de tous les livres, aux coûts déclarés et doublés |
+| `yearly.csv` | les rendements par année de tous les livres |
+| `overview.png` | toutes les courbes sur une échelle |
+| `equity_all.png`, `drawdowns_all.png` | un panneau par livre, contre `SA1` et le fonds détenu |
+| `costs.png` | ce que chaque livre a payé pour traiter |
+| `diagnostics.md` | les mesures complémentaires demandées par la revue |
+| `REF_WorldBuyHold/`, `REF_5050Rebalanced/`, `EWMA94control/` | les deux références et le témoin de `SA11`, sans code de catalogue |
+
+![Valeur nette de chaque livre, base 100](overview.png)
+
+Chaque `analysis.md` a trois
 sections : (1) les indicateurs de résultat globaux, à côté du fonds détenu ;
 (2) l'analyse — périodes mesurées, baisses sous un sommet avec leur date de
 récupération, années et mois, puis points forts, points faibles, pire et
@@ -53,18 +79,18 @@ décision. Score `QUALITY_V1` contre `ETF_WORLD` détenu, déflaté par 10 essai
 
 | Rang | Livre | Score | Net | Sharpe | Perte max. | Retour au sommet | Coûts (EUR) | Rapport |
 |---:|---|---:|---:|---:|---:|---:|---:|---|
-| 1 | 50/50 rebalancé (référence, hors catalogue) | 77,9 % | +103,3 % | 0,96 | -22,5 % | 232 j | 736 | [rapport](strategyREF_5050Rebalanced_ResultsAndAnalysis_10102026.md) |
-| 2 | EWMA 0,94 (témoin de SA11, sans code) | 53,6 % | +73,4 % | 0,93 | -15,4 % | 321 j | 1 519 | [rapport](strategyEWMA94control_ResultsAndAnalysis_10102026.md) |
-| 3 | SA6 - vol control | 52,0 % | +67,4 % | 0,90 | -15,7 % | 330 j | 1 445 | [rapport](strategySA6_ResultsAndAnalysis_10102026.md) |
-| 4 | SA10 - ensemble, **sans facteurs ni monétaire** | 51,1 % | +32,1 % | 0,86 | -11,8 % | 442 j | 1 986 | [rapport](strategySA10_ResultsAndAnalysis_10102026.md) |
-| 5 | SA3 - smooth MA | 49,0 % | +57,9 % | 0,79 | -21,6 % | 540 j | 680 | [rapport](strategySA3_ResultsAndAnalysis_10102026.md) |
-| 6 | **SA11 - GARCH vol control** | 48,6 % | +66,0 % | 0,87 | -16,5 % | 324 j | 3 749 | [rapport](strategySA11_ResultsAndAnalysis_10102026.md) |
-| 7 | SA2 - dual momentum | 44,1 % | +69,2 % | 0,78 | -22,8 % | 422 j | 4 629 | [rapport](strategySA2_ResultsAndAnalysis_10102026.md) |
-| 8 | SA5 - relative tilt | 29,4 % | +72,8 % | 0,76 | -22,9 % | 252 j | 20 517 | [rapport](strategySA5_ResultsAndAnalysis_10102026.md) |
-| 9 | SA1 - std MA20 | 0,0 % | +20,5 % | 0,42 | -18,9 % | 794 j | 15 730 | [rapport](strategySA1_ResultsAndAnalysis_10102026.md) |
-| 9 | SA4 - pullback | 0,0 % | +4,4 % | 0,41 | -3,4 % | non récupéré | 4 572 | [rapport](strategySA4_ResultsAndAnalysis_10102026.md) |
-| 9 | SA9 - VIX relief | 0,0 % | -0,7 % | -0,04 | -8,0 % | non récupéré | 2 041 | [rapport](strategySA9_ResultsAndAnalysis_10102026.md) |
-| — | ETF_WORLD détenu (étalon, non noté) | — | +94,8 % | 0,93 | -21,6 % | 229 j | 100 | [rapport](strategyREF_WorldBuyHold_ResultsAndAnalysis_10102026.md) |
+| 1 | 50/50 rebalancé (référence, hors catalogue) | 77,9 % | +103,3 % | 0,96 | -22,5 % | 232 j | 736 | [rapport](REF_5050Rebalanced/analysis.md) |
+| 2 | EWMA 0,94 (témoin de SA11, sans code) | 53,6 % | +73,4 % | 0,93 | -15,4 % | 321 j | 1 519 | [rapport](EWMA94control/analysis.md) |
+| 3 | SA6 - vol control | 52,0 % | +67,4 % | 0,90 | -15,7 % | 330 j | 1 445 | [rapport](../SA6/analysis.md) |
+| 4 | SA10 - ensemble, **sans facteurs ni monétaire** | 51,1 % | +32,1 % | 0,86 | -11,8 % | 442 j | 1 986 | [rapport](../SA10/analysis.md) |
+| 5 | SA3 - smooth MA | 49,0 % | +57,9 % | 0,79 | -21,6 % | 540 j | 680 | [rapport](../SA3/analysis.md) |
+| 6 | **SA11 - GARCH vol control** | 48,6 % | +66,0 % | 0,87 | -16,5 % | 324 j | 3 749 | [rapport](../SA11/analysis.md) |
+| 7 | SA2 - dual momentum | 44,1 % | +69,2 % | 0,78 | -22,8 % | 422 j | 4 629 | [rapport](../SA2/analysis.md) |
+| 8 | SA5 - relative tilt | 29,4 % | +72,8 % | 0,76 | -22,9 % | 252 j | 20 517 | [rapport](../SA5/analysis.md) |
+| 9 | SA1 - std MA20 | 0,0 % | +20,5 % | 0,42 | -18,9 % | 794 j | 15 730 | [rapport](../SA1/analysis.md) |
+| 9 | SA4 - pullback | 0,0 % | +4,4 % | 0,41 | -3,4 % | non récupéré | 4 572 | [rapport](../SA4/analysis.md) |
+| 9 | SA9 - VIX relief | 0,0 % | -0,7 % | -0,04 | -8,0 % | non récupéré | 2 041 | [rapport](../SA9/analysis.md) |
+| — | ETF_WORLD détenu (étalon, non noté) | — | +94,8 % | 0,93 | -21,6 % | 229 j | 100 | [rapport](REF_WorldBuyHold/analysis.md) |
 
 « Retour au sommet » : jours calendaires entre le sommet qui précède la perte
 maximale et la première valorisation revenue à ce niveau.
@@ -96,17 +122,17 @@ rejeté sur 1 416 décisions. Mieux prévoir la variance de clôture à clôture
 s'est pas traduit par une meilleure allocation après exécution à l'ouverture,
 bande et coûts (2,5 fois ceux de `SA6`). Les témoins simples sont conservés ;
 `SA11` reste au catalogue comme référence fixe. Cela ne dit rien des modèles
-GARCH en général. Détail : [SA11_study_10102026.md](SA11_study_10102026.md).
+GARCH en général. Détail : [SA11/study.md](../SA11/study.md).
 
 ## SA12 : une étude à part, sur la même période
 
-[strategySA12_ResultsAndAnalysis_10102026.md](strategySA12_ResultsAndAnalysis_10102026.md)
+[SA12/analysis.md](../SA12/analysis.md)
 vient de sa propre étude (`scripts/SA12_run_arima_garch_study.py`, commit `10f6d90`,
 même magasin, même période 2021-04-01 → 2026-10-09), qui exécute aussi trois
 contrôles sans code de catalogue : D0 (même ARIMA et même variance, filtre de
 direction toujours ouvert), D1 (variance EWMA), D2 (moyenne constante). Son
 registre compte 14 essais : ses scores ne se lisent pas dans le tableau
-ci-dessus, déflaté par 10. Détail : [SA12_study_10102026.md](SA12_study_10102026.md).
+ci-dessus, déflaté par 10. Détail : [SA12/study.md](../SA12/study.md).
 
 | Livre | Net | Net, coûts ×2 | Sharpe | Perte max. | Exposition | Coûts (EUR) |
 |---|---:|---:|---:|---:|---:|---:|
@@ -137,7 +163,7 @@ candidat : en adopter un serait une nouvelle hypothèse.
 
 ## SA13 : une étude à part, sur une période de test plus courte
 
-[strategySA13_ResultsAndAnalysis_10102026.md](strategySA13_ResultsAndAnalysis_10102026.md)
+[SA13/analysis.md](../SA13/analysis.md)
 vient de sa propre étude (`scripts/SA13_run_signature_study.py`, commit `2b7d147`,
 même magasin). Un modèle par mois est calibré sur ce qui était connu au soir
 de la dernière séance du mois précédent ; le premier mois calibrable est
@@ -145,7 +171,7 @@ janvier 2023, donc la **période de test est 2023-01-02 → 2026-10-09** (964
 séances), avec un portefeuille continu. Toutes les stratégies comparables y
 sont rejouées, avec huit contrôles sans code de catalogue (C0 à C7) : 19
 essais. **Ces chiffres ne se comparent pas à ceux du tableau du haut**, mesurés
-depuis 2021. Détail : [SA13_study_10102026.md](SA13_study_10102026.md).
+depuis 2021. Détail : [SA13/study.md](../SA13/study.md).
 
 | Livre | Net | Net, coûts ×2 | Sharpe | Perte max. | Exposition | Coûts (EUR) |
 |---|---:|---:|---:|---:|---:|---:|
@@ -191,7 +217,7 @@ serait une nouvelle hypothèse.
 ## Hors classement
 
 - **SA14**, appelée `ML1` jusqu'au 2026-10-11
-  ([rapport](strategySA14_ResultsAndAnalysis_10102026.md)) : son
+  ([rapport](../SA14/analysis.md)) : son
   information s'arrête au 2024-12-31. Il est mesuré sur 2025-01-02 →
   2026-10-09 (+13,4 % contre +24,5 % pour le fonds, Sharpe 0,76 contre 0,93).
   Son score, déflaté pour un seul essai, ne se compare pas à ceux du tableau.
@@ -214,7 +240,7 @@ que ce n'est pas fait.
 
 ## Diagnostics complémentaires
 
-[diagnostics_10102026.md](diagnostics_10102026.md) mesure ce que les analyses
+[diagnostics.md](diagnostics.md) mesure ce que les analyses
 listaient comme restant à mesurer ; c'est sa version 2, recalculée après la
 vérification. Tout y est **descriptif** : les témoins sont construits sur des
 poids constatés après coup, et aucune variante n'est candidate. Ce qu'on y lit :
@@ -260,12 +286,13 @@ poids constatés après coup, et aucune variante n'est candidate. Ce qu'on y lit
 
 ## Ce que ces fichiers ne contiennent pas
 
-Les rapports couvrent toutes les séances mais ne sont pas l'archive d'un run.
-Les ordres, prix d'exécution, coûts par séance, rejets et courbes brutes sont
-dans les exports de l'étude (`results/garch_study/`), et le détail des
-diagnostics dans `results/review_diagnostics/` (séjours un par un, entrées de
-`SA14`, tables des témoins). Ces dossiers ne sont pas commités : ils se
-reproduisent. Restent non produits : une attribution exacte de `SA2` et `SA5`
+Chaque dossier couvre toutes les séances de sa stratégie mais n'est pas
+l'archive d'un run. Les rejets, les coûts par séance, les prévisions et les
+courbes de tous les livres sont dans les exports bruts de chaque étude
+(`runs/garch_study/`, `runs/arima_garch_study/`, `runs/signature_study/`,
+`runs/sa14/`), et le détail des diagnostics dans `runs/review_diagnostics/`
+(séjours un par un, entrées de `SA14`, tables des témoins). `runs/` n'est pas
+commité : il se reproduit. Restent non produits : une attribution exacte de `SA2` et `SA5`
 aux quantités et aux prix d'ouverture ; un témoin à exposition ou à risque
 réellement rapprochés ; la décomposition des cibles de `SA10` règle par règle
 à chaque décision, et le facteur de réduction de son contrôle de risque ; une
@@ -276,25 +303,22 @@ analyse des entrées de `SA14`.
 ```bash
 uv sync --extra ml --extra stats
 uv run python scripts/update_market_data.py
-uv run python scripts/SA11_run_garch_study.py --output results/garch_study
+uv run python scripts/SA11_run_garch_study.py --output runs/garch_study
 # les diagnostics chargent d'abord le modèle de SA14 : il doit exister
 uv run python scripts/SA14_run_neural_strategy.py --seed 42 --calibrate-only
 uv run python scripts/run_review_diagnostics.py
-uv run python scripts/write_strategy_reports.py \
-    --study results/garch_study --output research/reports/2026-10-10
+uv run python scripts/write_strategy_reports.py --study runs/garch_study
 
 # SA12, son étude et son rapport (une heure environ, un seul fil de calcul)
 OMP_NUM_THREADS=1 uv run python scripts/SA12_run_arima_garch_study.py \
-    --output results/arima_garch_study
-uv run python scripts/write_strategy_reports.py \
-    --study results/arima_garch_study --output research/reports/2026-10-10 --only SA12
+    --output runs/arima_garch_study
+uv run python scripts/write_strategy_reports.py --study runs/arima_garch_study --only SA12
 
 # SA13, ses calibrations mensuelles, son étude et son rapport (vingt minutes environ)
 uv sync --extra ml --extra stats --extra signatures
 OMP_NUM_THREADS=1 uv run python scripts/SA13_run_signature_study.py \
-    --output results/signature_study
-uv run python scripts/write_strategy_reports.py \
-    --study results/signature_study --output research/reports/2026-10-10 --only SA13
+    --output runs/signature_study
+uv run python scripts/write_strategy_reports.py --study runs/signature_study --only SA13
 ```
 
 Cette recette refait la procédure, pas forcément les mêmes nombres : relancer
@@ -303,7 +327,8 @@ et une calibration refaite sur des données révisées n'est pas le modèle publ
 (`d9bfd125bf69`). Les diagnostics refusent de mettre un run à côté des exports
 d'une étude faite sur un autre magasin, un autre capital ou d'autres coûts.
 
-Le commentaire rédigé est dans [commentary.toml](commentary.toml) ; les
+Le commentaire rédigé est dans
+[research/commentary.toml](../../research/commentary.toml) ; les
 tableaux et les faits mesurés sont recalculés à chaque exécution. Tout est une
 évaluation rétrospective : l'historique d'`ETF_WORLD` a déjà été regardé, et la
 vérification prospective de `SA11` commence à la première séance XPAR après le

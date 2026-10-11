@@ -6,7 +6,7 @@ period starts after its information cutoff, and runs it once. From the
 repository root, once the store is filled and the ``ml`` extra installed
 (``uv sync --extra ml``):
 
-    uv run python scripts/SA14_run_neural_strategy.py --output results/sa14
+    uv run python scripts/SA14_run_neural_strategy.py --output runs/sa14
 
 The configuration is the one the store can serve today: the two PEA funds and
 the VIX are read, the two funds are bought. Bond, oil and gold series are not
@@ -389,7 +389,7 @@ def save_outputs(
 def main(arguments: Sequence[str] | None = None) -> int:
     """Prepare the model, run the final test and the references, print and write."""
     parser = argparse.ArgumentParser(description="Calibrate and test SA14, the neural allocation.")
-    parser.add_argument("--output", type=Path, default=Path("results/sa14"))
+    parser.add_argument("--output", type=Path, default=Path("runs/sa14"))
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts/neural/world_vix"))
     parser.add_argument("--seed", type=int, default=42)

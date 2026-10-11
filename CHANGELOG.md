@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### One folder of results per strategy, and one that compares them (2026-10-11)
+- **`results/` is committed and has a shape**: `results/SA1` ... `results/SA14`
+  each hold the strategy's `analysis.md`, its tables (`metrics.csv`,
+  `yearly.csv`, `history.csv`, `fills.csv`) and its figures (`equity.png`,
+  `drawdown.png`, `weights.png`, `orders.png`); `results/summary/` holds what
+  compares the books (`ranking.csv`, `ranking_costs_x2.csv`, `yearly.csv`,
+  `overview.png`, `equity_all.png`, `drawdowns_all.png`, `costs.png`), the
+  diagnostics, the hand-written `README.md`, and the folders of the two
+  references and of the control of `SA11`.
+- **`research/reports/2026-10-10/` is emptied into it**: a report
+  `strategy<CODE>_ResultsAndAnalysis_10102026.md` is now
+  `results/<CODE>/analysis.md`, a study document `results/<CODE>/study.md`,
+  the diagnostics `results/summary/diagnostics.md`. The written commentary is
+  `research/commentary.toml`.
+- **What a study script exports goes to `runs/`**, which is not committed:
+  `runs/garch_study`, `runs/arima_garch_study`, `runs/signature_study`,
+  `runs/sa14`, `runs/review_diagnostics`. These were the folders of `results/`.
+- `write_strategy_reports.py` writes the folders (`--output results`,
+  `--commentary research/commentary.toml`; `--stamp` is gone with the dates in
+  the file names). Two figures are new, `weights_figure` and `costs_figure`;
+  the others were already drawn by the comparison script and by `analytics`.
+- No number changes: every table is read from the exports the reports were
+  already written from.
+
 ### One flat folder of strategies, SA1 to SA14 (2026-10-11)
 - **`ML1` is now `SA14`.** `strategies/SA14_neural_allocation.py`,
   `scripts/SA14_run_neural_strategy.py`, their tests, the `strategy_id`

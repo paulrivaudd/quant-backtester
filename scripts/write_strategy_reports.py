@@ -1,30 +1,41 @@
-"""Write one results-and-analysis report per strategy, from the exports of the SA11 study.
+"""Write the results folder: one folder per strategy, and one that compares them.
 
-Each catalogued strategy that was run gets a Markdown file
-``strategy<CODE>_ResultsAndAnalysis_<DDMMYYYY>.md``; so do the control of
-``SA11`` and the two references - the fund held and the even split - since a
-strategy holding both funds cannot be read without the second. Three sections:
+Each catalogued strategy a study ran gets ``results/<CODE>/``:
 
-1. every global indicator, beside the fund bought and held;
-2. an analysis - the measured facts of its worst and best stretches, its
-   drawdowns with the date each peak was reached again, its years and months,
-   then the strengths, the weaknesses and the market situations that hurt it
-   most;
-3. the history: the closes of the funds, the signals the strategy read, the
-   weights it targeted and held, and its value, session by session.
+- ``analysis.md``: every global indicator beside the fund bought and held;
+  the measured facts of its worst and best stretches, its drawdowns with the
+  date each peak was reached again, its years and months, then the strengths,
+  the weaknesses and the market situations that hurt it most; and its history,
+  session by session;
+- ``metrics.csv``, ``yearly.csv``, ``history.csv`` and ``fills.csv``: the same
+  figures as tables - at the declared costs and at twice them, by calendar
+  year, by session, and order by order;
+- ``equity.png``, ``drawdown.png``, ``weights.png`` and ``orders.png``: its
+  value against the fund held, how far it stood below its own peak, what it
+  held, and its orders on the prices of the funds.
+
+The control of ``SA11`` and the two references - the fund held and the even
+split - have no catalogue code: their folders are under ``results/summary/``,
+beside what compares the books of the study: ``ranking.csv``,
+``ranking_costs_x2.csv``, ``yearly.csv`` and the figures of all of them
+(``overview.png``, ``equity_all.png``, ``drawdowns_all.png``, ``costs.png``).
+``results/summary/README.md`` is written by hand and is never touched here.
 
 From the repository root, after ``scripts/SA11_run_garch_study.py``:
 
-    uv run python scripts/write_strategy_reports.py \
-        --study results/garch_study --output research/reports/2026-10-10
+    uv run python scripts/write_strategy_reports.py --study runs/garch_study
 
-Nothing here computes a performance of its own for the ``SA`` strategies:
-every figure is read from the study's exports, so a report cannot disagree
+A strategy studied on its own (``SA12``, ``SA13``) is written from its own
+study with ``--only``; the document that study wrote, ``study.md``, is copied
+into its folder, as are the figures the study named after it.
+
+Nothing here computes a performance of its own for a strategy of a study:
+every figure is read from the study's exports, so a folder cannot disagree
 with the table it comes from. The measured facts of the analysis (dates and
 sizes of the falls and rises, exposure held through them) are computed here
 from those exports. The written commentary is not computed: it is read from
-``commentary.toml`` in the output folder, by strategy code, and a strategy
-without one says so instead of inventing a text.
+``research/commentary.toml``, by strategy code, and a strategy without one
+says so instead of inventing a text.
 
 ``SA14`` is not in the study: its information stops at 2024-12-31, so it is run
 here, once, on its test period extended to the study's last session, beside
@@ -40,6 +51,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import shutil
 import sys
 import tomllib
 from collections.abc import Mapping, Sequence
@@ -48,21 +60,43 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
+from matplotlib.figure import Figure
 from run_etf_strategies_comparison import (
+    BENCHMARK,
     HELD,
     SPLIT,
+    SURFACE,
     closes_of,
+    costs_figure,
+    drawdown_panels,
+    equity_panels,
+    ordered_funds,
+    orders_figure,
+    overview_figure,
     quality_details,
     slug,
+    weights_figure,
 )
 from SA11_run_garch_study import EWMA, FUND, summary_frame, yearly_frame
 
-from quant_backtester.analytics.curves import Book
+from quant_backtester.analytics.curves import Book, drawdown_curve
+from quant_backtester.analytics.plots import drawdown_figure, equity_figure
 from quant_backtester.strategies.catalogue import CATALOGUE
 
 UNCATALOGUED = {EWMA: "EWMA94control", HELD: "REF_WorldBuyHold", SPLIT: "REF_5050Rebalanced"}
-"""The code, in a file name, of each book that has no catalogue code: the control of
+"""The folder name of each book that has no catalogue code: the control of
 ``SA11`` and the two references every strategy is read against."""
+
+SUMMARY = "summary"
+"""The folder of what compares the books, and of the books that have no code."""
+
+FIGURE_DPI = 110
+"""Resolution of the figures of ``results/``: they are committed, so lighter than
+the 160 a study draws its own at."""
+
+DIAGNOSTICS = "results/summary/diagnostics.md"
+"""Where the complementary measures of a strategy are, unless its commentary names
+the document of its own study."""
 
 OTHER_FUND = "ETF_SP500_PEA"
 """The second fund some strategies hold."""
@@ -607,7 +641,7 @@ def commentary_markdown(notes: Mapping[str, object] | None) -> str:
             "_Aucun commentaire n'a été rédigé pour cette stratégie : seuls les faits "
             "mesurés ci-dessus sont disponibles._"
         )
-    source = notes.get("measured_source", "diagnostics_10102026.md")
+    source = notes.get("measured_source", DIAGNOSTICS)
     sections = (
         ("summary", "En résumé", False),
         ("strengths", "Points forts", True),
@@ -813,7 +847,7 @@ def report(
             "exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du "
             "portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur "
             "ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne "
-            "sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.",
+            "sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.",
             *([] if history_note is None else ["", history_note]),
             "",
             history_markdown(history),
@@ -822,9 +856,252 @@ def report(
     )
 
 
-def file_name(code: str, stamp: str) -> str:
-    """Return the name of a strategy's report: ``strategySA11_ResultsAndAnalysis_10102026.md``."""
-    return f"strategy{code}_ResultsAndAnalysis_{stamp}.md"
+@dataclass(frozen=True, slots=True)
+class BookFolder:
+    """Everything the folder of one book holds, before it is written.
+
+    Attributes
+    ----------
+    code : str
+        The catalogue code of the book, or its name in :data:`UNCATALOGUED`.
+    name : str
+        The book, as its study names it.
+    analysis : str
+        Its report, as Markdown.
+    metrics : pd.DataFrame
+        Its row of the study's table, at the declared costs and, when the
+        study ran it, at twice them.
+    yearly : pd.DataFrame
+        Its returns by calendar year, beside the fund held's.
+    history : pd.DataFrame
+        Its history by session: ``close_<fund>``, the signals it read,
+        ``target_<fund>``, ``held_<fund>`` and ``net_equity``.
+    fills : pd.DataFrame
+        Its executions, one row per order.
+    gross : pd.Series | None
+        Its equity with no cost taken out, when the study exported it.
+    market : pd.Series
+        Net equity of the fund held over the same sessions.
+    """
+
+    code: str
+    name: str
+    analysis: str
+    metrics: pd.DataFrame
+    yearly: pd.DataFrame
+    history: pd.DataFrame
+    fills: pd.DataFrame
+    gross: pd.Series | None  # type: ignore[type-arg]
+    market: pd.Series  # type: ignore[type-arg]
+
+
+def folder_of(output: Path, code: str) -> Path:
+    """Return a book's folder: ``results/SA11``, or under ``results/summary`` without a code."""
+    catalogued = {item.code for item in CATALOGUE}
+    return output / code if code in catalogued else output / SUMMARY / code
+
+
+def metrics_frame(row: Mapping[str, object], stressed: Mapping[str, object] | None) -> pd.DataFrame:
+    """Return a book's indicators as a table: a row at the declared costs, one at twice them.
+
+    Parameters
+    ----------
+    row : Mapping[str, object]
+        Its row of the study's table.
+    stressed : Mapping[str, object] | None
+        Its row in the second real run at doubled costs, when there is one.
+    """
+    rows = (
+        {"declared": dict(row)}
+        if stressed is None
+        else {"declared": dict(row), "doubled": dict(stressed)}
+    )
+    return pd.DataFrame.from_dict(rows, orient="index").rename_axis("costs")
+
+
+def yearly_rows(yearly: pd.DataFrame, name: str) -> pd.DataFrame:
+    """Return the returns by year of a book, of the fund held and the sessions counted."""
+    kept = [row for row in dict.fromkeys((name, HELD, "sessions")) if row in yearly.index]
+    return yearly.loc[kept]
+
+
+def fills_of(fills: pd.DataFrame, name: str) -> pd.DataFrame:
+    """Return the executions of one book, the column that named it dropped."""
+    own = fills.loc[fills["book"] == name]
+    return own.drop(columns="book").reset_index(drop=True)
+
+
+def book_figures(book: BookFolder) -> dict[str, Figure]:
+    """Return the figures of one book, by file name.
+
+    Parameters
+    ----------
+    book : BookFolder
+        What the folder holds; the figures are drawn from its history and
+        its fills, and compute nothing of their own.
+
+    Returns
+    -------
+    dict[str, Figure]
+        ``equity.png`` and ``drawdown.png`` always; ``weights.png`` and
+        ``orders.png`` when the history says what was held.
+    """
+    net = pd.Series(book.history["net_equity"], dtype="float64")
+    # A reference is not drawn against itself.
+    against = None if book.name == HELD else book.market.rename("fund held")
+    figures: dict[str, Figure] = {
+        "equity.png": equity_figure(
+            net,
+            title=f"{book.name}: net and gross equity"
+            + ("" if against is None else ", against the fund held"),
+            gross=book.gross,
+            benchmark=against,
+        ),
+        "drawdown.png": drawdown_figure(
+            drawdown_curve(net), title=f"{book.name}: drawdown of the net equity"
+        ),
+    }
+    held = [column for column in book.history.columns if column.startswith("held_")]
+    if held:
+        # One order of the funds for both figures, whatever order the study exported them in.
+        funds = ordered_funds([column.removeprefix("held_") for column in held])
+        weights = pd.DataFrame({fund: book.history[f"held_{fund}"] for fund in funds})
+        closes = {
+            fund: pd.Series(book.history[f"close_{fund}"], dtype="float64")
+            for fund in weights.columns
+            if f"close_{fund}" in book.history.columns
+        }
+        figures["weights.png"] = weights_figure(book.name, weights)
+        if closes:
+            figures["orders.png"] = orders_figure(
+                book.name, closes, book.fills, weights, net, book.market
+            )
+    return figures
+
+
+def write_book(folder: Path, book: BookFolder) -> list[Path]:
+    """Write the folder of one book and return the paths written.
+
+    Parameters
+    ----------
+    folder : Path
+        Where it goes; created when missing. Files already there under the
+        same names are replaced, and nothing else in the folder is touched.
+    book : BookFolder
+        What to write.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    written = [folder / "analysis.md"]
+    written[0].write_text(book.analysis, encoding="utf-8")
+    tables = {
+        "metrics.csv": book.metrics,
+        "yearly.csv": book.yearly,
+        "history.csv": book.history,
+    }
+    for name, table in tables.items():
+        table.to_csv(folder / name)
+        written.append(folder / name)
+    book.fills.to_csv(folder / "fills.csv", index=False)
+    written.append(folder / "fills.csv")
+    for name, figure in book_figures(book).items():
+        figure.savefig(folder / name, dpi=FIGURE_DPI, facecolor=SURFACE)
+        written.append(folder / name)
+    return written
+
+
+def owner_of(config: Mapping[str, object]) -> str:
+    """Return the code of the strategy a study is about: ``SA11`` for ``sa11_garch_vol_control``."""
+    return str(config.get("study", "")).split("_")[0].upper()
+
+
+def copy_study_files(study: Path, folder: Path, code: str) -> list[Path]:
+    """Copy into a strategy's folder what its own study wrote about it.
+
+    Parameters
+    ----------
+    study : Path
+        The folder of the study's exports.
+    folder : Path
+        The folder of the strategy the study is about.
+    code : str
+        Its code: the figures the study named after it start with it.
+
+    Returns
+    -------
+    list[Path]
+        ``study.md`` and every ``<CODE>_*.png`` of the study, as copied.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    sources = [study / "study.md", *sorted(study.glob(f"{code}_*.png"))]
+    written: list[Path] = []
+    for source in sources:
+        if source.is_file():
+            written.append(Path(shutil.copyfile(source, folder / source.name)))
+    return written
+
+
+def read_curves(study: Path) -> dict[str, pd.Series]:  # type: ignore[type-arg]
+    """Read the net equity of every book of a study, indexed by session date."""
+    frame = pd.read_csv(study / "equity.csv", index_col="session_date")
+    frame.index = pd.Index([date.fromisoformat(str(day)) for day in frame.index], dtype="object")
+    return {
+        str(column): pd.Series(frame[column], dtype="float64")
+        for column in frame.columns
+        if not str(column).endswith(" (gross)")
+    }
+
+
+def read_fills(study: Path) -> pd.DataFrame:
+    """Read the executions of every book of a study, their session as a date."""
+    fills = pd.read_csv(study / "fills.csv")
+    fills["session_date"] = [date.fromisoformat(str(day)) for day in fills["session_date"]]
+    return fills
+
+
+def write_summary(
+    folder: Path,
+    summary: pd.DataFrame,
+    stressed: pd.DataFrame,
+    yearly: pd.DataFrame,
+    curves: Mapping[str, pd.Series],  # type: ignore[type-arg]
+) -> list[Path]:
+    """Write what compares the books of a study and return the paths written.
+
+    Parameters
+    ----------
+    folder : Path
+        ``results/summary``; a ``README.md`` already there is left alone.
+    summary, stressed : pd.DataFrame
+        The study's table at the declared costs and at twice them, a row per book.
+    yearly : pd.DataFrame
+        Returns by calendar year of every book.
+    curves : Mapping[str, pd.Series]
+        Net equity of every book, on the same sessions.
+
+    Returns
+    -------
+    list[Path]
+        The three tables, ``overview.png``, ``costs.png`` when the study
+        measured the costs, and the two figures of panels when the study holds
+        the benchmark and the fund held they are drawn against.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    tables = {"ranking.csv": summary, "ranking_costs_x2.csv": stressed, "yearly.csv": yearly}
+    for name, table in tables.items():
+        table.to_csv(folder / name)
+    figures: dict[str, Figure] = {"overview.png": overview_figure(curves)}
+    if BENCHMARK in curves and HELD in curves:
+        figures["equity_all.png"] = equity_panels(curves)
+        figures["drawdowns_all.png"] = drawdown_panels(curves)
+    if "costs_eur" in summary.columns:
+        costs = summary["costs_eur"].dropna().to_numpy(dtype="float64")
+        names = [str(name) for name in summary["costs_eur"].dropna().index]
+        paid = dict(zip(names, (float(value) for value in costs), strict=True))
+        if paid:
+            figures["costs.png"] = costs_figure(paid)
+    for name, figure in figures.items():
+        figure.savefig(folder / name, dpi=FIGURE_DPI, facecolor=SURFACE)
+    return [folder / name for name in (*tables, *figures)]
 
 
 def study_inputs(study: Path) -> dict[str, object]:
@@ -889,10 +1166,10 @@ def study_lines(
     ]
 
 
-def sa14_report(
-    store: Path, artifacts: Path, end: str, stamp: str, notes: Mapping[str, object] | None
-) -> tuple[str, str]:
-    """Run SA14 on its test period up to ``end`` and return its file name and report.
+def sa14_book(
+    store: Path, artifacts: Path, end: str, notes: Mapping[str, object] | None
+) -> BookFolder:
+    """Run SA14 on its test period up to ``end`` and return what its folder holds.
 
     Raises
     ------
@@ -972,15 +1249,25 @@ def sa14_report(
             "deux fonds et du VIX sur 100 séances) ne sont pas dans ce tableau."
         ),
     )
-    return file_name("SA14", stamp), text
+    return BookFolder(
+        code="SA14",
+        name=neural.SA14,
+        analysis=text,
+        metrics=metrics_frame(own, None),
+        yearly=yearly_rows(yearly_frame(net), neural.SA14),
+        history=history.rename_axis("session_date"),
+        fills=results[neural.SA14].fills(),
+        gross=gross[neural.SA14],
+        market=net[HELD],
+    )
 
 
 def main(arguments: Sequence[str] | None = None) -> int:
-    """Write the report of every catalogued strategy the study ran, and of SA14."""
-    parser = argparse.ArgumentParser(description="Write one report per strategy.")
-    parser.add_argument("--study", type=Path, default=Path("results/garch_study"))
-    parser.add_argument("--output", type=Path, default=Path("research/reports/2026-10-10"))
-    parser.add_argument("--stamp", default="10102026", help="date in the file names, DDMMYYYY")
+    """Write the folder of every catalogued strategy the study ran, of SA14, and the summary."""
+    parser = argparse.ArgumentParser(description="Write the results folder of a study.")
+    parser.add_argument("--study", type=Path, default=Path("runs/garch_study"))
+    parser.add_argument("--output", type=Path, default=Path("results"))
+    parser.add_argument("--commentary", type=Path, default=Path("research/commentary.toml"))
     parser.add_argument("--store", type=Path, default=Path("market_data"))
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts/neural/world_vix"))
     parser.add_argument("--skip-sa14", action="store_true")
@@ -988,39 +1275,44 @@ def main(arguments: Sequence[str] | None = None) -> int:
         "--only",
         nargs="+",
         metavar="CODE",
-        help="write these reports only (SA12, SA13 ...), with the ranking of the study and "
-        "the section the study wrote for them; SA14 is then left alone",
+        help="write these folders only (SA12, SA13 ...), with the ranking of the study and "
+        "the section the study wrote for them; SA14 and the summary are then left alone",
     )
     options = parser.parse_args(arguments)
+    study: Path = options.study
+    output: Path = options.output
 
-    inputs = study_inputs(options.study)
+    inputs = study_inputs(study)
     summary, stressed, yearly = inputs["summary"], inputs["stressed"], inputs["yearly"]
     config = inputs["config"]
     assert isinstance(summary, pd.DataFrame) and isinstance(stressed, pd.DataFrame)
     assert isinstance(yearly, pd.DataFrame) and isinstance(config, dict)
-    commentary_path = options.output / "commentary.toml"
     commentary: dict[str, object] = {}
-    if commentary_path.exists():
-        commentary = tomllib.loads(commentary_path.read_text(encoding="utf-8"))
-    market = pd.Series(read_history(options.study, HELD)["net_equity"])
+    if options.commentary.exists():
+        commentary = tomllib.loads(options.commentary.read_text(encoding="utf-8"))
+    market = pd.Series(read_history(study, HELD)["net_equity"])
+    fills = read_fills(study)
     names = {item.display_name: item.code for item in CATALOGUE}
-    written: dict[str, str] = {}
+    books: list[BookFolder] = []
     for name in summary.index:
         # The control and the two references carry no catalogue code: a name of their own.
-        # The controls of a later study (D0, C0 ...) have neither, and no report.
+        # The controls of a later study (D0, C0 ...) have neither, and no folder.
         code = names.get(str(name)) or UNCATALOGUED.get(str(name))
         if code is None or (options.only and code not in options.only):
             continue
         notes = commentary.get(code)
         notes = notes if isinstance(notes, dict) else None
-        dedicated = options.study / f"report_extra_{code}.md"
+        dedicated = study / f"report_extra_{code}.md"
         selected = bool(options.only)
-        written[file_name(code, options.stamp)] = report(
+        history = read_history(study, str(name))
+        row = summary.loc[name].to_dict()
+        doubled = stressed.loc[name].to_dict()
+        text = report(
             str(name),
-            summary.loc[name].to_dict(),
+            row,
             summary.loc[HELD].to_dict(),
-            stressed.loc[name].to_dict(),
-            read_history(options.study, str(name)),
+            doubled,
+            history,
             market,
             yearly,
             notes,
@@ -1038,26 +1330,47 @@ def main(arguments: Sequence[str] | None = None) -> int:
                 dedicated.read_text(encoding="utf-8") if selected and dedicated.exists() else None
             ),
         )
+        books.append(
+            BookFolder(
+                code=code,
+                name=str(name),
+                analysis=text,
+                metrics=metrics_frame(row, doubled),
+                yearly=yearly_rows(yearly, str(name)),
+                history=history,
+                fills=fills_of(fills, str(name)),
+                gross=pd.Series(history["gross_equity"], dtype="float64")
+                if "gross_equity" in history.columns
+                else None,
+                market=market,
+            )
+        )
     if options.only:
-        missing = sorted(set(options.only) - {target.split("_")[0][8:] for target in written})
+        missing = sorted(set(options.only) - {book.code for book in books})
         if missing:
             raise SystemExit(f"the study has no book for {', '.join(missing)}")
     if not options.skip_sa14 and not options.only:
         notes = commentary.get("SA14")
         period = config["period"]
         assert isinstance(period, dict)
-        target, text = sa14_report(
-            options.store,
-            options.artifacts,
-            str(period["end"]),
-            options.stamp,
-            notes if isinstance(notes, dict) else None,
+        books.append(
+            sa14_book(
+                options.store,
+                options.artifacts,
+                str(period["end"]),
+                notes if isinstance(notes, dict) else None,
+            )
         )
-        written[target] = text
-    options.output.mkdir(parents=True, exist_ok=True)
-    for target, text in written.items():
-        (options.output / target).write_text(text, encoding="utf-8")
-        print(f"wrote {options.output / target}")
+    written: list[Path] = []
+    for book in books:
+        written += write_book(folder_of(output, book.code), book)
+    owner = owner_of(config)
+    if owner in {book.code for book in books}:
+        written += copy_study_files(study, folder_of(output, owner), owner)
+    if not options.only:
+        written += write_summary(output / SUMMARY, summary, stressed, yearly, read_curves(study))
+    for path in written:
+        print(f"wrote {path}")
     return 0
 
 

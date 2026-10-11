@@ -8,7 +8,7 @@ references, ``ETF_WORLD`` bought and held and an even split of the two funds
 rebalanced. A strategy is named by its catalogue code and label
 (:mod:`quant_backtester.strategies.catalogue`). From the repository root, once the store is filled:
 
-    uv run python scripts/run_etf_strategies_comparison.py --output results/etf_strategies
+    uv run python scripts/run_etf_strategies_comparison.py --output runs/etf_strategies
 
 ``SA11``, the GARCH volatility control, is run when its estimator is installed
 (the ``stats`` extra) and named as left out otherwise - never scored on a
@@ -54,6 +54,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.dates import date2num
 from matplotlib.figure import Figure
+from matplotlib.ticker import FuncFormatter
 
 from quant_backtester.analytics.benchmark_comparison import alpha_vs_benchmark
 from quant_backtester.analytics.config import AnalyticsConfig
@@ -783,6 +784,148 @@ def orders_figure(
     return figure
 
 
+def ordered_funds(funds: Sequence[str]) -> list[str]:
+    """Return funds in the order every figure stacks and lists them in.
+
+    The funds that have a colour come first, in the order of :data:`FUND_COLOURS`,
+    then any other by name: a fund keeps its place as it keeps its colour,
+    whatever the book and whatever the order its columns were exported in.
+    """
+    known = list(FUND_COLOURS)
+    return sorted(
+        (str(fund) for fund in funds),
+        key=lambda fund: (known.index(fund) if fund in known else len(known), fund),
+    )
+
+
+def weights_figure(name: str, weights: pd.DataFrame) -> Figure:
+    """Draw the share of a book held in each fund, valuation by valuation.
+
+    Parameters
+    ----------
+    name : str
+        The book.
+    weights : pd.DataFrame
+        Fraction of equity held in each fund at every valuation: a column per
+        fund, indexed by session.
+
+    Returns
+    -------
+    Figure
+        The weights stacked, in percent of equity; what is left unshaded up to
+        100 is cash.
+
+    Raises
+    ------
+    ValueError
+        If the frame holds no session or no fund.
+    """
+    columns = ordered_funds([str(column) for column in weights.columns])
+    if weights.empty or not columns:
+        raise ValueError("there is nothing to draw: the weights hold no session or no fund")
+    figure = Figure(figsize=(12, 3.6), layout="constrained", facecolor=SURFACE)
+    axes = figure.add_subplot()
+    _style(axes)
+    axes.stackplot(
+        list(weights.index),
+        *[list(weights[column].fillna(0.0) * 100.0) for column in columns],
+        colors=[FUND_COLOURS.get(column, HELD_COLOUR) for column in columns],
+        labels=columns,
+        alpha=0.75,
+        linewidth=0,
+    )
+    axes.set_ylim(0.0, 100.0)
+    sessions = sessions_of(pd.Series(weights[columns[0]]))
+    axes.set_xlim(_day(sessions[0]), _day(sessions[-1]))
+    axes.set_ylabel("% of equity held", fontsize=9, color=MUTED)
+    # One fund is named by the title; two need a legend to be told apart.
+    held = "each fund" if len(columns) > 1 else columns[0]
+    axes.set_title(
+        f"{name}: weight held in {held}", loc="left", fontsize=12, color=INK, fontweight="bold"
+    )
+    if len(columns) > 1:
+        # Above the frame: a book that is always invested leaves no room inside it.
+        axes.legend(
+            loc="lower right",
+            bbox_to_anchor=(1.0, 1.0),
+            fontsize=9,
+            frameon=False,
+            labelcolor=MUTED,
+            ncols=len(columns),
+        )
+    figure.supxlabel(
+        "Weights at each valuation. Unshaded up to 100: cash.",
+        x=0.01,
+        ha="left",
+        fontsize=9,
+        color=MUTED,
+    )
+    return figure
+
+
+def costs_figure(costs: Mapping[str, float]) -> Figure:
+    """Draw what each book paid to trade over the period, the dearest on top.
+
+    Parameters
+    ----------
+    costs : Mapping[str, float]
+        Commission, spread and slippage paid by each book, in the currency of
+        the books.
+
+    Returns
+    -------
+    Figure
+        One horizontal bar per book, with its amount written at its end.
+
+    Raises
+    ------
+    ValueError
+        If no book is given.
+    """
+    if not costs:
+        raise ValueError("there is nothing to draw: no book was given")
+    ordered = sorted(costs.items(), key=lambda item: item[1])
+    names = [name for name, _ in ordered]
+    paid = [float(value) for _, value in ordered]
+    figure = Figure(
+        figsize=(11, 0.42 * len(ordered) + 1.6), layout="constrained", facecolor=SURFACE
+    )
+    axes = figure.add_subplot()
+    _style(axes)
+    # Bars run along x: the grid that helps reading them does too.
+    axes.grid(axis="y", visible=False)
+    axes.grid(axis="x", color=GRID, linewidth=0.8)
+    bars = axes.barh(names, paid, color=STRATEGY_COLOUR, height=0.62)
+    for bar, value in zip(bars, paid, strict=True):
+        axes.annotate(
+            f"{value:,.0f}",
+            (value, bar.get_y() + bar.get_height() / 2.0),
+            xytext=(4, 0),
+            textcoords="offset points",
+            fontsize=9,
+            color=INK,
+            va="center",
+        )
+    axes.set_xlim(0.0, max(paid) * 1.12 if max(paid) > 0.0 else 1.0)
+    axes.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:,.0f}"))
+    axes.tick_params(axis="y", labelsize=9, colors=INK)
+    axes.set_title(
+        "Costs paid by each book over the period",
+        loc="left",
+        fontsize=12,
+        color=INK,
+        fontweight="bold",
+    )
+    figure.supxlabel(
+        "Commission, spread and slippage, in EUR, from the same starting cash.",
+        x=0.01,
+        ha="left",
+        fontsize=9,
+        color=MUTED,
+    )
+    return figure
+
+
 def closes_of(result: StrategyResult) -> dict[str, pd.Series]:  # type: ignore[type-arg]
     """Return the raw closes of the tradable funds over a run, as the run could read them."""
     closes: dict[str, pd.Series] = {}  # type: ignore[type-arg]
@@ -842,7 +985,7 @@ def save_outputs(
 def main(arguments: Sequence[str] | None = None) -> int:
     """Run every book, print the comparison and write the outputs."""
     parser = argparse.ArgumentParser(description="Compare the ETF strategies on the store.")
-    parser.add_argument("--output", type=Path, default=Path("results/etf_strategies"))
+    parser.add_argument("--output", type=Path, default=Path("runs/etf_strategies"))
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--start", default=PERIOD[0], help="first measured session, ISO date")
     parser.add_argument("--end", default=PERIOD[1], help="last measured session, ISO date")

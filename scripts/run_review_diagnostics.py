@@ -1,6 +1,6 @@
 """Measure what the review of the 2026-10-10 analyses left open.
 
-The analyses of ``research/reports/2026-10-10`` say, strategy by strategy, what
+The analyses of ``results/`` say, strategy by strategy, what
 their figures do not establish. This script measures those points, from the
 exports of ``scripts/SA11_run_garch_study.py`` and from a few more runs of the same
 engine on the same period, cash and costs:
@@ -26,8 +26,8 @@ engine on the same period, cash and costs:
 From the repository root, after the study:
 
     uv run python scripts/run_review_diagnostics.py \
-        --study results/garch_study --output results/review_diagnostics \
-        --report research/reports/2026-10-10/diagnostics_10102026.md
+        --study runs/garch_study --output runs/review_diagnostics \
+        --report results/summary/diagnostics.md
 
 Everything here is **descriptive**. A control built from the weights a rule
 was seen to hold is chosen after the fact; an ablation or another decay is a
@@ -738,11 +738,9 @@ n'est comparé aux exports que s'il a lu le même magasin.
 def main(arguments: Sequence[str] | None = None) -> int:
     """Compute every diagnostic and write the exports and the document."""
     parser = argparse.ArgumentParser(description="Measure what the review left open.")
-    parser.add_argument("--study", type=Path, default=Path("results/garch_study"))
-    parser.add_argument("--output", type=Path, default=Path("results/review_diagnostics"))
-    parser.add_argument(
-        "--report", type=Path, default=Path("research/reports/2026-10-10/diagnostics_10102026.md")
-    )
+    parser.add_argument("--study", type=Path, default=Path("runs/garch_study"))
+    parser.add_argument("--output", type=Path, default=Path("runs/review_diagnostics"))
+    parser.add_argument("--report", type=Path, default=Path("results/summary/diagnostics.md"))
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts/neural/world_vix"))
     parser.add_argument("--skip-sa14", action="store_true")
@@ -1142,7 +1140,7 @@ def sa14_section(
         ("graine 44, coûts x1", ["--seed", "44"]),
         (RECALIBRATED, ["--seed", "42", "--cost-multiplier", "2"]),
     ):
-        target = Path("results/sa14_sensitivities")
+        target = Path("runs/sa14_sensitivities")
         print(f"SA14 sensitivity: {label} ...", file=sys.stderr)
         neural.main(
             [

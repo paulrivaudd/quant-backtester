@@ -6,7 +6,7 @@ which ``SA11`` fits its model on a full window from the first decision, with
 decision. From the repository root, once the store is filled and the ``stats``
 extra installed (``uv sync --extra stats``):
 
-    uv run python scripts/SA11_run_garch_study.py --output results/garch_study
+    uv run python scripts/SA11_run_garch_study.py --output runs/garch_study
 
 The participants are those of ``run_etf_strategies_comparison.py`` - ``SA1``
 to ``SA6``, ``SA9``, ``SA10``, ``SA11``, the fund held and the even split -
@@ -1227,7 +1227,7 @@ def scored(results: Mapping[str, StrategyResult]) -> tuple[dict, dict]:  # type:
 def main(arguments: Sequence[str] | None = None) -> int:
     """Run the study and write every export."""
     parser = argparse.ArgumentParser(description="Run the SA11 GARCH volatility control study.")
-    parser.add_argument("--output", type=Path, default=Path("results/garch_study"))
+    parser.add_argument("--output", type=Path, default=Path("runs/garch_study"))
     parser.add_argument("--store", type=Path, default=STORE)
     options = parser.parse_args(arguments)
     require_arch()

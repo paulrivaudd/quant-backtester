@@ -1,4 +1,4 @@
-"""The per-strategy reports: their measured facts, their three sections and their names."""
+"""The results folder: a strategy's measured facts, its report, its tables and its figures."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from types import ModuleType
 
 import pandas as pd
 import pytest
+from matplotlib.figure import Figure
 
 pytest.importorskip("arch")
 
@@ -32,6 +33,7 @@ def load_script() -> ModuleType:
 
 
 SCRIPT = load_script()
+HELD = "buy & hold World"
 DAYS = [
     date(2026, 1, 29),
     date(2026, 1, 30),
@@ -198,6 +200,8 @@ def test_the_commentary_is_written_or_said_to_be_missing() -> None:
     measured = text.index("Mesures complémentaires")
     assert text.index("Situations de marché") < measured
     assert measured < text.index("Ce que ces résultats n'établissent pas")
+    # Unless its own study wrote them, the measures of a strategy are the diagnostics'.
+    assert "### Mesures complémentaires (voir results/summary/diagnostics.md)" in text
     assert "Aucun commentaire" in SCRIPT.commentary_markdown(None)
     assert "Aucun commentaire" in SCRIPT.commentary_markdown({})
 
@@ -225,8 +229,13 @@ def test_a_report_has_its_three_sections_with_the_analysis_above_the_history() -
     assert text[third:].count("\n| 2026-0") == len(DAYS)
 
 
-def test_a_report_is_named_by_its_code_and_its_date() -> None:
-    assert SCRIPT.file_name("SA11", "10102026") == "strategySA11_ResultsAndAnalysis_10102026.md"
+def test_a_strategy_has_a_folder_of_its_own_and_a_book_without_a_code_sits_in_the_summary() -> None:
+    root = Path("results")
+
+    assert SCRIPT.folder_of(root, "SA11") == root / "SA11"
+    assert SCRIPT.folder_of(root, "SA14") == root / "SA14"
+    assert SCRIPT.folder_of(root, "REF_WorldBuyHold") == root / "summary" / "REF_WorldBuyHold"
+    assert SCRIPT.folder_of(root, "EWMA94control") == root / "summary" / "EWMA94control"
 
 
 def test_a_drawdown_is_reported_with_the_day_its_peak_was_reached_again() -> None:
@@ -412,6 +421,20 @@ def test_a_study_says_what_its_period_is_and_why() -> None:
     assert test[-2:] == ["", "Un modèle par mois."]
 
 
+FILLS = pd.DataFrame(
+    {
+        "session_date": [DAYS[1], DAYS[4]],
+        "instrument_id": ["ETF_WORLD", "ETF_WORLD"],
+        "side": ["BUY", "BUY"],
+        "quantity": [0.5, 0.4],
+        "market_price": [110.0, 132.0],
+        "traded_value": [55.0, 52.8],
+        "total_cost": [0.05, 0.05],
+    }
+)
+"""The two orders of a book that bought half the fund, then the rest."""
+
+
 def study_folder(root: Path) -> Path:
     """Write the exports of a study of three books, one of them a control without a code."""
     names = ["D0 - same risk no filter", "SA12 - ARIMA GARCH", "buy & hold World"]
@@ -438,6 +461,13 @@ def study_folder(root: Path) -> Path:
     yearly.to_csv(root / "yearly.csv")
     for name in names:
         history().to_csv(root / f"history_{SCRIPT.slug(name)}.csv")
+    # Every book starts at the same value; the gross curve of each sits beside its net one.
+    equity = {name: history()["net_equity"] for name in names}
+    equity |= {f"{name} (gross)": history()["gross_equity"] for name in names}
+    pd.DataFrame(equity).to_csv(root / "equity.csv")
+    pd.concat([FILLS.assign(book=name) for name in names[1:]]).to_csv(
+        root / "fills.csv", index=False
+    )
     config = {
         "source": {"git_commit": "10f6d902af68", "source_state": "CLEAN"},
         "period": {"start": "2026-01-29", "end": "2026-03-02"},
@@ -445,49 +475,206 @@ def study_folder(root: Path) -> Path:
     }
     (root / "config.json").write_text(json.dumps(config), encoding="utf-8")
     (root / "report_extra_SA12.md").write_text("### Statut : **INSUFFICIENT_EVIDENCE**\n")
+    (root / "study.md").write_text("# The study of SA12\n", encoding="utf-8")
+    (root / "SA12_forecasts.png").write_bytes(b"a figure of the study")
+    (root / "SA11_other.png").write_bytes(b"a figure about another strategy")
     return root
 
 
-def test_only_the_reports_asked_for_are_written_and_a_control_has_none(tmp_path: Path) -> None:
+def test_only_the_folders_asked_for_are_written_and_a_control_has_none(tmp_path: Path) -> None:
     study = study_folder(tmp_path / "study")
-    output = tmp_path / "reports"
-    output.mkdir()
-    (output / "commentary.toml").write_text(
+    output = tmp_path / "results"
+    commentary = tmp_path / "commentary.toml"
+    commentary.write_text(
         '[SA12]\nsummary = "Une phrase."\nperiod_label = "Période de test"\n'
-        'context = "Contexte de l\'étude."\nmeasured_source = "SA12_study_10102026.md"\n'
+        'context = "Contexte de l\'étude."\nmeasured_source = "study.md"\n'
         'measured = ["m"]\nhistory_note = "Colonnes propres à cette étude."\n',
         encoding="utf-8",
     )
+    arguments = ["--study", str(study), "--output", str(output), "--commentary", str(commentary)]
 
-    code = SCRIPT.main(
-        ["--study", str(study), "--output", str(output), "--only", "SA12", "--stamp", "10102026"]
-    )
+    code = SCRIPT.main([*arguments, "--only", "SA12"])
 
-    written = sorted(path.name for path in output.glob("strategy*.md"))
-    assert code == 0 and written == ["strategySA12_ResultsAndAnalysis_10102026.md"]
-    text = (output / written[0]).read_text(encoding="utf-8")
+    # One folder, for the strategy asked for: no reference, no control, no summary.
+    assert code == 0 and sorted(path.name for path in output.iterdir()) == ["SA12"]
+    assert sorted(path.name for path in (output / "SA12").iterdir()) == [
+        "analysis.md",
+        "drawdown.png",
+        "equity.png",
+        "fills.csv",
+        "history.csv",
+        "metrics.csv",
+        "orders.png",
+        "weights.png",
+        "yearly.csv",
+    ]
+    text = (output / "SA12" / "analysis.md").read_text(encoding="utf-8")
     assert text.startswith("# SA12 - ARIMA GARCH — résultats et analyse")
     assert "Période de test 2026-01-29 → 2026-03-02" in text and "Contexte de l'étude." in text
     assert "| **SA12 - ARIMA GARCH** | 2 |" in text and "| D0 - same risk no filter | 1 |" in text
     assert "### Statut : **INSUFFICIENT_EVIDENCE**" in text
     assert "| Ratio de Sortino net (taux sans risque 0) | -0.17 | +1.30 |" in text
-    assert "Mesures complémentaires (voir SA12_study_10102026.md)" in text
+    assert "Mesures complémentaires (voir study.md)" in text
     assert text.index("## 3. Historique") < text.index("Colonnes propres à cette étude.")
+    assert "ils sont dans `fills.csv`, à côté de ce fichier" in text
     with pytest.raises(SystemExit, match="no book for SA13"):
-        SCRIPT.main(["--study", str(study), "--output", str(output), "--only", "SA13"])
+        SCRIPT.main([*arguments, "--only", "SA13"])
+
+
+def test_the_tables_of_a_folder_say_what_its_report_says(tmp_path: Path) -> None:
+    study = study_folder(tmp_path / "study")
+    output = tmp_path / "results"
+
+    SCRIPT.main(["--study", str(study), "--output", str(output), "--only", "SA12"])
+
+    folder = output / "SA12"
+    metrics = pd.read_csv(folder / "metrics.csv", index_col="costs")
+    assert list(metrics.index) == ["declared", "doubled"]
+    assert metrics.loc["declared", "sharpe"] == pytest.approx(-0.14)
+    yearly = pd.read_csv(folder / "yearly.csv", index_col="book")
+    assert list(yearly.index) == ["SA12 - ARIMA GARCH", "buy & hold World", "sessions"]
+    saved = pd.read_csv(folder / "history.csv", index_col="session_date")
+    assert list(saved["net_equity"]) == list(history()["net_equity"])
+    assert list(saved.index) == [day.isoformat() for day in DAYS]
+    fills = pd.read_csv(folder / "fills.csv")
+    assert "book" not in fills.columns and list(fills["market_price"]) == [110.0, 132.0]
+    assert all((folder / name).stat().st_size > 0 for name in ("equity.png", "orders.png"))
+
+
+def test_a_study_about_one_strategy_leaves_its_document_and_its_figures_in_that_folder(
+    tmp_path: Path,
+) -> None:
+    study = study_folder(tmp_path / "study")
+    config = json.loads((study / "config.json").read_text(encoding="utf-8"))
+    (study / "config.json").write_text(
+        json.dumps(config | {"study": "sa12_arima_garch"}), encoding="utf-8"
+    )
+    output = tmp_path / "results"
+
+    SCRIPT.main(["--study", str(study), "--output", str(output), "--only", "SA12"])
+
+    assert SCRIPT.owner_of({"study": "sa12_arima_garch"}) == "SA12"
+    assert SCRIPT.owner_of({}) == ""
+    assert (output / "SA12" / "study.md").read_text(encoding="utf-8") == "# The study of SA12\n"
+    assert (output / "SA12" / "SA12_forecasts.png").read_bytes() == b"a figure of the study"
+    # A figure the study named after another strategy stays where it was.
+    assert not (output / "SA12" / "SA11_other.png").exists()
 
 
 def test_without_a_selection_a_control_of_a_later_study_is_skipped(tmp_path: Path) -> None:
     study = study_folder(tmp_path / "study")
-    output = tmp_path / "reports"
+    output = tmp_path / "results"
+    summary = output / "summary"
+    summary.mkdir(parents=True)
+    (summary / "README.md").write_text("written by hand", encoding="utf-8")
 
     SCRIPT.main(["--study", str(study), "--output", str(output), "--skip-sa14"])
 
-    written = sorted(path.name for path in output.glob("strategy*.md"))
-    assert written == [
-        "strategyREF_WorldBuyHold_ResultsAndAnalysis_10102026.md",
-        "strategySA12_ResultsAndAnalysis_10102026.md",
-    ]
-    # No ranking and no study section unless the report was asked for by its code.
-    text = (output / written[1]).read_text(encoding="utf-8")
+    # The strategy at the root, the reference under the summary, and no folder for D0.
+    assert sorted(path.name for path in output.iterdir()) == ["SA12", "summary"]
+    assert (summary / "REF_WorldBuyHold" / "analysis.md").is_file()
+    # No ranking and no study section unless the folder was asked for by its code.
+    text = (output / "SA12" / "analysis.md").read_text(encoding="utf-8")
     assert "Classement de tous les livres" not in text and "### Statut" not in text
+    # The summary compares every book of the study, the control included.
+    ranking = pd.read_csv(summary / "ranking.csv", index_col="book")
+    assert list(ranking.index) == ["D0 - same risk no filter", "SA12 - ARIMA GARCH", HELD]
+    assert (summary / "ranking_costs_x2.csv").is_file() and (summary / "yearly.csv").is_file()
+    assert (summary / "overview.png").stat().st_size > 0
+    # Without the benchmark of the panels in the study, the panels are not drawn.
+    assert not (summary / "equity_all.png").exists()
+    assert (summary / "README.md").read_text(encoding="utf-8") == "written by hand"
+
+
+def test_a_reference_is_not_drawn_against_itself() -> None:
+    def book(name: str) -> object:
+        return SCRIPT.BookFolder(
+            code="X",
+            name=name,
+            analysis="",
+            metrics=pd.DataFrame(),
+            yearly=pd.DataFrame(),
+            history=history(),
+            fills=FILLS,
+            gross=history()["gross_equity"],
+            market=curve([100.0, 104.0, 96.0, 101.0, 120.0, 118.0]),
+        )
+
+    strategy, reference = SCRIPT.book_figures(book("a book")), SCRIPT.book_figures(book(HELD))
+
+    assert list(strategy) == ["equity.png", "drawdown.png", "weights.png", "orders.png"]
+    assert all(isinstance(figure, Figure) for figure in strategy.values())
+    labels = strategy["equity.png"].axes[0].get_legend_handles_labels()[1]
+    assert labels == ["gross", "net", "fund held"]
+    assert reference["equity.png"].axes[0].get_legend_handles_labels()[1] == ["gross", "net"]
+
+
+def test_both_figures_of_a_book_stack_its_funds_in_the_same_order() -> None:
+    frame = history().assign(held_ETF_SP500_PEA=0.2)
+    # The study exports the second fund first: the figures do not follow it.
+    columns = ["held_ETF_SP500_PEA", *[name for name in frame if name != "held_ETF_SP500_PEA"]]
+    book = SCRIPT.BookFolder(
+        code="X",
+        name="a book",
+        analysis="",
+        metrics=pd.DataFrame(),
+        yearly=pd.DataFrame(),
+        history=frame[columns],
+        fills=FILLS,
+        gross=None,
+        market=curve([100.0, 104.0, 96.0, 101.0, 120.0, 118.0]),
+    )
+
+    figures = SCRIPT.book_figures(book)
+
+    stacked = figures["weights.png"].axes[0].get_legend_handles_labels()[1]
+    assert stacked == ["ETF_WORLD", "ETF_SP500_PEA"]
+    # In the figure of orders the weights are the panel before the last one.
+    colours = [
+        band.get_facecolor()[0][:3] for band in figures["orders.png"].axes[-2].collections[:2]
+    ]
+    assert [tuple(round(float(part), 2) for part in colour) for colour in colours] == [
+        (0.16, 0.47, 0.84),
+        (0.92, 0.41, 0.2),
+    ]
+
+
+def test_the_summary_draws_its_panels_when_the_study_holds_what_they_are_read_against(
+    tmp_path: Path,
+) -> None:
+    names = [SCRIPT.BENCHMARK, HELD, "SA3 - smooth MA"]
+    curves = {
+        name: curve([100.0, 101.0 + rank, 99.0, 103.0, 110.0 + rank, 108.0])
+        for rank, name in enumerate(names)
+    }
+    table = pd.DataFrame(
+        {"net_return": [0.08, 0.09, 0.10], "costs_eur": [300.0, 10.0, 70.0]},
+        index=pd.Index(names, name="book"),
+    )
+
+    written = SCRIPT.write_summary(tmp_path / "summary", table, table, table, curves)
+
+    assert [path.name for path in written] == [
+        "ranking.csv",
+        "ranking_costs_x2.csv",
+        "yearly.csv",
+        "overview.png",
+        "equity_all.png",
+        "drawdowns_all.png",
+        "costs.png",
+    ]
+    assert all(path.stat().st_size > 0 for path in written)
+
+
+def test_the_curves_and_the_fills_of_a_study_are_read_with_their_dates(tmp_path: Path) -> None:
+    study = study_folder(tmp_path / "study")
+
+    curves, fills = SCRIPT.read_curves(study), SCRIPT.read_fills(study)
+
+    # Net curves only: a gross one is read with its book, not as a book of its own.
+    assert list(curves) == ["D0 - same risk no filter", "SA12 - ARIMA GARCH", HELD]
+    assert list(curves[HELD].index) == DAYS
+    assert list(fills["session_date"]) == [DAYS[1], DAYS[4]] * 2
+    own = SCRIPT.fills_of(fills, HELD)
+    assert len(own) == 2 and "book" not in own.columns
+    assert SCRIPT.fills_of(fills, "D0 - same risk no filter").empty
