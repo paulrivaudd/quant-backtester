@@ -176,8 +176,7 @@ de recherche : elles ne sont pas datées.
 > **Ne supprimez jamais `clean/` pour « repartir de zéro ».** Le journal
 > `applied_fetches.parquet` est dedans. Sans lui, le rejeu ne sait plus quels
 > téléchargements avaient été promus, et reconstruit un store vide. Pour
-> reconstruire, lancez `--rebuild` sur un `clean/` intact. Pour conserver un
-> run, utilisez `research.archive.keep(..., store=...)`, qui copie le store lu.
+> reconstruire, lancez `--rebuild` sur un `clean/` intact.
 
 ## 9. Lire (`reader.py`)
 

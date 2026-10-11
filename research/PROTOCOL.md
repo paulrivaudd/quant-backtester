@@ -37,13 +37,17 @@ plan already acted on is reviewed, never absorbed. Running it twice changes
 nothing. A rule or a condition changed after the start is a new plan, with a
 new start.
 
-**Closed on 2026-10-11.** The two plans were closed before any session was
-logged: the rules they name, and `scripts/paper_trade.py` with them, were
-removed from the code that day, when only the catalogued strategies and their
-reference books were kept. Their files stay in `research/paper/` as the record
-of what was committed to; the last commit able to run them is `cece9e3`. No
-result was read. `quant_backtester.research.paper` is unchanged: a strategy
-kept for observation gets a new plan, with a new start (section 6).
+**Closed on 2026-10-11, then removed.** The two plans were closed before any
+session was logged: the rules they name, and `scripts/paper_trade.py` with
+them, were removed from the code that day, when only the catalogued strategies
+and their reference books were kept; the last commit able to run them is
+`cece9e3`. No result was read. The plan files and the code that ran a plan
+(`quant_backtester.research.paper`) were then removed as well, by decision of
+the owner: nothing was using them. They are in the history of the repository,
+last at `a9e301f`. The rule stands without its tool: a strategy kept for
+observation is run forward with its configuration frozen and is not read
+before a year of sessions (section 6); how that is recorded has to be written
+again before the first such run.
 
 **Reading the result.** No verdict before 12 months of sessions (about 255):
 below that, the difference between two funds' returns is mostly one fund's
@@ -52,6 +56,19 @@ alongside exposure, turnover and drawdown, and it is reported whatever it
 says.
 
 ## 3. Every experiment is registered
+
+**Withdrawn on 2026-10-11.** `research/registry.jsonl` and the code that wrote
+it (`quant_backtester.research.registry`, with the archive of a run and the
+loader of the hypotheses) were removed by decision of the owner. Its nineteen
+lines were all runs of the baselines removed the same day, and no script was
+writing to it any more; they are in the history of the repository, last at
+`a9e301f`. What follows in this section describes the register as it was.
+
+What replaces it is narrower. A study counts the configurations it ran itself
+and deflates its Sharpe ratios by that number, which it prints
+(`results/<CODE>/study.md`); a variant tried outside a study is counted
+nowhere. The second paragraph below still holds: a hypothesis is written in
+`research/hypotheses.toml` before its first run.
 
 Any backtest run to answer a research question is appended to
 `research/registry.jsonl` (`quant_backtester.research.registry`): one line per

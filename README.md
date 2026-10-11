@@ -862,13 +862,14 @@ the rules down before any experiment they govern:
 - a hypothesis written in `research/hypotheses.toml` before its first run,
   with what would refute it, and a status that answers that question and
   nothing wider;
-- every research backtest appended to `research/registry.jsonl`, rejected ones
-  included and only from committed code, so a result is always read with the
-  number of variants it took;
+- a study that counts the configurations it ran and deflates its Sharpe ratios
+  by that number, so a result is read with the variants it took. The register
+  that counted every run of the project was removed on 2026-10-11: a variant
+  tried outside a study is counted nowhere;
 - a strategy kept for observation run forward on paper, its configuration
   frozen, and not read before a year of sessions. The two plans committed for
-  2026-10-01 were closed on 2026-10-11, before any session was logged, when the
-  rules they named were removed from the code;
+  2026-10-01 were closed before any session was logged, and removed with the
+  code that ran them;
 - neighbourhoods rather than points, rolling start dates, twice the costs, and
   an executable baseline over the same sessions before any variant is kept.
 

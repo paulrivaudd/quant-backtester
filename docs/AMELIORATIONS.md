@@ -15,13 +15,13 @@ sa reproductibilité, **P3** relève du confort ou de l'outillage.
 |---|---|
 | 1.3 Modèle d'exécution | `Sizing.AT_DECISION` : quantités fixées à la clôture de la décision, exécutées à l'ouverture, coupées au cash disponible. `scripts/sensitivity.py` : la rotation perd 0,01 point en ordres fixés la veille, près de 4 points à coûts doublés. Ce script et la rotation ont été retirés du code le 2026-10-11. |
 | 2.1 Séances contestées | `metadata/conflict_reviews.toml` : les 13 conflits sont revus et tranchés en faveur d'Euronext, la place de cotation, pour les valeurs exactes revues. **La barre du 24 octobre 2025 coûtait 0,47 point, et non les « environ 4 points » que j'avais écrits sans les mesurer.** |
-| 3.1 Dossier de run | `research.archive` : un run relu hors ligne sans recalcul, et recalculable à partir d'une copie vérifiée du store qu'il a lu. |
+| 3.1 Dossier de run | `research.archive` : un run relu hors ligne sans recalcul, et recalculable à partir d'une copie vérifiée du store qu'il a lu. Retiré du code le 2026-10-11. |
 | 3.2 Environnement | La version de Python, l'empreinte de `uv.lock` et les versions de numpy, pandas, pyarrow et scipy entrent dans le `run_id`. |
 | 4.1 Incertitude | `analytics.uncertainty` : bootstrap par blocs apparié entre la stratégie et son témoin exécutable. Sur la période du README, l'intervalle des Sharpe exclut zéro : le Sharpe de la rotation est le plus bas. |
 | 4.2 Hypothèses et verdicts | `research/hypotheses.toml` : les 19 runs existants sont déclarés `EXPLORATORY`. Les verdicts sont des événements, sans réécriture d'un run ni variante supplémentaire. |
 | 4.4 Comparateur exécutable | La suite README compare la rotation à un buy & hold du fonds monde soumis aux mêmes coûts, lots et cash. |
 | 5.1 Intégration continue | GitHub Actions : ruff, format, pyright et tests hors ligne à chaque push, tests réseau chaque nuit. |
-| Paper trading | `contract_id`, journal de l'état économique complet, code commité obligatoire, séance prise en compte seulement une fois prête (23:00 Paris), journaux sous verrou. |
+| Paper trading | `contract_id`, journal de l'état économique complet, code commité obligatoire, séance prise en compte seulement une fois prête (23:00 Paris), journaux sous verrou. Retiré du code le 2026-10-11. |
 
 ## Corrections apportées à la première version (audit de l'archive 9)
 

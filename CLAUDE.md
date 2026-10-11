@@ -37,7 +37,7 @@ src/quant_backtester/
     backtest/     the event loop that advances time
     analytics/    performance, risk, attribution, reporting
     strategies/   concrete strategies composed from the layers above
-    research/     the experiment register and the paper-trading plans
+    research/     the reference books a study measures a strategy against
 tests/            mirrors the package layout
 market_data/      metadata/ is committed; raw/, clean/ and validation/ are not
 ```

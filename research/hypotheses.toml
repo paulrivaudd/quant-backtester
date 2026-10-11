@@ -1,92 +1,14 @@
 # Hypotheses, written before the experiments that test them - committed, like
-# every decision a result is reproduced from. See research/PROTOCOL.md and
-# quant_backtester.research.hypotheses.
+# every decision a result is reproduced from. See research/PROTOCOL.md.
 #
-# The seven below name the runs made before this file existed: they are
-# EXPLORATORY, declared on the day this file was written, after their runs.
-# They describe what was looked at; they test nothing. A new idea is written
-# here as PREREGISTERED before its first variant is run.
-
-[[hypothesis]]
-hypothesis_id = "reference_rotation"
-status = "EXPLORATORY"
-written_on = 2026-09-26
-statement = "Holding the better of two PEA funds on 60-session momentum beats holding the world fund."
-universe = "ROTATION_2"
-prediction = "Higher net return than buy and hold of ETF_WORLD over the same sessions."
-refutation = "Lower net return than buy and hold of ETF_WORLD over the same sessions, net of costs."
-
-[[hypothesis]]
-hypothesis_id = "buy_and_hold_both"
-status = "EXPLORATORY"
-written_on = 2026-09-26
-statement = "Buying both funds once is the passive yardstick of ROTATION_2."
-universe = "ROTATION_2"
-prediction = "One session of trading, costs of one purchase per fund."
-refutation = "Trades after the initial purchase."
-
-[[hypothesis]]
-hypothesis_id = "equal_weight_daily"
-status = "EXPLORATORY"
-written_on = 2026-09-26
-statement = "Restating half and half every session costs more than holding and earns no more."
-universe = "ROTATION_2"
-prediction = "Net return no higher than buy_and_hold_both, costs higher."
-refutation = "Higher net return than buy_and_hold_both over the same sessions."
-
-[[hypothesis]]
-hypothesis_id = "buy_and_hold"
-status = "EXPLORATORY"
-written_on = 2026-09-26
-statement = "Buying the world fund once is the baseline every other rule is judged against."
-universe = "ROTATION_2"
-prediction = "One purchase, no trade after it."
-refutation = "Trades after the initial purchase."
-
-[[hypothesis]]
-hypothesis_id = "equal_weight"
-status = "EXPLORATORY"
-written_on = 2026-09-26
-statement = "Half and half, rebalanced monthly, beats holding either fund alone."
-universe = "ROTATION_2"
-prediction = "Higher net return than buy_and_hold over each period."
-refutation = "Lower net return than buy_and_hold over a period."
-
-[[hypothesis]]
-hypothesis_id = "momentum_rotation"
-status = "EXPLORATORY"
-written_on = 2026-09-26
-statement = "Rotating into the fund with the better 60-session momentum beats holding the world fund."
-universe = "ROTATION_2"
-prediction = "Higher net return than buy_and_hold over each period."
-refutation = "Lower net return than buy_and_hold over a period, net of costs."
-
-[[hypothesis]]
-hypothesis_id = "momentum_vix"
-status = "EXPLORATORY"
-written_on = 2026-09-26
-statement = "Standing aside while the VIX is high cuts the drawdown of the rotation for less than it costs."
-universe = "ROTATION_2"
-prediction = "Smaller maximum drawdown than momentum_rotation, at a similar net return."
-refutation = "A drawdown no smaller than momentum_rotation's, or a net return clearly lower."
-
-[[hypothesis]]
-hypothesis_id = "session_segments"
-status = "PREREGISTERED"
-written_on = 2026-10-03
-statement = "A Paris-listed fund of US-heavy equities earns its return between the Paris close and the next Paris open, when New York is still trading, and not during the Paris session."
-universe = "ETF_WORLD from 2019-04-01 to 2026-09-17, then ETF_SP500_PEA from 2014-03-18 to 2019-03-29, a period the first never saw."
-prediction = "The night segment carries more than two thirds of the log return of the fund, on both windows."
-refutation = "A night share at or below one half on either window. Separately, a night-only book that ends below buy and hold once each leg has paid its costs refutes the trade, whatever the share."
-
-[[hypothesis]]
-hypothesis_id = "rate_regime_trend"
-status = "PREREGISTERED"
-written_on = 2026-10-03
-statement = "A 200-session trend rule is right to sell a fall, except a panic that happens while shares and the ten-year yield move together: that one is bought back, and holding through it beats selling it."
-universe = "ETF_WORLD from 2019-04-01 to 2026-09-17 (first run, no parameter fitted), then the S&P 500 index held on paper in USD from 1991-01-02 to 2018-12-31. Parameters fixed before any run: trend 200 sessions, correlation 60 pairs, VIX z-score over 60 observations above 1.5."
-prediction = "On the validation window, a net Sharpe ratio above buy and hold's with a smaller maximum drawdown, and a net return above the plain 200-session trend rule's."
-refutation = "On the validation window, a net Sharpe ratio at or below buy and hold's, or a net return at or below the plain 200-session trend rule's: the regime then adds nothing to the trend."
+# One per catalogued strategy that was studied on its own, written before its
+# first run: what it predicts, on which universe, and what would refute it.
+# `ml1_neural_allocation` is the hypothesis of SA14, under the code that
+# strategy had when it was written. The statuses a study gives its hypothesis
+# are in results/<CODE>/study.md.
+#
+# The hypotheses of the baselines and of the exercises removed from the code on
+# 2026-10-11 were removed with them; they are in the history of this file.
 
 [[hypothesis]]
 hypothesis_id = "ml1_neural_allocation"

@@ -305,10 +305,11 @@ Lancez-le avec `uv run python mon_essai.py`, store local rempli
 
 ## 5. Juger une variante honnêtement
 
-1. **Commitez** le code, puis enregistrez chaque run :
-   `ExperimentRegistry(...).register(record_of(result, experiment_id=..., hypothesis="ma50_over_ma20_world", recorded_at=...))`.
-   Le registre refuse du code non commité ; le câblage est décrit dans
-   `quant_backtester.research.registry`.
+1. **Commitez** le code avant de lancer un run, et **comptez chaque variante
+   essayée** : le nombre d'essais déflate le Sharpe (`quality_details(...,
+   trials=...)`), et une variante oubliée le gonfle. Il n'y a plus de registre
+   commun des runs depuis le 2026-10-11 : c'est le script de l'étude qui tient
+   ce compte et l'écrit (`trial_register` dans `SA11_run_garch_study.py`).
 2. **Comparez à un témoin exécutable**, par exemple
    `BuyAndHold(instruments=("ETF_WORLD",))` sous les mêmes coûts, sur les mêmes
    séances, avec `paired_block_bootstrap(result.equity(), control.equity(),
@@ -317,13 +318,15 @@ Lancez-le avec `uv run python mon_essai.py`, store local rempli
    conclusion.
 3. **Raisonnez en voisinages** : 40/50/60 × 15/20/25, plusieurs dates de
    départ, coûts ×1 et ×2. Un résultat qui n'existe qu'en un point est du
-   bruit. Chaque point est un run enregistré.
-4. **Rendez un verdict** : `registry.judge(experiment_id, Verdict.KEPT |
-   Verdict.REJECTED, note, decided_at)`. Les rejets restent comptés.
-5. **Conservez les runs cités** : `research.archive.keep(result, dossier,
-   store=...)`.
-6. Une règle retenue ne se prouve que **hors échantillon** : un plan de paper
-   trading dans `research/paper/`, figé par son `contract_id`.
+   bruit. Chaque point est un essai compté.
+4. **Rendez un statut** qui répond à l'hypothèse écrite, et à rien de plus
+   large (`research/PROTOCOL.md`, section 6). Une variante rejetée reste
+   comptée.
+5. **Conservez ce que vous citez** : les exports de l'étude vont dans `runs/`,
+   et `write_strategy_reports.py` en tire le dossier `results/<CODE>/`, qui
+   est commité.
+6. Une règle retenue ne se prouve que **hors échantillon** : observée sur
+   papier, configuration figée, et lue seulement après un an de séances.
 
 ## 6. Check-list avant commit
 

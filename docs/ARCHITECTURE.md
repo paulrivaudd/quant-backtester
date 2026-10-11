@@ -82,7 +82,7 @@ Trois règles supplémentaires sont vérifiées par les mêmes tests :
 | `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (score 0-100 % contre le marché, règles versionnées `QUALITY_V1`), `volatility_forecast` (qualité ex post d'une prévision de variance : QLIKE), `return_forecast` (prévision de rendement à deux séances : moyenne, signe, perte jointe) |
 | `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1` à `SA14`), un module par stratégie à la racine (`SA1_world_ma20_benchmark` … `SA14_neural_allocation`), `adaptive/` (les règles qu'elles partagent) |
 | `ml/` | Les modèles ajustés (hors couches, voir ci-dessous) | `config` (`NeuralStrategyConfig`), `features` (`NeuralFeatureBuilder`, `FeatureScaler`), `network` (`NeuralAllocator`), `artifacts` (`NeuralArtifact`), `dataset` (`ForwardOpenReturnBuilder`, purge), `training` (`calibrate_neural_strategy`), `signatures/` (`SignatureVariant`, `SignatureArtifact`, `SignatureModelSchedule`, `calibrate_month`) |
-| `research/` | La discipline de recherche | `hypotheses`, `registry`, `archive`, `paper`, `journal`, `references` (les livres auxquels une étude se mesure) |
+| `research/` | La discipline de recherche | `references` (les livres auxquels une étude se mesure) |
 
 `provenance.py` (état git du code qui a produit un résultat) et `numbers.py`
 (gardes sur les paramètres numériques) sont transverses.
@@ -536,11 +536,13 @@ La couche `research/` porte la discipline de recherche décrite dans
 
 | Élément | Rôle |
 |---|---|
-| `research/hypotheses.toml` | hypothèses écrites **avant** leurs runs (`PREREGISTERED`), ou nommées après coup (`EXPLORATORY`) |
-| `research/registry.jsonl` + `ExperimentRegistry` | une ligne par run, jamais éditée, rejetés compris, uniquement depuis du code commité |
-| `verdicts.jsonl` + `judge()` | les verdicts (`KEPT`, `REJECTED`), des événements ajoutés et jamais réécrits |
-| `research.archive.keep()` / `read_back()` | un run conservé en entier, relisible hors ligne, avec copie vérifiée du store en option |
-| `research/paper/` + `quant_backtester.research.paper` | le seul vrai test hors échantillon : des plans figés par un `contract_id`, joués séance après séance. Les deux plans du 2026-10-01 sont clos, sans séance journalisée : leurs règles ont été retirées du code |
+| `research/hypotheses.toml` | les hypothèses des stratégies étudiées, écrites **avant** leurs runs (`PREREGISTERED`) : ce qu'elles prédisent et ce qui les réfuterait |
+| `research/commentary.toml` | l'analyse rédigée de chaque stratégie, lue par `write_strategy_reports.py` |
+| `quant_backtester.research.references` | `BuyAndHold`, `EqualWeightRebalance`, `FixedWeights` : les livres auxquels une étude mesure une stratégie |
+
+Le registre des runs, les plans de paper trading, l'archive d'un run et le
+chargeur des hypothèses ont été retirés le 2026-10-11 : plus aucun script ne
+s'en servait. Chaque étude compte ses propres essais et les imprime.
 
 ## 11. Mécanismes d'intégrité, en résumé
 

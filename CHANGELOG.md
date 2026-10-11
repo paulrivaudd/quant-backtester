@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### The research package keeps what is used (2026-10-11)
+- **Removed**: `research/registry.jsonl` (nineteen runs, all of baselines no
+  longer in the code), the two paper plans of `research/paper/`, and the nine
+  hypotheses of the baselines and of the exercises removed earlier that day.
+- **Removed with them**, since no script used them any more:
+  `quant_backtester.research.registry`, `.paper`, `.journal`, `.archive` and
+  `.hypotheses`, with their tests.
+- **Kept**: `research/hypotheses.toml` with the four hypotheses of the studied
+  strategies (`SA11`, `SA12`, `SA13`, and `SA14` under the identifier it was
+  written with), `research/PROTOCOL.md`, `research/commentary.toml`, and
+  `quant_backtester.research.references`.
+- **The protocol says what was withdrawn**: the common register of runs
+  (section 3) and the tool of the paper plans (section 2). A study still counts
+  its own trials and deflates by them; a variant tried outside a study is now
+  counted nowhere.
+
 ### One folder of results per strategy, and one that compares them (2026-10-11)
 - **`results/` is committed and has a shape**: `results/SA1` ... `results/SA14`
   each hold the strategy's `analysis.md`, its tables (`metrics.csv`,
