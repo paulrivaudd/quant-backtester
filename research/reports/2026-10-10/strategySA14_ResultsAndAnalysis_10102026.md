@@ -1,8 +1,8 @@
-# ML1 - neural allocation — résultats et analyse
+# SA14 - neural allocation — résultats et analyse
 
 Période de test 2025-01-02 → 2026-10-09 (après la date limite d'information du modèle, 2024-12-31) · modèle figé `d9bfd125bf69` (graine 42) · mêmes capital, coûts et conventions que les autres stratégies.
 
-Source : commit `a4c39349edd0` (CLEAN), magasin `750c23dfffc3`. **Période différente de celle des stratégies SA** (qui commence en 2021) : ces chiffres ne se comparent pas aux leurs, et ML1 n'a pas de rang dans le classement commun. Le test a déjà été lu une fois le 2026-10-04 jusqu'au 2026-09-30 ; ce run le prolonge avec le même modèle. Le score est déflaté pour un seul essai.
+Source : commit `cbcff7b4526a` (CLEAN), magasin `750c23dfffc3`. **Période différente de celle des autres stratégies** (qui commence en 2021) : ces chiffres ne se comparent pas aux leurs, et SA14 n'a pas de rang dans le classement commun. Le test a déjà été lu une fois le 2026-10-04 jusqu'au 2026-09-30 ; ce run le prolonge avec le même modèle. Le score est déflaté pour un seul essai.
 
 ## 1. Indicateurs de résultat globaux
 
@@ -90,7 +90,7 @@ Un petit réseau de neurones, entraîné sur 2019-2023 et sélectionné sur 2024
 ### Points faibles
 
 - **Fait.** Sharpe de 0,76 contre 0,93, alpha de -1,4 % par an (sans intervalle) pour un bêta de 0,67, sur ces seules dates.
-- **Fait.** Score de 45,8 %, sous le seuil de 50 % de son hypothèse, et Sharpe sous celui du fonds : les deux critères de réfutation sont atteints. Ce score est déflaté pour un seul essai et ne se compare pas à ceux des stratégies SA.
+- **Fait.** Score de 45,8 %, sous le seuil de 50 % de son hypothèse, et Sharpe sous celui du fonds : les deux critères de réfutation sont atteints. Ce score est déflaté pour un seul essai et ne se compare pas à ceux des autres stratégies.
 - **Fait.** Le test d'origine, clos au 2026-09-30, a été lu le 2026-10-04 ; ce run le prolonge de sept séances avec le même modèle. L'extension ne remet pas le compteur à zéro.
 - **Fait.** Les sensibilités prévues par l'hypothèse - graines 43 et 44, coûts doublés avec le modèle figé puis avec un modèle recalibré - sont dans les mesures complémentaires plus bas. Le bloc robustesse du score, lui, utilise un stress approché, pas un second run.
 - **Lecture.** Le réseau fait du timing ; la question ouverte est de savoir si ce timing ajoute ou retire de la valeur par rapport à une allocation constante. Un mauvais timing n'est pas une absence de timing.
@@ -111,12 +111,12 @@ Un petit réseau de neurones, entraîné sur 2019-2023 et sélectionné sur 2024
 
 ### Mesures complémentaires (voir diagnostics_10102026.md)
 
-- **Fait.** À côté d'un témoin à cible constante de 36,3 % de fonds S&P 500 et 30,3 % de fonds monde (ses poids moyens), sur les mêmes dates, avec la même bande de 3 points et les mêmes coûts : le témoin fait +17,2 % net, Sharpe 0,93, perte maximale -15,2 %, sommet retrouvé en 225 jours, 76 EUR de coûts, pour une exposition moyenne réalisée de 68,3 % ; ML1 fait +13,4 %, Sharpe 0,76, -16,1 %, 251 jours, pour 66,6 %.
-- **Lecture.** Sur ces dates ML1 fait moins bien que ce témoin construit sur ses propres poids moyens. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing du réseau : le témoin a porté 1,7 point d'exposition de plus en moyenne, et la composition, les coûts et la trajectoire changent aussi. Le témoin est choisi après coup.
+- **Fait.** À côté d'un témoin à cible constante de 36,3 % de fonds S&P 500 et 30,3 % de fonds monde (ses poids moyens), sur les mêmes dates, avec la même bande de 3 points et les mêmes coûts : le témoin fait +17,2 % net, Sharpe 0,93, perte maximale -15,2 %, sommet retrouvé en 225 jours, 76 EUR de coûts, pour une exposition moyenne réalisée de 68,3 % ; SA14 fait +13,4 %, Sharpe 0,76, -16,1 %, 251 jours, pour 66,6 %.
+- **Lecture.** Sur ces dates SA14 fait moins bien que ce témoin construit sur ses propres poids moyens. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing du réseau : le témoin a porté 1,7 point d'exposition de plus en moyenne, et la composition, les coûts et la trajectoire changent aussi. Le témoin est choisi après coup.
 - **Fait.** La part du fonds S&P 500 dans ce qui est investi va de 33 % à 66 % (moyenne 55 %) : le réseau déplace aussi la répartition entre les deux fonds.
 - **Fait.** Sensibilités annoncées, sur la période d'origine (jusqu'au 2026-09-30) : graine 42, score 44,5 % et Sharpe 0,68 ; graine 43, 45,9 % et 0,70 ; graine 44, 45,6 % et 0,71. Le Sharpe du fonds détenu y est de 0,86.
 - **Fait.** À coûts doublés, sur la même période d'origine, deux runs répondent à deux questions. Le modèle figé du test (`d9bfd125bf69`, même normalisation, mêmes poids, époque 20), rejoué en doublant seulement les coûts du moteur : score 40,7 %, +11,0 % net, Sharpe 0,64, perte maximale -16,2 %, 1 434 EUR de coûts au lieu de 752. La calibration refaite sous ces coûts retient l'époque 15 au lieu de 20 (`a5afb76183eb`) : c'est un autre modèle, score 44,3 %, +11,8 % net, Sharpe 0,69, 1 037 EUR de coûts. Dans chaque variante le Sharpe reste sous celui du fonds détenu et le score sous 50 %.
-- **Fait.** Les 319 caractéristiques lues par le réseau à chacune des 453 décisions sont exportées (`ml1_inputs.csv`) ; toutes les décisions ont un vecteur complet.
+- **Fait.** Les 319 caractéristiques lues par le réseau à chacune des 453 décisions sont exportées (`sa14_inputs.csv`) ; toutes les décisions ont un vecteur complet.
 
 ### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
 
@@ -127,7 +127,7 @@ Un petit réseau de neurones, entraîné sur 2019-2023 et sélectionné sur 2024
 
 Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
 
-Pour ML1, les colonnes « poids proposé » sont la **sortie** du réseau, pas ses entrées : les caractéristiques qu'il lit (rendements, moyennes, volatilités des deux fonds et du VIX sur 100 séances) ne sont pas dans ce tableau.
+Pour SA14, les colonnes « poids proposé » sont la **sortie** du réseau, pas ses entrées : les caractéristiques qu'il lit (rendements, moyennes, volatilités des deux fonds et du VIX sur 100 séances) ne sont pas dans ce tableau.
 
 | Séance | Clôture ETF_WORLD | Clôture ETF_SP500_PEA | Poids proposé ETF_WORLD | Poids proposé ETF_SP500_PEA | Poids proposé cash | Poids cible ETF_SP500_PEA | Poids cible ETF_WORLD | Poids détenu ETF_SP500_PEA | Poids détenu ETF_WORLD | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
