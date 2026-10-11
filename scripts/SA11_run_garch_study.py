@@ -175,6 +175,17 @@ run on; they joined on 2026-10-11, once their funds were registered, and the
 register counts two more trials since."""
 
 
+OUTSIDE_THE_RANKING = (entry("SA8").display_name,)
+"""Books run on the common period and reported, but neither scored nor counted
+among the trials. ``SA8`` holds a money-market fund and nothing else: with the
+risk-free rate of the ratios at zero, its Sharpe ratio is that of a fund that
+barely moves - 7.1 on this period - and measures neither a timing nor a
+selection. Counted among the trials it multiplied the dispersion of their
+Sharpe ratios by six and brought every other score down to about 1%: an
+artefact of the measure, seen on its first run on 2026-10-11, and the reason
+it is reported apart, like the fund held."""
+
+
 def participants() -> dict[str, Strategy]:
     """Return every book of the study by display name: the comparison's, and the control.
 
@@ -221,7 +232,8 @@ def trial_register(net: Mapping[str, pd.Series]) -> dict[str, object]:  # type: 
     dict[str, object]
         ``names`` - every strategy configuration examined here, the control
         included; the fund held and the even split are references, not
-        trials. ``trials`` - their count. ``sharpes`` - the per-session
+        trials, and a book of :data:`OUTSIDE_THE_RANKING` is reported apart.
+        ``trials`` - their count. ``sharpes`` - the per-session
         Sharpe ratio of each trial that has one. ``excluded`` - the trials
         whose Sharpe ratio is undefined, kept in the count and left out of the
         dispersion, never read as zero. ``trial_sharpe_std`` - the sample
@@ -231,7 +243,7 @@ def trial_register(net: Mapping[str, pd.Series]) -> dict[str, object]:  # type: 
         the variants tried in the earlier exercises on the same history are
         not in this register.
     """
-    names = [name for name in net if name not in (HELD, SPLIT)]
+    names = [name for name in net if name not in (HELD, SPLIT, *OUTSIDE_THE_RANKING)]
     sharpes = {name: session_sharpe(net[name], ANALYTICS) for name in names}
     defined = {name: value for name, value in sharpes.items() if value is not None}
     spread: float | None
@@ -301,7 +313,8 @@ def study_row(
     market : pd.Series
         Net equity of the fund held over the same sessions, same costs.
     detail : QualityScore | None
-        Its quality score against the fund held; ``None`` for the fund itself.
+        Its quality score against the fund held; ``None`` for the fund itself
+        and for a book of :data:`OUTSIDE_THE_RANKING`.
     rank : int | None
         Its rank; ``None`` when it is not scored.
 
@@ -315,6 +328,8 @@ def study_row(
     base = summary_row(result, benchmark)
     measures = {} if detail is None else dict(detail.measures)
     blocks = {} if detail is None else dict(detail.blocks)
+    # Why a book has no score: it is the yardstick, or it is reported apart.
+    unscored = "outside_the_ranking" if name in OUTSIDE_THE_RANKING else "market_fund_not_scored"
     equity = result.equity()
     market_beta: float | None = None
     if detail is not None:
@@ -339,7 +354,7 @@ def study_row(
         "sessions": len(equity),
         "first_session": equity.index[0],
         "last_session": equity.index[-1],
-        "diagnostics": "market_fund_not_scored" if detail is None else "|".join(detail.diagnostics),
+        "diagnostics": unscored if detail is None else "|".join(detail.diagnostics),
     }
     for key, value in base.items():
         row.setdefault(key, value)
@@ -1049,7 +1064,11 @@ def study_markdown(
         "The register holds the configurations run here "
         "and not the variants of earlier exercises: the ranking is exploratory. The score "
         "is a composite index, not a probability of making money. A book without a score "
-        "has no rank.",
+        "has no rank. SA8 holds a money-market fund and nothing else: with a risk-free rate "
+        "of zero its Sharpe ratio is that of a fund that barely moves, not a measure of "
+        "timing, so it is reported without a score and is not counted among the trials - "
+        "counted, it multiplies the dispersion of their Sharpe ratios by six and brings "
+        "every other score down to about 1%.",
         "",
         f"## The same table with every cost paid x{COST_STRESS:g} (second real run)",
         "",
@@ -1228,7 +1247,11 @@ def run_all(runner: StrategyRunner, strategies: Mapping[str, Strategy], label: s
 
 
 def scored(results: Mapping[str, StrategyResult]) -> tuple[dict, dict]:  # type: ignore[type-arg]
-    """Return the quality details of a set of runs and the register they were deflated by."""
+    """Return the quality details of a set of runs and the register they were deflated by.
+
+    A book of :data:`OUTSIDE_THE_RANKING` has no score, like the fund held: it
+    is in the result with ``None``, and was neither scored nor counted.
+    """
     net = {name: result.equity() for name, result in results.items()}
     gross = {name: result.equity(Book.GROSS) for name, result in results.items()}
     register = trial_register(net)
@@ -1237,8 +1260,14 @@ def scored(results: Mapping[str, StrategyResult]) -> tuple[dict, dict]:  # type:
         # Several trials and no dispersion to estimate: no significance is made up.
         return dict.fromkeys(net), register
     assert isinstance(spread, float) and isinstance(register["trials"], int)
-    details = quality_details(net, gross, trials=register["trials"], trial_sharpe_std=spread)
-    return details, register
+    ranked = [name for name in net if name not in OUTSIDE_THE_RANKING]
+    details = quality_details(
+        {name: net[name] for name in ranked},
+        {name: gross[name] for name in ranked},
+        trials=register["trials"],
+        trial_sharpe_std=spread,
+    )
+    return {name: details.get(name) for name in net}, register
 
 
 def main(arguments: Sequence[str] | None = None) -> int:

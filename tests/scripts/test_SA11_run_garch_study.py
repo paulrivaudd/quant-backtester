@@ -144,6 +144,26 @@ def test_the_register_counts_every_trial_and_never_reads_an_undefined_sharpe_as_
     assert register["complete"] is False
 
 
+def test_a_money_market_book_is_reported_without_a_score_and_is_not_a_trial() -> None:
+    every = curves()
+    monetary = SCRIPT.OUTSIDE_THE_RANKING[0]
+    # A fund that barely moves: a small steady return, and a Sharpe ratio no rule reaches.
+    steady = written(np.full(399, 0.0001) + np.random.default_rng(7).normal(0.0, 0.00002, 399))
+    with_it = every | {monetary: steady}
+
+    register = SCRIPT.trial_register(with_it)
+
+    assert monetary == "SA8 - monetary carry"
+    assert monetary not in register["names"] and monetary not in register["sharpes"]
+    assert register["trials"] == SCRIPT.trial_register(every)["trials"]
+    # Its dispersion is that of the rules it is reported beside, not six times it.
+    assert register["trial_sharpe_std"] == SCRIPT.trial_register(every)["trial_sharpe_std"]
+    counted = SCRIPT.statistics.stdev(
+        [*register["sharpes"].values(), SCRIPT.session_sharpe(steady, SCRIPT.ANALYTICS)]
+    )
+    assert counted > 5.0 * register["trial_sharpe_std"]
+
+
 def test_one_trial_has_no_dispersion_and_several_without_one_have_no_significance() -> None:
     every = curves()
     single = {SCRIPT.HELD: every[SCRIPT.HELD], SCRIPT.GARCH: every[SCRIPT.GARCH]}
