@@ -15,8 +15,6 @@ one priority: results you can trust and reproduce.
 - [What a run records](#what-a-run-records)
 - [Writing a strategy](#writing-a-strategy)
 - [Running one](#running-one)
-- [Four baselines, several periods](#four-baselines-several-periods)
-- [First strategy tested: the golden cross (exercise 1)](#first-strategy-tested-the-golden-cross-exercise-1)
 - [Research: what is left to test, and how](#research-what-is-left-to-test-and-how)
 - [What a strategy may not do](#what-a-strategy-may-not-do)
 
@@ -294,13 +292,12 @@ standardising them, never by dividing.
 A snapshot is one instant, not one universe. A `SignalRequest` carries the
 names a signal is computed for — a list, or a dated universe the engine
 resolves for the session being decided, because a basket of gauges changes over
-the years like any other — so a rotation between two funds can be gated by
-a volatility index or a yield that reaches the same snapshot without ever being
-ranked against them — `MomentumVix` is that decision, and it holds the
-rotation's choice only while the gauge stays at or below a declared threshold.
-What it does when the gauge cannot be read is declared too, because a risk
-filter that silently becomes no filter the day its input is late is only ever
-noticed afterwards.
+the years like any other — so a rule on a fund can be gated by a volatility
+index or a yield that reaches the same snapshot without ever being ranked
+against it: `SA9` reads the VIX beside the fund it buys. What such a rule does
+when the gauge cannot be read has to be declared too, because a risk filter
+that silently becomes no filter the day its input is late is only ever noticed
+afterwards.
 
 A signal never chooses its own instant, never opens a file and never repairs a
 window. Every number comes with a status, because "not listed yet", "no history
@@ -360,10 +357,11 @@ uv run pyright
 ```
 
 A first backtest needs no download. `scripts/demo.py` writes two invented
-funds, drawn from a fixed seed, to a temporary store, and runs a momentum
-rotation and a buy-and-hold over them with the project's own reader, engine,
-execution model and report (`quant_backtester.demo`). The prices are not market
-data; the machinery is the real one:
+funds, drawn from a fixed seed, to a temporary store, and runs `SA1` - a fund
+held above its 20-session average - and a buy-and-hold of the same fund over
+them with the project's own reader, engine, execution model and report
+(`quant_backtester.demo`). The prices are not market data; the machinery is the
+real one:
 
 ```bash
 uv run python scripts/demo.py                      # both reports, a few seconds
@@ -374,11 +372,11 @@ uv run python scripts/demo.py --figures demo_output  # and the equity and drawdo
 from pathlib import Path
 
 from quant_backtester.demo import demo_runner
-from quant_backtester.strategies.examples import MomentumRotation
+from quant_backtester.strategies import WorldMA20Benchmark
 
 runner = demo_runner(Path("demo_store"), seed=20240101)  # a new, empty directory
 result = runner.run(
-    MomentumRotation(lookback_sessions=60, top_n=1),
+    WorldMA20Benchmark(instrument_id="FUND_A"),  # SA1
     ("FUND_A", "FUND_B"),
     "2025-01-02",
     "2025-12-31",
@@ -440,7 +438,7 @@ from quant_backtester.provenance import git_source_state
 engine = BacktestEngine(
     reader=reader,
     calendars=calendars,
-    strategy=MomentumRotation(lookback_sessions=60, top_n=1),  # declares its own signals
+    strategy=BufferedDualMomentum(),  # SA2; a strategy declares its own signals
     universe=universes.get("ROTATION_2"),  # two PEA funds, dated memberships
     config=BacktestConfig(
         start=date(2025, 1, 2),
@@ -468,40 +466,57 @@ report = PerformanceReport.of(result, AnalyticsConfig(sessions_per_year=255, ris
 print(report.render())
 ```
 
+The report has the shape below. This one is the offline demo's
+(`uv run python scripts/demo.py`): `SA1` on invented prices, so its numbers show
+the layout and say nothing about the rule. What the catalogued strategies did on
+real data is in
+[research/reports/2026-10-10](research/reports/2026-10-10/README.md).
+
 ```text
-437 sessions, 1.71 years, 255 sessions/year, risk-free 2.00%
+255 sessions, 0.99 years, 255 sessions/year, risk-free 2.00%
 
                                gross         net
-total return                  20.29%      16.66%
-annualised return             11.44%       9.46%
-annualised volatility         14.90%      15.00%
-max drawdown                 -21.60%     -21.65%
-sharpe ratio                    0.67        0.54
+total return                   2.86%       0.22%
+annualised return              2.88%       0.22%
+annualised volatility         11.05%      11.23%
+max drawdown                 -13.85%     -15.34%
+sharpe ratio                    0.13       -0.10
 
-costs                       3,624.22
-  commission                2,265.14
-  spread                      906.05
-  slippage                    453.03
-  drag on the return           3.62%
-  share of gross              17.86%
-  rebalancings                    22
-  per rebalancing             164.74
-  turnover                    43.91x
-  turnover a year             25.74x
+relative to FUND_A (TOTAL_RETURN), 2025-01-02 to 2025-12-31
+  255 valuations, 254 returns, 255 sessions/year, risk-free 2.00%
+                                   gross         net
+regression alpha, a year          -5.86%      -8.57%
+beta                               0.515       0.523
+active return, a year            -12.77%     -15.36%
+tracking error, a year            10.72%      10.70%
+information ratio                 -1.191      -1.435
+r squared                          54.3%       54.3%
+  alpha is A x the intercept, not a compounded return; the ratios scale by sqrt(A)
+  FUND_A is held without costs, lots or cash left over, distributions reinvested at the close
+
+costs                         264.40
+  commission                  165.25
+  spread                       66.10
+  slippage                     33.05
+  drag on the return           2.64%
+  share of gross              92.33%
+  rebalancings                    32
+  per rebalancing               8.26
+  turnover                    31.56x
+  turnover a year             31.75x
 
 by instrument                    net       gross        cost    held
-  ETF_SP500_PEA            15,582.12   17,436.65    1,854.53     200
-  ETF_WORLD                 1,081.84    2,851.52    1,769.69     236
+  FUND_A                       21.97      286.37      264.40     138
 
 sessions valued on an older price              0
 sessions without an execution price            0
-purchases cut for want of cash                14
+purchases cut for want of cash                 1
 sessions with nothing to choose from           0
 sessions missing a line of the target          0
-average cash                               0.39%
-largest weight held                      100.00%
-orders, fills, rejects                43, 43, 14
-  INSUFFICIENT_CASH                           14
+average cash                              46.26%
+largest weight held                       99.92%
+orders, fills, rejects                 32, 32, 1
+  INSUFFICIENT_CASH                            1
 
 assumptions
   fills: OPEN_AUCTION_NOTIONAL - sized and filled at the next opening price
@@ -509,45 +524,27 @@ assumptions
   cash: earns nothing; the risk-free rate enters the Sharpe ratio and the regression alpha and beta, nothing else
   limits: cap target weights, before costs
   a decision lives: one execution; a refused order is not retried
-  history read: ASSUMED_UNREVISED ETF_SP500_PEA, ETF_WORLD
+  history read: ASSUMED_UNREVISED FUND_A, FUND_B
 ```
 
-Three and a half points of return went to execution — **close to a fifth of
-everything the idea earned** — and a Sharpe ratio of 0.67 that an investor
-would have experienced as 0.54. Twenty-two switches in twenty-one months is not
-a hyperactive strategy,
-and it still costs that much: the kind of fact a backtest without a cost model
-cannot show, which is why this one refuses to report a return without one.
+The block relative to the benchmark is there because the demo's runner declares
+one; it is read under [Running one](#running-one).
 
-The instrument block is the one that should worry its author. The world ETF
-was held for 236 of the 436 invested sessions and returned 1,082 euros of the
-16,664: it paid 1,770 in costs to earn 2,852 gross. Practically the whole
-result is the other leg. A rotation between two funds whose gain comes from one
-of them is not a rotation that works - it is a strategy that was right once,
-and the total return alone cannot tell the difference. The decomposition is
-exact: every instrument's share is computed from the quantities, the fills and
-the closes the run itself recorded, and what it fails to explain is reported
-rather than absorbed.
+Gross and net are the same fills with and without their costs, and the costs
+are three named terms. On these invented prices thirty-two orders took 264 of
+the 286 euros the rule earned before them: the kind of fact a backtest without
+a cost model cannot show, which is why this one refuses to report a return
+without one.
 
-The last block is not decoration, and it is where this README was once wrong.
-On 24 October 2025 the two providers disagreed on both funds' bar - Yahoo
-served a flat placeholder with no volume, Euronext the venue's real bar - and
-the reader served the session as a hole. A sixty-session momentum needs sixty
-sessions in a row, so for sixty-one sessions the ranking had one instrument
-where it needs two, the strategy had nothing to choose from, and the book
-stood in cash. This README used to say that the hole cost the strategy four
-points. It never measured it. The session is now settled by a committed review
-(`metadata/conflict_reviews.toml`, served from Euronext and marked
-`REVIEWED`, never `CONFIRMED`), and the run was made again with that review as
-the only change: **the hole cost 0.47 point**, not four - 16.19% net became
-16.66%, the sixty-one sessions with nothing to choose from became none, and
-the average cash fell from fourteen percent to under one. Fourteen purchases
-are still cut, because a switch pays the sale's costs out of its proceeds and
-the commission on top of the purchase, and execution lends nothing: each cut
-is a reject on the record, with the units it cost.
+The instrument block is exact: every instrument's share is computed from the
+quantities, the fills and the closes the run itself recorded, and what it fails
+to explain is reported rather than absorbed.
 
-Those lines are the caveats the figures above have to be read with, and a
-caveat is only worth what was measured about it.
+The last block is not decoration. A session valued on an older price, an order
+with no execution price, a purchase cut for want of cash, a session with
+nothing to choose from: each is counted, and a refused order is a reject on the
+record with its reason. Those lines are the caveats the figures above have to
+be read with, and a caveat is only worth what was measured about it.
 
 Inside a session the order is fixed, and it is what stops a strategy buying at
 the close it just read. The three instants are declared in the run's
@@ -621,8 +618,8 @@ A strategy is a name, the signals it needs, and one decision:
 from quant_backtester.strategies import Strategy
 
 
-class MomentumVix(Strategy):
-    strategy_id = "momentum_vix"
+class GatedRotation(Strategy):
+    strategy_id = "gated_rotation"
 
     def required_signals(self):
         momentum = MomentumSignal(
@@ -683,20 +680,19 @@ strategy choose the first. It keeps the positions and sends no order - which is
 not the same as asking for the weights the book has: those are the weights of
 the close, two funds drift apart overnight, and a target restated in weights
 trades that drift every morning. An earlier version did exactly that, and only
-the minimum trade value kept it still: without one, buy and hold on both funds
-traded 106 times over this README's period instead of once. A risk limit the
-kept book breaches still trades it down to the limit.
+the minimum trade value kept it still: without one, buy and hold on two funds
+traded 106 times in twenty-one months instead of once. A risk limit the kept
+book breaches still trades it down to the limit.
 
 It is also what makes a baseline honest. `BuyAndHold` buys its basket, completes
 it with the cash left if a name could not be bought the first time
 (`ctx.keep_and_buy`: the names held are kept, never traded back to equal
 weights), and keeps its positions afterwards; `EqualWeightRebalance` restates
-the same target at every decision. Over this README's period they are two
-different strategies — one session of trading against four (two fills against
-seven), 80 euros of costs against 86,
-no refused order against 372, most of them rebalancings too small to send — and
+the same target at every decision. They are two different strategies - the
+first trades once, the second whenever the funds have drifted apart - and
 calling the second one "buy and hold", as an earlier version of this project
-did, hides the very thing the comparison exists to measure.
+did, hides the very thing the comparison exists to measure. Both are the
+reference books of every study of the catalogued strategies.
 
 </details>
 
@@ -723,7 +719,7 @@ runner = StrategyRunner(
 )
 
 result = runner.run(
-    MomentumRotation(lookback_sessions=60, top_n=1),
+    BufferedDualMomentum(),  # SA2
     universe="ROTATION_2",
     start="2025-01-02",
     end="2026-09-17",
@@ -786,49 +782,46 @@ On a session the schedule does not decide on, the strategy is not called, no
 order is sent, and the record carries the target still standing with
 `decided = False` beside it.
 
-Measured against simply holding the world ETF, the rotation of this README is
-behind:
+`result.compare()` measures the run against its benchmark. On the demo's
+invented prices, `SA1` against the fund it trades:
 
 ```text
-437 sessions, strategy against ETF_WORLD
+255 sessions, strategy against FUND_A
 
-                            strategy     ETF_WORLD
-total return                  16.66%        20.19%
-annualised return              9.46%        11.39%
-annualised volatility         15.00%        14.67%
-max drawdown                 -21.65%       -21.66%
-sharpe ratio                    0.54          0.67
-excess return                 -3.53%
+                            strategy        FUND_A
+total return                   0.22%        16.07%
+annualised return              0.22%        16.18%
+annualised volatility         11.23%        15.83%
+max drawdown                 -15.34%       -10.13%
+sharpe ratio                   -0.10          0.90
+excess return                -15.85%
 
-relative to ETF_WORLD (TOTAL_RETURN), 2025-01-02 to 2026-09-17
-  437 valuations, 436 returns, 255 sessions/year, risk-free 2.00%
+relative to FUND_A (TOTAL_RETURN), 2025-01-02 to 2025-12-31
+  255 valuations, 254 returns, 255 sessions/year, risk-free 2.00%
 book                                 net
-regression alpha, a year          -1.84%
-beta                               1.015
-active return, a year             -1.69%
-tracking error, a year             1.90%
-information ratio                 -0.890
-r squared                          98.4%
+regression alpha, a year          -8.57%
+beta                               0.523
+active return, a year            -15.36%
+tracking error, a year            10.70%
+information ratio                 -1.435
+r squared                          54.3%
   alpha is A x the intercept, not a compounded return; the ratios scale by sqrt(A)
 
-ETF_WORLD is a yardstick, not an alternative that was traded: one share
+FUND_A is a yardstick, not an alternative that was traded: one share
 held from the first close, with no cost, no lot and no cash left over. The
 strategy starts in cash and trades at the next open on its own schedule.
 ```
 
 The second block measures the strategy *relative* to the benchmark, on the
-simple returns of the 436 sessions both curves share
+simple returns of the 254 sessions both curves share
 (`quant_backtester.analytics.relative`). **Beta** is the slope of the least
 squares fit of the strategy's excess return over the risk-free rate on the
-benchmark's: 1.015 means the rotation moved almost exactly with the world
-index, which an R squared of 98.4% confirms - switching between two equity
-funds is not a hedge. **Alpha** is the intercept of that fit multiplied by the
-255 sessions of a year: -1.84% a year that the exposure does not explain. It is
-a scaled coefficient and not a compounded return, and against a benchmark other
-than the market it is a regression alpha, not Jensen's. The **active return**
-is the mean of the daily difference of the two returns, annualised the same
-way; the **tracking error** is its spread times the root of 255; the
-**information ratio** is their quotient, -0.89. None of the three is the
+benchmark's: 0.523 here, for a book whose cash averaged 46%. **Alpha** is the intercept of that fit multiplied by the 255 sessions
+of a year. It is a scaled coefficient and not a compounded return, and against
+a benchmark other than the market it is a regression alpha, not Jensen's. The
+**active return** is the mean of the daily difference of the two returns,
+annualised the same way; the **tracking error** is its spread times the root
+of 255; the **information ratio** is their quotient. None of the three is the
 `excess return` line above, which is a difference of total returns. A figure the
 sample cannot identify - under the declared `minimum_sessions`, a benchmark
 that does not move, a constant active return - is a dash with its reason,
@@ -837,56 +830,17 @@ side, `result.compare(book=Book.GROSS)` the gross ones alone, and
 `result.report(benchmark=...)` measures the same run against another yardstick
 without touching the report it keeps. The formulas are in `docs/FORMULES.md`.
 
-Less than half a point of that gap was the contested bar of 24 October 2025:
-reviewed, it moved the strategy from 16.19% to 16.66%, and the gap to the
-index from 4.01 points to 3.53. A picture shows where the rest went, which is
-what `result.plot()` is for — it returns a figure and never calls `show`, so a
-notebook displays it, a script saves it and a test inspects it.
+`result.plot()` draws the run against its benchmark. It returns a figure and
+never calls `show`, so a notebook displays it, a script saves it and a test
+inspects it.
 
-Against the index the strategy trails by three and a half points, and against the fund it
-could actually have bought instead - the world fund bought once, under the same
-costs, lots and cash - the question is whether that gap means anything. The
-readme suite answers with a paired block bootstrap of the two books, the same
-blocks of ten sessions drawn for both, 2 000 draws, seed 20260926:
-
-```text
-== reference_rotation against the executable control, control_world
-difference      estimate       low      high   level
-mean_return       -0.019    -0.034     0.002     90%
-sharpe            -0.146    -0.281    -0.007     90%
-```
-
-The mean-return interval only just holds zero; the Sharpe interval does not.
-Both Sharpe ratios are the report's own - excess returns over the risk-free
-rate, divided by their own spread - since a common rate does not cancel in a
-difference of ratios with different spreads.
-Over 437 sessions the rotation took on more risk than keeping the world fund
-for no more return, and at this level its Sharpe ratio is the lower of the
-two. Nothing in this README says it is the better strategy - which is what
-`research/PROTOCOL.md` is for.
-
-Nor does the gap depend much on how the orders are simulated.
-`scripts/sensitivity.py` runs both books with quantities fixed at the
-decision's close instead of the opening auction's notional, and at twice the
-declared costs:
-
-```text
-scenario              book                      net  sharpe     costs  rejects
-notional, costs x1    reference_rotation     16.66%    0.54     3,624       14
-notional, costs x1    control_world          20.71%    0.69        80        0
-notional, costs x2    reference_rotation     12.77%    0.41     7,121       17
-notional, costs x2    control_world          20.63%    0.69       160        0
-overnight, costs x1   reference_rotation     16.65%    0.54     3,623       64
-overnight, costs x1   control_world          20.59%    0.69        79        0
-overnight, costs x2   reference_rotation     12.76%    0.41     7,118       38
-overnight, costs x2   control_world          20.51%    0.69       159        0
-```
-
-Fixing the quantities overnight costs the rotation a hundredth of a point and
-turns more purchases into cuts - an open above the close leaves an order
-bigger than the cash. The costs are what it is sensitive to: twice them take
-almost four points from the rotation and nothing from the fund it is measured
-against.
+An index is a yardstick; the fund a strategy could actually have bought
+instead, under the same costs, lots and cash, is a control, and whether the gap
+between two books means anything is a question for a paired block bootstrap of
+their returns (`quant_backtester.analytics.uncertainty`). The studies of the
+catalogued strategies report one with every comparison, beside a second run at
+twice the declared costs: see
+[research/reports/2026-10-10](research/reports/2026-10-10/README.md).
 
 The benchmark is read at the run's own decision instants, so adding data after
 the last session changes none of its figures; a session its venue did not hold
@@ -896,202 +850,6 @@ difference between the two curves is an exchange rate.
 
 </details>
 
-## Four baselines, several periods
-
-`scripts/run_baselines.py` runs the four reference strategies over the whole
-history both funds share and over three regimes inside it, with the costs of
-this README - five basis points of commission with a one-euro floor, two of
-half spread, one of slippage, no order under five hundred euros - and 100,000
-euros each time. Every line is a `StrategyResult` carrying its configuration,
-its fingerprint and the state of the code, followed by its refused orders by
-reason; `--suite all` takes a little over two minutes. `--suite readme` prints
-every other figure of this README, and `--records DIR` writes each run's
-sessions, orders, fills, rejects and holdings so that two versions of the code
-can be compared run for run, and its relative figures gross and net with what
-they are read with (`<run>_relative.csv`). After each table, the same runs are
-listed against `ETF_WORLD`, net book: regression alpha a year, beta,
-information ratio, tracking error and the number of returns. The `vs world`
-column stays what it is, a difference of total returns.
-
-<details>
-<summary>Show the table: four strategies over four periods</summary>
-
-```text
-strategy            period                         net    gross   a year  sharpe   max dd     costs  rebal.  fills  rejects  est.  vs world
-buy_and_hold        2018-07-16 2026-09-17      164.10%  164.18%   12.62%    0.71  -33.59%        80       1      1        0     0     0.44%
-equal_weight        2018-07-16 2026-09-17      182.29%  182.42%   13.54%    0.74  -33.57%       127      23     40      106     0    18.63%
-                    rejects: BELOW_MINIMUM_TRADE 92, INSUFFICIENT_CASH 14
-momentum_rotation   2018-07-16 2026-09-17      161.49%  185.44%   12.48%    0.68  -33.62%    23,957      88    175       64     0    -2.17%
-                    rejects: INSUFFICIENT_CASH 64
-momentum_vix        2018-07-16 2026-09-17      121.50%  159.70%   10.22%    0.65  -23.11%    38,203     218    297      109     0   -42.16%
-                    rejects: INSUFFICIENT_CASH 109
-
-buy_and_hold        2019-01-02 2021-12-31       82.30%   82.38%   22.20%    1.08  -33.61%        80       1      1        0     0     1.37%
-equal_weight        2019-01-02 2021-12-31       77.41%   77.50%   21.09%    1.02  -33.56%        90       6     10       45     0    -3.51%
-                    rejects: BELOW_MINIMUM_TRADE 41, INSUFFICIENT_CASH 4
-momentum_rotation   2019-01-02 2021-12-31       92.21%   97.34%   24.38%    1.14  -33.62%     5,130      24     47       17     0    11.29%
-                    rejects: INSUFFICIENT_CASH 17
-momentum_vix        2019-01-02 2021-12-31       78.91%   88.94%   21.44%    1.26  -12.21%    10,025      69     91       39     0    -2.01%
-                    rejects: INSUFFICIENT_CASH 39
-
-buy_and_hold        2022-01-03 2023-12-29        2.13%    2.21%    1.07%    0.01  -16.99%        80       1      1        0     0    -0.82%
-equal_weight        2022-01-03 2023-12-29        9.34%    9.42%    4.60%    0.24  -15.54%        83       4      5       30     0     6.39%
-                    rejects: BELOW_MINIMUM_TRADE 28, INSUFFICIENT_CASH 2
-momentum_rotation   2022-01-03 2023-12-29       -1.05%    2.61%   -0.53%   -0.08  -18.75%     3,662      26     51       18     0    -4.00%
-                    rejects: INSUFFICIENT_CASH 18
-momentum_vix        2022-01-03 2023-12-29       -8.83%   -3.23%   -4.55%   -0.39  -23.31%     5,605      63     83       30     0   -11.78%
-                    rejects: INSUFFICIENT_CASH 30
-
-buy_and_hold        2024-01-02 2026-09-17       53.43%   53.51%   17.13%    1.09  -21.61%        80       1      1        0     0    -0.19%
-equal_weight        2024-01-02 2026-09-17       49.50%   49.59%   16.01%    0.99  -22.46%        90       6     11       25     0    -4.13%
-                    rejects: BELOW_MINIMUM_TRADE 22, INSUFFICIENT_CASH 3
-momentum_rotation   2024-01-02 2026-09-17       48.62%   55.78%   15.76%    0.97  -21.62%     7,166      37     73       22     0    -5.01%
-                    rejects: INSUFFICIENT_CASH 22
-momentum_vix        2024-01-02 2026-09-17       35.90%   46.81%   11.99%    0.88  -13.47%    10,915      80    115       32     0   -17.73%
-                    rejects: INSUFFICIENT_CASH 32
-```
-
-</details>
-
-Over eight years the simplest things win. Half and half, rebalanced monthly,
-beats everything; the rotation earns, gross, what the equal weight keeps net,
-and hands twenty-four points of it to 88 sessions of switching. The VIX gate does what it
-says - its worst fall is a third smaller over the whole history, and its
-Sharpe ratio is the best of 2019-2021 - and pays for it twice: 218 sessions of trading, and
-the rebounds it sits out. In 2022-2023 both rotations lose money net, the gated
-one even before costs. None of this is a verdict on momentum: two funds are
-the thinnest universe a ranking can have, and over these years the S&P 500
-fund simply outran the world one. It is what the chain was built to be able to
-say.
-
-The refused orders say what each strategy runs into: the equal weight's are
-mostly rebalancings too small to send, the rotations' are purchases cut to the
-cash a switch leaves once the sale has paid its costs, and buy and hold has
-none at all - it keeps its positions and sends nothing. `est.` counts the
-sessions a position was valued on an older close: none, since the contested
-bar of 24 October 2025 was reviewed.
-
-The same runs against `ETF_WORLD`, net book - regression alpha a year, beta,
-information ratio, tracking error and the number of daily returns:
-
-<details>
-<summary>Show the table: the same runs relative to ETF_WORLD</summary>
-
-```text
-strategy            period                   benchmark       alpha/yr    beta  info. ratio  track. err.     n
-buy_and_hold        2018-07-16 2026-09-17    ETF_WORLD          0.03%   0.999        0.218        0.08%  2093
-equal_weight        2018-07-16 2026-09-17    ETF_WORLD          0.69%   1.019        0.464        1.93%  2093
-momentum_rotation   2018-07-16 2026-09-17    ETF_WORLD         -0.31%   1.029        0.003        2.77%  2093
-momentum_vix        2018-07-16 2026-09-17    ETF_WORLD          1.18%   0.670       -0.255        9.68%  2093
-buy_and_hold        2019-01-02 2021-12-31    ETF_WORLD          0.28%   0.998        0.559        0.44%   769
-equal_weight        2019-01-02 2021-12-31    ETF_WORLD         -0.57%   0.998       -0.204        3.00%   769
-momentum_rotation   2019-01-02 2021-12-31    ETF_WORLD          1.65%   1.025        0.682        3.14%   769
-momentum_vix        2019-01-02 2021-12-31    ETF_WORLD          6.62%   0.608       -0.080       11.88%   769
-buy_and_hold        2022-01-03 2023-12-29    ETF_WORLD         -0.40%   0.997       -0.720        0.56%   511
-equal_weight        2022-01-03 2023-12-29    ETF_WORLD          3.00%   0.920        0.592        4.98%   511
-momentum_rotation   2022-01-03 2023-12-29    ETF_WORLD         -1.90%   1.021       -0.659        2.86%   511
-momentum_vix        2022-01-03 2023-12-29    ETF_WORLD         -6.08%   0.831       -0.857        7.21%   511
-buy_and_hold        2024-01-02 2026-09-17    ETF_WORLD         -0.01%   0.997       -1.411        0.04%   692
-equal_weight        2024-01-02 2026-09-17    ETF_WORLD         -1.23%   1.019       -0.489        1.94%   692
-momentum_rotation   2024-01-02 2026-09-17    ETF_WORLD         -1.59%   1.030       -0.523        2.19%   692
-momentum_vix        2024-01-02 2026-09-17    ETF_WORLD          0.35%   0.651       -0.566        8.47%   692
-```
-
-</details>
-
-Three things the total returns did not say. The rotation is the index with
-noise: a beta of 1.03 in every period, and an information ratio of 0.003 over
-eight years - no active return at all once 2.8% of tracking error is paid for,
-with the one good regime (2019-2021) given back in the two others. The VIX gate
-is the only strategy that changes its exposure, a beta of 0.61 to 0.83: its
-positive alpha over the whole history means it earned more than that lower
-exposure explains, and its negative information ratio that it still earned
-less than the index, with a tracking error of 7 to 12 points a year - a
-different product rather than a better one. And the equal weight, the best of
-the four over the whole history, owes it to one regime (an alpha of 3% in
-2022-2023, when the S&P 500 fund held up better) and gives part of it back
-since. Buy and hold of the world fund is the benchmark bought under real
-costs, lots and cash: 0.08% of tracking error over eight years, which is the
-check that the two curves are measured the same way; its information ratio of
--1.41 in 2024-2026 is a ratio over 0.04% of tracking error, and says nothing.
-None of these figures has an interval yet, and all of these periods have been
-looked at: they describe the history, they do not test a rule.
-
-## First strategy tested: the golden cross (exercise 1)
-
-The first strategy written from an empty file and run on the real store is the
-oldest trend rule there is. `GoldenCrossETF`
-(`strategies/examples/golden_cross_etf.py`) holds one fund, `ETF_WORLD`, and
-asks one question after each Paris close:
-
-```text
-s(t) = MA50(t) / MA200(t) - 1        both averages on adjusted closes, ending at t
-
-s(t) > 0                             hold 100% of the fund
-s(t) <= 0, or no usable signal       hold 100% cash
-```
-
-The target is executed at the next open, by the engine. A signal that cannot be
-computed - fewer than 200 consecutive sessions, a missing bar - is cash, not a
-guess.
-
-**Why this one.** Not because it is expected to work. It is chosen because it
-is simple enough to check by hand, so that a surprising number is a bug in the
-chain and not a subtlety of the rule, and because its weaknesses are well known,
-so the run shows whether the framework reports them honestly. It exercises every
-layer once: a windowed signal, a decision with an "unusable" case, whole-share
-orders, three named costs, a benchmark.
-
-`scripts/run_golden_cross_exercise.py` runs it with the costs of this README,
-100,000 euros, from 2019-04-01 to 2026-09-17 (1912 sessions), measured against
-the fund itself held without trading:
-
-```text
-                            strategy     ETF_WORLD
-total return                  71.58%       149.91%
-annualised return              7.50%        13.06%
-annualised volatility         13.45%        15.90%
-max drawdown                 -33.55%       -33.62%
-sharpe ratio                    0.46          0.72
-
-gross total return            72.61%
-costs                          1,035   over 11 fills
-beta                           0.715
-regression alpha, a year      -2.10%
-information ratio             -0.634
-sessions invested          1495 of 1912, average cash 21.95%
-```
-
-![ETF_WORLD with its 50- and 200-session averages, the sessions invested and the trades](docs/figures/golden_cross_moving_averages.png)
-
-The close with its two averages; the shaded sessions are those the run was
-invested on, and each cross is a buy (green) or a sell (red), one session after the
-crossing that caused it. The figure is `moving_averages.png`, written by the
-script.
-
-The rule earns half of what holding the fund earned, and the run says why:
-
-- **It is late, both ways.** A 200-session average turns long after the price
-  has. In 2020 the rule sold on 30 March at 246.13, after the fall it was meant
-  to avoid - its worst drawdown is the benchmark's, to a tenth of a point - and
-  bought back on 3 August at 293.09, 19% higher. In 2025 the same thing: sold on
-  22 April at 478.83, back in on 18 August at 571.44.
-- **It is whipsawed when the market goes sideways.** Between September 2022 and
-  May 2023 it bought three times and sold twice, for nothing.
-- **Costs are not the reason.** One point of total return over seven years:
-  the rule trades too rarely for execution to matter. What it loses, it loses
-  by being out of the market on the wrong days.
-- **Lower risk, but not better risk.** Beta is 0.71 and volatility is lower
-  because the book is in cash a fifth of the time, and that cash earns nothing
-  here while the Sharpe ratio is still charged 2% a year.
-
-What this run does not show: it is one fund, one pair of lengths and one
-period, all of it already looked at, so it describes a history and tests
-nothing. Trying 20/50 or 100/200 until one beats the fund would be fitting the
-rule to these seven years. The run is not in `research/registry.jsonl`; it is an
-exercise, recorded as run `34ea6016…` on commit `1c8ec57`, and its figures come
-from its own script rather than from `run_baselines.py --suite readme`.
-
 ## Research: what is left to test, and how
 
 Every session of 2018 to 2026 on `ROTATION_2` has been looked at, and those
@@ -1099,15 +857,16 @@ results shaped choices, so none of that history is out of sample any more. The
 test left is the future. [`research/PROTOCOL.md`](research/PROTOCOL.md) writes
 the rules down before any experiment they govern:
 
-- two paper plans, committed before their start on 2026-10-01 and fixed by the
-  strategy's fingerprint - the reference rotation, and buy and hold of the
-  world fund as its control. `scripts/paper_trade.py` runs them forward and
-  appends each new session to a log that is never rewritten; a changed rule, or
-  a logged session that comes out differently, stops it;
+- a hypothesis written in `research/hypotheses.toml` before its first run,
+  with what would refute it, and a status that answers that question and
+  nothing wider;
 - every research backtest appended to `research/registry.jsonl`, rejected ones
   included and only from committed code, so a result is always read with the
-  number of variants it took (`run_baselines.py --register` registers the
-  suites' runs);
+  number of variants it took;
+- a strategy kept for observation run forward on paper, its configuration
+  frozen, and not read before a year of sessions. The two plans committed for
+  2026-10-01 were closed on 2026-10-11, before any session was logged, when the
+  rules they named were removed from the code;
 - neighbourhoods rather than points, rolling start dates, twice the costs, and
   an executable baseline over the same sessions before any variant is kept.
 
@@ -1140,12 +899,15 @@ back no reader, a decision taken on a store that knows what happens tomorrow is
 identical to one taken without it, and every part of a context must answer for
 the same instant or it cannot be built.
 
-Other scripts: `run_baselines.py` runs the named experiments every figure of
-this README comes from (`--suite readme`, `--suite baselines`, `--records` to
-keep every run's sessions, orders and fills), `generate_calendars.py` rewrites
-the committed calendars from
+Other scripts: a study script named after its strategy's code runs that
+strategy with its controls (`SA11_run_garch_study.py`,
+`SA12_run_arima_garch_study.py`, `SA13_run_signature_study.py`,
+`ML1_run_neural_strategy.py`), `run_etf_strategies_comparison.py` runs `SA1` to
+`SA10` on one period, `write_strategy_reports.py` writes the reports,
+`generate_calendars.py` rewrites the committed calendars from
 `exchange_calendars`, `check_calendar_coverage.py` says when they need
 extending, and `accept_revision.py` builds the entry that approves one detected
-correction.
+correction. The two reports printed in this README come from
+`scripts/demo.py`.
 
 Development rules live in [CLAUDE.md](CLAUDE.md).

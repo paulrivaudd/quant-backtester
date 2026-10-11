@@ -142,7 +142,7 @@ FUND_COLOURS = {"ETF_WORLD": "#2a78d6", "ETF_SP500_PEA": "#eb6834"}
 """The two funds, in the figures of orders: the same colour for a fund's price and weight."""
 
 BUY_COLOUR, SELL_COLOUR = "#2f855a", "#c53030"
-"""A buy is a green cross and a sell a red one, as in the exercises."""
+"""A buy is a green cross and a sell a red one."""
 
 ENSEMBLE = entry("SA10").display_name
 

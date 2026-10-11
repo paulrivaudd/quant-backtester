@@ -30,11 +30,9 @@ from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.provenance import SourceState, SourceStatus
-from quant_backtester.strategies.examples import (
-    BuyAndHold,
-    MomentumSingleAsset,
-    MovingAverageCross,
-)
+from quant_backtester.signals.price.trend import MovingAverageCrossSignal
+from quant_backtester.signals.types import PriceBasis, SignalStatus
+from quant_backtester.strategies.examples import BuyAndHold, WorldMA20Benchmark
 from quant_backtester.strategies.functional import FunctionalStrategy
 
 PARIS = BacktestTimetable(
@@ -117,11 +115,11 @@ def test_dates_are_accepted_as_well_as_strings(runner: StrategyRunner) -> None:
 def test_the_signals_see_the_data_before_the_start(runner: StrategyRunner) -> None:
     """``start`` is where the performance starts, not where the data does.
 
-    A five-session momentum run from the 10th reads the first week of
+    A five-session average read on the 10th holds the first week of
     September. Without that, every strategy would begin with a fortnight of
     artificial cash while its windows filled up.
     """
-    strategy = MomentumSingleAsset(instrument_id="ETF_EU", lookback_sessions=5)
+    strategy = WorldMA20Benchmark(instrument_id="ETF_EU", window_sessions=5)
 
     result = runner.run(strategy, ["ETF_EU"], "2026-09-10", "2026-09-14")
 
@@ -312,7 +310,7 @@ def test_the_runner_produces_what_the_engine_produces(
     from quant_backtester.backtest.engine import BacktestEngine
     from quant_backtester.backtest.schedule import EverySession
 
-    strategy = MomentumSingleAsset(instrument_id="ETF_EU", lookback_sessions=5)
+    strategy = WorldMA20Benchmark(instrument_id="ETF_EU", window_sessions=5)
     engine = BacktestEngine(
         reader=runner.reader,
         calendars=calendars,
@@ -1146,6 +1144,26 @@ def test_the_weight_of_a_fund_never_held_is_zero_on_every_session(
     pd.testing.assert_series_equal(result.weight_of("ETF_EU"), result.weights()["ETF_EU"])
 
 
+LONG_OVER_SHORT = MovingAverageCrossSignal(
+    signal_id="ma3_over_ma2",
+    first_sessions=3,
+    second_sessions=2,
+    price_basis=PriceBasis.ADJUSTED,
+)
+"""The 3-session average of a fund over its 2-session one: negative while the fund rises."""
+
+
+def _holds_while_the_long_average_is_on_top(ctx: StrategyContext) -> TargetAllocation:
+    """Hold ETF_EU while ``LONG_OVER_SHORT`` is positive, cash on a readable no."""
+    status = ctx.signal_status(LONG_OVER_SHORT.signal_id, "ETF_EU")
+    among = ctx.considering({"ETF_EU": status})
+    if status is not SignalStatus.OK:
+        return ctx.cash(among=among)
+    if ctx.signal_value(LONG_OVER_SHORT.signal_id, "ETF_EU") <= 0.0:
+        return ctx.cash(among=among)
+    return ctx.weights({"ETF_EU": 1.0}, among=among)
+
+
 def test_a_rule_that_says_no_on_valid_signals_had_something_to_choose_from(
     runner: StrategyRunner, sessions: tuple[date, ...]
 ) -> None:
@@ -1154,7 +1172,11 @@ def test_a_rule_that_says_no_on_valid_signals_had_something_to_choose_from(
     On a rising fund the 3-session average is below the 2-session one at every
     decision, so this rule stands aside all along - on a signal that was there.
     """
-    strategy = MovingAverageCross(instrument_id="ETF_EU", first_sessions=3, second_sessions=2)
+    strategy = FunctionalStrategy(
+        strategy_id="long_over_short",
+        decision=_holds_while_the_long_average_is_on_top,
+        signals=(LONG_OVER_SHORT,),
+    )
 
     result = runner.run(strategy, ["ETF_EU"], sessions[3], sessions[-1])
 

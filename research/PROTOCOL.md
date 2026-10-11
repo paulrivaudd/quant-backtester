@@ -37,6 +37,14 @@ plan already acted on is reviewed, never absorbed. Running it twice changes
 nothing. A rule or a condition changed after the start is a new plan, with a
 new start.
 
+**Closed on 2026-10-11.** The two plans were closed before any session was
+logged: the rules they name, and `scripts/paper_trade.py` with them, were
+removed from the code that day, when only the catalogued strategies and their
+reference books were kept. Their files stay in `research/paper/` as the record
+of what was committed to; the last commit able to run them is `cece9e3`. No
+result was read. `quant_backtester.research.paper` is unchanged: a strategy
+kept for observation gets a new plan, with a new start (section 6).
+
 **Reading the result.** No verdict before 12 months of sessions (about 255):
 below that, the difference between two funds' returns is mostly one fund's
 luck. At 12 months the comparison is net of costs, on the same sessions,

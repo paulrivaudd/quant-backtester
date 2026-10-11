@@ -9,14 +9,11 @@ be computed, and what they refuse to touch.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from datetime import date, datetime
+from datetime import date
 
-import pandas as pd
 import pytest
 
 from quant_backtester.backtest.context import StrategyContext
-from quant_backtester.data.calendars import TradingCalendar
-from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.portfolio.state import PortfolioState
 from quant_backtester.signals.base import Signal
 from quant_backtester.signals.context import SignalContext
@@ -26,14 +23,6 @@ from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.examples import (
     BuyAndHold,
     EqualWeightRebalance,
-    GoldenCrossETF,
-    MomentumRotation,
-    MomentumSingleAsset,
-    MomentumVix,
-    MovingAverageBandETF,
-    MovingAverageCross,
-    MovingAverageEntryExitETF,
-    RateRegimeTrend,
 )
 
 DecisionBuilder = Callable[..., StrategyContext]
@@ -46,7 +35,6 @@ UNIVERSE = ("ETF_EU", "ETF_OTHER")
 def snapshot_of(context: SignalContext, values: dict[str, float]):
     """Return a snapshot holding one score per instrument."""
     from quant_backtester.signals.base import (
-        Signal,
         SignalResult,
         build_result_frame,
         result_row,
@@ -92,11 +80,6 @@ def decide_with(
     return strategy.decide(make_decision(context, snapshot, universe=universe))
 
 
-def _id_of(item: Signal | SignalRequest) -> str:
-    """Return the id of a declared signal, whether or not it carries a universe."""
-    return item.signal.signal_id if isinstance(item, SignalRequest) else item.signal_id
-
-
 def test_buy_and_hold_holds_the_same_book_every_session(
     context: SignalContext, make_decision: DecisionBuilder
 ) -> None:
@@ -120,252 +103,6 @@ def test_buy_and_hold_of_nothing_is_refused() -> None:
     """A book with nothing in it is not a book to hold."""
     with pytest.raises(ValueError, match="at least one instrument"):
         BuyAndHold(instruments=())
-
-
-def test_momentum_holds_the_fund_while_it_is_rising(
-    context: SignalContext, make_decision: DecisionBuilder
-) -> None:
-    """The synthetic market rises by one a session, so the momentum is positive."""
-    strategy = MomentumSingleAsset(instrument_id="ETF_EU", lookback_sessions=5)
-
-    allocation = decide_with(strategy, context, make_decision)
-
-    assert dict(allocation.weights) == {"ETF_EU": 1.0}
-
-
-def test_momentum_stands_aside_when_the_fund_is_falling(
-    make_market: Callable[..., MarketDataReader],
-    make_bars: Callable[..., pd.DataFrame],
-    make_context: Callable[[MarketDataReader, datetime], SignalContext],
-    make_decision: DecisionBuilder,
-    xpar: TradingCalendar,
-    prices: Callable[..., dict[date, float]],
-    evening: Callable[[date], datetime],
-    sessions: tuple[date, ...],
-) -> None:
-    """A falling series is a flat day, and the rule is written in the strategy."""
-    falling = make_market({"ETF_EU": make_bars("ETF_EU", xpar, prices(200.0, -1.0))})
-    context = make_context(falling, evening(sessions[-1]))
-    strategy = MomentumSingleAsset(instrument_id="ETF_EU", lookback_sessions=5)
-
-    allocation = decide_with(strategy, context, make_decision, universe=("ETF_EU",))
-
-    assert dict(allocation.weights) == {}
-    assert allocation.invested == 0.0
-
-
-def test_momentum_stands_aside_when_it_cannot_be_computed(
-    context: SignalContext, make_decision: DecisionBuilder
-) -> None:
-    """ETF_LATE has four sessions of history, and sixty were asked for."""
-    strategy = MomentumSingleAsset(instrument_id="ETF_LATE", lookback_sessions=60)
-
-    allocation = decide_with(strategy, context, make_decision, universe=("ETF_LATE",))
-
-    assert allocation.invested == 0.0
-
-
-def test_a_rotation_holds_the_best_ranked_fund(
-    context: SignalContext, make_decision: DecisionBuilder
-) -> None:
-    """ETF_OTHER rises by three a session against ETF_EU's one."""
-    strategy = MomentumRotation(lookback_sessions=5, top_n=1)
-
-    allocation = decide_with(strategy, context, make_decision)
-
-    assert allocation.selected == ("ETF_OTHER",)
-    assert allocation.invested == pytest.approx(1.0)
-
-
-def test_a_rotation_that_finds_one_name_holds_it_at_its_share(
-    context: SignalContext, make_decision: DecisionBuilder
-) -> None:
-    """Not everything: a provider being late must not double a bet."""
-    strategy = MomentumRotation(lookback_sessions=5, top_n=2)
-
-    allocation = decide_with(
-        strategy, context, make_decision, universe=("ETF_EU", "ETF_OTHER", "ETF_LATE")
-    )
-
-    assert "ETF_LATE" not in allocation.weights
-    assert allocation.skipped["ETF_LATE"] is SignalStatus.INSUFFICIENT_HISTORY
-    assert allocation.invested == pytest.approx(1.0)
-
-
-def test_a_rotation_declares_the_ranking_it_reads() -> None:
-    """Nobody can run it while forgetting a signal it needs."""
-    declared = MomentumRotation(lookback_sessions=60, top_n=2).required_signals()
-
-    assert [_id_of(item) for item in declared] == ["momentum_60d", "momentum_60d_rank"]
-
-
-def gated_market(
-    make_market: Callable[..., MarketDataReader],
-    make_bars: Callable[..., pd.DataFrame],
-    make_levels: Callable[..., pd.DataFrame],
-    xpar: TradingCalendar,
-    prices: Callable[..., dict[date, float]],
-    sessions: tuple[date, ...],
-    gauge: list[float],
-) -> MarketDataReader:
-    """Return two rising funds and a gauge whose last value the test decides."""
-    return make_market(
-        {
-            "ETF_EU": make_bars("ETF_EU", xpar, prices(100.0, 1.0)),
-            "ETF_OTHER": make_bars("ETF_OTHER", xpar, prices(200.0, 3.0)),
-        },
-        None,
-        {"RATE_US": make_levels("RATE_US", dict(zip(sessions, gauge, strict=True)))},
-    )
-
-
-def test_a_quiet_gauge_lets_the_rotation_run(
-    make_market: Callable[..., MarketDataReader],
-    make_bars: Callable[..., pd.DataFrame],
-    make_levels: Callable[..., pd.DataFrame],
-    make_context: Callable[[MarketDataReader, datetime], SignalContext],
-    make_decision: DecisionBuilder,
-    xpar: TradingCalendar,
-    prices: Callable[..., dict[date, float]],
-    evening: Callable[[date], datetime],
-    sessions: tuple[date, ...],
-) -> None:
-    """A gauge sitting on its own mean is a z-score of zero, and the gate is open."""
-    market = gated_market(
-        make_market, make_bars, make_levels, xpar, prices, sessions, [4.0] * 9 + [4.1]
-    )
-    context = make_context(market, evening(sessions[-1]))
-    strategy = MomentumVix(
-        gauge_id="RATE_US", lookback_sessions=5, gauge_observations=5, top_n=1, maximum=5.0
-    )
-
-    allocation = decide_with(strategy, context, make_decision)
-
-    assert allocation.selected == ("ETF_OTHER",)
-
-
-def test_a_loud_gauge_stands_the_book_down(
-    make_market: Callable[..., MarketDataReader],
-    make_bars: Callable[..., pd.DataFrame],
-    make_levels: Callable[..., pd.DataFrame],
-    make_context: Callable[[MarketDataReader, datetime], SignalContext],
-    make_decision: DecisionBuilder,
-    xpar: TradingCalendar,
-    prices: Callable[..., dict[date, float]],
-    evening: Callable[[date], datetime],
-    sessions: tuple[date, ...],
-) -> None:
-    """The funds were rankable, and the strategy chose not to hold them.
-
-    ``considered`` stays above zero, which is what tells a gated day from a day
-    with nothing to choose from.
-    """
-    market = gated_market(
-        make_market, make_bars, make_levels, xpar, prices, sessions, [4.0] * 9 + [9.0]
-    )
-    context = make_context(market, evening(sessions[-1]))
-    strategy = MomentumVix(
-        gauge_id="RATE_US", lookback_sessions=5, gauge_observations=5, top_n=1, maximum=1.0
-    )
-
-    allocation = decide_with(strategy, context, make_decision)
-
-    assert allocation.selected == ()
-    assert allocation.considered == 2
-
-
-def test_the_gauge_is_never_held(
-    make_market: Callable[..., MarketDataReader],
-    make_bars: Callable[..., pd.DataFrame],
-    make_levels: Callable[..., pd.DataFrame],
-    make_context: Callable[[MarketDataReader, datetime], SignalContext],
-    make_decision: DecisionBuilder,
-    xpar: TradingCalendar,
-    prices: Callable[..., dict[date, float]],
-    evening: Callable[[date], datetime],
-    sessions: tuple[date, ...],
-) -> None:
-    """It is read through a universe of its own and never reaches the book."""
-    market = gated_market(
-        make_market, make_bars, make_levels, xpar, prices, sessions, [4.0] * 9 + [4.1]
-    )
-    context = make_context(market, evening(sessions[-1]))
-    strategy = MomentumVix(
-        gauge_id="RATE_US", lookback_sessions=5, gauge_observations=5, top_n=2, maximum=5.0
-    )
-
-    allocation = decide_with(strategy, context, make_decision)
-
-    assert "RATE_US" not in allocation.weights
-    assert set(allocation.weights) <= set(UNIVERSE)
-
-
-def test_what_a_strategy_does_with_an_unreadable_gauge_is_declared() -> None:
-    """A risk filter that silently becomes no filter is only noticed afterwards."""
-    with pytest.raises(ValueError, match="flat_when_unknown"):
-        MomentumVix(flat_when_unknown="yes")  # type: ignore[arg-type]
-
-
-def test_an_unreadable_gauge_can_be_declared_harmless(
-    make_market: Callable[..., MarketDataReader],
-    make_bars: Callable[..., pd.DataFrame],
-    make_levels: Callable[..., pd.DataFrame],
-    make_context: Callable[[MarketDataReader, datetime], SignalContext],
-    make_decision: DecisionBuilder,
-    xpar: TradingCalendar,
-    prices: Callable[..., dict[date, float]],
-    evening: Callable[[date], datetime],
-    sessions: tuple[date, ...],
-) -> None:
-    """The other policy, taken deliberately rather than by omission.
-
-    A risk filter that silently becomes no filter the day its input is late is
-    only ever noticed afterwards, so both answers are written in the config.
-    """
-    market = gated_market(make_market, make_bars, make_levels, xpar, prices, sessions, [4.0] * 10)
-    context = make_context(market, evening(sessions[-1]))
-    # Sixty observations asked of a ten-session series: the gauge has no value.
-    strategy = MomentumVix(
-        gauge_id="RATE_US",
-        lookback_sessions=5,
-        gauge_observations=60,
-        top_n=1,
-        maximum=1.0,
-        flat_when_unknown=False,
-    )
-
-    allocation = decide_with(strategy, context, make_decision)
-
-    assert allocation.selected == ("ETF_OTHER",)
-
-
-def test_an_unreadable_gauge_stands_the_book_down_by_default(
-    make_market: Callable[..., MarketDataReader],
-    make_bars: Callable[..., pd.DataFrame],
-    make_levels: Callable[..., pd.DataFrame],
-    make_context: Callable[[MarketDataReader, datetime], SignalContext],
-    make_decision: DecisionBuilder,
-    xpar: TradingCalendar,
-    prices: Callable[..., dict[date, float]],
-    evening: Callable[[date], datetime],
-    sessions: tuple[date, ...],
-) -> None:
-    """And the names it stood aside from are still counted."""
-    market = gated_market(make_market, make_bars, make_levels, xpar, prices, sessions, [4.0] * 10)
-    context = make_context(market, evening(sessions[-1]))
-    strategy = MomentumVix(
-        gauge_id="RATE_US",
-        lookback_sessions=5,
-        gauge_observations=60,
-        top_n=1,
-        maximum=1.0,
-        flat_when_unknown=True,
-    )
-
-    allocation = decide_with(strategy, context, make_decision)
-
-    assert allocation.selected == ()
-    assert allocation.considered == 2
 
 
 def test_buy_and_hold_lets_the_weights_drift(
@@ -410,13 +147,6 @@ def test_a_book_cannot_name_the_same_instrument_twice() -> None:
             strategy(instruments=("ETF_EU", "ETF_EU"))
 
 
-@pytest.mark.parametrize("minimum", [float("nan"), float("inf"), True])
-def test_a_momentum_threshold_that_is_not_a_number_is_refused(minimum: object) -> None:
-    """NaN is invested whenever a number exists; an infinity is always cash."""
-    with pytest.raises(ValueError, match="minimum"):
-        MomentumSingleAsset(instrument_id="ETF_EU", minimum=minimum)  # type: ignore[arg-type]
-
-
 def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
     context: SignalContext, make_decision: DecisionBuilder
 ) -> None:
@@ -448,25 +178,6 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands(
     runnable = {
         BuyAndHold(instruments=UNIVERSE),
         EqualWeightRebalance(instruments=UNIVERSE),
-        GoldenCrossETF(instrument_id="ETF_EU", fast_sessions=2, slow_sessions=5),
-        MomentumSingleAsset(instrument_id="ETF_EU", lookback_sessions=5),
-        MomentumRotation(lookback_sessions=5, top_n=1),
-        MomentumVix(gauge_id="RATE_US", lookback_sessions=5, gauge_observations=5),
-        MovingAverageBandETF(instrument_id="ETF_EU", window_sessions=5),
-        MovingAverageCross(instrument_id="ETF_EU", first_sessions=2, second_sessions=5),
-        MovingAverageEntryExitETF(instrument_id="ETF_EU", entry_sessions=2, exit_sessions=5),
-        RateRegimeTrend(
-            instrument_id="ETF_EU",
-            equity_id="IDX_US",
-            rate_id="RATE_US",
-            stress_id="RATE_US",
-            trend_sessions=5,
-            correlation_pairs=3,
-            stress_observations=5,
-            stress_minimum=1.5,
-            regime_max_age_sessions=1,
-            stress_max_age_sessions=1,
-        ),
         WorldMA20Benchmark(instrument_id="ETF_EU"),
         BufferedDualMomentum(first_id="ETF_EU", second_id="ETF_OTHER"),
         SmoothMovingAverage(instrument_id="ETF_EU"),
@@ -564,101 +275,3 @@ def test_a_kept_line_is_not_bought_again(
 
     with pytest.raises(ValueError, match="held already"):
         held.keep_and_buy({"ETF_EU": 0.1})
-
-
-def test_a_cross_holds_the_fund_while_its_first_average_is_on_top(
-    context: SignalContext, make_decision: DecisionBuilder
-) -> None:
-    """On a rising series the 2-session average is above the 5-session one."""
-    strategy = MovingAverageCross(instrument_id="ETF_EU", first_sessions=2, second_sessions=5)
-
-    allocation = decide_with(strategy, context, make_decision, universe=("ETF_EU",))
-
-    assert dict(allocation.weights) == {"ETF_EU": 1.0}
-
-
-def test_a_cross_the_other_way_round_stands_aside(
-    context: SignalContext, make_decision: DecisionBuilder
-) -> None:
-    """The same series, the averages swapped: the long one is below, so cash."""
-    strategy = MovingAverageCross(instrument_id="ETF_EU", first_sessions=5, second_sessions=2)
-
-    allocation = decide_with(strategy, context, make_decision, universe=("ETF_EU",))
-
-    assert allocation.invested == 0.0
-
-
-def test_a_long_average_above_a_short_one_holds_a_falling_fund(
-    make_market: Callable[..., MarketDataReader],
-    make_bars: Callable[..., pd.DataFrame],
-    make_context: Callable[[MarketDataReader, datetime], SignalContext],
-    make_decision: DecisionBuilder,
-    xpar: TradingCalendar,
-    prices: Callable[..., dict[date, float]],
-    evening: Callable[[date], datetime],
-    sessions: tuple[date, ...],
-) -> None:
-    """The guide's rule, 50 over 20 in miniature: it buys what has been falling."""
-    falling = make_market({"ETF_EU": make_bars("ETF_EU", xpar, prices(200.0, -1.0))})
-    context = make_context(falling, evening(sessions[-1]))
-    strategy = MovingAverageCross(instrument_id="ETF_EU", first_sessions=5, second_sessions=2)
-
-    allocation = decide_with(strategy, context, make_decision, universe=("ETF_EU",))
-
-    assert dict(allocation.weights) == {"ETF_EU": 1.0}
-
-
-def test_a_cross_stands_aside_when_it_cannot_be_computed(
-    context: SignalContext, make_decision: DecisionBuilder
-) -> None:
-    """ETF_LATE has four sessions, and the longer average wants five."""
-    strategy = MovingAverageCross(instrument_id="ETF_LATE", first_sessions=5, second_sessions=2)
-
-    allocation = decide_with(strategy, context, make_decision, universe=("ETF_LATE",))
-
-    assert allocation.invested == 0.0
-
-
-def test_a_cross_declares_the_signal_it_reads() -> None:
-    """Named after both lengths, first on top."""
-    declared = MovingAverageCross(instrument_id="ETF_WORLD").required_signals()
-
-    assert [_id_of(item) for item in declared] == ["ma50_over_ma20"]
-
-
-@pytest.mark.parametrize(("first", "second"), [(20, 20), (1, 20), (50, 1)])
-def test_a_cross_that_cannot_compare_two_averages_is_refused(first: int, second: int) -> None:
-    """Refused when it is built, not at the first decision of a run."""
-    with pytest.raises(ValueError, match="sessions"):
-        MovingAverageCross(instrument_id="ETF_EU", first_sessions=first, second_sessions=second)
-
-
-def test_the_cross_written_as_a_function_decides_as_the_class_does(
-    context: SignalContext, make_decision: DecisionBuilder
-) -> None:
-    """The notebook form of the developer guide, checked against the kept class."""
-    from quant_backtester.portfolio.targets import TargetAllocation
-    from quant_backtester.signals.price.trend import MovingAverageCrossSignal
-    from quant_backtester.signals.types import PriceBasis
-    from quant_backtester.strategies.functional import strategy
-
-    ma = MovingAverageCrossSignal(
-        signal_id="ma2_over_ma5",
-        first_sessions=2,
-        second_sessions=5,
-        price_basis=PriceBasis.ADJUSTED,
-    )
-
-    @strategy(strategy_id="ma_cross_notebook", signals=[ma], instrument_id="ETF_EU")
-    def ma_cross(ctx: StrategyContext) -> TargetAllocation:
-        if ctx.signal_status("ma2_over_ma5", "ETF_EU") is not SignalStatus.OK:
-            return ctx.cash()
-        if ctx.signal_value("ma2_over_ma5", "ETF_EU") <= 0.0:
-            return ctx.cash()
-        return ctx.weights({"ETF_EU": 1.0})
-
-    kept = MovingAverageCross(instrument_id="ETF_EU", first_sessions=2, second_sessions=5)
-
-    assert dict(decide_with(ma_cross, context, make_decision, ("ETF_EU",)).weights) == dict(
-        decide_with(kept, context, make_decision, ("ETF_EU",)).weights
-    )

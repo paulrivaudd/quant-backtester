@@ -1,17 +1,16 @@
-"""Strategies written the way a user is meant to write one.
+"""The catalogued rules, and the reference books they are measured against.
 
 Each of these is short on purpose: the whole point of the layers underneath is
 that a decision reads like the reasoning behind it, and that none of the
 machinery - calendars, corporate actions, point-in-time reads, fills, costs -
 appears in the file.
 
-They are also the smallest honest examples of four different shapes. Buy and
-hold needs no signal at all, and neither does the constant-weight baseline
-beside it - the gap between those two *is* what rebalancing was worth. A
-single-asset momentum needs one signal, and a rule about what to do when it
-cannot be computed. A rotation needs a ranking, and a decision about how many
-names to hold when fewer are usable than wanted. And a gated rotation needs two
-universes at one instant.
+A module named after a code (``SA1_world_ma20_benchmark`` ...) holds the
+strategy the catalogue gives that code to. The three without a code are not
+candidates: ``BuyAndHold`` and ``EqualWeightRebalance`` are the references of
+every study - the fund held and the even split of the two funds, the gap
+between those two being what rebalancing was worth - and ``FixedWeights`` is
+the constant-target control of the review diagnostics.
 """
 
 from __future__ import annotations
@@ -19,16 +18,6 @@ from __future__ import annotations
 from quant_backtester.strategies.examples.buy_and_hold import BuyAndHold
 from quant_backtester.strategies.examples.equal_weight import EqualWeightRebalance
 from quant_backtester.strategies.examples.fixed_weights import FixedWeights
-from quant_backtester.strategies.examples.golden_cross_etf import GoldenCrossETF
-from quant_backtester.strategies.examples.momentum_rotation import MomentumRotation
-from quant_backtester.strategies.examples.momentum_single_asset import MomentumSingleAsset
-from quant_backtester.strategies.examples.momentum_vix import MomentumVix
-from quant_backtester.strategies.examples.moving_average_band import MovingAverageBandETF
-from quant_backtester.strategies.examples.moving_average_cross import MovingAverageCross
-from quant_backtester.strategies.examples.moving_average_entry_exit import (
-    MovingAverageEntryExitETF,
-)
-from quant_backtester.strategies.examples.rate_regime_trend import RateRegimeTrend
 from quant_backtester.strategies.examples.SA1_world_ma20_benchmark import WorldMA20Benchmark
 from quant_backtester.strategies.examples.SA2_buffered_dual_momentum import BufferedDualMomentum
 from quant_backtester.strategies.examples.SA3_smooth_moving_average import SmoothMovingAverage
@@ -53,15 +42,7 @@ __all__ = [
     "FactorETFBlend",
     "FixedWeights",
     "GarchVolControl",
-    "GoldenCrossETF",
-    "MomentumRotation",
-    "MomentumSingleAsset",
-    "MomentumVix",
     "MonetaryCarry",
-    "MovingAverageBandETF",
-    "MovingAverageCross",
-    "MovingAverageEntryExitETF",
-    "RateRegimeTrend",
     "RealizedVolControl",
     "RelativeResidualTilt",
     "SmoothMovingAverage",

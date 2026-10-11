@@ -7,8 +7,9 @@ Run from the repository root, with nothing downloaded::
 
 Two synthetic funds are drawn from a fixed seed (see ``quant_backtester.demo``),
 written to a temporary store and read back through the project's own reader.
-A monthly momentum rotation and a buy-and-hold of the steadier fund are run
-over 2025, under the same costs, and both reports are printed. The numbers
+The steadier fund held above its 20-session average (``SA1``) and a
+buy-and-hold of the same fund are run over 2025, under the same costs, and
+both reports are printed. The numbers
 describe invented prices: they show how the engine works, not whether a rule
 does.
 """
@@ -21,9 +22,8 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
-from quant_backtester.backtest.schedule import Monthly
 from quant_backtester.demo import demo_runner
-from quant_backtester.strategies.examples import BuyAndHold, MomentumRotation
+from quant_backtester.strategies.examples import BuyAndHold, WorldMA20Benchmark
 
 SEED = 20240101
 """The seed of the demo prices, printed with the run."""
@@ -54,32 +54,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--figures",
         type=Path,
-        help="write the equity and drawdown figures of the rotation there",
+        help="write the equity and drawdown figures of the rule there",
     )
     arguments = parser.parse_args(argv)
 
     with tempfile.TemporaryDirectory(prefix="quant_backtester_demo_") as scratch:
         runner = demo_runner(Path(scratch) / "store", seed=SEED)
-        rotation = runner.run(
-            MomentumRotation(lookback_sessions=60, top_n=1),
-            UNIVERSE,
-            *PERIOD,
-            schedule=Monthly(),
-        )
+        rule = runner.run(WorldMA20Benchmark(instrument_id="FUND_A"), UNIVERSE, *PERIOD)
         control = runner.run(BuyAndHold(instruments=("FUND_A",)), UNIVERSE, *PERIOD)
 
         print(f"Synthetic market, seed {SEED}: invented prices, not market data.\n")
-        print("== Momentum rotation, 60 sessions, top 1, monthly ==")
-        print(rotation.report().render())
+        print("== SA1: FUND_A held above its 20-session average ==")
+        print(rule.report().render())
         print()
-        print(rotation.compare().render())
+        print(rule.compare().render())
         print("\n== Control: buy and hold FUND_A ==")
         print(control.report().render())
 
         if arguments.figures is not None:
             arguments.figures.mkdir(parents=True, exist_ok=True)
-            rotation.plot().savefig(arguments.figures / "equity.png", dpi=160)
-            rotation.plot_drawdown().savefig(arguments.figures / "drawdown.png", dpi=160)
+            rule.plot().savefig(arguments.figures / "equity.png", dpi=160)
+            rule.plot_drawdown().savefig(arguments.figures / "drawdown.png", dpi=160)
             print(f"\nFigures written to {arguments.figures}")
     return 0
 

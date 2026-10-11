@@ -13,7 +13,7 @@ sa reproductibilité, **P3** relève du confort ou de l'outillage.
 
 | Point | Ce qui a été fait |
 |---|---|
-| 1.3 Modèle d'exécution | `Sizing.AT_DECISION` : quantités fixées à la clôture de la décision, exécutées à l'ouverture, coupées au cash disponible. `scripts/sensitivity.py` : la rotation perd 0,01 point en ordres fixés la veille, près de 4 points à coûts doublés. |
+| 1.3 Modèle d'exécution | `Sizing.AT_DECISION` : quantités fixées à la clôture de la décision, exécutées à l'ouverture, coupées au cash disponible. `scripts/sensitivity.py` : la rotation perd 0,01 point en ordres fixés la veille, près de 4 points à coûts doublés. Ce script et la rotation ont été retirés du code le 2026-10-11. |
 | 2.1 Séances contestées | `metadata/conflict_reviews.toml` : les 13 conflits sont revus et tranchés en faveur d'Euronext, la place de cotation, pour les valeurs exactes revues. **La barre du 24 octobre 2025 coûtait 0,47 point, et non les « environ 4 points » que j'avais écrits sans les mesurer.** |
 | 3.1 Dossier de run | `research.archive` : un run relu hors ligne sans recalcul, et recalculable à partir d'une copie vérifiée du store qu'il a lu. |
 | 3.2 Environnement | La version de Python, l'empreinte de `uv.lock` et les versions de numpy, pandas, pyarrow et scipy entrent dans le `run_id`. |
@@ -26,7 +26,7 @@ sa reproductibilité, **P3** relève du confort ou de l'outillage.
 ## Corrections apportées à la première version (audit de l'archive 9)
 
 - **1.5** : le cash n'était **pas** « pénalisé deux fois ». Le Sharpe retranche le taux sans risque une seule fois. Un cash non rémunéré coûte `(1 − w) × r_ref` en coût d'opportunité, ce n'est pas un second prélèvement.
-- **2.2** : US10Y n'est lu par **aucune** baseline actuelle (la jauge de `MomentumVix` est le VIX). Le passer en millésimes ne déplace aucun chiffre publié.
+- **2.2** : US10Y n'est lu par **aucune** baseline actuelle (la jauge de `MomentumVix`, retirée du code depuis, était le VIX). Le passer en millésimes ne déplace aucun chiffre publié.
 - **2.5 et 4.5** : les univers datés existent déjà, et le turnover annuel comme le cash moyen sont déjà calculés et affichés dans le rapport.
 - **5.2** : le paper trading doit tourner après 23:00 Paris, l'heure de décision, pas « après la clôture européenne ».
 - **1.1** : un dividende sur une position détenue se comptabilise comme une créance à l'ex-date, réglée au paiement. Le seul cash au paiement créerait une fausse perte puis une fausse récupération.

@@ -26,17 +26,18 @@ dans un store temporaire sur un calendrier `DEMO`, qui recopie les fériés
 Euronext de 2024-2025, puis construit un `StrategyRunner` dont toutes les
 hypothèses sont déclarées : coûts, lots entiers, 10 000 EUR, benchmark
 `FUND_A`. Le lecteur, le moteur, l'exécution et le rapport sont ceux du projet.
-Seuls les prix sont faux. On peut y essayer une stratégie en cours d'écriture :
+Seuls les prix sont faux. On peut y essayer une stratégie en cours d'écriture,
+à la place de `SA1` ci-dessous :
 
 ```python
 from pathlib import Path
 
 from quant_backtester.demo import demo_runner
-from quant_backtester.strategies import MovingAverageCross
+from quant_backtester.strategies import WorldMA20Benchmark
 
 runner = demo_runner(Path("demo_store"), seed=20240101)  # un dossier neuf et vide
 result = runner.run(
-    MovingAverageCross(instrument_id="FUND_A", first_sessions=20, second_sessions=50),
+    WorldMA20Benchmark(instrument_id="FUND_A"),  # SA1 : le fonds au-dessus de sa MM20
     ("FUND_A", "FUND_B"),
     "2025-01-02",
     "2025-12-31",
@@ -194,7 +195,9 @@ Déclarez en `**paramètres` du décorateur toute valeur capturée par la foncti
 
 ### Forme conservée : une classe
 
-La version conservée est `strategies/examples/moving_average_cross.py` :
+Une stratégie que l'on garde est une classe figée. Celle de cet exemple n'est
+pas dans le paquet : elle ne sert qu'à ce guide. Les stratégies du catalogue
+sont écrites ainsi, `SA3_smooth_moving_average.py` par exemple :
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -247,9 +250,10 @@ Les règles de la décision :
   Le chemin du module entre dans `definition()` : renommer un module change
   l'empreinte de sa stratégie.
 
-### Tester la stratégie (`tests/strategies/test_examples.py`)
+### Tester la stratégie (`tests/strategies/test_<module>.py`)
 
-Le helper `decide_with(strategy, context, make_decision, universe)` calcule les
+Le helper `decide_with(strategy, context, make_decision, universe)` de
+`tests/strategies/test_examples.py` calcule les
 signaux déclarés puis appelle `decide`. Testez ce que la règle **décide** :
 investie sur une série montante (2 sur 5), en cash quand les moyennes sont
 inversées, en cash quand l'historique manque, identifiant du signal déclaré,
@@ -263,15 +267,15 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path("scripts").resolve()))
-from run_baselines import runner  # le même store, coûts, cash et benchmark que les suites
+from ma_strategie import MovingAverageCross  # la classe écrite plus haut, dans votre fichier
+from run_etf_strategies_comparison import STORE, UNIVERSE, build_runner
 
 from quant_backtester.backtest.schedule import EverySession
-from quant_backtester.strategies import MovingAverageCross
 
-runs = runner()
+runs = build_runner(STORE)  # le même store, coûts, cash et benchmark que les règles SA
 result = runs.run(
     MovingAverageCross(instrument_id="ETF_WORLD", first_sessions=50, second_sessions=20),
-    "ROTATION_2",
+    UNIVERSE,  # ETF_WORLD et ETF_SP500_PEA
     "2025-01-02",
     "2026-09-17",
     schedule=EverySession(),
@@ -291,7 +295,8 @@ Lancez-le avec `uv run python mon_essai.py`, store local rempli
   Une MM50 est donc calculable dès la première séance mesurée si l'historique
   existe.
 - **Coûts** : `dataclasses.replace(runs, execution=...)` pour un autre
-  `ExecutionModel` (voir `scripts/sensitivity.py` pour les coûts ×2).
+  `ExecutionModel` (les études `SA11` à `SA13` refont ainsi un second run à
+  coûts ×2).
 - **Lire le rapport** : « sessions with nothing to choose from » compte les
   décisions où aucun signal n'était lisible. Une séance passée en cash sur un
   signal valide n'y figure pas, à condition que la stratégie passe `among`
@@ -301,8 +306,8 @@ Lancez-le avec `uv run python mon_essai.py`, store local rempli
 
 1. **Commitez** le code, puis enregistrez chaque run :
    `ExperimentRegistry(...).register(record_of(result, experiment_id=..., hypothesis="ma50_over_ma20_world", recorded_at=...))`.
-   Le registre refuse du code non commité. `run_baselines.py --register`
-   montre le câblage.
+   Le registre refuse du code non commité ; le câblage est décrit dans
+   `quant_backtester.research.registry`.
 2. **Comparez à un témoin exécutable**, par exemple
    `BuyAndHold(instruments=("ETF_WORLD",))` sous les mêmes coûts, sur les mêmes
    séances, avec `paired_block_bootstrap(result.equity(), control.equity(),

@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Only the catalogued strategies are kept (2026-10-11)
+- **Removed**: every strategy without a catalogue code, except the three books
+  the studies are measured against. Gone are `MomentumRotation`,
+  `MomentumSingleAsset`, `MomentumVix`, `MovingAverageCross`, `GoldenCrossETF`,
+  `MovingAverageBandETF`, `MovingAverageEntryExitETF` and `RateRegimeTrend`,
+  with their tests.
+- **Removed with them**, the scripts that ran nothing else:
+  `run_baselines.py`, `sensitivity.py`, `paper_trade.py`,
+  `run_golden_cross_exercise.py`, `run_moving_average_band_exercise.py`,
+  `run_moving_average_entry_exit_exercise.py`, `run_rate_regime_study.py`,
+  `run_session_segments_study.py`, and the figure of the golden cross.
+- **Kept without a code**: `BuyAndHold` and `EqualWeightRebalance`, the
+  references of every study, and `FixedWeights`, the constant-target control of
+  the diagnostics. The signals, the analytics (`analytics/segments.py`
+  included) and `quant_backtester.research` are untouched.
+- **The two paper plans of 2026-10-01 are closed**, before any session was
+  logged: `research/PROTOCOL.md` says so, and their files stay as records. The
+  register and the hypotheses are not rewritten; the runs they name are
+  reproduced from the commit each one records, the last being `cece9e3`.
+- **The demo** (`scripts/demo.py`) runs `SA1` on the invented fund instead of
+  the rotation. The tests of the runner that used a removed strategy as their
+  example now use `SA1`, or a rule written in the test.
+- **README**: the sections on the four baselines and on the golden cross are
+  removed, and with them the figures of the reference rotation. The two reports
+  it prints are the demo's, reproducible offline; the results of the catalogued
+  strategies are in `research/reports/2026-10-10/`.
+
 ### Files of a catalogued strategy carry its code (2026-10-11)
 - **Renamed**, so that a strategy's files are found by its code. Modules:
   `strategies/examples/SA1_world_ma20_benchmark.py`,

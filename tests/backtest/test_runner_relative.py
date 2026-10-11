@@ -23,16 +23,16 @@ from quant_backtester.backtest.runner import StrategyResult, StrategyRunner
 from quant_backtester.demo import demo_runner
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
-from quant_backtester.strategies.examples import MomentumRotation
+from quant_backtester.strategies.examples import WorldMA20Benchmark
 
 SEED = 20240101
 PERIOD = ("2025-01-02", "2025-12-31")
 UNIVERSE = ("FUND_A", "FUND_B")
 
 
-def rotate(runner: StrategyRunner) -> StrategyResult:
-    """Run a rotation that trades, so costs separate the two books."""
-    return runner.run(MomentumRotation(lookback_sessions=20, top_n=1), UNIVERSE, *PERIOD)
+def trade(runner: StrategyRunner) -> StrategyResult:
+    """Run a rule that trades, so costs separate the two books."""
+    return runner.run(WorldMA20Benchmark(instrument_id="FUND_B"), UNIVERSE, *PERIOD)
 
 
 @pytest.fixture(scope="module")
@@ -47,14 +47,14 @@ def runner(tmp_path_factory: pytest.TempPathFactory) -> StrategyRunner:
 
 @pytest.fixture(scope="module")
 def result(runner: StrategyRunner) -> StrategyResult:
-    """Return the rotation, measured against the declared benchmark."""
-    return rotate(runner)
+    """Return the run, measured against the declared benchmark."""
+    return trade(runner)
 
 
 @pytest.fixture(scope="module")
 def bare(runner: StrategyRunner) -> StrategyResult:
-    """Return the same rotation with no benchmark declared."""
-    return rotate(replace(runner, benchmark=None))
+    """Return the same run with no benchmark declared."""
+    return trade(replace(runner, benchmark=None))
 
 
 def test_i01_a_declared_benchmark_puts_both_books_in_the_report(result: StrategyResult) -> None:
@@ -89,7 +89,7 @@ def test_i03_gross_and_net_are_computed_apart_and_agree_without_costs(
     costly = result.report().relative_frame()
     assert not costly["gross"].equals(costly["net"])
     free = replace(runner, execution=ExecutionModel(costs=CostModel()))
-    frame = rotate(free).report().relative_frame()
+    frame = trade(free).report().relative_frame()
     pd.testing.assert_series_equal(frame["gross"], frame["net"], check_names=False)
 
 

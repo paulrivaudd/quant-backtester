@@ -43,7 +43,7 @@ class Strategy(ABC):
     Attributes
     ----------
     strategy_id : str
-        Stable name of this strategy, e.g. ``"momentum_rotation_60d"``. It
+        Stable name of this strategy, e.g. ``"SA3_smooth_ma"``. It
         goes into results, reports and comparisons, so it is a name rather
         than a description, and it does not change when a parameter does -
         that is what the fingerprint is for.

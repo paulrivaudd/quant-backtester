@@ -142,6 +142,6 @@ def test_the_demo_script_prints_both_reports_and_writes_its_figures(
     assert module.main(["--figures", str(tmp_path / "figures")]) == 0
     printed = capsys.readouterr().out
     assert "invented prices, not market data" in printed
-    assert "Momentum rotation" in printed and "Control: buy and hold FUND_A" in printed
+    assert "SA1: FUND_A held above" in printed and "Control: buy and hold FUND_A" in printed
     assert (tmp_path / "figures" / "equity.png").stat().st_size > 0
     assert (tmp_path / "figures" / "drawdown.png").stat().st_size > 0

@@ -8,7 +8,7 @@ to restate all of it twice.
 So this is the façade. It is wired once with the store and the configuration
 that do not change between experiments, and then::
 
-    result = runner.run(MomentumRotation(top_n=2), "ROTATION_2", "2018-01-01", "2026-09-18")
+    result = runner.run(BufferedDualMomentum(), "ROTATION_2", "2018-01-01", "2026-09-18")
 
 Three things it is careful about, because each of them is a way to get a wrong
 number quietly:

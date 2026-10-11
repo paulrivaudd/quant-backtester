@@ -188,9 +188,10 @@ entry loads without it. ``SA12`` is the ARIMA-GARCH of the same day, on the same
 extra (the label takes no hyphen). ``SA13`` is the signature model of the same
 day: it keeps an SA code although its forecasts come from a small network, runs
 on a schedule of models calibrated before the backtest, and is built with
-``SignaturesNeurons.from_schedule``. ``ML1`` is the neural allocation of 2026-10-04. The
-exercises and the baselines that came before are not catalogued: they are
-examples of how a strategy is written.
+``SignaturesNeurons.from_schedule``. ``ML1`` is the neural allocation of 2026-10-04.
+``BuyAndHold``, ``EqualWeightRebalance`` and ``FixedWeights`` are the reference
+books and the control of the studies, not candidates: they carry no code. The
+exercises and the baselines that came before were removed on 2026-10-11.
 """
 
 

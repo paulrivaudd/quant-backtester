@@ -283,20 +283,17 @@ pas un poids du portefeuille, et il refuse une ligne déjà détenue.
 `@strategy` enregistre le nom qualifié de la fonction, pas son code : seul l'état
 git trace une modification de son corps.
 
-### Les stratégies livrées (`strategies/examples/`)
+### Les livres de référence (`strategies/examples/`)
+
+Les stratégies conservées ont un code et sont décrites plus bas, au catalogue.
+Les trois classes sans code de ce dossier ne sont pas des candidates : ce sont
+les références et le témoin auxquels les études les mesurent.
 
 | Classe | Règle exacte | Si le signal est inutilisable |
 |---|---|---|
 | `BuyAndHold(instruments)` | achète à parts égales puis garde les quantités ; les poids dérivent. Un nom dont l'achat a échoué est acheté plus tard avec le cash restant, sans revendre les lignes déjà détenues (D5) | pas de signal |
 | `EqualWeightRebalance(instruments)` | poids égaux redemandés à chaque décision, donc vend le gagnant et rachète le perdant | pas de signal |
-| `MomentumRotation(lookback_sessions=60, top_n=2)` | classe le momentum ajusté et détient les `top_n` premiers à `1/top_n` chacun. Il ne demande **pas** un momentum positif : le moins mauvais peut être retenu. Un rang incomplet laisse du cash | nom exclu du classement |
-| `MomentumSingleAsset(instrument_id, lookback_sessions=60, minimum=0.0)` | investi si le momentum ajusté est strictement supérieur à `minimum` | cash |
-| `MomentumVix(gauge_id, …, maximum, flat_when_unknown)` | rotation tant que le z-score de la jauge est ≤ `maximum`. Un z-score de 1,5 veut dire 1,5 écart-type au-dessus de sa moyenne récente, pas un VIX à 1,5 | cash si `flat_when_unknown`, sinon rotation (paramètre obligatoire) |
-| `MovingAverageCross(instrument_id, first_sessions=50, second_sessions=20)` | investi si `MA_first / MA_second − 1 > 0`. Avec 50/20, la règle **achète la baisse** ; le « golden cross » s'écrit 20/50 | cash |
-| `GoldenCrossETF(instrument_id, fast_sessions=50, slow_sessions=200)` | 100 % du fonds si `MA_fast / MA_slow − 1 > 0` strictement, cash sinon ; la moyenne rapide doit être plus courte que la lente | cash |
-| `MovingAverageBandETF(instrument_id, window_sessions=50, sell_below=1.0, buy_above=1.0)` | achète quand la clôture passe au-dessus de `buy_above` × sa moyenne et que le fonds n'est pas détenu, vend sous `sell_below` × la moyenne, ne fait rien entre les deux | positions conservées, aucun ordre |
-| `MovingAverageEntryExitETF(instrument_id, entry_sessions=50, exit_sessions=100)` | achète au-dessus de la moyenne d'entrée, vend sous la moyenne de sortie | positions conservées, aucun ordre |
-| `RateRegimeTrend(instrument_id, …)` | détient le fonds au-dessus de sa moyenne longue ; au-dessous, vend sauf si une panique (z-score du VIX) tombe pendant que les actions et le taux à dix ans évoluent ensemble (corrélation positive) | positions conservées si la tendance est illisible ; régime illisible = pas d'exception à la vente |
+| `FixedWeights(weights)` | vise des poids constants et ne traite que lorsque la dérive des cours l'écarte de sa cible de plus que la bande de rééquilibrage ; son exposition réalisée n'est donc pas exactement sa cible. Témoin des diagnostics | pas de signal |
 
 Une règle sur un seul fonds enregistre ce qu'elle a lu avec
 `ctx.considering({fonds: statut})`, passé en `among` à `cash`, `weights` ou
@@ -327,8 +324,8 @@ l'ordre d'adoption, et n'est jamais réutilisé ; le libellé peut être reformu
 leur spécification : `SA1` est le benchmark MA20, `SA10` l'ensemble), `SA11`
 le contrôle de volatilité GARCH, `SA12` l'ARIMA-GARCH et `SA13` les
 signatures neuronales du 2026-10-10 (libellés sans tiret), `ML1` l'allocation
-neuronale. Les exemples et exercices antérieurs ne sont pas
-catalogués. `entry("SA3")`, `entry_of(strategy)` et `family(Family.SA)`
+neuronale. Les trois livres de référence ne sont pas catalogués ; les exemples
+et exercices antérieurs ont été retirés du code le 2026-10-11. `entry("SA3")`, `entry_of(strategy)` et `family(Family.SA)`
 donnent une entrée ; `entry.load()` importe la classe à la demande.
 
 ### ML1, l'allocation neuronale (`strategies/ml/ML1_neural_allocation.py`)
@@ -540,7 +537,7 @@ La couche `research/` porte la discipline de recherche décrite dans
 | `research/registry.jsonl` + `ExperimentRegistry` | une ligne par run, jamais éditée, rejetés compris, uniquement depuis du code commité |
 | `verdicts.jsonl` + `judge()` | les verdicts (`KEPT`, `REJECTED`), des événements ajoutés et jamais réécrits |
 | `research.archive.keep()` / `read_back()` | un run conservé en entier, relisible hors ligne, avec copie vérifiée du store en option |
-| `research/paper/` + `scripts/paper_trade.py` | le seul vrai test hors échantillon : des plans figés par un `contract_id`, joués séance après séance |
+| `research/paper/` + `quant_backtester.research.paper` | le seul vrai test hors échantillon : des plans figés par un `contract_id`, joués séance après séance. Les deux plans du 2026-10-01 sont clos, sans séance journalisée : leurs règles ont été retirées du code |
 
 ## 11. Mécanismes d'intégrité, en résumé
 
@@ -576,9 +573,6 @@ La couche `research/` porte la discipline de recherche décrite dans
 | `scripts/accept_revision.py` | préparer le bloc TOML d'une révision à relire ; ne modifie aucun fichier | non |
 | `scripts/generate_calendars.py` | régénérer les calendriers depuis `exchange_calendars` et les vérifier | non |
 | `scripts/check_calendar_coverage.py` | échouer quand il reste moins de 90 jours de calendrier | non |
-| `scripts/run_baselines.py` | suites nommées (`--suite readme|baselines|all`, `--period`, `--records`, `--keep`, `--register`) | non |
-| `scripts/sensitivity.py` | la référence sous `AT_AUCTION` / `AT_DECISION`, avec coûts ×1 et ×2 | non |
-| `scripts/paper_trade.py` | vérifier et prolonger les plans de paper trading | non |
 | `scripts/run_etf_strategies_comparison.py` | les règles `SA` sur les mêmes dates et coûts (`--start`, `--end` ; `SA11` omise avec la mention « dependency missing » sans l'extra `stats`) ; `quality_details.csv` | non |
 | `scripts/SA13_run_signature_study.py` | l'étude `SA13` : calibrations mensuelles, contrôles C0 à C7, contributions, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`, extras `ml stats signatures`) | non |
 | `scripts/SA12_run_arima_garch_study.py` | l'étude `SA12` : contrôles D0/D1/D2, prévisions à deux pas, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`) | non |

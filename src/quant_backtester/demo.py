@@ -76,7 +76,7 @@ DEMO_COSTS = CostModel(
     slippage_rate=0.0001,
 )
 """Five basis points of commission with a one-euro floor, two of half spread
-and one of slippage: the assumptions of the baselines, stated again here."""
+and one of slippage: the assumptions of the demo, stated here."""
 
 DEMO_MINIMUM_TRADE = 100.0
 """No demo order below a hundred euros."""

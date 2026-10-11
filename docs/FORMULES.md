@@ -34,7 +34,7 @@ Précisions :
 - **Momentum avec skip.** Le point de départ reste `P_0`. Sauter les `k` dernières
   séances **raccourcit** la période mesurée à `L − k` rendements : la fenêtre ne
   se décale pas vers le passé. Pour `k = 0`, le momentum est le rendement.
-- **Moyennes mobiles.** `MovingAverageCross(first_sessions=50, second_sessions=20)`
+- **Moyennes mobiles.** `MovingAverageCrossSignal(first_sessions=50, second_sessions=20)`
   donne un score positif quand la moyenne 50 est **au-dessus** de la moyenne 20 :
   c'est une règle qui achète la baisse. Le « golden cross » s'écrit
   `first_sessions=20, second_sessions=50`.
