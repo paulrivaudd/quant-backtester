@@ -113,7 +113,7 @@ Acheter ETF_WORLD, à hauteur de 50 % au plus, après une baisse de cinq séance
 - **Plausible.** Baisse par gaps de nuit successifs : la vente est exécutée après le gap.
 - **Observé.** Frais : à coûts doublés le gain disparaît.
 
-### Mesures complémentaires (voir diagnostics_10102026.md)
+### Mesures complémentaires (voir results/summary/diagnostics.md)
 
 - **Fait.** Par séjour : 71 séjours, tous clos, de 2,8 valorisations en moyenne, 47 gagnants et 24 perdants (66 %) ; net moyen +0,06 %, net médian +0,04 %, pire -2,92 %, meilleur +1,85 %. Les séjours ont donc été gagnants deux fois sur trois, pour un gain net moyen d'environ 6,3 points de base par séjour, après 64 EUR de coûts en moyenne.
 - **Fait.** C'est le seul livre dont l'écart de prix signé clôture-ouverture, à quantités données, est positif : +2 303 EUR nets (écarts favorables +14 660 EUR, défavorables -12 358 EUR). Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture : ce solde n'est pas un gain encaissé.
@@ -126,7 +126,7 @@ Acheter ETF_WORLD, à hauteur de 50 % au plus, après une baisse de cinq séance
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 | Séance | Clôture ETF_WORLD | `pullback_5s_over_60r[ETF_WORLD]` | `price_over_ma200[ETF_WORLD]` | Poids cible ETF_WORLD | Poids détenu ETF_WORLD | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|---:|

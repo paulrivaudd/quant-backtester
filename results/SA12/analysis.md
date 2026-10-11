@@ -179,7 +179,7 @@ Détenir ETF_WORLD seulement quand un ARIMA(1,0,1), réestimé chaque soir sur 7
 - **Observé.** Hausse régulière du fonds avec des rendements quotidiens modestes (2021, 2023, 2024) : la prévision reste sous le seuil et le livre reste en cash pendant que le fonds gagne +18,4 %, +19,6 % et +27,1 %.
 - **Plausible.** Coefficients ARIMA qui changent d'une fenêtre à l'autre : la moyenne annuelle du coefficient autorégressif estimé passe de -0,17 en 2021 et 2022 à -0,44 en 2025 et -0,67 en 2026, celle du coefficient de moyenne mobile de +0,09 à +0,48. Les prévisions deviennent alors plus amples, ce qui coïncide avec l'apparition des signaux ; l'effet sur la décision n'est pas isolé ici.
 
-### Mesures complémentaires (voir SA12_study_10102026.md)
+### Mesures complémentaires (voir study.md)
 
 - **Fait.** SA12 contre D0 (même ARIMA, même variance, filtre toujours ouvert) : écart de Sharpe de -0,987, intervalle bootstrap à 95 % [-2,101 ; +0,252] aux coûts de base ; -1,241, intervalle [-2,335 ; -0,032], dans le second run à coûts doublés.
 - **Fait.** SA12 contre D1 (même ARIMA, variance EWMA) : écart de Sharpe de +0,061, intervalle [-0,037 ; +0,170] ; D1 fait -2,46 % net. GARCH et EWMA ne sont pas départagés.
@@ -197,7 +197,7 @@ Détenir ETF_WORLD seulement quand un ARIMA(1,0,1), réestimé chaque soir sur 7
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 Colonnes propres à SA12 : la prévision `mu_2`, en points de base, du rendement de l'ouverture de t + 1 à l'ouverture de t + 2 ; la volatilité annualisée prévue pour ce rendement ; le repli éventuel de la variance sur l'EWMA ; le filtre, lu sur le poids détenu ce soir-là ; le poids avant application de la bande de 3 points. Le détail de chaque ajustement est dans `sa12_forecasts.csv` de l'étude.
 

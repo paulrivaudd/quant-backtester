@@ -114,7 +114,7 @@ Détenir ETF_WORLD au-dessus de sa moyenne mobile 20 jours, être en cash en des
 - **Plausible.** Rebond rapide après un krach : la règle est en cash au point bas et ne rachète qu'une fois le cours repassé au-dessus de sa moyenne.
 - **Observé.** Hausse des coûts d'exécution : à coûts doublés le gain disparaît presque entièrement.
 
-### Mesures complémentaires (voir diagnostics_10102026.md)
+### Mesures complémentaires (voir results/summary/diagnostics.md)
 
 - **Fait.** Par séjour dans le marché : 72 séjours, dont 71 clos et 1 encore ouvert. Sur les 71 clos, 28 gagnants et 43 perdants (39,4 % de gagnants). Le séjour ouvert, entré à la valorisation du 2026-09-18, vaut +2,96 % au 2026-10-09, valorisé au marché, sans vente finale ni son coût. Sur les 72, l'ouvert compris : net moyen +0,31 %, net médian -0,28 %, pire -6,14 %, meilleur +17,48 %, pour 13 valorisations en moyenne ; leur produit retrouve les +20,45 % de la stratégie. **Lecture.** Le résultat tient à quelques longs séjours gagnants, pas à la fréquence des bons signaux.
 - **Fait.** Écart de prix signé clôture-ouverture, à quantités données : -14 568 EUR nets, soit -14,6 % du capital initial (écarts favorables +28 201 EUR, défavorables -42 768 EUR), mesuré sur le prix de marché de l'ouverture, donc hors spread, slippage et commission. C'est du même ordre que ses coûts explicites (15 730 EUR) et, de loin, le solde le plus défavorable de tous les livres. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture : le signal lit cette clôture, l'ordre ne pouvait pas y être exécuté, et un autre prix d'exécution aurait changé toutes les quantités suivantes.
@@ -127,7 +127,7 @@ Détenir ETF_WORLD au-dessus de sa moyenne mobile 20 jours, être en cash en des
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 | Séance | Clôture ETF_WORLD | `world_above_ma20[ETF_WORLD]` | Poids cible ETF_WORLD | Poids détenu ETF_WORLD | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|

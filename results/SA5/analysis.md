@@ -112,7 +112,7 @@ Détenir les deux fonds autour d'une répartition 50/50 et pencher, jusqu'à 25 
 - **Observé.** Frais et spread : avec près d'un ordre par séance, le résultat y est très sensible.
 - **Plausible.** Divergence durable entre les deux fonds (leadership, change) : un résidu qui ne revient pas fait pencher du mauvais côté tant qu'il dure.
 
-### Mesures complémentaires (voir diagnostics_10102026.md)
+### Mesures complémentaires (voir results/summary/diagnostics.md)
 
 - **Fait.** Attribution approchée contre le panier 50/50, en rendements logarithmiques : panier +0,727 ; exposition totale -0,011 ; choix entre les fonds +0,003 ; résidu de l'approximation aux poids de clôture -0,060 ; coûts -0,112 ; soit +0,547, contre +0,710 pour le panier exécuté. Les trois premiers termes valorisent les poids détenus à la clôture précédente avec le rendement de clôture à clôture.
 - **Fait.** Le résidu de régression qui commande l'inclinaison change de signe 293 fois, soit un signe tenu 4,8 valorisations en moyenne. Sa corrélation de Pearson avec le rendement relatif monde moins S&P 500, de clôture à clôture, est de +0,029 à la séance t + 1 (en partie avant l'exécution), +0,028 à la séance t + 2, la première entière après l'exécution, et +0,064 sur les séances t + 2 à t + 6, rendements composés (1 415, 1 414 et 1 410 paires) ; en rangs (Spearman) elle est de +0,030, +0,004 et +0,005.
@@ -126,7 +126,7 @@ Détenir les deux fonds autour d'une répartition 50/50 et pencher, jusqu'à 25 
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 | Séance | Clôture ETF_WORLD | Clôture ETF_SP500_PEA | `residual_vs_etf_sp500_pea_126r_5r[ETF_WORLD]` | Poids cible ETF_SP500_PEA | Poids cible ETF_WORLD | Poids détenu ETF_SP500_PEA | Poids détenu ETF_WORLD | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

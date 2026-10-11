@@ -112,7 +112,7 @@ Exposition à ETF_WORLD proportionnelle à l'écart entre ses moyennes mobiles 5
 - **Plausible.** Écart des moyennes oscillant près de zéro : la règle étant continue (0,1 % d'écart donne 5 % d'exposition avant bande), elle n'alterne pas entre 0 et 100 %, mais de petits ajustements répétés peuvent coûter.
 - **Observé.** Reprise après un marché baissier long (2023) : le retour à l'exposition vient plusieurs mois après le point bas.
 
-### Mesures complémentaires (voir diagnostics_10102026.md)
+### Mesures complémentaires (voir results/summary/diagnostics.md)
 
 - **Fait.** À côté d'un témoin à cible constante de 71,5 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : le témoin fait +63,2 % net, Sharpe 0,93, perte maximale -15,9 %, sommet retrouvé en 226 jours, 7 ordres et 94 EUR de coûts, pour une exposition moyenne réalisée de 72,2 % ; SA3 fait +57,9 %, Sharpe 0,79, -21,6 %, 540 jours, pour 71,5 %.
 - **Lecture.** Sur cette période SA3 fait moins bien que ce témoin, en rendement comme en risque. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing des deux moyennes : le niveau d'exposition, les coûts et la trajectoire changent aussi. Le témoin est choisi après coup : c'est un constat, pas une règle qu'on aurait pu fixer à l'avance.
@@ -124,7 +124,7 @@ Exposition à ETF_WORLD proportionnelle à l'écart entre ses moyennes mobiles 5
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 | Séance | Clôture ETF_WORLD | `ma50_over_ma200[ETF_WORLD]` | Poids cible ETF_WORLD | Poids détenu ETF_WORLD | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|

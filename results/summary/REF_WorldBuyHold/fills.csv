@@ -1,0 +1,2 @@
+session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
+2021-04-06,2021-04-06 09:01:00+02:00,ETF_WORLD,BUY,272.0,366.9500122070313,367.13348721313474,99860.30852197263,49.93015426098633,29.943120996093747,19.9620806640625,99.83535592114258

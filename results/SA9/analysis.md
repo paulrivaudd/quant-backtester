@@ -112,7 +112,7 @@ Acheter le fonds S&P 500 à 50 % quand le VIX est retombé à 80 % ou moins d'un
 - **Plausible.** Panique dont le pic reste sous 30 : la règle ne s'active pas.
 - **Plausible.** Série publiée avec un jour de retard : un VIX trop ancien envoie la règle en cash.
 
-### Mesures complémentaires (voir diagnostics_10102026.md)
+### Mesures complémentaires (voir results/summary/diagnostics.md)
 
 - **Fait.** Par séjour : 21 séjours, tous clos, de 5 valorisations en moyenne, 9 gagnants et 12 perdants ; net moyen -0,02 %, net médian -0,70 %, pire -2,64 % (le faux départ d'avril 2025), meilleur +3,64 % (la seconde entrée d'avril 2025).
 - **Fait.** Regroupés par convention, deux séjours séparés par 20 valorisations ou moins allant dans le même groupe, ils forment 7 groupes : trois perdants (décembre 2021 à février 2022, -2,07 % en cinq séjours ; mai à juillet 2022, -2,50 % en cinq séjours ; octobre-novembre 2022, -2,22 % en deux séjours) et quatre gagnants (mars-avril 2022, +0,30 % en trois séjours ; août-septembre 2024, +1,75 % en deux ; avril-mai 2025, +0,90 % en deux, faux départ compris ; avril 2026, +3,30 % en deux). Ce regroupement est automatique : ce ne sont pas sept paniques indépendantes identifiées économiquement.
@@ -125,7 +125,7 @@ Acheter le fonds S&P 500 à 50 % quand le VIX est retombé à 80 % ou moins d'un
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 | Séance | Clôture ETF_WORLD | Clôture ETF_SP500_PEA | `relief_20o[VIX]` | `momentum_5s_skip0[ETF_SP500_PEA]` | Poids cible ETF_SP500_PEA | Poids détenu ETF_SP500_PEA | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|

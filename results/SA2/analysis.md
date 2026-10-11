@@ -113,7 +113,7 @@ Répartir entre ETF_WORLD et ETF_SP500_PEA selon l'écart de leurs momentums 6 e
 - **Observé.** Reprise après une baisse (début 2023, mai 2025) : la règle est en cash ou sous-investie quand le marché remonte.
 - **Plausible.** Inversion du leadership entre les États-Unis et le reste du monde : l'inclinaison suit le fonds qui a le mieux monté.
 
-### Mesures complémentaires (voir diagnostics_10102026.md)
+### Mesures complémentaires (voir results/summary/diagnostics.md)
 
 - **Fait.** Attribution approchée contre le panier 50/50, en rendements logarithmiques sur la période : panier +0,727 ; exposition totale -0,140 ; choix entre les deux fonds +0,004 ; résidu de l'approximation aux poids de clôture -0,039 ; coûts -0,027 ; soit +0,526 pour la stratégie, contre +0,710 pour le panier exécuté par le moteur. Les trois premiers termes valorisent les poids détenus à la clôture précédente avec le rendement de clôture à clôture, ce qui n'est pas la façon dont le livre a traité.
 - **Lecture.** Dans cette approximation la contribution de l'exposition totale est négative et celle du choix entre les fonds, objet du momentum relatif, proche de zéro ; les coûts pèsent 2,7 points logarithmiques. Le résidu n'est pas une mesure de l'exécution : il contient aussi le rendement de la journée sur ce qui a été acheté ou vendu le matin même, donc une partie de l'effet du signal. Ces termes ne sont pas l'apport complet d'un timing, et une attribution exacte reste à faire.
@@ -126,7 +126,7 @@ Répartir entre ETF_WORLD et ETF_SP500_PEA selon l'écart de leurs momentums 6 e
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 | Séance | Clôture ETF_WORLD | Clôture ETF_SP500_PEA | `momentum_126s_skip21[ETF_WORLD]` | `momentum_126s_skip21[ETF_SP500_PEA]` | `momentum_252s_skip21[ETF_WORLD]` | `momentum_252s_skip21[ETF_SP500_PEA]` | Poids cible ETF_SP500_PEA | Poids cible ETF_WORLD | Poids détenu ETF_SP500_PEA | Poids détenu ETF_WORLD | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|

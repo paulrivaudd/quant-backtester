@@ -113,7 +113,7 @@ Le témoin de SA11 : la même règle d'allocation, la même fenêtre et la même
 - **Observé.** Rebond rapide après une panique : le poids reste entre 30 % et 44 % du 2025-04-15 au 2025-05-19.
 - **Plausible.** Régime de volatilité durablement au-dessus de 12 % dans un marché qui monte.
 
-### Mesures complémentaires (voir diagnostics_10102026.md)
+### Mesures complémentaires (voir results/summary/diagnostics.md)
 
 - **Fait.** À côté d'un témoin à cible constante de 87,8 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : ce témoin fait +81,6 % net, Sharpe 0,92, perte maximale -19,5 %, sommet retrouvé en 229 jours, pour une exposition moyenne réalisée de 89,3 % ; l'EWMA fait +73,4 %, Sharpe 0,93, -15,4 %, 321 jours, pour 87,8 %.
 - **Lecture.** C'est le seul des trois contrôles de volatilité dont le Sharpe égale celui de son témoin à cible constante (0,93 contre 0,92), avec quatre points de perte maximale en moins et huit points de rendement en moins. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 1,5 point d'exposition de plus en moyenne.
@@ -128,7 +128,7 @@ Le témoin de SA11 : la même règle d'allocation, la même fenêtre et la même
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 | Séance | Clôture ETF_WORLD | `ewma94_vol_756r[ETF_WORLD]` | Poids cible ETF_WORLD | Poids détenu ETF_WORLD | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|

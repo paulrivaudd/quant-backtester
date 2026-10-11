@@ -116,7 +116,7 @@ Détenir ETF_WORLD à hauteur de w = min(1, 12 % / max(σ, 5 %)), où σ est la 
 - **Plausible.** Prévision oscillant autour de la cible de 12 % : la bande de 3 points est franchie plus souvent qu'avec un estimateur plus lisse, ce qui est cohérent avec ses 508 ordres.
 - **Observé.** Marché baissier lent (2022) : -13,2 % contre -13,7 % pour le fonds, avec un poids moyen de 70 % ; la protection y est presque nulle.
 
-### Mesures complémentaires (voir diagnostics_10102026.md)
+### Mesures complémentaires (voir results/summary/diagnostics.md)
 
 - **Fait.** À côté d'un témoin à cible constante de 87,5 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : le témoin fait +81,2 % net, Sharpe 0,92, perte maximale -19,5 %, sommet retrouvé en 229 jours, 96 EUR de coûts, pour une exposition moyenne réalisée de 89,0 % ; SA11 fait +66,0 %, Sharpe 0,87, -16,5 %, 324 jours, pour 87,5 %.
 - **Lecture.** À exposition comparable mais non identique, SA11 a une perte maximale inférieure de 3,0 points à celle de ce témoin, pour 15 points de rendement en moins et un Sharpe plus bas. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 1,5 point d'exposition de plus en moyenne. Il est choisi après coup.
@@ -132,7 +132,7 @@ Détenir ETF_WORLD à hauteur de w = min(1, 12 % / max(σ, 5 %)), où σ est la 
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 | Séance | Clôture ETF_WORLD | `garch11_t_vol_756r[ETF_WORLD]` | Poids cible ETF_WORLD | Poids détenu ETF_WORLD | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|

@@ -33,11 +33,14 @@ market_data/validation/
 market_data/.pending/
 market_data/.lock
 
-# No data file is committed anywhere. Revisit the day a test needs a binary
-# fixture: it would have to be force-added, which is the right amount of
+# No market data file is committed anywhere. Revisit the day a test needs a
+# binary fixture: it would have to be force-added, which is the right amount of
 # friction for a file nobody can read in a diff.
 *.parquet
 *.csv
+# The exception: the tables of results/ are what a report was written from, and
+# are committed beside it.
+!results/**/*.csv
 
 # OS / editor
 .DS_Store

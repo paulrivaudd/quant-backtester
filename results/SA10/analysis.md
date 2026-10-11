@@ -112,7 +112,7 @@ SA10 sans facteurs ni monétaire : cinq règles (momentum, moyennes lissées, re
 - **Observé.** Marché haussier long : le cash, non rémunéré ici, est un coût d'opportunité permanent.
 - **Observé.** Reprise après une panique : l'exposition est au plus bas (16 % le 2025-05-19) pendant le rebond.
 
-### Mesures complémentaires (voir diagnostics_10102026.md)
+### Mesures complémentaires (voir results/summary/diagnostics.md)
 
 - **Fait.** À côté d'un témoin à cible constante de 15,3 % de fonds S&P 500 et 27,1 % de fonds monde (ses poids moyens), avec la même bande de 3 points et les mêmes coûts : le témoin fait +37,1 % net, Sharpe 0,93, perte maximale -10,0 %, sommet retrouvé en 231 jours, 61 EUR de coûts, pour une exposition moyenne réalisée de 44,8 % ; SA10 fait +32,1 %, Sharpe 0,86, -11,8 %, 442 jours, pour 42,4 %.
 - **Lecture.** Sur cette période l'ensemble fait moins bien que ce témoin, y compris en perte maximale. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 2,4 points d'exposition de plus en moyenne, et la composition, les coûts et la trajectoire diffèrent aussi. Ce run ne montre pas que la protection de l'ensemble vienne d'autre chose que de son niveau d'exposition.
@@ -129,7 +129,7 @@ SA10 sans facteurs ni monétaire : cinq règles (momentum, moyennes lissées, re
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 | Séance | Clôture ETF_WORLD | Clôture ETF_SP500_PEA | `momentum_126s_skip21[ETF_WORLD]` | `momentum_126s_skip21[ETF_SP500_PEA]` | `momentum_252s_skip21[ETF_WORLD]` | `momentum_252s_skip21[ETF_SP500_PEA]` | `ma50_over_ma200[ETF_WORLD]` | `pullback_5s_over_60r[ETF_WORLD]` | `price_over_ma200[ETF_WORLD]` | `residual_vs_etf_sp500_pea_126r_5r[ETF_WORLD]` | `relief_20o[VIX]` | `momentum_5s_skip0[ETF_SP500_PEA]` | `volatility_20r[ETF_WORLD]` | `volatility_20r[ETF_SP500_PEA]` | `volatility_60r[ETF_WORLD]` | `volatility_60r[ETF_SP500_PEA]` | Poids cible ETF_SP500_PEA | Poids cible ETF_WORLD | Poids détenu ETF_SP500_PEA | Poids détenu ETF_WORLD | Valeur nette (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|

@@ -240,7 +240,7 @@ Détenir ETF_WORLD seulement quand un petit réseau additif (4 unités tanh par 
 - **Plausible.** Coefficients d'ordre 3 hors du domaine d'apprentissage : aux décisions de test, 1,5 % et 2,3 % des valeurs normalisées de deux coefficients d'ordre 3 dépassent +5 et sont écrêtées, alors que les entrées reposent surtout sur ce groupe (+25,8 pb pour une prévision moyenne de +23,3 pb aux 8 décisions d'entrée).
 - **Plausible.** Un modèle changé chaque mois peut déplacer la prévision au changement de mois sans que le marché ait bougé : la référence passe de -3,95 pb à -0,89 pb entre le soir du 2025-01-31 et celui du 2025-02-03. L'effet sur les décisions n'est pas mesuré.
 
-### Mesures complémentaires (voir SA13_study_10102026.md)
+### Mesures complémentaires (voir study.md)
 
 - **Fait.** SA13 contre C0 : écart de Sharpe de -1,353, intervalle bootstrap à 95 % [-1,999 ; -0,627] par blocs de 60 séances, [-2,028 ; -0,543] par blocs de 20 et [-1,987 ; -0,673] par blocs de 120. À coûts doublés : -1,401, intervalle [-2,052 ; -0,678].
 - **Fait.** Les livres des contrôles, nets : C7 (Ridge, deux processus) +17,87 % ; C4 (réseau, indicateurs classiques) +14,05 % ; C1 (Ridge) +11,25 % ; C5 (Ridge, trajectoire brute) -1,19 %, et -25,72 % à coûts doublés avec 75 rotations de l'actif par an ; C6 (réseau, deux processus) -2,49 % ; C3 (sans volume) -3,47 % ; C2 (ordre 2) -3,75 %. Aucun n'approche C0.
@@ -261,7 +261,7 @@ Détenir ETF_WORLD seulement quand un petit réseau additif (4 unités tanh par 
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv` de l'étude.
+Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
 
 Colonnes propres à SA13 : le mois du modèle utilisé, dont l'information s'arrête au soir de la dernière séance du mois précédent ; la prévision en points de base et sa décomposition exacte - référence, déplacements de prix et d'activité, aires prix-volume, prix-temps et volume-temps, groupe d'ordre 3 - dont la somme est la prévision ; le filtre, lu sur le poids détenu ce soir-là ; le poids avant la bande de 3 points ; les deux volatilités réalisées de la règle de taille. Une contribution à la prévision n'est pas une contribution au résultat. L'identifiant complet de chaque modèle est dans `sa13_history.csv` de l'étude.
 
