@@ -12,7 +12,7 @@ The participants are those of ``run_etf_strategies_comparison.py`` - ``SA1``
 to ``SA6``, ``SA9``, ``SA10``, ``SA11``, the fund held and the even split -
 and one control without a catalogue code: the allocation rule of ``SA11`` on
 an EWMA of decay 0.94. ``SA7`` and ``SA8`` are not run: their instruments are
-not registered. ``ML1`` is not in the table: its information stops at the end
+not registered. ``SA14`` is not in the table: its information stops at the end
 of 2024, so a common table would have to start in 2025.
 
 Three questions are kept apart, because an answer to one is not an answer to
@@ -1152,7 +1152,7 @@ def study_markdown(
         "- The forecast covers close to close and orders are filled at the next open.",
         "- A prospective check starts at the first XPAR session after 2026-10-10 with this "
         "configuration frozen; it does not exist yet.",
-        "- SA7 and SA8 were not run (instruments not registered). ML1 is reported apart.",
+        "- SA7 and SA8 were not run (instruments not registered). SA14 is reported apart.",
         "",
         "## Timings",
         "",

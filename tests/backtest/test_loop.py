@@ -44,6 +44,7 @@ from quant_backtester.portfolio.constraints import (
 from quant_backtester.portfolio.limits import PortfolioLimits
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.provenance import SourceState, SourceStatus
+from quant_backtester.research.references import BuyAndHold
 from quant_backtester.signals.base import Signal
 from quant_backtester.signals.cross_sectional.rank import CrossSectionalRank
 from quant_backtester.signals.engine import SignalRequest
@@ -52,7 +53,6 @@ from quant_backtester.signals.price.returns import ReturnSignal
 from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import PriceBasis
 from quant_backtester.strategies.base import Strategy
-from quant_backtester.strategies.examples import BuyAndHold
 
 PARIS = BacktestTimetable(
     decision_time=time(23, 0),

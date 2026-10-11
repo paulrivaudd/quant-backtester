@@ -37,10 +37,10 @@ from quant_backtester.ml.signatures.config import (
     SignatureModelConfig,
     SignatureTrainingConfig,
 )
+from quant_backtester.research.references import BuyAndHold, EqualWeightRebalance
 from quant_backtester.signals.signatures.logsignature import FeatureKind
 from quant_backtester.signals.signatures.path import SignaturePathConfig
 from quant_backtester.signals.types import SignalStatus
-from quant_backtester.strategies import BuyAndHold, EqualWeightRebalance
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 

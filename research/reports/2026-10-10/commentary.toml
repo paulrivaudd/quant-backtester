@@ -15,11 +15,14 @@
 # cible constante », leur exposition réalisée est citée et la comparaison ne
 # prétend plus isoler le timing ; l'écart de prix clôture-ouverture est
 # remesuré à quantités données et n'est plus présenté comme un coût ; le séjour
-# encore ouvert de SA1 est compté à part ; ML1 a deux runs à coûts doublés,
+# encore ouvert de SA1 est compté à part ; SA14 a deux runs à coûts doublés,
 # modèle figé et modèle recalibré ; les contradictions relevées une à une sont
 # corrigées (SA2 en 2021 et 2024, seuil de SA3, séjours de SA4, meilleur
 # épisode et groupes de SA9, contrôle de risque de SA10, lenteur de SA11,
-# test de l'EWMA, sensibilités de ML1).
+# test de l'EWMA, sensibilités de SA14).
+#
+# Le 2026-10-11 la stratégie cataloguée ML1 est devenue SA14 : sa section
+# s'appelle [SA14] et son texte la nomme ainsi. Rien d'autre n'y change.
 #
 # Conventions de lecture, valables partout ci-dessous :
 # - « Fait » : relu dans les exports de results/garch_study (summary.csv,
@@ -358,7 +361,7 @@ to_test = [
   "Regardé après coup comme témoin, l'EWMA n'a pas été préinscrite comme candidate : la retenir serait une nouvelle hypothèse à écrire.",
 ]
 
-[ML1]
+[SA14]
 summary = "Un petit réseau de neurones, entraîné sur 2019-2023 et sélectionné sur 2024, propose chaque soir des poids entre ETF_WORLD, ETF_SP500_PEA et le cash. Il réduit le risque global par sa part de cash, mais produit aussi des changements d'allocation importants : début avril 2025 il coupe fortement pendant la baisse puis remonte vite, et le portefeuille atteint son creux après celui du fonds. Sur ses dates de test (2025-01-02 au 2026-10-09) il ne montre pas d'avantage net : +13,4 % contre +24,5 % pour le fonds détenu."
 strengths = [
   "**Fait.** Volatilité de 9,9 % contre 14,3 % pour le fonds, perte maximale de -16,11 % contre -21,51 %.",
@@ -367,7 +370,7 @@ strengths = [
 ]
 weaknesses = [
   "**Fait.** Sharpe de 0,76 contre 0,93, alpha de -1,4 % par an (sans intervalle) pour un bêta de 0,67, sur ces seules dates.",
-  "**Fait.** Score de 45,8 %, sous le seuil de 50 % de son hypothèse, et Sharpe sous celui du fonds : les deux critères de réfutation sont atteints. Ce score est déflaté pour un seul essai et ne se compare pas à ceux des stratégies SA.",
+  "**Fait.** Score de 45,8 %, sous le seuil de 50 % de son hypothèse, et Sharpe sous celui du fonds : les deux critères de réfutation sont atteints. Ce score est déflaté pour un seul essai et ne se compare pas à ceux des autres stratégies.",
   "**Fait.** Le test d'origine, clos au 2026-09-30, a été lu le 2026-10-04 ; ce run le prolonge de sept séances avec le même modèle. L'extension ne remet pas le compteur à zéro.",
   "**Fait.** Les sensibilités prévues par l'hypothèse - graines 43 et 44, coûts doublés avec le modèle figé puis avec un modèle recalibré - sont dans les mesures complémentaires plus bas. Le bloc robustesse du score, lui, utilise un stress approché, pas un second run.",
   "**Lecture.** Le réseau fait du timing ; la question ouverte est de savoir si ce timing ajoute ou retire de la valeur par rapport à une allocation constante. Un mauvais timing n'est pas une absence de timing.",
@@ -380,12 +383,12 @@ risks = [
   "**Plausible.** Régime absent de son apprentissage (2019-2023) : la sortie softmax et les plafonds bornent toujours les poids, mais rien n'assure leur pertinence économique si les entrées dérivent ; l'artefact n'est pas réentraîné.",
 ]
 measured = [
-  "**Fait.** À côté d'un témoin à cible constante de 36,3 % de fonds S&P 500 et 30,3 % de fonds monde (ses poids moyens), sur les mêmes dates, avec la même bande de 3 points et les mêmes coûts : le témoin fait +17,2 % net, Sharpe 0,93, perte maximale -15,2 %, sommet retrouvé en 225 jours, 76 EUR de coûts, pour une exposition moyenne réalisée de 68,3 % ; ML1 fait +13,4 %, Sharpe 0,76, -16,1 %, 251 jours, pour 66,6 %.",
-  "**Lecture.** Sur ces dates ML1 fait moins bien que ce témoin construit sur ses propres poids moyens. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing du réseau : le témoin a porté 1,7 point d'exposition de plus en moyenne, et la composition, les coûts et la trajectoire changent aussi. Le témoin est choisi après coup.",
+  "**Fait.** À côté d'un témoin à cible constante de 36,3 % de fonds S&P 500 et 30,3 % de fonds monde (ses poids moyens), sur les mêmes dates, avec la même bande de 3 points et les mêmes coûts : le témoin fait +17,2 % net, Sharpe 0,93, perte maximale -15,2 %, sommet retrouvé en 225 jours, 76 EUR de coûts, pour une exposition moyenne réalisée de 68,3 % ; SA14 fait +13,4 %, Sharpe 0,76, -16,1 %, 251 jours, pour 66,6 %.",
+  "**Lecture.** Sur ces dates SA14 fait moins bien que ce témoin construit sur ses propres poids moyens. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing du réseau : le témoin a porté 1,7 point d'exposition de plus en moyenne, et la composition, les coûts et la trajectoire changent aussi. Le témoin est choisi après coup.",
   "**Fait.** La part du fonds S&P 500 dans ce qui est investi va de 33 % à 66 % (moyenne 55 %) : le réseau déplace aussi la répartition entre les deux fonds.",
   "**Fait.** Sensibilités annoncées, sur la période d'origine (jusqu'au 2026-09-30) : graine 42, score 44,5 % et Sharpe 0,68 ; graine 43, 45,9 % et 0,70 ; graine 44, 45,6 % et 0,71. Le Sharpe du fonds détenu y est de 0,86.",
   "**Fait.** À coûts doublés, sur la même période d'origine, deux runs répondent à deux questions. Le modèle figé du test (`d9bfd125bf69`, même normalisation, mêmes poids, époque 20), rejoué en doublant seulement les coûts du moteur : score 40,7 %, +11,0 % net, Sharpe 0,64, perte maximale -16,2 %, 1 434 EUR de coûts au lieu de 752. La calibration refaite sous ces coûts retient l'époque 15 au lieu de 20 (`a5afb76183eb`) : c'est un autre modèle, score 44,3 %, +11,8 % net, Sharpe 0,69, 1 037 EUR de coûts. Dans chaque variante le Sharpe reste sous celui du fonds détenu et le score sous 50 %.",
-  "**Fait.** Les 319 caractéristiques lues par le réseau à chacune des 453 décisions sont exportées (`ml1_inputs.csv`) ; toutes les décisions ont un vecteur complet.",
+  "**Fait.** Les 319 caractéristiques lues par le réseau à chacune des 453 décisions sont exportées (`sa14_inputs.csv`) ; toutes les décisions ont un vecteur complet.",
 ]
 to_test = [
   "Les entrées sont exportées mais pas analysées : rien ici ne dit quelles caractéristiques expliquent les réallocations d'avril 2025.",

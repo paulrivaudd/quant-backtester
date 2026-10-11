@@ -21,8 +21,7 @@ from quant_backtester.demo import demo_runner
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.engine import SignalRequest
 from quant_backtester.signals.types import SignalStatus
-from quant_backtester.strategies.adaptive.rebalance import RuleStrategy, settle
-from quant_backtester.strategies.examples import (
+from quant_backtester.strategies import (
     BufferedDualMomentum,
     FactorETFBlend,
     MonetaryCarry,
@@ -33,6 +32,7 @@ from quant_backtester.strategies.examples import (
     VixReliefEntry,
     WorldMA20Benchmark,
 )
+from quant_backtester.strategies.adaptive.rebalance import RuleStrategy, settle
 
 WORLD, SP500, THIRD, VIX = "ETF_EU", "ETF_OTHER", "ETF_LATE", "RATE_US"
 """The synthetic market's stand-ins for the two core funds, a third fund and the index."""

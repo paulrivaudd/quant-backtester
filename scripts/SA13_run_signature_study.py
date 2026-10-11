@@ -34,7 +34,7 @@ this period, ``SA13``, and eight controls that carry no catalogue code:
 
 The forecasts are judged on the return they were made for - from the open after
 the decision to the open after that, corporate actions by the engine's
-convention - and the books on their net equity valued at the close. ``ML1`` is
+convention - and the books on their net equity valued at the close. ``SA14`` is
 left out: its artifacts were calibrated on a period this one overlaps. The
 gradient-boosted variant of the specification is not developed.
 
@@ -155,7 +155,7 @@ from quant_backtester.strategies.adaptive.rules import (
 )
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.catalogue import entry
-from quant_backtester.strategies.examples.SA13_signatures_neurons import (
+from quant_backtester.strategies.SA13_signatures_neurons import (
     STRATEGY_ID,
     SignaturesNeurons,
 )
@@ -1848,7 +1848,7 @@ def manifest(
         },
         "coverage": coverage.to_dict(orient="index"),
         "not_run": {
-            "ML1": "its artifacts were calibrated on a period this test overlaps",
+            "SA14": "its artifacts were calibrated on a period this test overlaps",
             "gradient boosting on the log-signature": "optional, not developed",
         },
         "trial_register": dict(register),

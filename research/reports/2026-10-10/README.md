@@ -16,7 +16,7 @@ lus par la stratégie, de ses poids et de sa valeur.
 indépendante faite sur le commit `4e04eae`
 (`revue_analyses_strategies_resultats_10102026.md`). Les chiffres globaux
 n'ont pas changé. Ont changé : les chronologies de positions (SA3, SA4, SA6,
-SA9, SA10, SA11, ML1), les conclusions causales non démontrées, la
+SA9, SA10, SA11, SA14), les conclusions causales non démontrées, la
 distinction entre fait mesuré et lecture, l'ajout de la récupération des
 baisses, des mois sans variation, des périodes partielles, du contrôle 50/50,
 des deux rapports de référence et d'un intervalle sur les écarts de QLIKE.
@@ -29,9 +29,9 @@ de `SA2` et `SA5` n'est plus appelé « exécution » ; les témoins sont dits �
 cible constante » et la comparaison ne prétend plus isoler le timing ; l'écart
 de prix clôture-ouverture est remesuré à quantités données et n'est plus
 présenté comme un coût ; le séjour encore ouvert de `SA1` est compté à part ;
-`ML1` est rejoué à coûts doublés avec son modèle figé ; les contradictions
+`SA14` est rejoué à coûts doublés avec son modèle figé ; les contradictions
 relevées dans les textes de `SA2`, `SA3`, `SA4`, `SA9`, `SA10`, `SA11`, de
-l'EWMA et de `ML1` sont corrigées.
+l'EWMA et de `SA14` sont corrigées.
 
 ## Comment lire
 
@@ -190,7 +190,8 @@ serait une nouvelle hypothèse.
 
 ## Hors classement
 
-- **ML1** ([rapport](strategyML1_ResultsAndAnalysis_10102026.md)) : son
+- **SA14**, appelée `ML1` jusqu'au 2026-10-11
+  ([rapport](strategySA14_ResultsAndAnalysis_10102026.md)) : son
   information s'arrête au 2024-12-31. Il est mesuré sur 2025-01-02 →
   2026-10-09 (+13,4 % contre +24,5 % pour le fonds, Sharpe 0,76 contre 0,93).
   Son score, déflaté pour un seul essai, ne se compare pas à ceux du tableau.
@@ -252,7 +253,7 @@ poids constatés après coup, et aucune variante n'est candidate. Ce qu'on y lit
   Sharpe.
 - **`SA6` contre l'EWMA** : différence de Sharpe de -0,036, intervalle
   [-0,104 ; +0,027] ; les deux témoins ne sont pas départagés.
-- **`ML1`** fait moins bien que son témoin à cible constante (Sharpe 0,76
+- **`SA14`** fait moins bien que son témoin à cible constante (Sharpe 0,76
   contre 0,93) ; les graines 43 et 44 échouent comme la graine 42 (Sharpe 0,68
   à 0,71 contre 0,86 pour le fonds, score sous 50 %), et à coûts doublés le
   modèle figé (0,64) comme le modèle recalibré (0,69) restent sous le fonds.
@@ -263,12 +264,12 @@ Les rapports couvrent toutes les séances mais ne sont pas l'archive d'un run.
 Les ordres, prix d'exécution, coûts par séance, rejets et courbes brutes sont
 dans les exports de l'étude (`results/garch_study/`), et le détail des
 diagnostics dans `results/review_diagnostics/` (séjours un par un, entrées de
-`ML1`, tables des témoins). Ces dossiers ne sont pas commités : ils se
+`SA14`, tables des témoins). Ces dossiers ne sont pas commités : ils se
 reproduisent. Restent non produits : une attribution exacte de `SA2` et `SA5`
 aux quantités et aux prix d'ouverture ; un témoin à exposition ou à risque
 réellement rapprochés ; la décomposition des cibles de `SA10` règle par règle
 à chaque décision, et le facteur de réduction de son contrôle de risque ; une
-analyse des entrées de `ML1`.
+analyse des entrées de `SA14`.
 
 ## Reproduire
 
@@ -276,8 +277,8 @@ analyse des entrées de `ML1`.
 uv sync --extra ml --extra stats
 uv run python scripts/update_market_data.py
 uv run python scripts/SA11_run_garch_study.py --output results/garch_study
-# les diagnostics chargent d'abord le modèle de ML1 : il doit exister
-uv run python scripts/ML1_run_neural_strategy.py --seed 42 --calibrate-only
+# les diagnostics chargent d'abord le modèle de SA14 : il doit exister
+uv run python scripts/SA14_run_neural_strategy.py --seed 42 --calibrate-only
 uv run python scripts/run_review_diagnostics.py
 uv run python scripts/write_strategy_reports.py \
     --study results/garch_study --output research/reports/2026-10-10

@@ -24,7 +24,7 @@ from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
-from quant_backtester.strategies.examples import BuyAndHold
+from quant_backtester.research.references import BuyAndHold
 
 PARIS = BacktestTimetable(
     decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)

@@ -10,7 +10,7 @@ from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.backtest.runner import StrategyRunner
 from quant_backtester.demo import demo_runner
 from quant_backtester.portfolio.targets import TargetAllocation
-from quant_backtester.strategies import FixedWeights
+from quant_backtester.research.references import FixedWeights
 
 UNIVERSE = ("ETF_EU", "ETF_OTHER")
 BOOK = FixedWeights(weights=(("ETF_EU", 0.6), ("ETF_OTHER", 0.2)))

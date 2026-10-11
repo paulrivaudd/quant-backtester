@@ -37,7 +37,7 @@ from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.schemas import ActionType
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
-from quant_backtester.strategies.examples import BuyAndHold
+from quant_backtester.research.references import BuyAndHold
 
 PARIS = BacktestTimetable(
     decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)

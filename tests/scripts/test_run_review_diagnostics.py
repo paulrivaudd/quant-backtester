@@ -13,7 +13,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quant_backtester.strategies import ETFEnsemble, EwmaVolControl, FixedWeights
+from quant_backtester.research.references import FixedWeights
+from quant_backtester.strategies import ETFEnsemble, EwmaVolControl
 
 pytest.importorskip("arch")
 

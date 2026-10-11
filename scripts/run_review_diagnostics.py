@@ -18,7 +18,7 @@ engine on the same period, cash and costs:
 - ``SA10`` **without each of its rules**, and without its risk control;
 - ``SA6`` against the EWMA control (paired bootstrap), and the EWMA rule at two
   other decays fixed here in advance (0.90 and 0.97);
-- ``ML1`` beside a constant-target allocation, its announced sensitivities
+- ``SA14`` beside a constant-target allocation, its announced sensitivities
   (seeds 43 and 44, doubled costs - the frozen model run dearer, and the model
   recalibrated under those costs, two different questions), and the inputs
   its network read.
@@ -82,8 +82,9 @@ from write_strategy_reports import (
 
 from quant_backtester.analytics.uncertainty import PairedBootstrap
 from quant_backtester.backtest.runner import StrategyResult, StrategyRunner
+from quant_backtester.research.references import FixedWeights
 from quant_backtester.signals.context import SignalContext
-from quant_backtester.strategies import ETFEnsemble, EwmaVolControl, FixedWeights
+from quant_backtester.strategies import ETFEnsemble, EwmaVolControl
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.catalogue import entry
 
@@ -120,7 +121,7 @@ PANIC_GAP_SESSIONS = 20
 
 FROZEN = "graine 42, modèle figé du test, coûts x2 (moteur seul)"
 RECALIBRATED = "graine 42, recalibrée sous coûts x2"
-"""The two rows of ``ML1`` at doubled costs: the same artifact run dearer, and
+"""The two rows of ``SA14`` at doubled costs: the same artifact run dearer, and
 the calibration redone under those costs. Two questions, two labels."""
 
 NO_RISK_CONTROL_TARGET = 10.0
@@ -487,7 +488,7 @@ def require_same_provenance(
     result : StrategyResult
         A run made by this script.
     same_period : bool
-        ``False`` for a run that is on another period by design - ``ML1`` on
+        ``False`` for a run that is on another period by design - ``SA14`` on
         its test period - whose store and cash must still be the study's.
 
     Raises
@@ -729,7 +730,7 @@ colonne « exécution » de l'attribution est renommée en résidu, parce qu'ell
 n'isole pas l'exécution ; les séjours clos et le séjour encore ouvert sont
 comptés à part ; les corrélations de `SA5` gardent leur première décision et
 composent leurs rendements à cinq séances ; les témoins sont dits « à cible
-constante » ; `ML1` est rejoué avec son modèle figé à coûts doublés ; un run
+constante » ; `SA14` est rejoué avec son modèle figé à coûts doublés ; un run
 n'est comparé aux exports que s'il a lu le même magasin.
 """
 
@@ -744,7 +745,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts/neural/world_vix"))
-    parser.add_argument("--skip-ml1", action="store_true")
+    parser.add_argument("--skip-sa14", action="store_true")
     options = parser.parse_args(arguments)
     study: Path = options.study
     output: Path = options.output
@@ -1050,8 +1051,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         "",
     ]
 
-    if not options.skip_ml1:
-        sections += ml1_section(options.store, options.artifacts, COMMON_PERIOD[1], frames, config)
+    if not options.skip_sa14:
+        sections += sa14_section(options.store, options.artifacts, COMMON_PERIOD[1], frames, config)
 
     output.mkdir(parents=True, exist_ok=True)
     for name, frame in frames.items():
@@ -1062,14 +1063,14 @@ def main(arguments: Sequence[str] | None = None) -> int:
     return 0
 
 
-def ml1_section(
+def sa14_section(
     store: Path,
     artifacts: Path,
     end: str,
     frames: dict[str, pd.DataFrame],
     study: Mapping[str, object],
 ) -> list[str]:
-    """Return the section on ML1: a constant-target allocation, its sensitivities, its inputs.
+    """Return the section on SA14: a constant-target allocation, its sensitivities, its inputs.
 
     Raises
     ------
@@ -1079,11 +1080,11 @@ def ml1_section(
         If the store read is not the one the exports of the study were made from.
     """
     # Imported on use: the script and the model need PyTorch, an optional dependency.
-    import ML1_run_neural_strategy as neural
+    import SA14_run_neural_strategy as neural
 
     from quant_backtester.ml.artifacts import NeuralArtifact
     from quant_backtester.ml.features import NeuralFeatureBuilder
-    from quant_backtester.strategies.ml.ML1_neural_allocation import NeuralAllocationStrategy
+    from quant_backtester.strategies.SA14_neural_allocation import NeuralAllocationStrategy
 
     runner: StrategyRunner = neural.build_runner(store)
     config = neural.neural_config(42)
@@ -1091,24 +1092,24 @@ def ml1_section(
     strategy = NeuralAllocationStrategy.from_artifact(artifact)
     start, last = neural.TEST_PERIOD[0], date.fromisoformat(end)
     neural.validate_test_period(strategy, runner, start, last)
-    print(f"running {neural.ML1} on {start} to {last} ...", file=sys.stderr)
+    print(f"running {neural.SA14} on {start} to {last} ...", file=sys.stderr)
     result = runner.run(strategy, neural.TRADABLE, start, last)
     require_same_provenance(study, result, same_period=False)
     held = result.weights().fillna(0.0)
     weights = tuple(
         (str(fund), round(float(weight), 4)) for fund, weight in held.mean().items() if weight > 0
     )
-    control = FixedWeights(weights=weights, strategy_id="research_control_ml1")
-    print("running the constant allocation of ML1 ...", file=sys.stderr)
+    control = FixedWeights(weights=weights, strategy_id="research_control_sa14")
+    print("running the constant allocation of SA14 ...", file=sys.stderr)
     fixed = runner.run(control, neural.TRADABLE, start, last)
     rows = {
-        neural.ML1: run_row(result),
+        neural.SA14: run_row(result),
         "↳ témoin à cible constante ("
         + ", ".join(f"{fund} {weight:.1%}" for fund, weight in weights)
         + ")": run_row(fixed),
         HELD: run_row(runner.run(neural.references()[neural.HELD], neural.TRADABLE, start, last)),
     }
-    frames["ml1_constant_allocation"] = pd.DataFrame.from_dict(rows, orient="index")
+    frames["sa14_constant_allocation"] = pd.DataFrame.from_dict(rows, orient="index")
     exposure = held.sum(axis=1).iloc[1:]
     share = (held[OTHER_FUND] / held.sum(axis=1)).iloc[1:]
 
@@ -1131,7 +1132,7 @@ def ml1_section(
                 row.update(dict(zip(names, numbers, strict=True)))
             inputs[record.session_date] = row
     features = pd.DataFrame.from_dict(inputs, orient="index").rename_axis("session_date")
-    frames["ml1_inputs"] = features
+    frames["sa14_inputs"] = features
     usable = int((features["status"] == "OK").sum())
 
     sensitivities: dict[str, dict[str, object]] = {}
@@ -1141,8 +1142,8 @@ def ml1_section(
         ("graine 44, coûts x1", ["--seed", "44"]),
         (RECALIBRATED, ["--seed", "42", "--cost-multiplier", "2"]),
     ):
-        target = Path("results/ml1_sensitivities")
-        print(f"ML1 sensitivity: {label} ...", file=sys.stderr)
+        target = Path("results/sa14_sensitivities")
+        print(f"SA14 sensitivity: {label} ...", file=sys.stderr)
         neural.main(
             [
                 *arguments,
@@ -1158,7 +1159,7 @@ def ml1_section(
         written = pd.read_csv(
             target / f"seed{arguments[1]}_costs_x{multiplier}" / "summary.csv", index_col="book"
         )
-        sensitivities[label] = written.loc[neural.ML1].to_dict()
+        sensitivities[label] = written.loc[neural.SA14].to_dict()
         sensitivities[label]["held_sharpe"] = float(written.loc[neural.HELD, "sharpe"])
         manifest = json.loads(
             (artifacts / f"seed{arguments[1]}_costs_x{multiplier}" / "manifest.json").read_text(
@@ -1172,15 +1173,15 @@ def ml1_section(
     # to trade - another question than a recalibration under those costs.
     dearer: StrategyRunner = neural.build_runner(store, COST_STRESS)
     neural.validate_test_period(strategy, dearer, *neural.TEST_PERIOD)
-    print(f"ML1 sensitivity: {FROZEN} ...", file=sys.stderr)
+    print(f"SA14 sensitivity: {FROZEN} ...", file=sys.stderr)
     frozen = {
         name: dearer.run(book, neural.TRADABLE, *neural.TEST_PERIOD)
-        for name, book in {neural.ML1: strategy, **neural.references()}.items()
+        for name, book in {neural.SA14: strategy, **neural.references()}.items()
     }
-    require_same_provenance(study, frozen[neural.ML1], same_period=False)
+    require_same_provenance(study, frozen[neural.SA14], same_period=False)
     same_model: dict[str, object] = dict(
         neural.summary_row(
-            frozen[neural.ML1],
+            frozen[neural.SA14],
             frozen[neural.SA1].equity(),
             None,
             frozen[neural.HELD].equity(),
@@ -1196,29 +1197,29 @@ def ml1_section(
             ordered[FROZEN] = same_model
         ordered[label] = found
     sensitivities = ordered
-    frames["ml1_sensitivities"] = pd.DataFrame.from_dict(sensitivities, orient="index")
+    frames["sa14_sensitivities"] = pd.DataFrame.from_dict(sensitivities, orient="index")
     below = all(
         float(row["sharpe"]) < float(row["held_sharpe"]) and float(row["quality"]) < 0.5  # type: ignore[arg-type]
         for row in sensitivities.values()
     )
 
     return [
-        "## 7. ML1",
+        "## 7. SA14",
         "",
         f"Période de test prolongée, {start} → {last}, modèle figé `{artifact.model_id[:12]}`.",
         "",
         "### Contre une allocation constante",
         "",
-        table(frames["ml1_constant_allocation"], RUN_COLUMNS, "Livre"),
+        table(frames["sa14_constant_allocation"], RUN_COLUMNS, "Livre"),
         "",
-        "Témoin à cible constante égale aux poids moyens de ML1 sur ces dates, avec la "
+        "Témoin à cible constante égale aux poids moyens de SA14 sur ces dates, avec la "
         "même bande de 3 points et les mêmes coûts : c'est le témoin exécutable que le "
         "produit « 65 % fois le rendement du fonds » ne remplaçait pas. Son exposition "
-        "réalisée n'est pas exactement celle de ML1 (colonne « Expo. moy. ») : la "
+        "réalisée n'est pas exactement celle de SA14 (colonne « Expo. moy. ») : la "
         "comparaison décrit deux règles exécutables et n'isole pas la valeur du timing à "
         "exposition identique. Choisi après coup, il est descriptif.",
         "",
-        f"Sur ces dates, hors la première séance, le poids total détenu par ML1 va de "
+        f"Sur ces dates, hors la première séance, le poids total détenu par SA14 va de "
         f"{float(exposure.min()):.1%} à {float(exposure.max()):.1%} (écart-type "
         f"{float(exposure.std()):.1%}), et la part du fonds S&P 500 dans ce qui est "
         f"investi va de {float(share.min()):.1%} à {float(share.max()):.1%} (moyenne "
@@ -1228,7 +1229,7 @@ def ml1_section(
         f"{neural.TEST_PERIOD[0]} → {neural.TEST_PERIOD[1]})",
         "",
         table(
-            frames["ml1_sensitivities"],
+            frames["sa14_sensitivities"],
             [
                 ("model", "Modèle", "`{}`"),
                 ("epoch", "Époque retenue", "{:.0f}"),
@@ -1250,7 +1251,7 @@ def ml1_section(
         "**même artefact** que le test préinscrit - même normalisation, mêmes poids, même "
         "époque - en doublant seulement les coûts du moteur : ce que devient le modèle "
         "initial s'il coûte deux fois plus cher à exécuter. « Recalibrée » refait la "
-        "calibration de `scripts/ML1_run_neural_strategy.py` sous ces coûts : sa validation "
+        "calibration de `scripts/SA14_run_neural_strategy.py` sous ces coûts : sa validation "
         "peut retenir une autre époque, et c'est alors un autre modèle - ce que produit "
         "la procédure de calibration sous un autre coût. "
         + (
@@ -1263,7 +1264,7 @@ def ml1_section(
         "### Entrées du réseau",
         "",
         f"Les {len(names)} caractéristiques lues par le réseau à chacune des "
-        f"{len(features)} décisions sont exportées dans `ml1_inputs.csv` (dossier des "
+        f"{len(features)} décisions sont exportées dans `sa14_inputs.csv` (dossier des "
         f"diagnostics), avec leur statut : {usable} décisions ont un vecteur complet. "
         "Elles sont reconstruites par le `NeuralFeatureBuilder` du modèle sur un lecteur "
         "figé à l'instant de chaque décision.",

@@ -6,7 +6,8 @@ import dataclasses
 
 import pytest
 
-from quant_backtester.strategies import BuyAndHold, ETFEnsemble, WorldMA20Benchmark
+from quant_backtester.research.references import BuyAndHold
+from quant_backtester.strategies import ETFEnsemble, WorldMA20Benchmark
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.catalogue import (
     CATALOGUE,
@@ -24,17 +25,21 @@ def test_a_code_gives_the_three_spellings_of_a_name() -> None:
     assert first.display_name == "SA1 - std MA20"
     assert first.strategy_id == "SA1_std_ma20"
     assert first.slug == "sa1_std_ma20"
-    assert entry("ML1").display_name == "ML1 - neural allocation"
+    assert entry("SA14").display_name == "SA14 - neural allocation"
     with pytest.raises(KeyError, match="SA99"):
         entry("SA99")
 
 
-def test_the_statistical_rules_are_sa1_to_sa13_and_the_network_is_ml1() -> None:
-    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 14)]
+def test_the_catalogue_runs_from_sa1_to_sa14_and_names_the_one_that_needs_an_extra() -> None:
+    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 15)]
+    assert family(Family.SA) == CATALOGUE
+    assert [(item.code, item.extra) for item in CATALOGUE if item.extra] == [("SA14", "ml")]
     assert entry("SA13").display_name == "SA13 - Signatures Neurons"
     assert entry("SA12").display_name == "SA12 - ARIMA GARCH"
     assert entry("SA11").display_name == "SA11 - GARCH vol control"
-    assert [item.code for item in family(Family.ML)] == ["ML1"]
+    # The network was ML1 until 2026-10-11: that code is retired, not given again.
+    with pytest.raises(KeyError, match="ML1"):
+        entry("ML1")
     assert len({item.strategy_id for item in CATALOGUE}) == len(CATALOGUE)
     assert entry_of(WorldMA20Benchmark).code == "SA1"
     assert entry_of(ETFEnsemble(enable_factors=False, enable_monetary=False)).code == "SA10"
@@ -42,8 +47,12 @@ def test_the_statistical_rules_are_sa1_to_sa13_and_the_network_is_ml1() -> None:
         entry_of(BuyAndHold)
 
 
-@pytest.mark.parametrize("item", family(Family.SA), ids=lambda item: item.code)
-def test_a_rule_based_strategy_is_recorded_under_its_catalogue_id(item: CatalogueEntry) -> None:
+@pytest.mark.parametrize(
+    "item", [item for item in CATALOGUE if item.extra is None], ids=lambda item: item.code
+)
+def test_a_strategy_that_needs_no_extra_is_recorded_under_its_catalogue_id(
+    item: CatalogueEntry,
+) -> None:
     kind = item.load()
 
     assert issubclass(kind, Strategy)
@@ -54,10 +63,10 @@ def test_a_rule_based_strategy_is_recorded_under_its_catalogue_id(item: Catalogu
 
 def test_the_neural_strategy_is_recorded_under_its_catalogue_id() -> None:
     pytest.importorskip("torch")
-    from quant_backtester.strategies.ml.ML1_neural_allocation import STRATEGY_ID
+    from quant_backtester.strategies.SA14_neural_allocation import STRATEGY_ID
 
-    assert entry("ML1").strategy_id == STRATEGY_ID
-    assert entry("ML1").load().__name__ == "NeuralAllocationStrategy"
+    assert entry("SA14").strategy_id == STRATEGY_ID
+    assert entry("SA14").load().__name__ == "NeuralAllocationStrategy"
 
 
 @pytest.mark.parametrize(

@@ -28,7 +28,7 @@ from quant_backtester.demo import (
     demo_runner,
     draw_bars,
 )
-from quant_backtester.strategies.examples import BuyAndHold
+from quant_backtester.research.references import BuyAndHold
 
 SEED = 20240101
 """The seed every demo in these tests is drawn from."""

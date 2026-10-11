@@ -29,7 +29,7 @@ from quant_backtester.research.paper import (
     last_ready_session,
     run_plan,
 )
-from quant_backtester.strategies.examples import BuyAndHold
+from quant_backtester.research.references import BuyAndHold
 
 STRATEGY = BuyAndHold(instruments=("ETF_EU",))
 AT = datetime(2026, 9, 26, 22, 0, tzinfo=UTC)

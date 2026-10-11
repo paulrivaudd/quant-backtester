@@ -1,4 +1,4 @@
-"""Calibrate ML1, the neural allocation, then run its final test beside three references.
+"""Calibrate SA14, the neural allocation, then run its final test beside three references.
 
 The network is trained and selected before any backtest (``prepare``), and the
 artifact it leaves is frozen: the test below loads it, checks that the test
@@ -6,7 +6,7 @@ period starts after its information cutoff, and runs it once. From the
 repository root, once the store is filled and the ``ml`` extra installed
 (``uv sync --extra ml``):
 
-    uv run python scripts/ML1_run_neural_strategy.py --output results/ml1
+    uv run python scripts/SA14_run_neural_strategy.py --output results/sa14
 
 The configuration is the one the store can serve today: the two PEA funds and
 the VIX are read, the two funds are bought. Bond, oil and gold series are not
@@ -39,7 +39,7 @@ decision with the weights proposed, the target after the thresholds, the
 weights held, the action taken and its reason, so that a day in cash for want
 of data is told from a day in cash by choice.
 
-The tests are in ``tests/scripts/test_ML1_run_neural_strategy.py``.
+The tests are in ``tests/scripts/test_SA14_run_neural_strategy.py``.
 """
 
 from __future__ import annotations
@@ -69,12 +69,13 @@ from quant_backtester.ml.artifacts import MANIFEST_FILE, NeuralArtifact
 from quant_backtester.ml.config import NeuralStrategyConfig
 from quant_backtester.ml.training import VALIDATION_METRICS_FILE, calibrate_neural_strategy
 from quant_backtester.provenance import git_source_state
+from quant_backtester.research.references import BuyAndHold, EqualWeightRebalance
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.types import SignalStatus
-from quant_backtester.strategies import BuyAndHold, EqualWeightRebalance, WorldMA20Benchmark
+from quant_backtester.strategies import WorldMA20Benchmark
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.catalogue import entry
-from quant_backtester.strategies.ml.ML1_neural_allocation import (
+from quant_backtester.strategies.SA14_neural_allocation import (
     Action,
     NeuralAllocationStrategy,
     neural_decision,
@@ -95,13 +96,13 @@ INITIAL_CASH = 100_000.0
 ANALYTICS = AnalyticsConfig(sessions_per_year=252, risk_free_rate=0.0, minimum_sessions=60)
 """252 sessions a year and cash earning nothing, as in the model's own objective."""
 
-ML1, SA1 = entry("ML1").display_name, entry("SA1").display_name
+SA14, SA1 = entry("SA14").display_name, entry("SA1").display_name
 HELD, SPLIT = "buy & hold World", "equal weight"
 """The book under test, its benchmark and the two references, as every output names them."""
 
 
 def neural_config(seed: int = 42) -> NeuralStrategyConfig:
-    """Return the configuration of ML1 on the series the store holds today."""
+    """Return the configuration of SA14 on the series the store holds today."""
     return NeuralStrategyConfig(
         calibration_start=date(2019, 1, 2),
         validation_start=date(2024, 1, 2),
@@ -208,7 +209,7 @@ def validate_test_period(
 
 
 def references() -> dict[str, Strategy]:
-    """Return the benchmark and the two references ML1 is run beside, by display name."""
+    """Return the benchmark and the two references SA14 is run beside, by display name."""
     return {
         SA1: WorldMA20Benchmark(),
         HELD: BuyAndHold(instruments=("ETF_WORLD",)),
@@ -217,7 +218,7 @@ def references() -> dict[str, Strategy]:
 
 
 def neural_decisions(result: StrategyResult, strategy: NeuralAllocationStrategy) -> pd.DataFrame:
-    """Return one row per decision of a run of ML1: proposal, target, book, action, reason.
+    """Return one row per decision of a run of SA14: proposal, target, book, action, reason.
 
     Parameters
     ----------
@@ -366,9 +367,9 @@ def save_outputs(
     results: Mapping[str, StrategyResult],
     decisions: pd.DataFrame,
 ) -> list[Path]:
-    """Write the summary, the curves, ML1's tables and its decisions; return the paths."""
+    """Write the summary, the curves, SA14's tables and its decisions; return the paths."""
     output.mkdir(parents=True, exist_ok=True)
-    book = results[ML1]
+    book = results[SA14]
     equity = pd.DataFrame({name: result.equity() for name, result in results.items()})
     tables = {
         "summary.csv": table,
@@ -387,8 +388,8 @@ def save_outputs(
 
 def main(arguments: Sequence[str] | None = None) -> int:
     """Prepare the model, run the final test and the references, print and write."""
-    parser = argparse.ArgumentParser(description="Calibrate and test ML1, the neural allocation.")
-    parser.add_argument("--output", type=Path, default=Path("results/ml1"))
+    parser = argparse.ArgumentParser(description="Calibrate and test SA14, the neural allocation.")
+    parser.add_argument("--output", type=Path, default=Path("results/sa14"))
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts/neural/world_vix"))
     parser.add_argument("--seed", type=int, default=42)
@@ -404,7 +405,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     runner = build_runner(options.store, options.cost_multiplier)
     variant = f"seed{options.seed}_costs_x{options.cost_multiplier:g}"
     artifact_dir = options.artifacts / variant
-    print(f"preparing {ML1} in {artifact_dir} ...", file=sys.stderr)
+    print(f"preparing {SA14} in {artifact_dir} ...", file=sys.stderr)
     artifact = prepare(config, runner, artifact_dir)
     strategy = NeuralAllocationStrategy.from_artifact(artifact)
     validate_test_period(strategy, runner, *TEST_PERIOD)
@@ -418,10 +419,10 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return 0
 
     results: dict[str, StrategyResult] = {}
-    for name, book in {ML1: strategy, **references()}.items():
+    for name, book in {SA14: strategy, **references()}.items():
         print(f"running {name} on the test period ...", file=sys.stderr)
         results[name] = runner.run(book, TRADABLE, *TEST_PERIOD)
-    decisions = neural_decisions(results[ML1], strategy)
+    decisions = neural_decisions(results[SA14], strategy)
     missing = int((decisions["reason"] == "MISSING_DATA").sum())
     benchmark, market = results[SA1].equity(), results[HELD].equity()
     table = pd.DataFrame.from_dict(
@@ -429,7 +430,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
             name: summary_row(
                 result,
                 benchmark,
-                missing if name == ML1 else None,
+                missing if name == SA14 else None,
                 None if name == HELD else market,
             )
             for name, result in results.items()
@@ -441,8 +442,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
     first, last = benchmark.index[0], benchmark.index[-1]
     print(f"final test, {first} to {last}, {len(benchmark)} sessions, {variant}:")
     print(table.T.to_string(float_format=lambda value: f"{value:,.4f}"))
-    print("actions of ML1:", decisions["action"].value_counts().to_dict())
-    print("reasons of ML1:", decisions["reason"].value_counts().to_dict())
+    print("actions of SA14:", decisions["action"].value_counts().to_dict())
+    print("reasons of SA14:", decisions["reason"].value_counts().to_dict())
     for path in save_outputs(options.output / variant, table, results, decisions):
         print(f"wrote {path}")
     return 0

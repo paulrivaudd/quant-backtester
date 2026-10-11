@@ -21,7 +21,7 @@ from quant_backtester.research.archive import (
     read_back,
     same_economics,
 )
-from quant_backtester.strategies.examples import BuyAndHold
+from quant_backtester.research.references import BuyAndHold
 
 STRATEGY = BuyAndHold(instruments=("ETF_EU",))
 

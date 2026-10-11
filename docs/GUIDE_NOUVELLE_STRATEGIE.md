@@ -237,23 +237,24 @@ Les règles de la décision :
   lecture de fichier. Un test fait échouer le build sinon.
 - Les poids sont des fractions de capital dans [0, 1], de somme ≤ 1, pour des
   noms de `ctx.universe` négociables. Le reste est du cash.
-- Exportez la classe dans `strategies/examples/__init__.py` et
-  `strategies/__init__.py`, et ajoutez-la au test « chaque stratégie exportée
-  est exécutable ».
+- Exportez la classe dans `strategies/__init__.py`, et ajoutez-la au test
+  « chaque stratégie exportée est exécutable »
+  (`tests/strategies/test_exports.py`).
 - **Une stratégie qui reçoit un code du catalogue le porte en tête de ses
   fichiers** : son module (`SA11_garch_vol_control.py`), son fichier de test
   (`test_SA11_garch_vol_control.py`, `test_` restant devant pour pytest), son
   script d'étude (`scripts/SA11_run_garch_study.py`, et son test
   `test_SA11_run_garch_study.py`) et les figures que ce script écrit
   (`SA11_equity_common.png`). Un module que plusieurs stratégies partagent
-  (signaux, modèles, règles) et un exemple sans code gardent un nom simple.
+  (signaux, modèles, règles) garde un nom simple. Les modules de stratégie
+  sont tous à la racine de `strategies/`, sans sous-dossier.
   Le chemin du module entre dans `definition()` : renommer un module change
   l'empreinte de sa stratégie.
 
 ### Tester la stratégie (`tests/strategies/test_<module>.py`)
 
 Le helper `decide_with(strategy, context, make_decision, universe)` de
-`tests/strategies/test_examples.py` calcule les
+`tests/research/test_references.py` calcule les
 signaux déclarés puis appelle `decide`. Testez ce que la règle **décide** :
 investie sur une série montante (2 sur 5), en cash quand les moyennes sont
 inversées, en cash quand l'historique manque, identifiant du signal déclaré,

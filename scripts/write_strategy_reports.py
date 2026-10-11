@@ -26,9 +26,9 @@ from those exports. The written commentary is not computed: it is read from
 ``commentary.toml`` in the output folder, by strategy code, and a strategy
 without one says so instead of inventing a text.
 
-``ML1`` is not in the study: its information stops at 2024-12-31, so it is run
+``SA14`` is not in the study: its information stops at 2024-12-31, so it is run
 here, once, on its test period extended to the study's last session, beside
-the fund held and ``SA1`` over the same sessions (``--skip-ml1`` leaves it
+the fund held and ``SA1`` over the same sessions (``--skip-sa14`` leaves it
 out; it needs the ``ml`` extra and its calibrated artifact). Its figures are
 on another period than the others' and are not comparable with them.
 
@@ -889,10 +889,10 @@ def study_lines(
     ]
 
 
-def ml1_report(
+def sa14_report(
     store: Path, artifacts: Path, end: str, stamp: str, notes: Mapping[str, object] | None
 ) -> tuple[str, str]:
-    """Run ML1 on its test period up to ``end`` and return its file name and report.
+    """Run SA14 on its test period up to ``end`` and return its file name and report.
 
     Raises
     ------
@@ -902,17 +902,17 @@ def ml1_report(
         If the calibrated artifact of seed 42 is not in ``artifacts``.
     """
     # Imported on use: the script and the model need PyTorch, an optional dependency.
-    import ML1_run_neural_strategy as neural
+    import SA14_run_neural_strategy as neural
 
     from quant_backtester.ml.artifacts import NeuralArtifact
-    from quant_backtester.strategies.ml.ML1_neural_allocation import NeuralAllocationStrategy
+    from quant_backtester.strategies.SA14_neural_allocation import NeuralAllocationStrategy
 
     runner = neural.build_runner(store)
     artifact = NeuralArtifact.load(artifacts / "seed42_costs_x1", expected=neural.neural_config(42))
     strategy = NeuralAllocationStrategy.from_artifact(artifact)
     start, last = neural.TEST_PERIOD[0], date.fromisoformat(end)
     neural.validate_test_period(strategy, runner, start, last)
-    books = {neural.ML1: strategy, **neural.references()}
+    books = {neural.SA14: strategy, **neural.references()}
     results = {}
     for name, book in books.items():
         print(f"running {name} on {start} to {last} ...", file=sys.stderr)
@@ -920,7 +920,7 @@ def ml1_report(
     net = {name: result.equity() for name, result in results.items()}
     gross = {name: result.equity(Book.GROSS) for name, result in results.items()}
     # One trial, as its hypothesis states: the frozen model of seed 42.
-    kept = {name: net[name] for name in (neural.ML1, HELD)}
+    kept = {name: net[name] for name in (neural.SA14, HELD)}
     details = {
         **dict.fromkeys(results),
         **quality_details(
@@ -928,17 +928,17 @@ def ml1_report(
         ),
     }
     summary = summary_frame(results, details)
-    decisions = neural.neural_decisions(results[neural.ML1], strategy).set_index("session_date")
-    closes = closes_of(results[neural.ML1])
+    decisions = neural.neural_decisions(results[neural.SA14], strategy).set_index("session_date")
+    closes = closes_of(results[neural.SA14])
     parts = [
         pd.DataFrame({f"close_{fund}": series for fund, series in closes.items()}),
         decisions[[column for column in decisions if column.startswith("proposed_")]],
-        results[neural.ML1].target_weights().add_prefix("target_"),
-        results[neural.ML1].weights().add_prefix("held_"),
-        net[neural.ML1].rename("net_equity"),
+        results[neural.SA14].target_weights().add_prefix("target_"),
+        results[neural.SA14].weights().add_prefix("held_"),
+        net[neural.SA14].rename("net_equity"),
     ]
-    history = pd.concat(parts, axis=1).reindex(net[neural.ML1].index)
-    source = results[neural.ML1].source.definition()
+    history = pd.concat(parts, axis=1).reindex(net[neural.SA14].index)
+    source = results[neural.SA14].source.definition()
     provenance = [
         f"Période de test {summary['first_session'].iloc[0]} → {summary['last_session'].iloc[0]} "
         "(après la date limite d'information du modèle, "
@@ -947,16 +947,16 @@ def ml1_report(
         "autres stratégies.",
         "",
         f"Source : commit `{str(source.get('git_commit'))[:12]}` ({source.get('source_state')}), "
-        f"magasin `{results[neural.ML1].data_state.digest[:12]}`. **Période différente de celle "
-        "des stratégies SA** (qui commence en 2021) : ces chiffres ne se comparent pas aux "
-        "leurs, et ML1 n'a pas de rang dans le classement commun. Le test a déjà été lu une "
+        f"magasin `{results[neural.SA14].data_state.digest[:12]}`. **Période différente de celle "
+        "des autres stratégies** (qui commence en 2021) : ces chiffres ne se comparent pas aux "
+        "leurs, et SA14 n'a pas de rang dans le classement commun. Le test a déjà été lu une "
         "fois le 2026-10-04 jusqu'au 2026-09-30 ; ce run le prolonge avec le même modèle. Le "
         "score est déflaté pour un seul essai.",
     ]
     # Alone in its table, on its own period: it has no place in the common ranking.
-    own = {**summary.loc[neural.ML1].to_dict(), "rank": None}
+    own = {**summary.loc[neural.SA14].to_dict(), "rank": None}
     text = report(
-        neural.ML1,
+        neural.SA14,
         own,
         summary.loc[HELD].to_dict(),
         None,
@@ -967,29 +967,29 @@ def ml1_report(
         provenance,
         control=neural.SPLIT,
         history_note=(
-            "Pour ML1, les colonnes « poids proposé » sont la **sortie** du réseau, pas ses "
+            "Pour SA14, les colonnes « poids proposé » sont la **sortie** du réseau, pas ses "
             "entrées : les caractéristiques qu'il lit (rendements, moyennes, volatilités des "
             "deux fonds et du VIX sur 100 séances) ne sont pas dans ce tableau."
         ),
     )
-    return file_name("ML1", stamp), text
+    return file_name("SA14", stamp), text
 
 
 def main(arguments: Sequence[str] | None = None) -> int:
-    """Write the report of every catalogued strategy the study ran, and of ML1."""
+    """Write the report of every catalogued strategy the study ran, and of SA14."""
     parser = argparse.ArgumentParser(description="Write one report per strategy.")
     parser.add_argument("--study", type=Path, default=Path("results/garch_study"))
     parser.add_argument("--output", type=Path, default=Path("research/reports/2026-10-10"))
     parser.add_argument("--stamp", default="10102026", help="date in the file names, DDMMYYYY")
     parser.add_argument("--store", type=Path, default=Path("market_data"))
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts/neural/world_vix"))
-    parser.add_argument("--skip-ml1", action="store_true")
+    parser.add_argument("--skip-sa14", action="store_true")
     parser.add_argument(
         "--only",
         nargs="+",
         metavar="CODE",
         help="write these reports only (SA12, SA13 ...), with the ranking of the study and "
-        "the section the study wrote for them; ML1 is then left alone",
+        "the section the study wrote for them; SA14 is then left alone",
     )
     options = parser.parse_args(arguments)
 
@@ -1042,11 +1042,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
         missing = sorted(set(options.only) - {target.split("_")[0][8:] for target in written})
         if missing:
             raise SystemExit(f"the study has no book for {', '.join(missing)}")
-    if not options.skip_ml1 and not options.only:
-        notes = commentary.get("ML1")
+    if not options.skip_sa14 and not options.only:
+        notes = commentary.get("SA14")
         period = config["period"]
         assert isinstance(period, dict)
-        target, text = ml1_report(
+        target, text = sa14_report(
             options.store,
             options.artifacts,
             str(period["end"]),

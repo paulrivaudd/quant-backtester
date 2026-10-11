@@ -23,7 +23,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from quant_backtester.demo import demo_runner
-from quant_backtester.strategies.examples import BuyAndHold, WorldMA20Benchmark
+from quant_backtester.research.references import BuyAndHold
+from quant_backtester.strategies import WorldMA20Benchmark
 
 SEED = 20240101
 """The seed of the demo prices, printed with the run."""

@@ -22,13 +22,13 @@ from quant_backtester.strategies.adaptive.rules import (
     risk_scale,
 )
 from quant_backtester.strategies.base import Strategy
-from quant_backtester.strategies.examples.SA2_buffered_dual_momentum import BufferedDualMomentum
-from quant_backtester.strategies.examples.SA3_smooth_moving_average import SmoothMovingAverage
-from quant_backtester.strategies.examples.SA4_trend_filtered_pullback import TrendFilteredPullback
-from quant_backtester.strategies.examples.SA5_relative_residual_tilt import RelativeResidualTilt
-from quant_backtester.strategies.examples.SA7_factor_etf_blend import FactorETFBlend
-from quant_backtester.strategies.examples.SA8_monetary_carry import MonetaryCarry
-from quant_backtester.strategies.examples.SA9_vix_relief_entry import VixReliefEntry
+from quant_backtester.strategies.SA2_buffered_dual_momentum import BufferedDualMomentum
+from quant_backtester.strategies.SA3_smooth_moving_average import SmoothMovingAverage
+from quant_backtester.strategies.SA4_trend_filtered_pullback import TrendFilteredPullback
+from quant_backtester.strategies.SA5_relative_residual_tilt import RelativeResidualTilt
+from quant_backtester.strategies.SA7_factor_etf_blend import FactorETFBlend
+from quant_backtester.strategies.SA8_monetary_carry import MonetaryCarry
+from quant_backtester.strategies.SA9_vix_relief_entry import VixReliefEntry
 
 RISK_ROUNDING = 1e-9
 """How far above its target a book's estimated risk may sit and still be the

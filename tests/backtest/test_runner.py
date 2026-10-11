@@ -30,9 +30,10 @@ from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.provenance import SourceState, SourceStatus
+from quant_backtester.research.references import BuyAndHold
 from quant_backtester.signals.price.trend import MovingAverageCrossSignal
 from quant_backtester.signals.types import PriceBasis, SignalStatus
-from quant_backtester.strategies.examples import BuyAndHold, WorldMA20Benchmark
+from quant_backtester.strategies import WorldMA20Benchmark
 from quant_backtester.strategies.functional import FunctionalStrategy
 
 PARIS = BacktestTimetable(

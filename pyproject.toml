@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# The neural strategies (ML family). Everything else runs without it.
+# The neural allocation, SA14. Everything else runs without it.
 ml = [
     "torch>=2.14.1",
 ]

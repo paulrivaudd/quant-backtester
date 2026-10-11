@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### One flat folder of strategies, SA1 to SA14 (2026-10-11)
+- **`ML1` is now `SA14`.** `strategies/SA14_neural_allocation.py`,
+  `scripts/SA14_run_neural_strategy.py`, their tests, the `strategy_id`
+  `SA14_neural_allocation` and the name `SA14 - neural allocation`. The code
+  `ML1` is retired and not given again; the family `ML` has no member left and
+  is removed. The registered hypothesis keeps its identifier,
+  `ml1_neural_allocation`, and the frozen model (`d9bfd125bf69`) is the same
+  file, loaded as before.
+- **Every strategy module is at the root of `strategies/`**: `examples/` and
+  `ml/` are gone, and `SA10_etf_ensemble.py` leaves `adaptive/`, which keeps the
+  rules the strategies share. `from quant_backtester.strategies import ...`
+  works as before for `SA1` to `SA12`.
+- **`SA14` imports PyTorch when it is loaded**, and says so: its catalogue
+  entry declares `extra="ml"`, the package does not import it, and the test
+  that loads the catalogue without any extra leaves that one entry out.
+- **The three reference books left `strategies/`**: `buy_and_hold.py`,
+  `equal_weight.py` and `fixed_weights.py` are deleted, and `BuyAndHold`,
+  `EqualWeightRebalance` and `FixedWeights` live in
+  `quant_backtester.research.references`. They are what every study and a
+  large part of the engine's tests are measured against, so the classes are
+  kept; they are no longer exported by `quant_backtester.strategies`.
+- The fingerprints of `SA1` to `SA14` and of the three books change once more
+  with their module paths. No number of a result moves.
+- Exports and options named after the old code follow: `sa14_inputs.csv`,
+  `sa14_sensitivities.csv`, `--skip-sa14`, `results/sa14`.
+
 ### Only the catalogued strategies are kept (2026-10-11)
 - **Removed**: every strategy without a catalogue code, except the three books
   the studies are measured against. Gone are `MomentumRotation`,

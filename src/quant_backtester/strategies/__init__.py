@@ -22,10 +22,17 @@ what a user has to write. A rule that needed its signals wired in from outside
 would look identical in an import list and fail at the first decision, which is
 why there is no such thing here any more.
 
-The strategies that are kept have a code and a label in ``catalogue``:
-``SA1 - std MA20``, ``ML1 - neural allocation``. The ML family lives in
-``strategies.ml`` and is not imported here: it needs PyTorch, an optional
-dependency, and is reached through the catalogue or its own module.
+Every strategy kept has a code and a label in ``catalogue``, ``SA1 - std MA20``
+to ``SA14 - neural allocation``, and its module carries that code:
+``SA3_smooth_moving_average``. ``SA13`` and ``SA14`` are not imported here.
+``SA13`` is built from a schedule of models calibrated before the run, and
+``SA14`` needs PyTorch, an optional dependency (the ``ml`` extra), which the
+other strategies must keep importing without: both are reached through the
+catalogue or their own module.
+
+The books a study is measured against - the fund held, the even split, a
+constant target - are not strategies of the catalogue and live in
+``quant_backtester.research.references``.
 
 ``GarchVolControl`` (``SA11``) is imported here although its estimator, the
 ``arch`` package, is optional too (the ``stats`` extra): the class imports
@@ -35,36 +42,27 @@ missing. ``EwmaVolControl`` is its control and carries no catalogue code.
 
 from __future__ import annotations
 
-from quant_backtester.strategies.adaptive.SA10_etf_ensemble import ETFEnsemble
 from quant_backtester.strategies.base import Strategy
-from quant_backtester.strategies.examples import (
-    ArimaGarch,
-    BufferedDualMomentum,
-    BuyAndHold,
-    EqualWeightRebalance,
-    EwmaVolControl,
-    FactorETFBlend,
-    FixedWeights,
-    GarchVolControl,
-    MonetaryCarry,
-    RealizedVolControl,
-    RelativeResidualTilt,
-    SmoothMovingAverage,
-    TrendFilteredPullback,
-    VixReliefEntry,
-    WorldMA20Benchmark,
-)
 from quant_backtester.strategies.functional import FunctionalStrategy, strategy
+from quant_backtester.strategies.SA1_world_ma20_benchmark import WorldMA20Benchmark
+from quant_backtester.strategies.SA2_buffered_dual_momentum import BufferedDualMomentum
+from quant_backtester.strategies.SA3_smooth_moving_average import SmoothMovingAverage
+from quant_backtester.strategies.SA4_trend_filtered_pullback import TrendFilteredPullback
+from quant_backtester.strategies.SA5_relative_residual_tilt import RelativeResidualTilt
+from quant_backtester.strategies.SA6_realized_vol_control import RealizedVolControl
+from quant_backtester.strategies.SA7_factor_etf_blend import FactorETFBlend
+from quant_backtester.strategies.SA8_monetary_carry import MonetaryCarry
+from quant_backtester.strategies.SA9_vix_relief_entry import VixReliefEntry
+from quant_backtester.strategies.SA10_etf_ensemble import ETFEnsemble
+from quant_backtester.strategies.SA11_garch_vol_control import EwmaVolControl, GarchVolControl
+from quant_backtester.strategies.SA12_arima_garch import ArimaGarch
 
 __all__ = [
     "ArimaGarch",
     "BufferedDualMomentum",
-    "BuyAndHold",
     "ETFEnsemble",
-    "EqualWeightRebalance",
     "EwmaVolControl",
     "FactorETFBlend",
-    "FixedWeights",
     "FunctionalStrategy",
     "GarchVolControl",
     "MonetaryCarry",

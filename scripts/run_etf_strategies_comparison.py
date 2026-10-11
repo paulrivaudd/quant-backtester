@@ -75,13 +75,12 @@ from quant_backtester.data.schemas import BarField
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel, Sizing
 from quant_backtester.provenance import git_source_state
+from quant_backtester.research.references import BuyAndHold, EqualWeightRebalance
 from quant_backtester.signals.models.arima_garch import require_statsmodels
 from quant_backtester.signals.models.garch import MissingDependency, require_arch
 from quant_backtester.strategies import (
     ArimaGarch,
     BufferedDualMomentum,
-    BuyAndHold,
-    EqualWeightRebalance,
     ETFEnsemble,
     GarchVolControl,
     RealizedVolControl,

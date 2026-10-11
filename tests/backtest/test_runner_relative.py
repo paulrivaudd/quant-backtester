@@ -23,7 +23,7 @@ from quant_backtester.backtest.runner import StrategyResult, StrategyRunner
 from quant_backtester.demo import demo_runner
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel
-from quant_backtester.strategies.examples import WorldMA20Benchmark
+from quant_backtester.strategies import WorldMA20Benchmark
 
 SEED = 20240101
 PERIOD = ("2025-01-02", "2025-12-31")

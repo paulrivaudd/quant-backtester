@@ -17,7 +17,7 @@ importing the first group never drags in the second.
 
 PyTorch is an optional dependency (the ``ml`` extra): nothing outside this
 package and the two modules that use it - ``signals.ml`` and
-``strategies.ml`` - imports it.
+``strategies.SA14_neural_allocation`` - imports it.
 """
 
 from __future__ import annotations

@@ -346,7 +346,7 @@ provide; importing the store there fails with a message saying so.
 
 ```bash
 uv sync                          # create the environment from uv.lock
-uv sync --extra ml               # the same, with PyTorch (CPU) for the ML strategies
+uv sync --extra ml               # the same, with PyTorch (CPU) for SA14
 uv sync --extra stats            # the same, with arch and statsmodels for SA11 and SA12
 uv sync --extra ml --extra stats --extra signatures   # everything, SA13 (log-signatures) included
 git config core.hooksPath .githooks   # once per clone: the commit-message hook
@@ -902,7 +902,7 @@ the same instant or it cannot be built.
 Other scripts: a study script named after its strategy's code runs that
 strategy with its controls (`SA11_run_garch_study.py`,
 `SA12_run_arima_garch_study.py`, `SA13_run_signature_study.py`,
-`ML1_run_neural_strategy.py`), `run_etf_strategies_comparison.py` runs `SA1` to
+`SA14_run_neural_strategy.py`), `run_etf_strategies_comparison.py` runs `SA1` to
 `SA10` on one period, `write_strategy_reports.py` writes the reports,
 `generate_calendars.py` rewrites the committed calendars from
 `exchange_calendars`, `check_calendar_coverage.py` says when they need

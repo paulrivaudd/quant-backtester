@@ -1,4 +1,4 @@
-"""The ML1 script: its configuration, its preparation step and its decision export."""
+"""The SA14 script: its configuration, its preparation step and its decision export."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from quant_backtester.backtest.runner import StrategyRunner
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.ml.artifacts import ArtifactError
 from quant_backtester.ml.config import NeuralStrategyConfig
-from quant_backtester.strategies.ml.ML1_neural_allocation import (
+from quant_backtester.strategies.SA14_neural_allocation import (
     InformationCutoffError,
     NeuralAllocationStrategy,
 )
@@ -28,9 +28,9 @@ TEST_START, TEST_END = date(2026, 9, 1), date(2026, 12, 18)
 
 
 def load_script() -> ModuleType:
-    """Import ``scripts/ML1_run_neural_strategy.py`` by its path."""
-    path = REPOSITORY / "scripts" / "ML1_run_neural_strategy.py"
-    spec = importlib.util.spec_from_file_location("ML1_run_neural_strategy", path)
+    """Import ``scripts/SA14_run_neural_strategy.py`` by its path."""
+    path = REPOSITORY / "scripts" / "SA14_run_neural_strategy.py"
+    spec = importlib.util.spec_from_file_location("SA14_run_neural_strategy", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -80,7 +80,7 @@ def test_the_costs_are_the_opening_assumption_and_double_as_a_whole() -> None:
 
 
 def test_the_books_are_named_by_the_catalogue() -> None:
-    assert SCRIPT.ML1 == "ML1 - neural allocation"
+    assert SCRIPT.SA14 == "SA14 - neural allocation"
     assert list(SCRIPT.references()) == ["SA1 - std MA20", "buy & hold World", "equal weight"]
     for strategy in SCRIPT.references().values():
         strategy.validate()
@@ -137,8 +137,8 @@ def test_a_model_is_calibrated_once_then_loaded_and_exported_decision_by_decisio
 
     written = SCRIPT.save_outputs(
         tmp_path / "out",
-        pd.DataFrame.from_dict({SCRIPT.ML1: row}, orient="index"),
-        {SCRIPT.ML1: result},
+        pd.DataFrame.from_dict({SCRIPT.SA14: row}, orient="index"),
+        {SCRIPT.SA14: result},
         decisions,
     )
     assert sorted(path.name for path in written) == [

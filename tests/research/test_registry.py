@@ -11,6 +11,7 @@ import pytest
 from quant_backtester.backtest.runner import StrategyRunner
 from quant_backtester.provenance import SourceState, SourceStatus
 from quant_backtester.research.hypotheses import Hypotheses, Hypothesis, HypothesisStatus
+from quant_backtester.research.references import BuyAndHold
 from quant_backtester.research.registry import (
     ExperimentRecord,
     ExperimentRegistry,
@@ -18,7 +19,6 @@ from quant_backtester.research.registry import (
     Verdict,
     record_of,
 )
-from quant_backtester.strategies.examples import BuyAndHold
 
 AT = datetime(2026, 9, 26, 18, 0, tzinfo=UTC)
 

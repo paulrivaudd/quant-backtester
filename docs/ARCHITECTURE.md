@@ -80,16 +80,16 @@ Trois règles supplémentaires sont vérifiées par les mêmes tests :
 | `execution/` | Ce que le marché fait d'un ordre | `model` (`ExecutionModel`, `Sizing`), `costs` (`CostModel`), `rounding` (lots), `orders`, `fills` (`Fill`, `ExecutionReject`) |
 | `backtest/` | Le temps | `config` (`BacktestConfig`), `engine`, `timetable`, `schedule`, `context` (`StrategyContext`), `market`, `records` (`BacktestRecord`), `result` (`BacktestResult`), `runner` (`StrategyRunner`, `StrategyResult`) |
 | `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (score 0-100 % contre le marché, règles versionnées `QUALITY_V1`), `volatility_forecast` (qualité ex post d'une prévision de variance : QLIKE), `return_forecast` (prévision de rendement à deux séances : moyenne, signe, perte jointe) |
-| `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1`, `ML1`…), `examples/`, `adaptive/`, `ml/` |
+| `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1` à `SA14`), un module par stratégie à la racine (`SA1_world_ma20_benchmark` … `SA14_neural_allocation`), `adaptive/` (les règles qu'elles partagent) |
 | `ml/` | Les modèles ajustés (hors couches, voir ci-dessous) | `config` (`NeuralStrategyConfig`), `features` (`NeuralFeatureBuilder`, `FeatureScaler`), `network` (`NeuralAllocator`), `artifacts` (`NeuralArtifact`), `dataset` (`ForwardOpenReturnBuilder`, purge), `training` (`calibrate_neural_strategy`), `signatures/` (`SignatureVariant`, `SignatureArtifact`, `SignatureModelSchedule`, `calibrate_month`) |
-| `research/` | La discipline de recherche | `hypotheses`, `registry`, `archive`, `paper`, `journal` |
+| `research/` | La discipline de recherche | `hypotheses`, `registry`, `archive`, `paper`, `journal`, `references` (les livres auxquels une étude se mesure) |
 
 `provenance.py` (état git du code qui a produit un résultat) et `numbers.py`
 (gardes sur les paramètres numériques) sont transverses.
 
 `ml/` n'est pas une couche. `config`, `features`, `network` et `artifacts` ne
 lisent rien au-dessus de `signals/` : ce sont eux qu'importent le signal
-(`signals/ml/`) et la stratégie (`strategies/ml/`) d'un modèle. `dataset` et
+(`signals/ml/`) et la stratégie (`strategies/SA14_neural_allocation.py`) d'un modèle. `dataset` et
 `training` tournent hors ligne, **avant** tout backtest : ils composent le
 lecteur, le runner et la stratégie, comme `backtest/runner.py`, et aucune
 couche ne les importe. PyTorch est une dépendance optionnelle
@@ -283,11 +283,12 @@ pas un poids du portefeuille, et il refuse une ligne déjà détenue.
 `@strategy` enregistre le nom qualifié de la fonction, pas son code : seul l'état
 git trace une modification de son corps.
 
-### Les livres de référence (`strategies/examples/`)
+### Les livres de référence (`research/references.py`)
 
 Les stratégies conservées ont un code et sont décrites plus bas, au catalogue.
-Les trois classes sans code de ce dossier ne sont pas des candidates : ce sont
-les références et le témoin auxquels les études les mesurent.
+Les trois classes de ce module ne sont pas des candidates et ne sont pas dans
+le paquet `strategies` : ce sont les références et le témoin auxquels les
+études mesurent une stratégie.
 
 | Classe | Règle exacte | Si le signal est inutilisable |
 |---|---|---|
@@ -317,22 +318,24 @@ la main :
 | `strategy_id` d'un résultat | `strategy_id` | `SA3_smooth_ma` |
 | nom de fichier | `slug` | `sa3_smooth_ma` |
 
-Familles : `SA` (règles statistiques sur prix et séries publiées) et `ML`
-(poids proposés par un modèle ajusté). Un code est attribué une fois, dans
+Une seule famille, `SA`. L'allocation neuronale était `ML1`, seule de sa
+famille, jusqu'au 2026-10-11 : elle est `SA14`, et le code `ML1` n'est pas
+réattribué. Son module importe PyTorch dès son chargement, ce que son entrée
+déclare (`extra = "ml"`). Un code est attribué une fois, dans
 l'ordre d'adoption, et n'est jamais réutilisé ; le libellé peut être reformulé.
 `SA1` à `SA10` sont les dix règles ETF du 2026-10-03 (numérotées 0 à 9 dans
 leur spécification : `SA1` est le benchmark MA20, `SA10` l'ensemble), `SA11`
 le contrôle de volatilité GARCH, `SA12` l'ARIMA-GARCH et `SA13` les
-signatures neuronales du 2026-10-10 (libellés sans tiret), `ML1` l'allocation
+signatures neuronales du 2026-10-10 (libellés sans tiret), `SA14` l'allocation
 neuronale. Les trois livres de référence ne sont pas catalogués ; les exemples
 et exercices antérieurs ont été retirés du code le 2026-10-11. `entry("SA3")`, `entry_of(strategy)` et `family(Family.SA)`
 donnent une entrée ; `entry.load()` importe la classe à la demande.
 
-### ML1, l'allocation neuronale (`strategies/ml/ML1_neural_allocation.py`)
+### SA14, l'allocation neuronale (`strategies/SA14_neural_allocation.py`)
 
 Un petit réseau (encodeur partagé `Linear(100, 8)`, couche cachée de 16,
 softmax sur les fonds achetables et le cash) propose chaque soir des poids. Il
-est entraîné **avant** le backtest (`scripts/ML1_run_neural_strategy.py`), puis
+est entraîné **avant** le backtest (`scripts/SA14_run_neural_strategy.py`), puis
 figé dans un artefact identifié par son contenu (`model_id`). La décision
 plafonne, retire les poids sous 1 %, puis compare au livre réellement détenu :
 `hold_positions` dans la bande de 3 points (cash compris), `weights` sinon,
@@ -343,7 +346,7 @@ en décision ; les rendements futurs ouverture→ouverture ne sont lus que par
 l'artefact porte sa date limite d'information et une décision prise avant est
 refusée (`InformationCutoffError`).
 
-### SA11, le contrôle de volatilité GARCH (`strategies/examples/SA11_garch_vol_control.py`)
+### SA11, le contrôle de volatilité GARCH (`strategies/SA11_garch_vol_control.py`)
 
 `GarchVolControl` détient `ETF_WORLD` à hauteur de
 `min(1, 12 % / max(σ, 5 %))`, où `σ = sqrt(252 · h(t+1|t))` est la prévision à
@@ -380,7 +383,7 @@ compté), erreur quadratique, résidus standardisés. `scripts/SA11_run_garch_st
 tient séparés le classement commun, la qualité de la prévision et le test
 économique de l'hypothèse (bootstrap apparié, second run réel à coûts doublés).
 
-### SA12, ARIMA-GARCH (`strategies/examples/SA12_arima_garch.py`)
+### SA12, ARIMA-GARCH (`strategies/SA12_arima_garch.py`)
 
 `ArimaGarch` détient `ETF_WORLD` tant qu'un ARIMA(1,0,1) prévoit un rendement
 positif pour **la première séance qu'un ordre peut porter**, à un poids
@@ -415,7 +418,7 @@ dimensionné par la variance de ce rendement.
 rendement de l'ouverture `t+1` à l'ouverture `t+2` et mesure la moyenne (MSE,
 signe avec ses dénominateurs) et la perte jointe `log v + e²/v`.
 
-### SA13, signatures neuronales (`strategies/examples/SA13_signatures_neurons.py`)
+### SA13, signatures neuronales (`strategies/SA13_signatures_neurons.py`)
 
 `SignaturesNeurons` détient `ETF_WORLD` tant qu'un modèle additif, lisant la
 log-signature de ses 60 dernières séances, prévoit un rendement simple positif

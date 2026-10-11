@@ -1,4 +1,4 @@
-"""ML1: from the network's proposal to one of the three answers of a decision."""
+"""SA14: from the network's proposal to one of the three answers of a decision."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from quant_backtester.portfolio.targets import TargetAllocation
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.engine import SignalEngine
 from quant_backtester.signals.types import SignalStatus
-from quant_backtester.strategies.ml.ML1_neural_allocation import (
+from quant_backtester.strategies.SA14_neural_allocation import (
     Action,
     InformationCutoffError,
     NeuralAllocationStrategy,
@@ -107,7 +107,7 @@ def test_the_band_never_holds_back_a_full_exit_or_a_breached_cap() -> None:
 
 @pytest.fixture
 def strategy(neural_artifact: NeuralArtifact) -> NeuralAllocationStrategy:
-    """Return ML1 on the untrained model of the fixtures."""
+    """Return SA14 on the untrained model of the fixtures."""
     return NeuralAllocationStrategy.from_artifact(neural_artifact)
 
 
@@ -115,7 +115,7 @@ def strategy(neural_artifact: NeuralArtifact) -> NeuralAllocationStrategy:
 def contexts(
     strategy: NeuralAllocationStrategy, calendars, make_decision, make_book
 ) -> Callable[..., StrategyContext]:
-    """Return the context ML1 is handed for one decision on a given store and book."""
+    """Return the context SA14 is handed for one decision on a given store and book."""
 
     def at(
         reader: MarketDataReader,
@@ -207,7 +207,7 @@ def test_the_strategy_is_recorded_by_its_models_identity(
     again = NeuralAllocationStrategy.from_artifact(neural_artifact)
 
     strategy.validate()
-    assert strategy.strategy_id == "ML1_neural_allocation"
+    assert strategy.strategy_id == "SA14_neural_allocation"
     assert strategy.parameters()["model_id"] == neural_artifact.model_id
     assert strategy.parameters()["config"] == neural_artifact.config.definition()
     assert definition["signals"][0]["signal"]["model_id"] == neural_artifact.model_id  # type: ignore[index]

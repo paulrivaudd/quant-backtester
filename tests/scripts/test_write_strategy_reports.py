@@ -481,7 +481,7 @@ def test_without_a_selection_a_control_of_a_later_study_is_skipped(tmp_path: Pat
     study = study_folder(tmp_path / "study")
     output = tmp_path / "reports"
 
-    SCRIPT.main(["--study", str(study), "--output", str(output), "--skip-ml1"])
+    SCRIPT.main(["--study", str(study), "--output", str(output), "--skip-sa14"])
 
     written = sorted(path.name for path in output.glob("strategy*.md"))
     assert written == [

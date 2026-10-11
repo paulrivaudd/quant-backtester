@@ -1,4 +1,4 @@
-"""ML1: hold what a frozen network proposes, between the tradable funds and cash."""
+"""SA14: hold what a frozen network proposes, between the tradable funds and cash."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from quant_backtester.signals.ml.neural_allocation import NeuralAllocationSignal
 from quant_backtester.signals.types import SignalStatus, require_identifier
 from quant_backtester.strategies.base import Strategy
 
-STRATEGY_ID = "ML1_neural_allocation"
+STRATEGY_ID = "SA14_neural_allocation"
 """The catalogue code of the strategy and its label, as one identifier."""
 
 SIGNAL_ID = "neural_allocation_weights"

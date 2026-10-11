@@ -231,8 +231,11 @@ ML = PACKAGE / "ml"
 ML_INFERENCE = ("config.py", "features.py", "network.py", "artifacts.py")
 """What a model's signal and strategy import: nothing above the signals."""
 
-TORCH_MODULES = (ML, SIGNALS / "ml", STRATEGIES / "ml")
-"""The only places PyTorch, an optional dependency, may be imported from."""
+TORCH_MODULES = (ML, SIGNALS / "ml")
+"""The folders PyTorch, an optional dependency, may be imported from."""
+
+TORCH_STRATEGY = STRATEGIES / "SA14_neural_allocation.py"
+"""The one strategy module that may reach it: it is not imported with its package."""
 
 SIGNATURE_INFERENCE = ("config.py", "models.py", "artifacts.py")
 """What the signal and the strategy of a signature model import from ``ml/signatures``."""
@@ -278,7 +281,7 @@ def test_no_layer_imports_the_training_of_a_model():
 def test_pytorch_is_imported_by_the_model_code_only():
     """Every other strategy keeps running without the ``ml`` extra installed."""
     for path in PACKAGE.rglob("*.py"):
-        if any(root in path.parents for root in TORCH_MODULES):
+        if path == TORCH_STRATEGY or any(root in path.parents for root in TORCH_MODULES):
             continue
         direct = {name.split(".")[0] for name in imported_modules(path)}
         assert "torch" not in direct, f"{path.relative_to(PACKAGE)} imports torch"
@@ -293,7 +296,7 @@ def test_pytorch_is_imported_by_the_model_code_only():
                     "quant_backtester.ml.training",
                     "quant_backtester.ml.signatures.training",
                     "quant_backtester.signals.ml.",
-                    "quant_backtester.strategies.ml.",
+                    "quant_backtester.strategies.SA14_neural_allocation",
                 )
             )
         )
@@ -330,16 +333,21 @@ def test_a_signal_excused_from_the_pytorch_rule_really_imports_none():
 
 
 def test_every_catalogued_rule_imports_without_any_optional_package():
-    """Listing and loading the statistical family loads none of the extras.
+    """Listing the catalogue, and loading every entry that declares no extra, loads none.
+
+    ``SA14`` declares the ``ml`` extra and is the only entry left out: importing
+    the ``strategies`` package must not import it either.
 
     Checked in a fresh interpreter: an optional package already imported by
     another test of this session would hide a leak.
     """
     program = (
         "import sys\n"
-        "from quant_backtester.strategies.catalogue import Family, family\n"
-        "for item in family(Family.SA):\n"
-        "    item.load()\n"
+        "import quant_backtester.strategies\n"
+        "from quant_backtester.strategies.catalogue import CATALOGUE\n"
+        "for item in CATALOGUE:\n"
+        "    if item.extra is None:\n"
+        "        item.load()\n"
         f"loaded = [name for name in {OPTIONAL_PACKAGES!r} if name in sys.modules]\n"
         "assert not loaded, loaded\n"
     )

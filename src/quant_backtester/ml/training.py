@@ -45,7 +45,7 @@ from quant_backtester.ml.network import (
     proxy_returns,
     risk_adjusted_objective,
 )
-from quant_backtester.strategies.ml.ML1_neural_allocation import NeuralAllocationStrategy
+from quant_backtester.strategies.SA14_neural_allocation import NeuralAllocationStrategy
 
 TRAINING_METRICS_FILE = "training_metrics.csv"
 VALIDATION_METRICS_FILE = "validation_metrics.csv"

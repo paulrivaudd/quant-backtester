@@ -1,8 +1,8 @@
-"""The catalogue: one code and one short label per strategy, by family.
+"""The catalogue: one code and one short label per strategy.
 
 Two hundred strategies cannot be told apart by class names and by the order
 they were written in. So a strategy that is kept gets a code - a family and a
-number, ``SA3`` or ``ML1`` - and a label of two or three words, and that pair
+number, ``SA3`` or ``SA14`` - and a label of two or three words, and that pair
 is its name everywhere a person reads one: ``"SA3 - smooth MA"`` in a table or
 a figure, ``SA3_smooth_ma`` as the ``strategy_id`` of a result, and
 ``sa3_smooth_ma`` in the name of a file a run exports.
@@ -11,7 +11,8 @@ The files written for one catalogued strategy alone carry its code first: its
 module (``SA3_smooth_moving_average.py``), its test file
 (``test_SA11_garch_vol_control.py``), its study script
 (``SA11_run_garch_study.py``) and the figures that script writes. A module
-several strategies share, and an example that has no code, keep a plain name.
+several strategies share keeps a plain name. Every strategy module sits at the
+root of the ``strategies`` package, beside this one.
 
 A code is given once and never reused: a strategy that is dropped keeps its
 number, and the next one takes the next. The label may be reworded; the code
@@ -37,11 +38,9 @@ class Family(Enum):
     """What kind of reasoning a strategy rests on. The value is the code's prefix."""
 
     SA = "SA"
-    """Statistical rules on prices and published series: trends, momentum,
-    pullbacks, relative value, volatility control, and blends of those."""
-
-    ML = "ML"
-    """Weights proposed by a model fitted on a training period."""
+    """Systematic rules on prices and published series: trends, momentum,
+    pullbacks, relative value, volatility control, blends of those, and weights
+    proposed by a model fitted on a training period (``SA13``, ``SA14``)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +57,10 @@ class CatalogueEntry:
         Two or three words that tell it from its neighbours.
     target : str
         ``"module:Class"`` of the strategy.
+    extra : str | None
+        The optional dependency group its module imports as soon as it is
+        loaded, ``"ml"`` for PyTorch; ``None`` when the class loads without
+        any extra.
 
     Raises
     ------
@@ -71,6 +74,7 @@ class CatalogueEntry:
     number: int
     label: str
     target: str
+    extra: str | None = None
 
     def __post_init__(self) -> None:
         """Refuse an entry that cannot be written as a code, a name and a slug."""
@@ -109,9 +113,9 @@ class CatalogueEntry:
         Raises
         ------
         ImportError
-            If the module needs an optional dependency that is not installed
-            (the ``ml`` extra for the ML family). ``SA11`` loads without its
-            ``stats`` extra and refuses to run without it.
+            If the module needs an optional dependency that is not installed:
+            the one ``extra`` names (``ml`` for ``SA14``). ``SA11`` loads
+            without its ``stats`` extra and refuses to run without it.
         TypeError
             If the target is not a strategy.
         """
@@ -122,62 +126,62 @@ class CatalogueEntry:
         return loaded
 
 
-_EXAMPLES = "quant_backtester.strategies.examples"
+_STRATEGIES = "quant_backtester.strategies"
 
 CATALOGUE: tuple[CatalogueEntry, ...] = (
     CatalogueEntry(
-        Family.SA, 1, "std MA20", f"{_EXAMPLES}.SA1_world_ma20_benchmark:WorldMA20Benchmark"
+        Family.SA, 1, "std MA20", f"{_STRATEGIES}.SA1_world_ma20_benchmark:WorldMA20Benchmark"
     ),
     CatalogueEntry(
         Family.SA,
         2,
         "dual momentum",
-        f"{_EXAMPLES}.SA2_buffered_dual_momentum:BufferedDualMomentum",
+        f"{_STRATEGIES}.SA2_buffered_dual_momentum:BufferedDualMomentum",
     ),
     CatalogueEntry(
-        Family.SA, 3, "smooth MA", f"{_EXAMPLES}.SA3_smooth_moving_average:SmoothMovingAverage"
+        Family.SA, 3, "smooth MA", f"{_STRATEGIES}.SA3_smooth_moving_average:SmoothMovingAverage"
     ),
     CatalogueEntry(
-        Family.SA, 4, "pullback", f"{_EXAMPLES}.SA4_trend_filtered_pullback:TrendFilteredPullback"
+        Family.SA, 4, "pullback", f"{_STRATEGIES}.SA4_trend_filtered_pullback:TrendFilteredPullback"
     ),
     CatalogueEntry(
         Family.SA,
         5,
         "relative tilt",
-        f"{_EXAMPLES}.SA5_relative_residual_tilt:RelativeResidualTilt",
+        f"{_STRATEGIES}.SA5_relative_residual_tilt:RelativeResidualTilt",
     ),
     CatalogueEntry(
-        Family.SA, 6, "vol control", f"{_EXAMPLES}.SA6_realized_vol_control:RealizedVolControl"
+        Family.SA, 6, "vol control", f"{_STRATEGIES}.SA6_realized_vol_control:RealizedVolControl"
     ),
     CatalogueEntry(
-        Family.SA, 7, "factor blend", f"{_EXAMPLES}.SA7_factor_etf_blend:FactorETFBlend"
-    ),
-    CatalogueEntry(Family.SA, 8, "monetary carry", f"{_EXAMPLES}.SA8_monetary_carry:MonetaryCarry"),
-    CatalogueEntry(Family.SA, 9, "VIX relief", f"{_EXAMPLES}.SA9_vix_relief_entry:VixReliefEntry"),
-    CatalogueEntry(
-        Family.SA,
-        10,
-        "ensemble",
-        "quant_backtester.strategies.adaptive.SA10_etf_ensemble:ETFEnsemble",
+        Family.SA, 7, "factor blend", f"{_STRATEGIES}.SA7_factor_etf_blend:FactorETFBlend"
     ),
     CatalogueEntry(
-        Family.SA, 11, "GARCH vol control", f"{_EXAMPLES}.SA11_garch_vol_control:GarchVolControl"
+        Family.SA, 8, "monetary carry", f"{_STRATEGIES}.SA8_monetary_carry:MonetaryCarry"
     ),
-    CatalogueEntry(Family.SA, 12, "ARIMA GARCH", f"{_EXAMPLES}.SA12_arima_garch:ArimaGarch"),
+    CatalogueEntry(
+        Family.SA, 9, "VIX relief", f"{_STRATEGIES}.SA9_vix_relief_entry:VixReliefEntry"
+    ),
+    CatalogueEntry(Family.SA, 10, "ensemble", f"{_STRATEGIES}.SA10_etf_ensemble:ETFEnsemble"),
+    CatalogueEntry(
+        Family.SA, 11, "GARCH vol control", f"{_STRATEGIES}.SA11_garch_vol_control:GarchVolControl"
+    ),
+    CatalogueEntry(Family.SA, 12, "ARIMA GARCH", f"{_STRATEGIES}.SA12_arima_garch:ArimaGarch"),
     CatalogueEntry(
         Family.SA,
         13,
         "Signatures Neurons",
-        f"{_EXAMPLES}.SA13_signatures_neurons:SignaturesNeurons",
+        f"{_STRATEGIES}.SA13_signatures_neurons:SignaturesNeurons",
     ),
     CatalogueEntry(
-        Family.ML,
-        1,
+        Family.SA,
+        14,
         "neural allocation",
-        "quant_backtester.strategies.ml.ML1_neural_allocation:NeuralAllocationStrategy",
+        f"{_STRATEGIES}.SA14_neural_allocation:NeuralAllocationStrategy",
+        extra="ml",
     ),
 )
-"""Every catalogued strategy, by family then by number.
+"""Every catalogued strategy, by number.
 
 ``SA1`` to ``SA10`` are the ten ETF rules of 2026-10-03, numbered 0 to 9 in
 their specification: ``SA1`` is its benchmark 0, the fund held above its
@@ -188,10 +192,13 @@ entry loads without it. ``SA12`` is the ARIMA-GARCH of the same day, on the same
 extra (the label takes no hyphen). ``SA13`` is the signature model of the same
 day: it keeps an SA code although its forecasts come from a small network, runs
 on a schedule of models calibrated before the backtest, and is built with
-``SignaturesNeurons.from_schedule``. ``ML1`` is the neural allocation of 2026-10-04.
-``BuyAndHold``, ``EqualWeightRebalance`` and ``FixedWeights`` are the reference
-books and the control of the studies, not candidates: they carry no code. The
-exercises and the baselines that came before were removed on 2026-10-11.
+``SignaturesNeurons.from_schedule``. ``SA14`` is the neural allocation of
+2026-10-04: it was catalogued as ``ML1``, alone in a family of its own, until
+2026-10-11, and the code ``ML1`` is not given again. Its module imports PyTorch
+when it is loaded, which is what its ``extra`` says. The reference books of the
+studies (``quant_backtester.research.references``) are not candidates and carry
+no code. The exercises and the baselines that came before were removed on
+2026-10-11.
 """
 
 
