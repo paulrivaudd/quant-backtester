@@ -2,15 +2,15 @@
 
 Période commune 2021-04-01 → 2026-10-09 · capital 100 000 EUR · commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · 252 séances par an.
 
-Source : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
+Source : commit `91a2f3776759` (CLEAN), magasin `b5facce52a6f`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
 
 ## 1. Indicateurs de résultat globaux
 
 | Indicateur | Stratégie | Fonds détenu (buy & hold ETF_WORLD) |
 |---|---:|---:|
 | Période mesurée | 2021-04-01 → 2026-10-09 (1416 séances) | idem |
-| Rang au classement commun (QUALITY_V1) | 6 | n/a |
-| Score de qualité QUALITY_V1 (0-100 %) | 48.6% | n/a |
+| Rang au classement commun (QUALITY_V1) | 7 | n/a |
+| Score de qualité QUALITY_V1 (0-100 %) | 48.7% | n/a |
 | - bloc marché (IR et alpha contre le fonds détenu) | 0.23 | n/a |
 | - bloc significativité (Sharpe déflaté) | 0.81 | n/a |
 | - bloc risque (drawdown relatif) | 0.74 | n/a |
@@ -99,7 +99,7 @@ Détenir ETF_WORLD à hauteur de w = min(1, 12 % / max(σ, 5 %)), où σ est la 
 - **Fait.** Aux coûts de base, les intervalles de la différence de Sharpe incluent zéro : [-0,141 ; +0,076] contre SA6, [-0,147 ; +0,009] contre l'EWMA. Il n'y a donc pas de preuve à 95 % d'une infériorité générale. Dans le second run à coûts doublés, l'intervalle contre l'EWMA est [-0,172 ; -0,014], négatif, sous les hypothèses de ce bootstrap conditionnel.
 - **Fait.** 508 ordres, rotation de 5,5 fois l'actif par an, 3 749 EUR de coûts, contre 180 ordres et 1 445 EUR pour SA6 ; le poids de clôture varie de 2,3 points par séance en moyenne, contre 0,9.
 - **Fait.** +66,0 % contre +94,8 % pour le fonds, alpha de -0,4 % par an (sans intervalle) ; sommet retrouvé le 2026-01-09, 324 jours après, contre 229 pour le fonds.
-- **Fait.** Sixième du classement commun (48,6 %). L'écart avec SA6 (52,0 %) et l'EWMA (53,6 %) n'est pas un test de supériorité.
+- **Fait.** Septième du classement commun (48,7 %). L'écart avec SA6 (52,0 %) et l'EWMA (53,6 %) n'est pas un test de supériorité.
 
 ### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
 

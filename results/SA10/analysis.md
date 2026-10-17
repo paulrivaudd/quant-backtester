@@ -2,7 +2,7 @@
 
 Période commune 2021-04-01 → 2026-10-09 · capital 100 000 EUR · commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · 252 séances par an.
 
-Source : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
+Source : commit `91a2f3776759` (CLEAN), magasin `b5facce52a6f`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
 
 ## 1. Indicateurs de résultat globaux
 
@@ -124,7 +124,7 @@ SA10 sans facteurs ni monétaire : cinq règles (momentum, moyennes lissées, re
 
 - La décomposition des cibles règle par règle à chaque décision, que le code sait calculer et qui n'est pas exportée.
 - Le facteur de réduction du contrôle de risque, les dates où il est inférieur à 1 et les décisions forcées par le risque du portefeuille détenu : tant qu'ils ne sont pas exportés, ni la fréquence de ce contrôle ni son rôle en avril 2025 ne peuvent être commentés.
-- La version complète, quand les instruments de SA7 et SA8 seront enregistrés.
+- La version complète, avec les fonds de SA7 et de SA8, enregistrés depuis le 2026-10-11 : ce run-ci est toujours exécuté sans eux.
 - Ces ablations sont des variantes regardées après coup : aucune n'est candidate.
 
 ## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie

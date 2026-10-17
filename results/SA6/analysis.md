@@ -2,7 +2,7 @@
 
 Période commune 2021-04-01 → 2026-10-09 · capital 100 000 EUR · commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · 252 séances par an.
 
-Source : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
+Source : commit `91a2f3776759` (CLEAN), magasin `b5facce52a6f`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
 
 ## 1. Indicateurs de résultat globaux
 
@@ -90,7 +90,7 @@ Détenir ETF_WORLD à hauteur de min(1, 12 % / max(vol 20 jours, vol 60 jours, 5
 - **Fait.** Perte maximale de -15,72 % contre -21,64 % pour le fonds, volatilité de 10,9 % contre 13,8 %, Sharpe de 0,90 contre 0,93.
 - **Fait.** 180 ordres, 1 445 EUR de coûts, rotation de 2,1 fois l'actif par an ; +65,5 % et Sharpe de 0,88 dans le second run à coûts doublés.
 - **Fait.** Le 2025-04-02, à la veille de la seconde vague, son poids de clôture est de 65,0 %, contre 77,7 % pour SA11 et 67,2 % pour le témoin EWMA.
-- **Fait.** Troisième du classement commun (52,0 %). L'écart avec le témoin EWMA (53,6 %) et SA11 (48,6 %) n'est pas un test de supériorité.
+- **Fait.** Troisième du classement commun (52,0 %). L'écart avec le témoin EWMA (53,6 %) et SA11 (48,7 %) n'est pas un test de supériorité.
 
 ### Points faibles
 

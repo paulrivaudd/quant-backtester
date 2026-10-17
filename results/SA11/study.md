@@ -6,36 +6,40 @@ Common period 2021-04-01 to 2026-10-09, 1416 sessions, 100,000 EUR, costs of the
 
 | book | rank | score | market | signif. | risk | robust. | implem. | net | net/yr | vol | Sharpe | max DD | alpha/yr | beta | IR | costs EUR | turnover/yr | expo |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 50/50 rebalanced | 1 | 77.9% | 0.78 | 0.86 | 0.46 | 0.91 | 0.98 | +103.3% | +13.71% | 14.2% | +0.96 | -22.5% | +0.51% | 1.02 | +0.55 | 736 | 0.18 | 100% |
+| 50/50 rebalanced | 1 | 77.9% | 0.78 | 0.87 | 0.46 | 0.91 | 0.98 | +103.3% | +13.71% | 14.2% | +0.96 | -22.5% | +0.51% | 1.02 | +0.55 | 736 | 0.18 | 100% |
 | EWMA 0.94 control | 2 | 53.6% | 0.27 | 0.85 | 0.79 | 0.48 | 0.93 | +73.4% | +10.48% | 11.2% | +0.93 | -15.4% | +0.39% | 0.78 | -0.58 | 1,519 | 2.15 | 88% |
 | SA6 - vol control | 3 | 52.0% | 0.25 | 0.83 | 0.77 | 0.48 | 0.93 | +67.4% | +9.78% | 10.9% | +0.90 | -15.7% | +0.03% | 0.76 | -0.69 | 1,445 | 2.07 | 85% |
 | SA10 - ensemble | 4 | 51.1% | 0.24 | 0.80 | 0.96 | 0.44 | 0.81 | +32.1% | +5.16% | 6.0% | +0.86 | -11.8% | -0.12% | 0.41 | -0.92 | 1,986 | 3.05 | 42% |
-| SA3 - smooth MA | 5 | 49.0% | 0.27 | 0.76 | 0.50 | 0.49 | 0.96 | +57.9% | +8.62% | 11.0% | +0.79 | -21.6% | +0.39% | 0.65 | -0.51 | 680 | 0.98 | 71% |
-| SA11 - GARCH vol control | 6 | 48.6% | 0.23 | 0.81 | 0.74 | 0.44 | 0.82 | +66.0% | +9.61% | 11.1% | +0.87 | -16.5% | -0.39% | 0.78 | -0.77 | 3,749 | 5.46 | 87% |
-| SA2 - dual momentum | 7 | 44.1% | 0.21 | 0.75 | 0.45 | 0.52 | 0.79 | +69.2% | +9.99% | 13.1% | +0.78 | -22.8% | -1.03% | 0.88 | -0.48 | 4,629 | 6.78 | 86% |
-| SA5 - relative tilt | 8 | 29.4% | 0.13 | 0.73 | 0.44 | 0.25 | 0.27 | +72.8% | +10.42% | 14.2% | +0.76 | -22.9% | -2.40% | 1.03 | -1.33 | 20,517 | 29.23 | 100% |
-| SA1 - std MA20 | 9 | 0.0% | 0.17 | 0.43 | 0.62 | 0.00 | 0.00 | +20.5% | +3.43% | 8.9% | +0.42 | -18.9% | -1.61% | 0.41 | -0.86 | 15,730 | 25.53 | 66% |
-| SA4 - pullback | 9 | 0.0% | 0.26 | 0.42 | 1.00 | 0.00 | 0.00 | +4.4% | +0.79% | 1.9% | +0.41 | -3.4% | +0.18% | 0.05 | -0.91 | 4,572 | 8.02 | 4% |
-| SA9 - VIX relief | 9 | 0.0% | 0.21 | 0.10 | 1.00 | 0.00 | 0.00 | -0.7% | -0.13% | 2.3% | -0.04 | -8.0% | -0.71% | 0.05 | -0.97 | 2,041 | 3.78 | 4% |
+| SA7 - factor blend | 5 | 49.8% | 0.24 | 0.79 | 0.74 | 0.47 | 0.89 | +60.2% | +8.90% | 10.8% | +0.83 | -16.4% | -0.24% | 0.72 | -0.66 | 1,983 | 2.83 | 91% |
+| SA3 - smooth MA | 6 | 49.1% | 0.27 | 0.76 | 0.50 | 0.49 | 0.96 | +57.9% | +8.62% | 11.0% | +0.79 | -21.6% | +0.39% | 0.65 | -0.51 | 680 | 0.98 | 71% |
+| SA11 - GARCH vol control | 7 | 48.7% | 0.23 | 0.81 | 0.74 | 0.44 | 0.82 | +66.0% | +9.61% | 11.1% | +0.87 | -16.5% | -0.39% | 0.78 | -0.77 | 3,749 | 5.46 | 87% |
+| SA2 - dual momentum | 8 | 44.2% | 0.21 | 0.75 | 0.45 | 0.52 | 0.79 | +69.2% | +9.99% | 13.1% | +0.78 | -22.8% | -1.03% | 0.88 | -0.48 | 4,629 | 6.78 | 86% |
+| SA5 - relative tilt | 9 | 29.5% | 0.13 | 0.74 | 0.44 | 0.25 | 0.27 | +72.8% | +10.42% | 14.2% | +0.76 | -22.9% | -2.40% | 1.03 | -1.33 | 20,517 | 29.23 | 100% |
+| SA1 - std MA20 | 10 | 0.0% | 0.17 | 0.44 | 0.62 | 0.00 | 0.00 | +20.5% | +3.43% | 8.9% | +0.42 | -18.9% | -1.61% | 0.41 | -0.86 | 15,730 | 25.53 | 66% |
+| SA4 - pullback | 10 | 0.0% | 0.26 | 0.43 | 1.00 | 0.00 | 0.00 | +4.4% | +0.79% | 1.9% | +0.41 | -3.4% | +0.18% | 0.05 | -0.91 | 4,572 | 8.02 | 4% |
+| SA9 - VIX relief | 10 | 0.0% | 0.21 | 0.11 | 1.00 | 0.00 | 0.00 | -0.7% | -0.13% | 2.3% | -0.04 | -8.0% | -0.71% | 0.05 | -0.97 | 2,041 | 3.78 | 4% |
+| SA8 - monetary carry | n/a | n/a | n/a | n/a | n/a | n/a | n/a | +10.5% | +1.82% | 0.2% | +7.10 | -0.3% | n/a | n/a | n/a | 963 | 1.65 | 69% |
 | buy & hold World | n/a | n/a | n/a | n/a | n/a | n/a | n/a | +94.8% | +12.83% | 13.8% | +0.93 | -21.6% | n/a | n/a | n/a | 100 | 0.13 | 100% |
 
-Deflated by 10 trials (dispersion of per-session Sharpe ratios 0.01959). The register holds the configurations run here and not the variants of earlier exercises: the ranking is exploratory. The score is a composite index, not a probability of making money. A book without a score has no rank.
+Deflated by 11 trials (dispersion of per-session Sharpe ratios 0.01885). The register holds the configurations run here and not the variants of earlier exercises: the ranking is exploratory. The score is a composite index, not a probability of making money. A book without a score has no rank. SA8 holds a money-market fund and nothing else: with a risk-free rate of zero its Sharpe ratio is that of a fund that barely moves, not a measure of timing, so it is reported without a score and is not counted among the trials - counted, it multiplies the dispersion of their Sharpe ratios by six and brings every other score down to about 1%.
 
 ## The same table with every cost paid x2 (second real run)
 
 | book | rank | score | market | signif. | risk | robust. | implem. | net | net/yr | vol | Sharpe | max DD | alpha/yr | beta | IR | costs EUR | turnover/yr | expo |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 50/50 rebalanced | 1 | 75.3% | 0.77 | 0.77 | 0.46 | 0.91 | 0.97 | +102.7% | +13.65% | 14.2% | +0.96 | -22.5% | +0.47% | 1.03 | +0.54 | 1,069 | 0.17 | 100% |
-| EWMA 0.94 control | 2 | 50.0% | 0.26 | 0.73 | 0.78 | 0.46 | 0.86 | +70.9% | +10.19% | 11.1% | +0.91 | -15.5% | +0.16% | 0.78 | -0.64 | 3,033 | 2.16 | 88% |
-| SA6 - vol control | 3 | 48.5% | 0.24 | 0.71 | 0.77 | 0.46 | 0.86 | +65.5% | +9.55% | 10.9% | +0.88 | -15.8% | -0.17% | 0.76 | -0.73 | 2,810 | 2.02 | 85% |
+| EWMA 0.94 control | 2 | 50.1% | 0.26 | 0.73 | 0.78 | 0.46 | 0.86 | +70.9% | +10.19% | 11.1% | +0.91 | -15.5% | +0.16% | 0.78 | -0.64 | 3,033 | 2.16 | 88% |
+| SA6 - vol control | 3 | 48.6% | 0.24 | 0.71 | 0.77 | 0.46 | 0.86 | +65.5% | +9.55% | 10.9% | +0.88 | -15.8% | -0.17% | 0.76 | -0.73 | 2,810 | 2.02 | 85% |
 | SA3 - smooth MA | 4 | 46.1% | 0.27 | 0.63 | 0.50 | 0.48 | 0.92 | +56.9% | +8.50% | 11.0% | +0.79 | -21.6% | +0.30% | 0.65 | -0.52 | 1,353 | 0.98 | 71% |
-| SA10 - ensemble | 5 | 44.4% | 0.23 | 0.64 | 0.95 | 0.37 | 0.61 | +29.6% | +4.80% | 6.0% | +0.80 | -11.8% | -0.45% | 0.41 | -0.96 | 3,891 | 3.03 | 42% |
-| SA11 - GARCH vol control | 6 | 42.3% | 0.21 | 0.66 | 0.73 | 0.38 | 0.65 | +61.3% | +9.04% | 11.1% | +0.82 | -16.6% | -0.88% | 0.78 | -0.89 | 7,306 | 5.42 | 87% |
-| SA2 - dual momentum | 7 | 36.1% | 0.16 | 0.57 | 0.45 | 0.45 | 0.58 | +62.4% | +9.17% | 13.1% | +0.72 | -22.8% | -1.74% | 0.88 | -0.61 | 9,013 | 6.77 | 86% |
-| SA1 - std MA20 | 8 | 0.0% | 0.04 | 0.11 | 0.53 | 0.00 | 0.00 | +4.4% | +0.78% | 8.9% | +0.13 | -20.9% | -4.16% | 0.42 | -1.10 | 29,241 | 25.47 | 66% |
-| SA4 - pullback | 8 | 0.0% | 0.22 | 0.06 | 1.00 | 0.00 | 0.00 | -0.2% | -0.03% | 1.9% | -0.00 | -4.0% | -0.63% | 0.05 | -0.97 | 8,950 | 8.01 | 4% |
-| SA5 - relative tilt | 8 | 0.0% | 0.00 | 0.41 | 0.42 | 0.00 | 0.00 | +46.4% | +7.14% | 14.2% | +0.55 | -23.3% | -5.34% | 1.03 | -3.14 | 37,617 | 29.36 | 100% |
-| SA9 - VIX relief | 8 | 0.0% | 0.20 | 0.02 | 1.00 | 0.00 | 0.00 | -2.8% | -0.51% | 2.3% | -0.21 | -9.3% | -1.09% | 0.05 | -1.00 | 4,040 | 3.79 | 4% |
+| SA7 - factor blend | 5 | 45.3% | 0.22 | 0.65 | 0.74 | 0.44 | 0.79 | +57.7% | +8.59% | 10.8% | +0.80 | -16.4% | -0.50% | 0.72 | -0.71 | 3,935 | 2.83 | 91% |
+| SA10 - ensemble | 6 | 44.5% | 0.23 | 0.64 | 0.95 | 0.37 | 0.61 | +29.6% | +4.80% | 6.0% | +0.80 | -11.8% | -0.45% | 0.41 | -0.96 | 3,891 | 3.03 | 42% |
+| SA11 - GARCH vol control | 7 | 42.3% | 0.21 | 0.66 | 0.73 | 0.38 | 0.65 | +61.3% | +9.04% | 11.1% | +0.82 | -16.6% | -0.88% | 0.78 | -0.89 | 7,306 | 5.42 | 87% |
+| SA2 - dual momentum | 8 | 36.1% | 0.16 | 0.57 | 0.45 | 0.45 | 0.58 | +62.4% | +9.17% | 13.1% | +0.72 | -22.8% | -1.74% | 0.88 | -0.61 | 9,013 | 6.77 | 86% |
+| SA1 - std MA20 | 9 | 0.0% | 0.04 | 0.11 | 0.53 | 0.00 | 0.00 | +4.4% | +0.78% | 8.9% | +0.13 | -20.9% | -4.16% | 0.42 | -1.10 | 29,241 | 25.47 | 66% |
+| SA4 - pullback | 9 | 0.0% | 0.22 | 0.06 | 1.00 | 0.00 | 0.00 | -0.2% | -0.03% | 1.9% | -0.00 | -4.0% | -0.63% | 0.05 | -0.97 | 8,950 | 8.01 | 4% |
+| SA5 - relative tilt | 9 | 0.0% | 0.00 | 0.41 | 0.42 | 0.00 | 0.00 | +46.4% | +7.14% | 14.2% | +0.55 | -23.3% | -5.34% | 1.03 | -3.14 | 37,617 | 29.36 | 100% |
+| SA9 - VIX relief | 9 | 0.0% | 0.20 | 0.02 | 1.00 | 0.00 | 0.00 | -2.8% | -0.51% | 2.3% | -0.21 | -9.3% | -1.09% | 0.05 | -1.00 | 4,040 | 3.79 | 4% |
+| SA8 - monetary carry | n/a | n/a | n/a | n/a | n/a | n/a | n/a | +9.5% | +1.65% | 0.3% | +4.89 | -0.7% | n/a | n/a | n/a | 1,917 | 1.65 | 69% |
 | buy & hold World | n/a | n/a | n/a | n/a | n/a | n/a | n/a | +94.3% | +12.79% | 13.8% | +0.93 | -21.6% | n/a | n/a | n/a | 199 | 0.13 | 100% |
 
 ## SA11 against its controls
@@ -91,6 +95,8 @@ The share is at or below 5%: no reserve on attributing the results to GARCH.
 | SA4 - pullback | +1.1% | -0.8% | -0.7% | +5.5% | -2.4% | +1.7% |
 | SA5 - relative tilt | +18.2% | -16.9% | +18.1% | +25.9% | +2.4% | +15.6% |
 | SA6 - vol control | +14.9% | -11.3% | +16.3% | +20.3% | +1.6% | +15.6% |
+| SA7 - factor blend | +14.1% | -8.3% | +13.0% | +17.7% | +5.4% | +9.1% |
+| SA8 - monetary carry | +0.0% | +0.0% | +3.3% | +3.6% | +1.8% | +1.4% |
 | SA9 - VIX relief | -0.8% | -5.6% | +0.0% | +1.7% | +0.9% | +3.3% |
 | SA10 - ensemble | +9.6% | -7.4% | +5.5% | +14.8% | -1.7% | +9.2% |
 | SA11 - GARCH vol control | +14.2% | -13.2% | +15.6% | +22.5% | +2.5% | +15.3% |
@@ -120,10 +126,10 @@ Sessions of each year inside the period: 2021: 195, 2022: 257, 2023: 255, 2024: 
 - The store is not a set of provider vintages: restated closes are what a decision read, as far as the store can say.
 - The forecast covers close to close and orders are filled at the next open.
 - A prospective check starts at the first XPAR session after 2026-10-10 with this configuration frozen; it does not exist yet.
-- SA7 and SA8 were not run (instruments not registered). ML1 is reported apart.
+- SA7 and SA8 hold funds listed on Xetra, served by one provider and not cross-checked; SA10 is run without them. SA14 is reported apart.
 
 ## Timings
 
-- every run at costs x1: 143.3 s
-- every run at costs x2: 147.5 s
+- every run at costs x1: 171.7 s
+- every run at costs x2: 171.8 s
 - GARCH calibration alone, one fit per decision: 20.0 s

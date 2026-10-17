@@ -2,7 +2,7 @@
 
 Période commune 2021-04-01 → 2026-10-09 · capital 100 000 EUR · commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · 252 séances par an.
 
-Source : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
+Source : commit `91a2f3776759` (CLEAN), magasin `b5facce52a6f`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
 
 ## 1. Indicateurs de résultat globaux
 
@@ -90,7 +90,7 @@ Le témoin de SA11 : la même règle d'allocation, la même fenêtre et la même
 - **Fait.** Sharpe de 0,934 contre 0,930 pour le fonds détenu : un écart économiquement minuscule, qui ne démontre aucune supériorité. Perte maximale de -15,45 % au lieu de -21,64 %.
 - **Fait.** 220 ordres, 1 519 EUR de coûts, rotation de 2,1 fois l'actif par an ; +70,9 % et Sharpe de 0,91 dans le second run à coûts doublés.
 - **Fait.** Pas d'optimisation statistique quotidienne : un seul paramètre, fixé d'avance à 0,94, une variance amorcée sur 60 rendements, puis une récurrence. Pas de dépendance à un optimiseur GARCH, donc pas de non-convergence possible.
-- **Fait.** Deuxième du classement commun (53,6 %), devant SA6 (52,0 %) et SA11 (48,6 %) ; ces écarts ne sont pas un test.
+- **Fait.** Deuxième du classement commun (53,6 %), devant SA6 (52,0 %) et SA11 (48,7 %) ; ces écarts ne sont pas un test.
 
 ### Points faibles
 
