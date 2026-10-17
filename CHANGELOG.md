@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### SA7 and SA8 run, on Xetra funds (2026-10-11)
+- **SA7 and SA8 have results**, in the common study, on the funds registered
+  for them: +60.2% net for SA7 (rank 5 of 11, score 49.8%), +10.5% for SA8.
+  The other books' figures are those of the previous run to the cent; their
+  scores move by less than a tenth of a point.
+- **SA8 is reported outside the ranking**: its Sharpe ratio of 7.1, a
+  money-market fund against a risk-free rate of zero, would have brought every
+  other score down to about 1%.
+- **Two reserves, measured in their analyses**: a Paris session Xetra does not
+  hold leaves the funds without a close, and both rules then sell and buy back
+  the next day (30 of SA7's 72 orders, 8 of SA8's 9); two sessions the provider
+  does not serve keep SA7 in cash for 62 and 60 valuations.
+- The diagnostics are regenerated on the new store: the same numbers, and two
+  rows for SA7 and SA8 in the table of close-to-open gaps.
+
 ### The research package keeps what is used (2026-10-11)
 - **Removed**: `research/registry.jsonl` (nineteen runs, all of baselines no
   longer in the code), the two paper plans of `research/paper/`, and the nine

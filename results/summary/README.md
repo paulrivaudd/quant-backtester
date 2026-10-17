@@ -59,6 +59,13 @@ présenté comme un coût ; le séjour encore ouvert de `SA1` est compté à par
 relevées dans les textes de `SA2`, `SA3`, `SA4`, `SA9`, `SA10`, `SA11`, de
 l'EWMA et de `SA14` sont corrigées.
 
+**SA7 et SA8, le 2026-10-11.** Elles étaient cataloguées avec les autres
+règles ETF mais n'avaient jamais tourné, faute de fonds choisis. Leurs fonds,
+cotés sur Xetra, ont été enregistrés ce jour-là et l'étude commune a été
+relancée : le magasin change (`b5facce52a6f`), mais les chiffres des autres
+livres sont identiques, au centime, à ceux du run précédent. `SA7` entre au
+classement ; `SA8` est rapportée à part (voir plus bas).
+
 ## Comment lire
 
 - Une décision est prise le soir de la séance t (signal et poids cible de la
@@ -75,7 +82,7 @@ l'EWMA et de `SA14` sont corrigées.
 
 Période 2021-04-01 → 2026-10-09 (1 416 valorisations), 100 000 EUR, commission
 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb, quantités fixées à la
-décision. Score `QUALITY_V1` contre `ETF_WORLD` détenu, déflaté par 10 essais.
+décision. Score `QUALITY_V1` contre `ETF_WORLD` détenu, déflaté par 11 essais.
 
 | Rang | Livre | Score | Net | Sharpe | Perte max. | Retour au sommet | Coûts (EUR) | Rapport |
 |---:|---|---:|---:|---:|---:|---:|---:|---|
@@ -83,13 +90,15 @@ décision. Score `QUALITY_V1` contre `ETF_WORLD` détenu, déflaté par 10 essai
 | 2 | EWMA 0,94 (témoin de SA11, sans code) | 53,6 % | +73,4 % | 0,93 | -15,4 % | 321 j | 1 519 | [rapport](EWMA94control/analysis.md) |
 | 3 | SA6 - vol control | 52,0 % | +67,4 % | 0,90 | -15,7 % | 330 j | 1 445 | [rapport](../SA6/analysis.md) |
 | 4 | SA10 - ensemble, **sans facteurs ni monétaire** | 51,1 % | +32,1 % | 0,86 | -11,8 % | 442 j | 1 986 | [rapport](../SA10/analysis.md) |
-| 5 | SA3 - smooth MA | 49,0 % | +57,9 % | 0,79 | -21,6 % | 540 j | 680 | [rapport](../SA3/analysis.md) |
-| 6 | **SA11 - GARCH vol control** | 48,6 % | +66,0 % | 0,87 | -16,5 % | 324 j | 3 749 | [rapport](../SA11/analysis.md) |
-| 7 | SA2 - dual momentum | 44,1 % | +69,2 % | 0,78 | -22,8 % | 422 j | 4 629 | [rapport](../SA2/analysis.md) |
-| 8 | SA5 - relative tilt | 29,4 % | +72,8 % | 0,76 | -22,9 % | 252 j | 20 517 | [rapport](../SA5/analysis.md) |
-| 9 | SA1 - std MA20 | 0,0 % | +20,5 % | 0,42 | -18,9 % | 794 j | 15 730 | [rapport](../SA1/analysis.md) |
-| 9 | SA4 - pullback | 0,0 % | +4,4 % | 0,41 | -3,4 % | non récupéré | 4 572 | [rapport](../SA4/analysis.md) |
-| 9 | SA9 - VIX relief | 0,0 % | -0,7 % | -0,04 | -8,0 % | non récupéré | 2 041 | [rapport](../SA9/analysis.md) |
+| 5 | SA7 - factor blend, **fonds Xetra** | 49,8 % | +60,2 % | 0,83 | -16,4 % | 242 j | 1 983 | [rapport](../SA7/analysis.md) |
+| 6 | SA3 - smooth MA | 49,1 % | +57,9 % | 0,79 | -21,6 % | 540 j | 680 | [rapport](../SA3/analysis.md) |
+| 7 | **SA11 - GARCH vol control** | 48,7 % | +66,0 % | 0,87 | -16,5 % | 324 j | 3 749 | [rapport](../SA11/analysis.md) |
+| 8 | SA2 - dual momentum | 44,2 % | +69,2 % | 0,78 | -22,8 % | 422 j | 4 629 | [rapport](../SA2/analysis.md) |
+| 9 | SA5 - relative tilt | 29,5 % | +72,8 % | 0,76 | -22,9 % | 252 j | 20 517 | [rapport](../SA5/analysis.md) |
+| 10 | SA1 - std MA20 | 0,0 % | +20,5 % | 0,42 | -18,9 % | 794 j | 15 730 | [rapport](../SA1/analysis.md) |
+| 10 | SA4 - pullback | 0,0 % | +4,4 % | 0,41 | -3,4 % | non récupéré | 4 572 | [rapport](../SA4/analysis.md) |
+| 10 | SA9 - VIX relief | 0,0 % | -0,7 % | -0,04 | -8,0 % | non récupéré | 2 041 | [rapport](../SA9/analysis.md) |
+| — | SA8 - monetary carry (placement monétaire, hors classement) | — | +10,5 % | 7,10 | -0,4 % | 75 j | 963 | [rapport](../SA8/analysis.md) |
 | — | ETF_WORLD détenu (étalon, non noté) | — | +94,8 % | 0,93 | -21,6 % | 229 j | 100 | [rapport](REF_WorldBuyHold/analysis.md) |
 
 « Retour au sommet » : jours calendaires entre le sommet qui précède la perte
@@ -97,11 +106,18 @@ maximale et la première valorisation revenue à ce niveau.
 
 Ce classement est **exploratoire**. Le score est une moyenne géométrique
 pondérée de cinq blocs : un seul bloc à zéro donne un score nul, ce qui
-explique les trois zéros du rang 9 et ne signifie ni égalité économique ni
-probabilité de gain nulle. Il est déflaté par les dix essais de cette étude,
+explique les trois zéros du rang 10 et ne signifie ni égalité économique ni
+probabilité de gain nulle. Il est déflaté par les onze essais de cette étude,
 pas par les variantes des exercices antérieurs. Un écart de quelques points
-(53,6 / 52,0 / 48,6) n'est pas un test de supériorité. Aucune stratégie du
-catalogue ne bat le panier passif 50/50 des deux mêmes fonds.
+(53,6 / 52,0 / 49,8 / 48,7) n'est pas un test de supériorité. Aucune stratégie
+du catalogue ne bat le panier passif 50/50 des deux mêmes fonds.
+
+`SA8` tourne sur la même période et aux mêmes coûts, mais n'est ni notée ni
+comptée parmi les essais, comme le fonds détenu. Elle ne détient qu'un fonds
+monétaire : avec un taux sans risque nul, son Sharpe de 7,10 est celui d'un
+cours qui ne bouge presque pas, pas une mesure de timing. Comptée parmi les
+essais, elle multipliait par six la dispersion des Sharpe qui déflate les
+scores et ramenait tous les autres autour de 1 %.
 
 ## SA11 : les critères préinscrits ne sont pas satisfaits
 
@@ -225,18 +241,35 @@ serait une nouvelle hypothèse.
   graines 43 et 44 et les deux runs à coûts doublés (modèle figé, modèle
   recalibré) sont dans les diagnostics.
 
-## SA7 et SA8 : non exécutées
+## SA7 et SA8 : exécutées sur des fonds Xetra, avec deux réserves
 
-| Stratégie | Statut | Ce qui manque | Conséquence |
-|---|---|---|---|
-| SA7 - factor blend | non exécutée, aucun résultat | les trois fonds de style ne sont pas dans `market_data/metadata/instruments.toml` | le budget de 30 % de `SA10` reste en cash |
-| SA8 - monetary carry | non exécutée, aucun résultat | le fonds monétaire n'est pas enregistré (la règle lit son propre rendement passé) | `SA10` ne place pas son capital résiduel |
+| Stratégie | Fonds | Net | Sharpe | Rang |
+|---|---|---:|---:|---|
+| [SA7 - factor blend](../SA7/analysis.md) | iShares Edge MSCI World Value, Quality, Minimum Volatility (`IS3S.DE`, `IS3Q.DE`, `IQQ0.DE`) | +60,2 % | 0,83 | 5 |
+| [SA8 - monetary carry](../SA8/analysis.md) | Xtrackers II EUR Overnight Rate Swap (`XEON.DE`) | +10,5 % | 7,10 | hors classement |
 
-Aucune analyse de performance n'existe pour elles et aucune n'est inventée
-ici. Pour les exécuter : enregistrer les instruments, archiver leur historique
-(`update_market_data.py --archive`), écrire leur hypothèse avant le premier
-run, puis les ajouter au comparateur. `SA10` reste une version partielle tant
-que ce n'est pas fait.
+Les premiers fonds choisis étaient cotés à Paris (trois fonds de style BNP
+Paribas Easy, et `OBLI.PA`) ; le contrôle des données les a refusés, une barre
+sur cinq des fonds de style ayant depuis 2023 une clôture hors de sa propre
+fourchette. Les fonds retenus sont cotés sur Xetra, en euros, ne sont pas
+éligibles au PEA, et n'ont qu'une source de cours.
+
+Les deux réserves pèsent sur les chiffres et sont mesurées dans chaque
+analyse :
+
+- **Le calendrier.** Le run est mené sur celui de Paris. Une séance que Paris
+  tient et Xetra non (lundi de Pentecôte 2021, 24 et 31 décembre) laisse les
+  fonds sans clôture ; les deux règles visent alors le cash, vendent et
+  rachètent le lendemain. Cela fait 30 des 72 ordres de `SA7` (1 215 EUR) et 8
+  des 9 ordres de `SA8` (863 EUR de ses 963 EUR de coûts).
+- **Deux séances que le fournisseur ne sert pas**, le 2025-10-24 et le
+  2026-03-06, rompent la fenêtre de 61 clôtures consécutives de `SA7`, qui
+  reste en cash 62 puis 60 valorisations pendant que le fonds Value gagne
+  +9,3 % puis +29,4 %. Aucune seconde source ne permet de les combler, et un
+  cours n'est jamais reconstitué.
+
+`SA10` reste exécutée sans fonds de style ni fonds monétaire, comme dans tous
+ses runs précédents : sa version complète est un autre run, à décider.
 
 ## Diagnostics complémentaires
 
@@ -322,8 +355,10 @@ uv run python scripts/write_strategy_reports.py --study runs/signature_study --o
 ```
 
 Cette recette refait la procédure, pas forcément les mêmes nombres : relancer
-`update_market_data.py` ne garantit pas de retrouver le magasin `750c23dfffc3`,
-et une calibration refaite sur des données révisées n'est pas le modèle publié
+`update_market_data.py` ne garantit pas de retrouver le magasin de l'étude
+commune (`b5facce52a6f`) ni celui des études de `SA12` et `SA13`
+(`750c23dfffc3`), et une calibration refaite sur des données révisées n'est
+pas le modèle publié
 (`d9bfd125bf69`). Les diagnostics refusent de mettre un run à côté des exports
 d'une étude faite sur un autre magasin, un autre capital ou d'autres coûts.
 

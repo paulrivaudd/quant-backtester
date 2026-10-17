@@ -28,7 +28,10 @@
 # Conventions de lecture, valables partout ci-dessous :
 # - « Fait » : relu dans les exports de runs/garch_study (summary.csv,
 #   history_*.csv, fills.csv, comparison.csv, forecast_*.csv), run du commit
-#   788507b sur le magasin 750c23dfffc3, période 2021-04-01 -> 2026-10-09.
+#   91a2f37 sur le magasin b5facce52a6f, période 2021-04-01 -> 2026-10-09. C'est
+#   le run du 2026-10-11, qui ajoute SA7 et SA8 : les chiffres des autres livres
+#   y sont ceux du run 788507b sur le magasin 750c23dfffc3, à l'identique ; seuls
+#   leurs scores bougent de moins d'un dixième de point (onze essais au lieu de dix).
 #   Les « mesures complémentaires » sont relues dans results/summary/diagnostics.md,
 #   version 2, écrit par scripts/run_review_diagnostics.py sur le même magasin.
 # - « Lecture » : une interprétation plausible de ces faits, non démontrée.
@@ -202,7 +205,7 @@ strengths = [
   "**Fait.** Perte maximale de -15,72 % contre -21,64 % pour le fonds, volatilité de 10,9 % contre 13,8 %, Sharpe de 0,90 contre 0,93.",
   "**Fait.** 180 ordres, 1 445 EUR de coûts, rotation de 2,1 fois l'actif par an ; +65,5 % et Sharpe de 0,88 dans le second run à coûts doublés.",
   "**Fait.** Le 2025-04-02, à la veille de la seconde vague, son poids de clôture est de 65,0 %, contre 77,7 % pour SA11 et 67,2 % pour le témoin EWMA.",
-  "**Fait.** Troisième du classement commun (52,0 %). L'écart avec le témoin EWMA (53,6 %) et SA11 (48,6 %) n'est pas un test de supériorité.",
+  "**Fait.** Troisième du classement commun (52,0 %). L'écart avec le témoin EWMA (53,6 %) et SA11 (48,7 %) n'est pas un test de supériorité.",
 ]
 weaknesses = [
   "**Fait.** +67,4 % contre +94,8 % pour le fonds : poids de clôture moyen de 84,7 %. L'alpha de +0,03 % par an est pratiquement nul et sans intervalle : c'est un outil de réduction du risque, pas une création d'alpha démontrée.",
@@ -225,6 +228,73 @@ measured = [
 ]
 to_test = [
   "Un témoin à risque équivalent fixé à l'avance, plutôt qu'au poids moyen constaté.",
+]
+
+[SA7]
+summary = "Répartir le capital entre trois fonds de style - iShares Edge MSCI World Value, Quality et Minimum Volatility - pour moitié à parts égales et pour moitié en raison inverse de leur volatilité sur 60 rendements, chaque fonds plafonné à 40 %. La règle tient un panier presque constant, un tiers environ dans chaque fonds, et n'a rééquilibré que neuf fois. Son résultat, +60,2 % net contre +94,8 % pour le fonds monde, n'est pas celui de la règle sur des données complètes : sept fois elle a tout vendu parce qu'un cours manquait, dont deux fois pour une soixantaine de séances."
+context = "Fonds cotés sur Xetra, en euros, servis par un seul fournisseur et non recoupés par une seconde source. Le run est mené sur le calendrier de Paris : une séance que Paris tient et que Xetra ne tient pas est valorisée au dernier cours connu."
+strengths = [
+  "**Fait.** Volatilité de 10,8 % contre 13,8 % pour le fonds monde, perte maximale de -16,36 % contre -21,64 %, bêta de 0,72.",
+  "**Fait.** Cinquième du classement commun (49,8 %), entre SA10 (51,1 %) et SA3 (49,1 %) ; ces écarts ne sont pas un test.",
+  "**Fait.** -8,3 % en 2022 contre -13,7 % pour le fonds monde et -14,0 % pour le panier 50/50.",
+  "**Fait.** La règle elle-même traite peu : neuf rééquilibrages en cinq ans et demi, 27 ordres, 76 EUR de coûts. +57,7 % net et Sharpe de 0,80 dans le second run à coûts doublés.",
+]
+weaknesses = [
+  "**Fait.** +60,2 % contre +94,8 % pour le fonds monde ; derrière lui chaque année de hausse (+14,1 % contre +18,4 % en 2021, +13,0 % contre +19,6 % en 2023, +17,7 % contre +27,1 % en 2024, +9,1 % contre +17,7 % en 2026). Alpha de -0,2 % par an, ratio d'information de -0,66, sans intervalle.",
+  "**Fait.** 91 % de ses coûts (1 808 EUR sur 1 983) viennent de sept sorties complètes que la règle n'a pas décidées sur un signal de marché : elle ne détient rien dès qu'il manque une clôture à l'un des trois fonds.",
+  "**Fait.** Cinq de ces sorties durent une séance et suivent une séance que Paris a tenue et que Xetra n'a pas tenue (lundi de Pentecôte 2021, 24 et 31 décembre 2021 et 2024) : tout est vendu à l'ouverture suivante et racheté le lendemain, 30 ordres pour 1 215 EUR.",
+  "**Fait.** Les deux autres suivent les deux séances que le fournisseur ne sert pas (2025-10-24 et 2026-03-06) : la fenêtre de 61 clôtures consécutives est rompue, et le livre reste en cash 62 puis 60 valorisations, du 2025-10-28 au 2026-01-26 et du 2026-03-10 au 2026-06-04.",
+  "**Fait.** Pendant ces deux absences les trois fonds font, en clôture : Value +9,3 % puis +29,4 %, Quality +2,5 % puis +8,2 %, Minimum Volatility -1,2 % puis -2,0 %. Le livre, de la veille de chaque sortie au jour du rachat, fait -0,8 % puis +1,2 %.",
+]
+worst = "**Fait.** Du 2025-02-27 au 2025-04-09 la stratégie perd -16,36 % avec un poids de clôture de 99 % d'un bout à l'autre, quand le fonds monde perd -20,0 % en clôture ; elle retrouve son sommet le 2025-10-27, 242 jours après. Sur les 63 pires rendements consécutifs (2025-01-10 au 2025-04-09) elle perd -11,86 % contre -18,17 %. **Lecture.** La règle ne réduit jamais son exposition : la perte plus faible vient des fonds détenus, qui ont moins baissé que le fonds monde, pas d'une décision prise pendant la chute."
+best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur couvre presque toute la période (2021-05-19 au 2026-10-07, +63,3 % contre +99,7 % pour le fonds monde). Sur les 63 meilleurs rendements consécutifs (2025-04-09 au 2025-07-10) elle fait +12,54 % contre +19,34 %, pleinement investie. Son plus fort retard relatif va du 2023-01-06 au 2026-06-02 : +39,6 % contre +75,9 %, soit un écart relatif de -20,6 %. **Lecture.** Le panier des trois styles monte moins que le fonds monde dans les hausses de cette période, et la fin de ce retard coïncide avec la seconde absence du livre."
+risks = [
+  "**Observé.** Marché haussier porté par des valeurs que les trois styles sous-pondèrent (2023, 2024) : le panier suit avec un bêta de 0,72.",
+  "**Observé.** Une clôture manquante sur un seul des trois fonds : la règle sort entièrement, pour une séance ou pour soixante.",
+  "**Plausible.** Hausse simultanée des volatilités : la part en raison inverse ne change presque rien quand les trois montent ensemble, et rien ne réduit l'exposition totale.",
+]
+measured = [
+  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : +3 015 EUR nets (écarts favorables +6 602 EUR, défavorables -3 587 EUR). Ce n'est ni un gain encaissé ni le résultat d'un backtest exécuté à la clôture, et la plupart de ses ordres sont ceux des sept sorties décrites plus haut.",
+  "**Fait.** Poids détenus en moyenne sur toutes les valorisations : 32,5 % de Minimum Volatility, 29,2 % de Value, 29,1 % de Quality, le reste en cash (exposition moyenne 90,9 %).",
+]
+to_test = [
+  "Le même run avec des décisions prises seulement aux séances que Xetra tient : les cinq sorties d'une séance sont un effet du calendrier de référence, pas de la règle.",
+  "Ce que la règle aurait fait sans les deux séances manquantes n'est pas mesuré : aucune seconde source ne sert ces fonds, et un cours n'est jamais reconstitué.",
+  "La comparaison que sa spécification demande, à l'équipondération des trois mêmes fonds, n'est pas produite.",
+  "Les trois fonds ont été choisis le 2026-10-11 après le refus de trois fonds parisiens par le contrôle des données ; ce choix précède le premier run, mais leur historique existait déjà.",
+]
+
+[SA8]
+summary = "Placer tout le capital dans un fonds monétaire en euros - Xtrackers II EUR Overnight Rate Swap - quand son rendement des 63 dernières séances, annualisé, couvre en un trimestre un coût d'aller-retour de 0,20 % et que sa volatilité reste sous 2 %. La règle reste en cash tant que les taux sont négatifs ou trop bas, achète le fonds le 2022-12-05 et le garde : +10,5 % net. Elle n'a pas de rang : c'est un placement de trésorerie, et son Sharpe de 7,1 ne se compare pas à celui d'une stratégie actions."
+context = "Fonds cotés sur Xetra, en euros, servis par un seul fournisseur et non recoupés par une seconde source. Le run est mené sur le calendrier de Paris : une séance que Paris tient et que Xetra ne tient pas est valorisée au dernier cours connu. SA8 est rapportée hors classement : avec un taux sans risque nul, le Sharpe d'un fonds monétaire est celui d'un cours qui ne bouge presque pas ; comptée parmi les essais, elle multipliait par six la dispersion qui déflate les scores et ramenait tous les autres à environ 1 %."
+strengths = [
+  "**Fait.** Volatilité de 0,25 % et perte maximale de -0,35 %.",
+  "**Fait.** En cash du 2021-04-01 au 2022-12-02, pendant que le fonds monétaire perd de la valeur (de 135,72 à un plus bas de 134,64 le 2022-08-04) : la règle n'achète pas un portage négatif. Son signal devient positif le 2022-10-04 et l'achat est exécuté le 2022-12-05, à 134,95.",
+  "**Fait.** +3,3 % en 2023, +3,6 % en 2024, +1,8 % en 2025, +1,4 % en 2026 jusqu'au 9 octobre : le rendement du fonds une fois détenu.",
+]
+weaknesses = [
+  "**Fait.** +10,5 % net en cinq ans et demi contre +94,8 % pour le fonds monde : la règle ne porte aucun risque actions, ce n'est pas une alternative à un fonds d'actions.",
+  "**Fait.** 963 EUR de coûts pour 9 ordres, soit environ 8 % du gain brut (+11,4 % brut, +10,5 % net). L'achat initial coûte 100 EUR ; les huit autres ordres, 863 EUR, sont quatre ventes suivies d'un rachat le lendemain.",
+  "**Fait.** Ces quatre allers-retours suivent les 24 et 31 décembre 2024 et 2025 : Paris tient une séance, Xetra non, le fonds n'a pas de clôture, le signal est illisible et la règle vise alors le cash. Ce sont ses deux plus fortes baisses (-0,33 % et -0,35 %).",
+  "**Fait.** +9,5 % net dans le second run à coûts doublés, où ces allers-retours coûtent deux fois plus.",
+]
+worst = "**Fait.** Du 2025-12-24 au 2026-01-05 la stratégie perd -0,35 % : elle vend le 2025-12-29, rachète le 30, vend le 2026-01-02 et rachète le 5, pour 435 EUR de coûts, pendant que le cours du fonds monte de 148,01 à 148,12. Le sommet est retrouvé le 2026-03-09, 75 jours après. La même séquence un an plus tôt coûte -0,33 %. **Lecture.** Cette perte est entièrement un coût d'exécution provoqué par deux séances sans cours, pas un mouvement du fonds."
+best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2022-12-05 au 2026-10-09 (+10,57 %) : c'est la détention du fonds depuis l'achat. Sur les 63 meilleurs rendements consécutifs (2023-12-06 au 2024-03-07) elle fait +1,06 %, quand le rendement annualisé lu par le signal est proche de +3,9 %. **Lecture.** La règle ne produit rien de plus que le taux monétaire, ce qui est son objet."
+risks = [
+  "**Observé.** Une séance sans cours du fonds : la règle vend et rachète, et chaque aller-retour coûte environ 0,2 % du capital.",
+  "**Observé.** Taux négatifs ou nuls (2021-2022) : la règle reste en cash, qui ne rapporte rien ici.",
+  "**Plausible.** Baisse rapide des taux : le portage est mesuré sur les 63 séances passées et tarde à le voir.",
+]
+measured = [
+  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : +47 EUR nets. Sur un fonds monétaire l'écart entre une clôture et l'ouverture suivante est de l'ordre du rendement d'une nuit.",
+  "**Fait.** Rendement annualisé lu par le signal : +1,2 % fin 2022, +3,2 % mi-2023, +3,9 % fin 2023, +3,8 % mi-2024, +3,3 % fin 2024, +2,2 % mi-2025 et au 2026-10-09.",
+  "**Fait.** Investie à 979 valorisations sur 1 416 ; le fonds lui-même fait +10,9 % sur toute la période et +11,5 % depuis le cours d'achat.",
+]
+to_test = [
+  "Le même run avec des décisions prises seulement aux séances que Xetra tient : les quatre allers-retours disparaîtraient, et avec eux 863 EUR de coûts sur 963.",
+  "Un Sharpe calculé contre le taux monétaire, et non contre zéro : il serait proche de zéro, et c'est la mesure qui permettrait de la classer.",
+  "Son rôle prévu, placer le capital que SA10 laisse en cash : SA10 est encore exécutée sans elle.",
+  "Six barres du fonds, plates et sans volume, sont gardées telles que servies sur la période ; aucune seconde source ne les arbitre.",
 ]
 
 [SA9]
@@ -288,7 +358,7 @@ measured = [
 to_test = [
   "La décomposition des cibles règle par règle à chaque décision, que le code sait calculer et qui n'est pas exportée.",
   "Le facteur de réduction du contrôle de risque, les dates où il est inférieur à 1 et les décisions forcées par le risque du portefeuille détenu : tant qu'ils ne sont pas exportés, ni la fréquence de ce contrôle ni son rôle en avril 2025 ne peuvent être commentés.",
-  "La version complète, quand les instruments de SA7 et SA8 seront enregistrés.",
+  "La version complète, avec les fonds de SA7 et de SA8, enregistrés depuis le 2026-10-11 : ce run-ci est toujours exécuté sans eux.",
   "Ces ablations sont des variantes regardées après coup : aucune n'est candidate.",
 ]
 
@@ -306,7 +376,7 @@ weaknesses = [
   "**Fait.** Aux coûts de base, les intervalles de la différence de Sharpe incluent zéro : [-0,141 ; +0,076] contre SA6, [-0,147 ; +0,009] contre l'EWMA. Il n'y a donc pas de preuve à 95 % d'une infériorité générale. Dans le second run à coûts doublés, l'intervalle contre l'EWMA est [-0,172 ; -0,014], négatif, sous les hypothèses de ce bootstrap conditionnel.",
   "**Fait.** 508 ordres, rotation de 5,5 fois l'actif par an, 3 749 EUR de coûts, contre 180 ordres et 1 445 EUR pour SA6 ; le poids de clôture varie de 2,3 points par séance en moyenne, contre 0,9.",
   "**Fait.** +66,0 % contre +94,8 % pour le fonds, alpha de -0,4 % par an (sans intervalle) ; sommet retrouvé le 2026-01-09, 324 jours après, contre 229 pour le fonds.",
-  "**Fait.** Sixième du classement commun (48,6 %). L'écart avec SA6 (52,0 %) et l'EWMA (53,6 %) n'est pas un test de supériorité.",
+  "**Fait.** Septième du classement commun (48,7 %). L'écart avec SA6 (52,0 %) et l'EWMA (53,6 %) n'est pas un test de supériorité.",
 ]
 worst = "**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -16,50 % contre -21,64 % pour le fonds. Le 19 février la volatilité prévue est de 10,9 % et le poids de 99,9 %. Le poids de clôture descend à 65,8 % le 7 mars et 60,7 % le 12, puis remonte : 79,8 % le 20 mars, 77,7 % le 2 avril, quand SA6 est à 65,0 % et l'EWMA à 67,2 %. Il est de 37,7 % le 7 avril, 38,5 % le 8, 31,6 % le 9. Le creux, pour la stratégie comme pour le fonds, est le 9 avril : ce soir-là la prévision vaut 42,7 % et la cible 28,1 %, exécutée le lendemain (28,9 % détenus le 10 avril, 28,7 % le 11). La prévision de 45,2 % du 10 avril, la plus haute de la période, vient après et n'a déclenché aucune de ces ventes. **Lecture.** La remontée du risque en mars est locale et constatée ; l'attribuer au retour du GARCH vers sa moyenne est plausible, mais avec des paramètres réestimés chaque soir la trajectoire dépend des chocs et de leur recalibration, et ce n'est pas une propriété générale établie."
 best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2022-06-17 au 2026-10-06 (+70,2 % contre +96,6 % pour le fonds, poids moyen 90 %), une durée libre. Sur les 63 meilleurs rendements consécutifs (2023-10-30 au 2024-01-30, +15,27 % contre +15,58 %), le poids de clôture est de 99 % en moyenne et descend à 88,8 % ; la prévision dépasse la cible de 12 % à 13 valorisations, jusqu'à 13,6 %. Quatre ordres y sont exécutés, pour 20 EUR de coûts. **Lecture.** Quand le risque prévu reste proche ou sous la cible, GARCH, EWMA et SA6 font à peu près la même chose, pour un coût faible."
@@ -335,7 +405,7 @@ strengths = [
   "**Fait.** Sharpe de 0,934 contre 0,930 pour le fonds détenu : un écart économiquement minuscule, qui ne démontre aucune supériorité. Perte maximale de -15,45 % au lieu de -21,64 %.",
   "**Fait.** 220 ordres, 1 519 EUR de coûts, rotation de 2,1 fois l'actif par an ; +70,9 % et Sharpe de 0,91 dans le second run à coûts doublés.",
   "**Fait.** Pas d'optimisation statistique quotidienne : un seul paramètre, fixé d'avance à 0,94, une variance amorcée sur 60 rendements, puis une récurrence. Pas de dépendance à un optimiseur GARCH, donc pas de non-convergence possible.",
-  "**Fait.** Deuxième du classement commun (53,6 %), devant SA6 (52,0 %) et SA11 (48,6 %) ; ces écarts ne sont pas un test.",
+  "**Fait.** Deuxième du classement commun (53,6 %), devant SA6 (52,0 %) et SA11 (48,7 %) ; ces écarts ne sont pas un test.",
 ]
 weaknesses = [
   "**Fait.** QLIKE moyenne de -8,6033, moins bonne que celle du GARCH (-8,6225) dans l'échantillon ; l'intervalle de cette différence inclut zéro. Elle est en revanche meilleure que celle de l'estimateur de SA6, avec un intervalle qui exclut zéro ([-0,075 ; -0,006]).",

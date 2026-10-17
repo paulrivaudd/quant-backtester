@@ -26,7 +26,7 @@ composent leurs rendements à cinq séances ; les témoins sont dits « à cible
 constante » ; `SA14` est rejoué avec son modèle figé à coûts doublés ; un run
 n'est comparé aux exports que s'il a lu le même magasin.
 
-Exports de l'étude : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`. Runs de ce document : commit `43bd6030d29b` (CLEAN).
+Exports de l'étude : commit `91a2f3776759` (CLEAN), magasin `b5facce52a6f`. Runs de ce document : commit `91a2f3776759` (CLEAN).
 
 ## 1. Résultat par séjour dans le marché (SA1, SA4, SA9)
 
@@ -62,6 +62,7 @@ Deux séjours séparés par 20 valorisations ou moins sont rattachés au même g
 | EWMA 0.94 control | 220 | +3,571 | -6,647 | -3,076 | -3.08% | 0 |
 | SA6 - vol control | 180 | +2,985 | -5,487 | -2,503 | -2.50% | 0 |
 | SA10 - ensemble | 465 | +4,966 | -5,997 | -1,031 | -1.03% | 0 |
+| SA7 - factor blend | 72 | +6,602 | -3,587 | +3,015 | +3.02% | 0 |
 | SA3 - smooth MA | 78 | +2,107 | -2,752 | -645 | -0.65% | 0 |
 | SA11 - GARCH vol control | 508 | +10,066 | -12,989 | -2,923 | -2.92% | 0 |
 | SA2 - dual momentum | 317 | +9,460 | -11,297 | -1,838 | -1.84% | 0 |
@@ -69,6 +70,7 @@ Deux séjours séparés par 20 valorisations ou moins sont rattachés au même g
 | SA1 - std MA20 | 143 | +28,201 | -42,768 | -14,568 | -14.57% | 0 |
 | SA4 - pullback | 237 | +14,660 | -12,358 | +2,303 | +2.30% | 0 |
 | SA9 - VIX relief | 42 | +4,528 | -9,472 | -4,944 | -4.94% | 0 |
+| SA8 - monetary carry | 9 | +95 | -47 | +47 | +0.05% | 0 |
 | buy & hold World | 1 | +0 | -951 | -951 | -0.95% | 0 |
 
 Pour chaque ordre : `-signe x quantité x (ouverture - clôture précédente)`, signe +1 pour un achat, sur le prix de marché de l'ouverture et non sur le prix exécuté : le spread, le slippage et la commission restent dans les coûts. Positif : le mouvement de la nuit est allé dans le sens de l'ordre. Un ordre exécuté à une date de détachement est exclu, les deux prix n'étant pas sur la même base.
