@@ -1,0 +1,11 @@
+{
+  "strategy_id": "Nasdaq_buy_hold",
+  "class": "quant_backtester.research.references.BuyAndHold",
+  "parameters": {
+    "instruments": [
+      "ETF_NASDAQ"
+    ],
+    "strategy_id": "Nasdaq_buy_hold"
+  },
+  "signals": []
+}

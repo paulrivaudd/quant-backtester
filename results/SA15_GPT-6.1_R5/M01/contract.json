@@ -1,0 +1,191 @@
+{
+  "id": "M01",
+  "candidate": {
+    "id": "M01",
+    "parent": "M00",
+    "reason": "Le pilote manque les reprises, exposition Nasdaq moyenne66% sur jours classes reprise. Ajouter uniquement la reprise momentum21 positif pour tester une reentree sans attendre MA200.",
+    "changed_block": "recovery",
+    "expected_benefit": "Recuperer les rebonds qui precedent le retournement de MA200, en conservant le cap de volatilite.",
+    "expected_cost": "Faux retours durant les rebonds de marche baissier et davantage de transactions.",
+    "refutation": "Apport net negatif sans protection supplementaire ou hausse forte de drawdown/interventions; aucune retouche de seuil21 apres calcul.",
+    "schedule": "monthly",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "monetary_id": "ETF_MONETARY_EUR",
+      "gold_id": "ETF_GOLD",
+      "government_id": "ETF_EURO_GOV",
+      "canary_ids": [
+        "ETF_WORLD",
+        "ETF_EMERGING"
+      ],
+      "trend_rule": "ma200",
+      "risk_rule": "cap_max",
+      "recovery_rule": "positive21",
+      "shock_rule": "off",
+      "confirmation_rule": "off",
+      "defensive_rule": "monetary",
+      "execution_rule": "band",
+      "fast_sessions": 21,
+      "medium_sessions": 63,
+      "slow_sessions": 126,
+      "ma_fast_sessions": 50,
+      "ma_slow_sessions": 200,
+      "vol_fast_returns": 20,
+      "vol_slow_returns": 60,
+      "target_volatility": 0.2,
+      "volatility_floor": 0.05,
+      "partial_exposure": 0.5,
+      "risk_relief_floor": 0.75,
+      "drawdown_sessions": 63,
+      "near_high_threshold": -0.02,
+      "shock_loss_threshold": -0.08,
+      "shock_drawdown_threshold": -0.1,
+      "defensive_sessions": 63,
+      "monetary_sessions": 21,
+      "rebalance_band": 0.1,
+      "entry_band": 0.2,
+      "reduction_band": 0.05,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R5"
+    }
+  },
+  "parent": {
+    "id": "M00",
+    "reason": "Parent fixe du pilote MA200 + plafond vol20%, monetaire conditionnel et bande10points; aucun nouveau choix sur resultats.",
+    "schedule": "monthly",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "monetary_id": "ETF_MONETARY_EUR",
+      "gold_id": "ETF_GOLD",
+      "government_id": "ETF_EURO_GOV",
+      "canary_ids": [
+        "ETF_WORLD",
+        "ETF_EMERGING"
+      ],
+      "trend_rule": "ma200",
+      "risk_rule": "cap_max",
+      "recovery_rule": "off",
+      "shock_rule": "off",
+      "confirmation_rule": "off",
+      "defensive_rule": "monetary",
+      "execution_rule": "band",
+      "fast_sessions": 21,
+      "medium_sessions": 63,
+      "slow_sessions": 126,
+      "ma_fast_sessions": 50,
+      "ma_slow_sessions": 200,
+      "vol_fast_returns": 20,
+      "vol_slow_returns": 60,
+      "target_volatility": 0.2,
+      "volatility_floor": 0.05,
+      "partial_exposure": 0.5,
+      "risk_relief_floor": 0.75,
+      "drawdown_sessions": 63,
+      "near_high_threshold": -0.02,
+      "shock_loss_threshold": -0.08,
+      "shock_drawdown_threshold": -0.1,
+      "defensive_sessions": 63,
+      "monetary_sessions": 21,
+      "rebalance_band": 0.1,
+      "entry_band": 0.2,
+      "reduction_band": 0.05,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R5"
+    }
+  },
+  "candidate_sha256": "8b308df5171a17bd1d3018c4eb08135e4b99ba00c72f920b54d22342b80334be",
+  "frozen_inputs_sha256": "262ed00f041b64e35d70cca98196de6e64474ed67ba79e3e5d04e90717892551",
+  "preceding_analyses": [],
+  "period": "choice",
+  "start": "2019-06-03",
+  "end": "2024-12-31",
+  "contracts": [
+    {
+      "role": "candidate",
+      "cost_multiplier": 1.0,
+      "cache_key": "e512b78dbf3d4b38a59d9a99876c2d9fcf955dd5ca34c968a7da1da363d5a704"
+    },
+    {
+      "role": "parent",
+      "cost_multiplier": 1.0,
+      "cache_key": "e3e1c179cb0964c47ef087107d336030edc60769a82772d4196aee07f60d465b"
+    },
+    {
+      "role": "Nasdaq_buy_hold",
+      "cost_multiplier": 1.0,
+      "cache_key": "1f4bea88369f738c544fc3e204409c938ff9171762563aca48aa8626c08dc476"
+    },
+    {
+      "role": "without_trend",
+      "cost_multiplier": 1.0,
+      "cache_key": "6bd004f6f256c63218a18070548d6a795db63f3a18b0918b3fad5e5eabae9b4a"
+    },
+    {
+      "role": "without_risk",
+      "cost_multiplier": 1.0,
+      "cache_key": "8c95b0009890785a515ec532583344a7fbe8b77f4f49bbd635979d475d9ca22a"
+    },
+    {
+      "role": "without_recovery",
+      "cost_multiplier": 1.0,
+      "cache_key": "e3e1c179cb0964c47ef087107d336030edc60769a82772d4196aee07f60d465b"
+    },
+    {
+      "role": "without_defensive",
+      "cost_multiplier": 1.0,
+      "cache_key": "ecb0c41c4a670aaacb92272c2199363f5ee92275fb3154926143aeaf5e3d966e"
+    },
+    {
+      "role": "without_execution",
+      "cost_multiplier": 1.0,
+      "cache_key": "7ff28123a94f855a3246deb9bfc251e6ab7af491ca62a17341c5fd5b109e37ae"
+    },
+    {
+      "role": "candidate",
+      "cost_multiplier": 2.0,
+      "cache_key": "993a773e20d46e01bc3502635d4749fb4a936e5ce0258fa39ca42097ba08b519"
+    },
+    {
+      "role": "parent",
+      "cost_multiplier": 2.0,
+      "cache_key": "9648760eb5fc23da9ca7da2ef03ad482df80eaa7df3c12f518b5f9c7c1547f59"
+    },
+    {
+      "role": "Nasdaq_buy_hold",
+      "cost_multiplier": 2.0,
+      "cache_key": "f8603eab0936d2329524509b004cbb29e0bad7cc48525c4b09dd52936d8dcec9"
+    },
+    {
+      "role": "without_trend",
+      "cost_multiplier": 2.0,
+      "cache_key": "ee455628470a87283715bb69bde2b0a4d9d6db65bf02d7afbb65b9ad9f43c84a"
+    },
+    {
+      "role": "without_risk",
+      "cost_multiplier": 2.0,
+      "cache_key": "215386a7a6f89ae0e27ca56aefbe78c0d3aea6dcb6f41236cf9ab7c73c4daf17"
+    },
+    {
+      "role": "without_recovery",
+      "cost_multiplier": 2.0,
+      "cache_key": "9648760eb5fc23da9ca7da2ef03ad482df80eaa7df3c12f518b5f9c7c1547f59"
+    },
+    {
+      "role": "without_defensive",
+      "cost_multiplier": 2.0,
+      "cache_key": "1173aa23e10f5233b6b62a474d8ff366addf6c88ef5b7cbaef8e0596eb3bf05a"
+    },
+    {
+      "role": "without_execution",
+      "cost_multiplier": 2.0,
+      "cache_key": "ef2da45c1aa686e2bf3d5ee58a6f2dfcd4c5a46b35570a7042bf4444fde48a98"
+    }
+  ],
+  "ablation_blocks": [
+    "trend",
+    "risk",
+    "recovery",
+    "defensive",
+    "execution"
+  ]
+}

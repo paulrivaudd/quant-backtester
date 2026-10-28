@@ -1,0 +1,302 @@
+{
+  "signature": {
+    "format": 1,
+    "data_state": "316789fb823677f2e236f4e8f1b21076071d2578d5fb6f299689ed35c60b0e62",
+    "fingerprint": "32246a7efaadf4f8cabe2273ecd2e1af5c5ba7a95e03eab76ecbb4469d521a5f",
+    "strategy": {
+      "strategy_id": "SA15_GPT-6.1_R3",
+      "class": "quant_backtester.strategies.SA15_gpt61_nasdaq.SA15NasdaqAdaptive",
+      "parameters": {
+        "core_id": "ETF_NASDAQ",
+        "defensive_ids": [
+          "ETF_GOLD",
+          "ETF_SP500_PEA"
+        ],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "guard_mode": "momentum",
+        "trend_sessions": 0,
+        "fast_lookback": 21,
+        "slow_lookback": 126,
+        "fast_entry_threshold": -0.04,
+        "slow_entry_threshold": -0.1,
+        "recovery_threshold": 0.0,
+        "core_floor": 0.5,
+        "defensive_lookbacks": [
+          63,
+          126
+        ],
+        "defensive_weights": [
+          1.0,
+          1.0
+        ],
+        "top_k": 1,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.08,
+        "relative_rotation": false,
+        "relative_threshold": 0.02,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R3"
+      },
+      "signals": [
+        {
+          "signal": {
+            "type": "EndpointMomentumSignal",
+            "lookback_sessions": 21,
+            "skip_recent_sessions": 0,
+            "price_basis": "ADJUSTED",
+            "bar_field": "close",
+            "max_age_sessions": 1,
+            "window_mode": "AVAILABLE_OBSERVATIONS",
+            "endpoint_mode": "EXACT_VENUE_SESSION_OFFSETS",
+            "endpoint_session_offsets": [
+              21,
+              0
+            ],
+            "observations_consumed": 2,
+            "freshness_anchor": "LATEST_EXPECTED_AVAILABLE_VENUE_CLOSE",
+            "freshness_loader_observations": 2,
+            "unit": "FRACTION"
+          },
+          "instruments": [
+            "ETF_NASDAQ",
+            "ETF_MONETARY_EUR"
+          ]
+        },
+        {
+          "signal": {
+            "type": "EndpointMomentumSignal",
+            "lookback_sessions": 126,
+            "skip_recent_sessions": 0,
+            "price_basis": "ADJUSTED",
+            "bar_field": "close",
+            "max_age_sessions": 1,
+            "window_mode": "AVAILABLE_OBSERVATIONS",
+            "endpoint_mode": "EXACT_VENUE_SESSION_OFFSETS",
+            "endpoint_session_offsets": [
+              126,
+              0
+            ],
+            "observations_consumed": 2,
+            "freshness_anchor": "LATEST_EXPECTED_AVAILABLE_VENUE_CLOSE",
+            "freshness_loader_observations": 2,
+            "unit": "FRACTION"
+          },
+          "instruments": [
+            "ETF_NASDAQ",
+            "ETF_GOLD",
+            "ETF_SP500_PEA"
+          ]
+        },
+        {
+          "signal": {
+            "type": "EndpointMomentumSignal",
+            "lookback_sessions": 63,
+            "skip_recent_sessions": 0,
+            "price_basis": "ADJUSTED",
+            "bar_field": "close",
+            "max_age_sessions": 1,
+            "window_mode": "AVAILABLE_OBSERVATIONS",
+            "endpoint_mode": "EXACT_VENUE_SESSION_OFFSETS",
+            "endpoint_session_offsets": [
+              63,
+              0
+            ],
+            "observations_consumed": 2,
+            "freshness_anchor": "LATEST_EXPECTED_AVAILABLE_VENUE_CLOSE",
+            "freshness_loader_observations": 2,
+            "unit": "FRACTION"
+          },
+          "instruments": [
+            "ETF_GOLD",
+            "ETF_SP500_PEA"
+          ]
+        }
+      ]
+    },
+    "source_finance_hashes": {
+      "scripts/SA15_run_gpt61_round3.py": "f462352fcd9a201203430fab036c2cecbf862d9bd5f076fa88cc7ee7cde5edb0",
+      "scripts/SA15_run_gpt61_study.py": "519fbbbe5f26e4bdb3ef4e32d317fe75cd712bf205764c439b4ba0776f025e7c",
+      "src/quant_backtester/analytics/__init__.py": "b3b8fbfdc3af7f6541b1a716f33561d8404829583749c12295c2887268264eda",
+      "src/quant_backtester/analytics/attribution.py": "38e4d093abae8f3e1044a5a4ae6da05d70e4f6d732b7736223380c7ea8dd026d",
+      "src/quant_backtester/analytics/benchmark_comparison.py": "6caf1ad606517811e175fcaa7554506c5080579e9d6fa09d6c6db80e09d5dd75",
+      "src/quant_backtester/analytics/comparison.py": "99772134d1554314235047a01083edf1048db7e8a738d0e67c4f2686c9e5730f",
+      "src/quant_backtester/analytics/config.py": "df3a0fef778370ad1fc04e9c1365bffd4240bda5d8b5be68eab837c4bf93e55b",
+      "src/quant_backtester/analytics/contribution.py": "86906d4e199c74297f5e518867ec4dd584675e82bae3cb0c0ad0ca334bec9b39",
+      "src/quant_backtester/analytics/curves.py": "d56015cecdd245655e919635f099d571a9503684b89ecc0d821895df5c313e7a",
+      "src/quant_backtester/analytics/performance.py": "8c9ac3e5aa15bf8f3bee4bbd9411cf8c95e4afad05aa0fd30ac9ed53a0484b4b",
+      "src/quant_backtester/analytics/plots.py": "061af61c19be950f4949a1cedde7a8109fc102218c7e5eae0bfd04669a0dc2a9",
+      "src/quant_backtester/analytics/quality.py": "3e58536beea1218858ee42c6f1a610aff356ad2579ebab84e9e31b7a4b9709e4",
+      "src/quant_backtester/analytics/relative.py": "292eb6eb2cdcf8716b3876e5d36d7de2609eef73e12a4457d9b01bd119689f53",
+      "src/quant_backtester/analytics/report.py": "08523d643e5db1d668d96a9a35ba1a25f570384bfa386617f394441a282177e0",
+      "src/quant_backtester/analytics/return_forecast.py": "ef336306b056c4357c5deb7ba175a8e650b70be88f65909dd696986e090da747",
+      "src/quant_backtester/analytics/segments.py": "4c96380f12d01d27850b2718a3d2ba68b5453e17c661c4654fba90b76d4c3a7a",
+      "src/quant_backtester/analytics/uncertainty.py": "1c09f06faba33b3ffbe54d8345b1c6c8fa396f24860177c61b05444f614e137d",
+      "src/quant_backtester/analytics/volatility_forecast.py": "8afb875e128bbe948b6cb1a608665100a97e7e4d162c643aa53dc546231fb10b",
+      "src/quant_backtester/backtest/__init__.py": "350a063f2777ddfcbfb6f98e0d2e68ec232df9f58e34c81a70b4e550c30bfcb0",
+      "src/quant_backtester/backtest/config.py": "f77e5944c42cfbb54ceb4645e0bf8a8a995854ee4aadf16cd557063b85005234",
+      "src/quant_backtester/backtest/context.py": "8fe66245b6f119cfe5f12d9a26b3b703fdb74126d8f5d80246ba2eb12674ccc3",
+      "src/quant_backtester/backtest/engine.py": "f9823c37b5273fd0d776df22bb61d3a0cc61c9c19693310fd23663884bc3c826",
+      "src/quant_backtester/backtest/market.py": "d6a6b8dbf2852a17b9b3e8c4c8f1ac5dcfae6d84c8c3306d3f26c6c5b4097e79",
+      "src/quant_backtester/backtest/records.py": "5cef1a516e0ea8d691056a49dc769f8090fb0730d2478e314d1122d376936a7f",
+      "src/quant_backtester/backtest/result.py": "b1cd4f58d2eff568f7b28f349c4dc081ad5f4a5087da674a7a330ea1f9e50b01",
+      "src/quant_backtester/backtest/runner.py": "ef080987f50f0b198bcb11055d5f81166ce1fdbff11d3586cf28b9b172f7a25f",
+      "src/quant_backtester/backtest/schedule.py": "907bde72e332e77f38ccd541aa6381adbabfbc447f0b498a67d37f37613d54da",
+      "src/quant_backtester/backtest/timetable.py": "b0d169c527bc03d6581a8bc778bbe14c040dd651b4aea025ae67ca3ec3ad4ab5",
+      "src/quant_backtester/data/__init__.py": "0a5335cbdcf63b10a3e31863587fda5d20b790a29bf5d1fe92f26cf3f906063c",
+      "src/quant_backtester/data/bar_corrections.py": "cd628015e7a7fb4340b23d34a9009154afa3223bdf97c698e48db45be38ca069",
+      "src/quant_backtester/data/calendars.py": "a67bdb023f65171a30c121f47a66aaf7f17b645de8faee6cc8546e231fc47414",
+      "src/quant_backtester/data/conflict_reviews.py": "95906e7b3a7da5afb1f2526398f4189936320de1d714a1ed0a4f1ba316a755ab",
+      "src/quant_backtester/data/corporate_actions.py": "eda0e91bb9b0bc7f1f61fa7a39dda5e512a91ad8e6eb6796cbde30dbc5baef78",
+      "src/quant_backtester/data/crosscheck.py": "d9a243a04dea2bbc152e000028716890b862c886ee024b5edf38e7d716e75e6f",
+      "src/quant_backtester/data/instruments.py": "8546c33d627975937f54b56ebb13ebf8efe651ce58ab3753c2f8d14d3b999a1d",
+      "src/quant_backtester/data/known_gaps.py": "49ce4518746f11166033d9cfa4d39cebe02dae9021930a8215a1d2dd29fc23e6",
+      "src/quant_backtester/data/normalizer.py": "2871e311719f392139c79244085496b01dbaf4cb57b870bec8f40ab91f138364",
+      "src/quant_backtester/data/reader.py": "13f74a84f8055949a3ea684d717c51ff92880680bb912648b74d04cccaa963d6",
+      "src/quant_backtester/data/repository.py": "56391fbbf5895c90689bd97bc5b939576c988831249909f8e513beb44b53eecc",
+      "src/quant_backtester/data/revisions.py": "436a6537f0f965d1639378a185cc86af19726fb318d37274b52c4f88947d7113",
+      "src/quant_backtester/data/schemas.py": "089862df265fa3d86f467f0d3097ea6500f8ebb01665d047e3c241ae97c5f98c",
+      "src/quant_backtester/data/sources/__init__.py": "61e6076529b3492ab9941b8261e087580d2b515584ce97340d9fd5a3792d908f",
+      "src/quant_backtester/data/sources/alfred.py": "eb18b17f097536619f95342583dbbba8e98af9df482d301859d7ff217aa9ff6e",
+      "src/quant_backtester/data/sources/base.py": "a250694e3d836d4446605bbb9de0a3986a0f9562516d1243319d4d3de9b4954c",
+      "src/quant_backtester/data/sources/ecb.py": "459b2166b67f3865ca1bafb24ac47d28cfeb8c4a8a2dbee653ae4bd83ca591e5",
+      "src/quant_backtester/data/sources/euronext.py": "0a912fdab94f39b0890e33d080430c70ed69d301f7f85a4b3c4f6979384ebf7a",
+      "src/quant_backtester/data/sources/fred.py": "84633069e88d037a3d99885ff54e9ee69fce137801c6789fef7aa02bdcf50f88",
+      "src/quant_backtester/data/sources/yahoo.py": "4b87018e2a8b5ca95f9fe4081bbe4b171acdde20e72c5e6b907eb6fc72e867f3",
+      "src/quant_backtester/data/universes.py": "d137c61bc02cbf0adf06614d76ebded7602e5b2d8d9c011abf4cc83b04d75c6b",
+      "src/quant_backtester/data/updater.py": "e35800f53ca3d5b7c47742b786d174987dd0979aff9fe281ebf704449bd5f53d",
+      "src/quant_backtester/data/validator.py": "c87cfc4b885acc0368d2a1a9c7452048a8311ddbabdb5ffc1f0978b200dd0a91",
+      "src/quant_backtester/execution/__init__.py": "dc6c90f08e5e418c33d624c688de6a2eb840656b1f06b759f167a19a4ce7ae05",
+      "src/quant_backtester/execution/costs.py": "286e516e6c855b49d64bf54738c602553af6bd07800f657acac156a79629cebd",
+      "src/quant_backtester/execution/fills.py": "6388a620a21a885d2350134fcb154641981ba23b66ee105f2cd51dc95602b4fa",
+      "src/quant_backtester/execution/model.py": "264b9e2d5f96afcd77b021728e703de49ecf01c381c237a4d001c47445e66f1c",
+      "src/quant_backtester/execution/orders.py": "b23a2c39a67ca5c88a057e425ce4ae7f0397fdb0357fde5531ba9893a613b6a3",
+      "src/quant_backtester/execution/rounding.py": "a544c91a9c541fa7dda915d407be17410201e671568a2d7f5817ef91d8d3a53e",
+      "src/quant_backtester/numbers.py": "7c926c9a343290df84296322cc464b96409ac18a24d261e29faa730156742c3c",
+      "src/quant_backtester/portfolio/__init__.py": "674bbafb768b1e8c9e8ae8dd43eec18b2415caef5861106ddb0ef4f9512b9d3a",
+      "src/quant_backtester/portfolio/allocation.py": "2794993cd476ccd7f537aecb009ed9e49be22ef8be8999c0cbffd4f9077cc87f",
+      "src/quant_backtester/portfolio/constraints.py": "b587454f64f64b374b107e9656a5879e0f1f58475cebd57bba7b7e855edfb5b6",
+      "src/quant_backtester/portfolio/holdings.py": "4668bf1e907677a4632db7c9ec4ecda3e38786168f8f339327be3ea1bc7efcec",
+      "src/quant_backtester/portfolio/limits.py": "4302345b7b8b2f21df3a5541545716c8ce397fe7870f9ce053f6d102100f353d",
+      "src/quant_backtester/portfolio/state.py": "99334e4fad46f17d0f1c5bb2689579b8862526be34f7fb74e2688d90b0957b1d",
+      "src/quant_backtester/portfolio/targets.py": "79c0111dafd9664d2821ca46e8fa3b780fdd7fa7bd57c673d4101f9fbb739265",
+      "src/quant_backtester/portfolio/view.py": "ceb7faa287815a7e8a6eb2048a8e96992784b25f7f2acbc245db1db39bd32bd9",
+      "src/quant_backtester/provenance.py": "8741c80663f14a721119e1c3a63cd2d636a613345b218a488fb4480a4b866e82",
+      "src/quant_backtester/research/references.py": "c2c027dad97831703a7e4848207b9d406ff3328f8778b6fbffce0349fbac6da3",
+      "src/quant_backtester/signals/__init__.py": "1f982f97779361c46a117942188ba16fa870eb0b74c7b9ba67fdbef2476d596a",
+      "src/quant_backtester/signals/base.py": "783a9eb2e086ddd6ee242f501185463284edf240bb231e036afd146944731eef",
+      "src/quant_backtester/signals/context.py": "1a69add0b39225a1dcf0d25409f955d7be9d1c2ee78c71c037880c62984a843c",
+      "src/quant_backtester/signals/cross_asset/__init__.py": "2f0d34888421b4909f54026e7d9d81fe0daee6e05c7cf2f5cbe78ec54b59b62a",
+      "src/quant_backtester/signals/cross_asset/correlation.py": "40075577200eb46124e4859cce9509702a163da63d79f9437fd725330ba5f1d4",
+      "src/quant_backtester/signals/cross_asset/relative_residual.py": "363176230938ace3dfc5499a371132ecf97e2f9c9767af245d3c8b453166d79f",
+      "src/quant_backtester/signals/cross_sectional/__init__.py": "81cee5c7d85f5d81e36f6e0247abc57adbd0d59814b6b04e78430722f36b0dac",
+      "src/quant_backtester/signals/cross_sectional/rank.py": "5f31ad7d42b0fb95810d50c230abcd031463d5885c5a8a44d418423d1bbe75ff",
+      "src/quant_backtester/signals/engine.py": "3291a83662ba2b60255c4452949d9a3f73c360f78c12f8d54f3597f43abf510e",
+      "src/quant_backtester/signals/level/__init__.py": "0d687fc30e157abcd8af04f452cc04e4ea724d8509ff375e9cb0bdd9c4cf31f0",
+      "src/quant_backtester/signals/level/change.py": "fa4b57ae3e2c9e7b11d390b957947078b5e4380f86ce6ab0d78101d9793235f0",
+      "src/quant_backtester/signals/level/vix_relief.py": "9c815cd1a5f0caa13e82b02f89ba227292403980b4c0f1529f612175dded01af",
+      "src/quant_backtester/signals/level/zscore.py": "249f9e9bc04367bfd8018ff2f2f107443c0f21c0c18496f952acd3e5624df151",
+      "src/quant_backtester/signals/ml/__init__.py": "caa5c7561c90659ecebeeb1e3e785c29a27881a11d2035806d80f297e1cfad9c",
+      "src/quant_backtester/signals/ml/neural_allocation.py": "8b6c209e34d4b9ee1e74f29faca23936c0fb7c80e8f13d975c205d4c9061dbe8",
+      "src/quant_backtester/signals/ml/signature_return.py": "53009f80f82477ab60ad8af5a7dd6706b1e0b433713988a7872846564ab75094",
+      "src/quant_backtester/signals/models/__init__.py": "2f5ee9dcaf9b0c093ade7b76a52968ea0d4cf6ac50337bb0b269bf73c0e0fd58",
+      "src/quant_backtester/signals/models/arima_garch.py": "a943546517f6d63a8853605fe59de8e818d18b510ef139f47c96dc9d87a33401",
+      "src/quant_backtester/signals/models/garch.py": "acfd891ac362d1790112272b3305f1f1e95cc392e6a47007121406da4d630ef6",
+      "src/quant_backtester/signals/price/__init__.py": "43b3abc64ad4f2ed02c66d17f7182f8a539e8fbe1af367f905f9d9e4c50e64cc",
+      "src/quant_backtester/signals/price/endpoint_momentum.py": "c2d993637481a8b52417d23b54edf62be006621a68b25edd153f59224968fb78",
+      "src/quant_backtester/signals/price/mean_reversion.py": "0b71ece93d58b0a8baf5bb0477f0993bb4b295ddf48ae6a20e9bc633cf685d45",
+      "src/quant_backtester/signals/price/momentum.py": "3ec4429a7b41f110209bf9cd85b3d78c8c90d351a7216e161c5a7241648e1c19",
+      "src/quant_backtester/signals/price/normalized_pullback.py": "bcb6b670c3fe640cb60f8d464793916884a1181a99ceb846994324f3eae12f5b",
+      "src/quant_backtester/signals/price/returns.py": "cf993a218a69a8fae53f83edee5e103df88598c2ae35d026e8e6934eac6a21ab",
+      "src/quant_backtester/signals/price/trend.py": "48888419a1b9a9c5b88fa2ef8f2eb719ee03d1558a78f35884de97731853907b",
+      "src/quant_backtester/signals/risk/__init__.py": "50dc9d292711f302b353d8effa06dba0c287d643c094ab17fc58d3731aa27227",
+      "src/quant_backtester/signals/risk/drawdown.py": "1fec5773c942015cf4f46a67e7b6ce56a51bee6e5746d69926dad6770d23afbc",
+      "src/quant_backtester/signals/risk/volatility.py": "d7d0128ec6308e4dc90c77dd3e917294daa43683250b850ecd7b0127d24e628e",
+      "src/quant_backtester/signals/signatures/__init__.py": "53dd64feba3c624eab30d089248a4460f590252f9b5798ec9642ab544078e396",
+      "src/quant_backtester/signals/signatures/logsignature.py": "da5872879cb70557f9d28a814569d7b646d239f5a1fa272b5322aca204b4ee26",
+      "src/quant_backtester/signals/signatures/path.py": "a9a4ecd605cabcc465ac8bd2cf4fa4d09f8d56355796df85b61f9800aac7ca70",
+      "src/quant_backtester/signals/snapshot.py": "278aa945b7401582bacb960813c879fc521a170ff8b2132056ba246a82ee9357",
+      "src/quant_backtester/signals/types.py": "dc3ba57034821563350a53aac1d3ba13473558ae42fe49de8ffe5212d9f5bac0",
+      "src/quant_backtester/signals/windows.py": "030a24fe568fca244fa080892617aeceb63b3bcb661cb9635f5399b102873906",
+      "src/quant_backtester/strategies/SA15_gpt61_nasdaq.py": "2299c998b344abc93aecf22f28b5141ef9ab8cb5a2c3f8c41814b87d0443522a",
+      "src/quant_backtester/strategies/adaptive/__init__.py": "a1a63a0e7e4536426e5114ffda013fd31ba9cc6acbf41a7f950912bb1d0a2bde",
+      "src/quant_backtester/strategies/adaptive/inputs.py": "6148a6fee7fd2a41a7594afe19fdf319d12726261d505b8c2b4bf0507ce49d64",
+      "src/quant_backtester/strategies/adaptive/rebalance.py": "a00466db26fa72051ed00561de4b48c1865c4e7e147f525858d52219f0673ef1",
+      "src/quant_backtester/strategies/adaptive/rules.py": "eb0b8860d0220e51907c61121840069851a4974fca0d28debf6c35cdfc33d5a4",
+      "src/quant_backtester/strategies/base.py": "136de4b39bcfdd9cee79e8a98fcf3b7978ae12b92bde2e3eef3bdb270bcadc9d",
+      "uv.lock": "485d02ffc2838730f8546def1e3b10896ecfc300ca9e951b7d64354c8cdb8cf3"
+    },
+    "configuration": {
+      "requested_start": "2023-01-02",
+      "requested_end": "2024-12-31",
+      "data_state": "316789fb823677f2e236f4e8f1b21076071d2578d5fb6f299689ed35c60b0e62",
+      "execution": {
+        "fill_model": "DECISION_CLOSE_QUANTITIES",
+        "fill": "market order at the opening auction, sized at its price",
+        "costs": {
+          "commission_rate": 0.001,
+          "minimum_commission": 2.0,
+          "half_spread_rate": 0.0006,
+          "slippage_rate": 0.0004
+        },
+        "minimum_trade_value": 0.0
+      },
+      "initial_cash": 100000.0,
+      "base_currency": "EUR",
+      "reference_calendar": "XPAR",
+      "timetable": {
+        "decision_time": "23:00:00",
+        "execution_time": "09:01:00",
+        "valuation_time": "23:00:00",
+        "timezone": "Europe/Paris",
+        "execution": {
+          "field": "open",
+          "session_offset": 1
+        }
+      },
+      "analytics": {
+        "sessions_per_year": 252,
+        "risk_free_rate": 0.0,
+        "minimum_sessions": 60
+      },
+      "portfolio": {
+        "limits": {
+          "max_weight_per_instrument": 1.0,
+          "max_gross": 1.0,
+          "long_only": true,
+          "applies_to": "target weights, before costs"
+        }
+      },
+      "schedule": {
+        "type": "WeeklyFromStart",
+        "parameters": {
+          "initial_decision": true
+        }
+      },
+      "universe": {
+        "type": "StaticUniverse",
+        "members": [
+          "ETF_COMMODITY",
+          "ETF_EMERGING",
+          "ETF_EURO_GOV",
+          "ETF_GOLD",
+          "ETF_MONETARY_EUR",
+          "ETF_NASDAQ",
+          "ETF_SP500_PEA",
+          "ETF_WORLD"
+        ]
+      }
+    }
+  },
+  "artifacts": {
+    "metrics.json": "4b42a867e43cd88f40847cd56c8994484a103e8a46d39a6400c8b007f10ddff8",
+    "configuration.json": "a26986bfd08e2abd07804528b9487b5e7430e4c286cecad757f117406f9103c2",
+    "strategy.json": "205138aa31982b9d1d2726f7f7b52b46afe8ea971c08b5f74a552a429322d600",
+    "identity.json": "7f38a4bda57d1bab1224027ac3a20fa3e8e62fca5006c4b227294c9b16e8fb9f",
+    "equity.csv": "0994017a3e04c05d894fe9e99208cc94764ca76f31600735d17b931ccf743a44",
+    "weights.csv": "72164746388b8fff7c0c8b1fd55598a7a8ac564c18473ae6c1e5c4fadb6b6396",
+    "fills.csv": "61b004dd6dd72fe5acb2e325ae2688295909b77fa57852518128c8b5fb38b68e",
+    "rejects.csv": "b06e5d02b2ced9ee9af46679be3d924f9c225e69b5b7ec9e3a1cfe3179b71654",
+    "decisions.csv": "03efdc292b19d1fbeb1ef0f13e3337f5fd7d594ee350ba3e032cdd50233fc6ea"
+  }
+}

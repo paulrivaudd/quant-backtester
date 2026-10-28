@@ -1,0 +1,2 @@
+session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
+2022-01-04,2022-01-04 09:01:00+01:00,ETF_GOLD,BUY,1942.0,51.41999816894531,51.44570816802978,99907.56526231383,49.95378263115692,29.957290933227537,19.97152728881836,99.88260085320282

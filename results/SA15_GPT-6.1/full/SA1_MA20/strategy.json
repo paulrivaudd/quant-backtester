@@ -1,0 +1,26 @@
+{
+  "strategy_id": "SA1_std_ma20",
+  "class": "quant_backtester.strategies.SA1_world_ma20_benchmark.WorldMA20Benchmark",
+  "parameters": {
+    "instrument_id": "ETF_WORLD",
+    "window_sessions": 20,
+    "rebalance_band": 0.03,
+    "strategy_id": "SA1_std_ma20"
+  },
+  "signals": [
+    {
+      "signal": {
+        "type": "MovingAverageTrendSignal",
+        "window_sessions": 20,
+        "bar_field": "close",
+        "price_basis": "ADJUSTED",
+        "max_age_sessions": 0,
+        "window_mode": "CONSECUTIVE_SESSIONS",
+        "unit": "FRACTION"
+      },
+      "instruments": [
+        "ETF_WORLD"
+      ]
+    }
+  ]
+}

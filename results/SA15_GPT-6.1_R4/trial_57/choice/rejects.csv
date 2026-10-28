@@ -1,0 +1,3 @@
+session_date,instrument_id,reason,side,requested_quantity
+2022-01-03,ETF_GOLD,INSUFFICIENT_CASH,BUY,6.0
+2022-01-03,ETF_WORLD_HEALTH,INSUFFICIENT_CASH,BUY,2.0

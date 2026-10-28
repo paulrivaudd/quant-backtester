@@ -1,0 +1,11 @@
+{
+  "id": "M33",
+  "decision": "Ne pas retenir l’instrument supplémentaire comme amélioration : il n’a aucun apport économique observé dans le candidat. Conserver M32, plus simple.",
+  "findings": [
+    "Le candidat M33 reproduit exactement M32 à frais normaux et doubles : CAGR 25,887 %, drawdown 19,073 %, onze dates et 19 fills x1 ; aucune obligation n’est détenue. L’ajout ne réduit donc ni la dépendance réalisée à l’or ni le drawdown. Il ne prouve pas que les obligations seront toujours inutiles ; il montre seulement leur absence d’effet dans ce parcours.",
+    "Les effets conditionnels des autres blocs restent publiés : confirmation +2,359 points de CAGR et 8,897 points de protection ; tendance +1,437 point de CAGR et 0,544 point de protection ; défense +6,003 points de CAGR mais 2,899 points de drawdown perdus. L’exécution affiche +1,509 point de CAGR et neuf dates évitées dans les ablations M33, qui peuvent activer les obligations : l’effet d’un bloc dépend de l’état des autres.",
+    "68 soirées de contrôle, onze dates de fills, 19 fills, sept rejets x1, aucun signal indisponible. Les données et règles financières sont conservées, et aucun résultat nul n’est supprimé."
+  ],
+  "next_defect": "Sur M32, le filtre intermédiaire réduit les reprises à 53,91 % de Nasdaq moyen. Comparer une confirmation fondée sur le niveau de prix relatif aux moyennes à celle fondée sur un prix de base à 63 séances, sans modifier le momentum long.",
+  "completed_sha256": "07d4c0dbf08a151b43ee53e7d3868e4d1bfb94a405d6b6a14dc1828102af70fe"
+}

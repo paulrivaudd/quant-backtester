@@ -1,0 +1,11 @@
+{
+  "id": "M15",
+  "decision": "Rejeter la reprise sur nouveau plus haut comme amélioration de M10 : elle n’a ajouté qu’un faux retour de marché baissier.",
+  "findings": [
+    "M15 donne un CAGR de 23,330 %, un drawdown de 22,054 % et 26 dates d’ordres, contre 23,800 %, 22,054 % et 25 dates pour M10. Il perd 0,470 point de CAGR, ajoute une date et 147,01 EUR de frais sans améliorer le drawdown. Le déficit est de 0,480 point de CAGR aux frais doubles. La durée maximale sous le sommet s’allonge de 338 à 349 séances.",
+    "Le journal recense une seule décision où la reprise restaure effectivement la direction : le 29 juillet 2022. Le prix atteint le plus haut des 63 séances et le momentum à 21 séances vaut +13,96 %, alors que le momentum à 126 séances reste à −5,28 % et le prix sous MA200 de 2,08 %. Le mécanisme augmente la cible Nasdaq à 71,03 %, contre environ 23,68 % sans reprise ; ce rebond échoue ensuite. Aucune autre réentrée active ne vient compenser ce coût.",
+    "Les ablations confirment que le bloc de reprise coûte 0,470 point de CAGR sans protection. Le risque ajoute 0,327 point de CAGR et évite 2,009 points de drawdown ; la défense ajoute 3,327 points de CAGR avec un coût de drawdown de 0,018 point ; l’exécution ajoute 0,890 point de CAGR et évite neuf dates. La tendance coûte 0,266 point de CAGR mais évite 5,207 points de drawdown. Le rendement actif en reprise se dégrade à −1,970 point de base par jour."
+  ],
+  "next_defect": "Un nouveau plus haut court ne distingue pas une reprise durable d’un rebond dans un marché encore baissier. Tester une confirmation de risque par d’autres marchés, en publiant également son coût sur toutes les autres décisions.",
+  "completed_sha256": "31ac9db3bef4a8f79708a2f10a44aebf0ca5453a1d0e71cefe236dd1cdc4e444"
+}

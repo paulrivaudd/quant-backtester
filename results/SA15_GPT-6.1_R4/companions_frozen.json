@@ -1,0 +1,806 @@
+{
+  "format": 1,
+  "created_at_utc": "2026-10-16T18:59:10.421082+00:00",
+  "role": "descriptive_only_no_winner_replacement",
+  "criteria": {
+    "eligible": "qualified candidates only, from the same fifty verified choice runs",
+    "minimum_interventions": [
+      "trade_days_per_year ascending",
+      "score descending",
+      "trial ascending"
+    ],
+    "minimum_drawdown": [
+      "drawdown_depth ascending",
+      "score descending",
+      "trial ascending"
+    ],
+    "deduplication": "choose extrema independently; remove winner and duplicates; never force another",
+    "role": "descriptive only; neither companion can replace the main winner"
+  },
+  "ranking": {
+    "expected_winner": 71,
+    "criterion_winners": {
+      "minimum_interventions": 55,
+      "minimum_drawdown": 79
+    },
+    "companions": [
+      55,
+      79
+    ],
+    "qualified_count": 28
+  },
+  "expected_winner": {
+    "number": 71,
+    "candidate": {
+      "number": 71,
+      "reason": "62(or/matièrespremières) gagne4,96points de CAGR mais dépasse4dates/an. Dernier voisin de trading :bande20points au lieu de15, même cible20%, même mensuel et défenses. Aucun paramètre après contrôle final.",
+      "schedule": "monthly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH"
+        ],
+        "defensive_ids": [
+          "ETF_GOLD",
+          "ETF_COMMODITY"
+        ],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "vol_control",
+        "momentum_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "equal",
+        "fixed_weights": [],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.2,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          60
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.2,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    },
+    "fingerprint": "ef95006960c2102347cd008e43ee2959526e576f4971ceca75b3fdb398cbe69e",
+    "candidate_sha256": "a121a1338e9fe952c8953a5312803aac0ab418c996e9b2e9ad37f51d88b2aceb",
+    "selection_sha256": "e44d8fd0e6ae536e1a5c36d2d18d7e20e093d395ece313077a654e43ee5ad0b3"
+  },
+  "companions": [
+    {
+      "number": 55,
+      "candidate": {
+        "number": 55,
+        "reason": "Le mélange75/25 de35 est qualifié avec un seul rééquilibrage2019–24. Porter la bande à15points pour tester une gestion encore plus rare, sans modifier poids, cadence trimestrielle ni seuil de qualification.",
+        "schedule": "quarterly",
+        "parameters": {
+          "core_id": "ETF_US_TECH",
+          "risky_ids": [
+            "ETF_US_TECH",
+            "ETF_GOLD"
+          ],
+          "defensive_ids": [],
+          "monetary_id": "ETF_MONETARY_EUR",
+          "mode": "balanced",
+          "momentum_lookbacks": [
+            21,
+            63,
+            126
+          ],
+          "momentum_weights": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "trend_kind": "momentum",
+          "core_floor": 0.0,
+          "top_k": 1,
+          "allocation_mode": "fixed",
+          "fixed_weights": [
+            0.75,
+            0.25
+          ],
+          "absolute_filter": true,
+          "core_preference": 0.02,
+          "switch_buffer": 0.02,
+          "rebalance_band": 0.15,
+          "canary_ids": [],
+          "canary_lookbacks": [
+            21,
+            63,
+            126
+          ],
+          "canary_weights": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "canary_min_breadth": 0.5,
+          "volatility_windows": [
+            20,
+            60
+          ],
+          "volatility_floor": 0.05,
+          "target_volatility": 0.0,
+          "recovery_lookback": 0,
+          "recovery_threshold": 0.0,
+          "defensive_top_k": 1,
+          "monetary_lookback": 21,
+          "max_age_sessions": 1,
+          "strategy_id": "SA15_GPT-6.1_R4"
+        }
+      },
+      "fingerprint": "6235407d1b81daa50a639f27b85aac4786aaff242acf87be84772b51054e091f",
+      "candidate_sha256": "a8fd959d5fa96da2ec5bcdc9fbf7e1cd3fa73f2a121c10910b69e08de9558576",
+      "selection_sha256": "0cfa38dfbcda2e1c5be5ddeb5eed5ac745efd9aa1c18795ccdd794124e42d939",
+      "criteria": [
+        "minimum_interventions"
+      ]
+    },
+    {
+      "number": 79,
+      "candidate": {
+        "number": 79,
+        "reason": "Frontière de risque des mélanges toujours investis :60% technologie/40% or, bande15points trimestrielle. Le voisin65/35 reste supérieur au Nasdaq sur choix ; tester si davantage de défense peut encore préserver cette cible avec presque aucun trading.",
+        "schedule": "quarterly",
+        "parameters": {
+          "core_id": "ETF_US_TECH",
+          "risky_ids": [
+            "ETF_US_TECH",
+            "ETF_GOLD"
+          ],
+          "defensive_ids": [],
+          "monetary_id": "ETF_MONETARY_EUR",
+          "mode": "balanced",
+          "momentum_lookbacks": [
+            21,
+            63,
+            126
+          ],
+          "momentum_weights": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "trend_kind": "momentum",
+          "core_floor": 0.0,
+          "top_k": 1,
+          "allocation_mode": "fixed",
+          "fixed_weights": [
+            0.6,
+            0.4
+          ],
+          "absolute_filter": true,
+          "core_preference": 0.02,
+          "switch_buffer": 0.02,
+          "rebalance_band": 0.15,
+          "canary_ids": [],
+          "canary_lookbacks": [
+            21,
+            63,
+            126
+          ],
+          "canary_weights": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "canary_min_breadth": 0.5,
+          "volatility_windows": [
+            20,
+            60
+          ],
+          "volatility_floor": 0.05,
+          "target_volatility": 0.0,
+          "recovery_lookback": 0,
+          "recovery_threshold": 0.0,
+          "defensive_top_k": 1,
+          "monetary_lookback": 21,
+          "max_age_sessions": 1,
+          "strategy_id": "SA15_GPT-6.1_R4"
+        }
+      },
+      "fingerprint": "f0b00f334f91362f49bd274cec1296fbf0e055615dc0b89712b7a6f1fd403f17",
+      "candidate_sha256": "e21bb096d4acb95b801f10bfdeed8c85b3ff0e64c5044475da24d61de4ba825c",
+      "selection_sha256": "c05a9e776f5a10401ade6c8781ec0ff36908e7ab38ebafeaeb49556c3978616e",
+      "criteria": [
+        "minimum_drawdown"
+      ]
+    }
+  ],
+  "trial_scores": [
+    {
+      "trial": 31,
+      "excess_choice": -0.042330231353997716,
+      "excess_validation": -0.11135480762749994,
+      "drawdown_depth": 0.17937089533280348,
+      "trade_days_per_year": 0.3584396467124632,
+      "qualified": false,
+      "score": -0.0439443797497705
+    },
+    {
+      "trial": 32,
+      "excess_choice": -0.042330231353997716,
+      "excess_validation": -0.11135480762749994,
+      "drawdown_depth": 0.17937089533280348,
+      "trade_days_per_year": 0.3584396467124632,
+      "qualified": false,
+      "score": -0.0439443797497705
+    },
+    {
+      "trial": 33,
+      "excess_choice": -0.02021144364168248,
+      "excess_validation": -0.042865775976469456,
+      "drawdown_depth": 0.2522684194622056,
+      "trade_days_per_year": 0.1792198233562316,
+      "qualified": false,
+      "score": -0.02041704868168085
+    },
+    {
+      "trial": 34,
+      "excess_choice": -0.047095373692877196,
+      "excess_validation": -0.09539284475349308,
+      "drawdown_depth": 0.17156178603425898,
+      "trade_days_per_year": 3.763616290480863,
+      "qualified": false,
+      "score": -0.04315720951043936
+    },
+    {
+      "trial": 35,
+      "excess_choice": 0.022709492063728298,
+      "excess_validation": 0.029596382016353395,
+      "drawdown_depth": 0.24998643236049312,
+      "trade_days_per_year": 0.3584396467124632,
+      "qualified": true,
+      "score": 0.03481093816929257
+    },
+    {
+      "trial": 36,
+      "excess_choice": -0.03569367493306119,
+      "excess_validation": -0.07663044833306287,
+      "drawdown_depth": 0.24070692894148438,
+      "trade_days_per_year": 4.838935230618253,
+      "qualified": false,
+      "score": -0.041732875457579144
+    },
+    {
+      "trial": 37,
+      "excess_choice": -0.08741102325671934,
+      "excess_validation": -0.0994902832870519,
+      "drawdown_depth": 0.2833589005391376,
+      "trade_days_per_year": 2.5090775269872423,
+      "qualified": false,
+      "score": -0.12353609187821574
+    },
+    {
+      "trial": 38,
+      "excess_choice": 0.0003071734683128824,
+      "excess_validation": -0.03797708476819728,
+      "drawdown_depth": 0.30254141915209454,
+      "trade_days_per_year": 2.6882973503434737,
+      "qualified": false,
+      "score": -0.033867358552539716
+    },
+    {
+      "trial": 39,
+      "excess_choice": 0.04170294315371925,
+      "excess_validation": 0.041359484531421575,
+      "drawdown_depth": 0.24842441018841388,
+      "trade_days_per_year": 5.735034347399411,
+      "qualified": false,
+      "score": 0.05238175934629996
+    },
+    {
+      "trial": 40,
+      "excess_choice": -0.0764596836977327,
+      "excess_validation": -0.10621334893229006,
+      "drawdown_depth": 0.17703165019461264,
+      "trade_days_per_year": 4.48049558390579,
+      "qualified": false,
+      "score": -0.07680111397597064
+    },
+    {
+      "trial": 41,
+      "excess_choice": 0.01373734797687276,
+      "excess_validation": -0.0180612737721233,
+      "drawdown_depth": 0.23736966520508218,
+      "trade_days_per_year": 0.3584396467124632,
+      "qualified": true,
+      "score": 0.023846829070488396
+    },
+    {
+      "trial": 42,
+      "excess_choice": 0.005212392061824334,
+      "excess_validation": -0.024814599528484305,
+      "drawdown_depth": 0.2245243926267294,
+      "trade_days_per_year": 0.3584396467124632,
+      "qualified": true,
+      "score": 0.016202596232020274
+    },
+    {
+      "trial": 43,
+      "excess_choice": 0.027561188972910156,
+      "excess_validation": 0.03678514886218265,
+      "drawdown_depth": 0.26239883028509814,
+      "trade_days_per_year": 0.1792198233562316,
+      "qualified": false,
+      "score": 0.030980740351004357
+    },
+    {
+      "trial": 44,
+      "excess_choice": 0.013788290383905943,
+      "excess_validation": -0.016848408256325387,
+      "drawdown_depth": 0.23736966520508218,
+      "trade_days_per_year": 0.3584396467124632,
+      "qualified": true,
+      "score": 0.024200987856471057
+    },
+    {
+      "trial": 45,
+      "excess_choice": 0.008552468934629243,
+      "excess_validation": 0.020594186482350008,
+      "drawdown_depth": 0.30987937379074837,
+      "trade_days_per_year": 1.9714180569185475,
+      "qualified": false,
+      "score": -0.02126436014123172
+    },
+    {
+      "trial": 46,
+      "excess_choice": 0.040885226764865834,
+      "excess_validation": 0.04639930304002271,
+      "drawdown_depth": 0.24842441018841388,
+      "trade_days_per_year": 3.942836113837095,
+      "qualified": true,
+      "score": 0.053299077304845954
+    },
+    {
+      "trial": 47,
+      "excess_choice": 0.03643697916864652,
+      "excess_validation": 0.041988408065429805,
+      "drawdown_depth": 0.24664088556203168,
+      "trade_days_per_year": 3.046736997055937,
+      "qualified": true,
+      "score": 0.04920753463390308
+    },
+    {
+      "trial": 48,
+      "excess_choice": 0.034621269730499726,
+      "excess_validation": 0.024995696108199184,
+      "drawdown_depth": 0.24664088556203168,
+      "trade_days_per_year": 2.329857703631011,
+      "qualified": true,
+      "score": 0.047391825195756285
+    },
+    {
+      "trial": 49,
+      "excess_choice": 0.02612031368888501,
+      "excess_validation": 0.014360345479081271,
+      "drawdown_depth": 0.24072048090907205,
+      "trade_days_per_year": 4.48049558390579,
+      "qualified": false,
+      "score": 0.03959445450082771
+    },
+    {
+      "trial": 50,
+      "excess_choice": 0.050959720459094804,
+      "excess_validation": 0.057933160747114076,
+      "drawdown_depth": 0.25648087149984133,
+      "trade_days_per_year": 3.4051766437684003,
+      "qualified": false,
+      "score": 0.058521842986868765
+    },
+    {
+      "trial": 51,
+      "excess_choice": 0.028441152364790057,
+      "excess_validation": -0.019026446164275512,
+      "drawdown_depth": 0.24664088556203168,
+      "trade_days_per_year": 1.0753189401373895,
+      "qualified": true,
+      "score": 0.03645509628897774
+    },
+    {
+      "trial": 52,
+      "excess_choice": 0.02383866189128825,
+      "excess_validation": 0.014360267599178078,
+      "drawdown_depth": 0.24072048090907205,
+      "trade_days_per_year": 3.584396467124632,
+      "qualified": true,
+      "score": 0.037793298287136734
+    },
+    {
+      "trial": 53,
+      "excess_choice": 0.0024841200498406657,
+      "excess_validation": -0.013114434913980677,
+      "drawdown_depth": 0.23482046005760304,
+      "trade_days_per_year": 4.122055937193327,
+      "qualified": false,
+      "score": 0.014218095950294461
+    },
+    {
+      "trial": 54,
+      "excess_choice": 0.033998918870665085,
+      "excess_validation": 0.041994077581421596,
+      "drawdown_depth": 0.24844342887253534,
+      "trade_days_per_year": 3.4051766437684003,
+      "qualified": true,
+      "score": 0.04640896567382091
+    },
+    {
+      "trial": 55,
+      "excess_choice": 0.02138007401998454,
+      "excess_validation": 0.02536071183701538,
+      "drawdown_depth": 0.24998643236049312,
+      "trade_days_per_year": 0.1792198233562316,
+      "qualified": true,
+      "score": 0.033481520125548815
+    },
+    {
+      "trial": 56,
+      "excess_choice": 0.01507274830994132,
+      "excess_validation": 0.013597044447197337,
+      "drawdown_depth": 0.23736966520508218,
+      "trade_days_per_year": 0.1792198233562316,
+      "qualified": true,
+      "score": 0.02969754784658778
+    },
+    {
+      "trial": 57,
+      "excess_choice": 0.0029163814314174807,
+      "excess_validation": -0.04912326739914197,
+      "drawdown_depth": 0.2444816212068337,
+      "trade_days_per_year": 0.3584396467124632,
+      "qualified": true,
+      "score": 0.003837972917928145
+    },
+    {
+      "trial": 58,
+      "excess_choice": 0.01240667371271642,
+      "excess_validation": 0.02979109707063543,
+      "drawdown_depth": 0.2871580905109752,
+      "trade_days_per_year": 6.272693817468106,
+      "qualified": false,
+      "score": -0.0037779508847714176
+    },
+    {
+      "trial": 59,
+      "excess_choice": -0.0035136056001918714,
+      "excess_validation": 0.001902688742596803,
+      "drawdown_depth": 0.2803130477283936,
+      "trade_days_per_year": 5.1973748773307165,
+      "qualified": false,
+      "score": -0.013831381309735213
+    },
+    {
+      "trial": 60,
+      "excess_choice": -0.030397018081768756,
+      "excess_validation": -0.1223437100875866,
+      "drawdown_depth": 0.189175201851691,
+      "trade_days_per_year": 5.735034347399411,
+      "qualified": false,
+      "score": -0.03845428774374012
+    },
+    {
+      "trial": 61,
+      "excess_choice": 0.04380398594462909,
+      "excess_validation": 0.0464012264036151,
+      "drawdown_depth": 0.24842441018841388,
+      "trade_days_per_year": 3.942836113837095,
+      "qualified": true,
+      "score": 0.05621783648460921
+    },
+    {
+      "trial": 62,
+      "excess_choice": 0.04961253789436326,
+      "excess_validation": 0.037708523920934045,
+      "drawdown_depth": 0.24842441018841388,
+      "trade_days_per_year": 4.301275760549558,
+      "qualified": false,
+      "score": 0.061725112673793825
+    },
+    {
+      "trial": 63,
+      "excess_choice": 0.04528893988932192,
+      "excess_validation": 0.06044776246501482,
+      "drawdown_depth": 0.24842441018841388,
+      "trade_days_per_year": 3.942836113837095,
+      "qualified": true,
+      "score": 0.05770279042930204
+    },
+    {
+      "trial": 64,
+      "excess_choice": 0.03984190609717708,
+      "excess_validation": 0.04440574929871377,
+      "drawdown_depth": 0.24842441018841388,
+      "trade_days_per_year": 3.763616290480863,
+      "qualified": true,
+      "score": 0.0522557566371572
+    },
+    {
+      "trial": 65,
+      "excess_choice": 0.027132445977631647,
+      "excess_validation": 0.018573398584736944,
+      "drawdown_depth": 0.2484449397516706,
+      "trade_days_per_year": 3.4051766437684003,
+      "qualified": true,
+      "score": 0.03954219060496043
+    },
+    {
+      "trial": 66,
+      "excess_choice": 0.04548612312240197,
+      "excess_validation": 0.057309311987638445,
+      "drawdown_depth": 0.2484449397516706,
+      "trade_days_per_year": 4.301275760549558,
+      "qualified": false,
+      "score": 0.05759459198918119
+    },
+    {
+      "trial": 67,
+      "excess_choice": 0.01596959156258282,
+      "excess_validation": 0.011462374602814629,
+      "drawdown_depth": 0.27049698978953607,
+      "trade_days_per_year": 2.5090775269872423,
+      "qualified": false,
+      "score": 0.013720431287570466
+    },
+    {
+      "trial": 68,
+      "excess_choice": 0.0282679370974106,
+      "excess_validation": 0.014247022182095614,
+      "drawdown_depth": 0.2436788060642866,
+      "trade_days_per_year": 3.763616290480863,
+      "qualified": true,
+      "score": 0.041630908462216176
+    },
+    {
+      "trial": 69,
+      "excess_choice": 0.019470370523966718,
+      "excess_validation": 0.012396798802743803,
+      "drawdown_depth": 0.24998643236049312,
+      "trade_days_per_year": 0.5376594700686947,
+      "qualified": true,
+      "score": 0.03157181662953099
+    },
+    {
+      "trial": 70,
+      "excess_choice": 0.015372915088164962,
+      "excess_validation": -0.002261660958144951,
+      "drawdown_depth": 0.23736966520508218,
+      "trade_days_per_year": 0.896099116781158,
+      "qualified": true,
+      "score": 0.029432299385275185
+    },
+    {
+      "trial": 71,
+      "excess_choice": 0.052585044362779776,
+      "excess_validation": 0.03662659373396915,
+      "drawdown_depth": 0.24664088556203168,
+      "trade_days_per_year": 3.4051766437684003,
+      "qualified": true,
+      "score": 0.06535559982803633
+    },
+    {
+      "trial": 72,
+      "excess_choice": 0.04411994271863251,
+      "excess_validation": 0.06656589496996523,
+      "drawdown_depth": 0.24664088556203168,
+      "trade_days_per_year": 2.8675171736997056,
+      "qualified": true,
+      "score": 0.05689049818388907
+    },
+    {
+      "trial": 73,
+      "excess_choice": 0.04734083970975034,
+      "excess_validation": 0.06392499693592435,
+      "drawdown_depth": 0.24664088556203168,
+      "trade_days_per_year": 2.6882973503434737,
+      "qualified": true,
+      "score": 0.060111395175006896
+    },
+    {
+      "trial": 74,
+      "excess_choice": 0.01603037242359151,
+      "excess_validation": 0.026472849785500685,
+      "drawdown_depth": 0.24844674603657657,
+      "trade_days_per_year": 4.48049558390579,
+      "qualified": false,
+      "score": 0.027959260210033303
+    },
+    {
+      "trial": 75,
+      "excess_choice": 0.008565818936420833,
+      "excess_validation": -0.0166459254559701,
+      "drawdown_depth": 0.2245243926267294,
+      "trade_days_per_year": 0.896099116781158,
+      "qualified": true,
+      "score": 0.021598191624745324
+    },
+    {
+      "trial": 76,
+      "excess_choice": 0.019088513068483026,
+      "excess_validation": 0.012597847124574457,
+      "drawdown_depth": 0.24998643236049312,
+      "trade_days_per_year": 0.5376594700686947,
+      "qualified": true,
+      "score": 0.0311899591740473
+    },
+    {
+      "trial": 77,
+      "excess_choice": 0.013789172363201763,
+      "excess_validation": -0.0017167687318107028,
+      "drawdown_depth": 0.23736966520508218,
+      "trade_days_per_year": 0.896099116781158,
+      "qualified": true,
+      "score": 0.027984779716895548
+    },
+    {
+      "trial": 78,
+      "excess_choice": -0.035355494441387414,
+      "excess_validation": -0.09293510241532621,
+      "drawdown_depth": 0.17929729548750495,
+      "trade_days_per_year": 1.4337585868498528,
+      "qualified": false,
+      "score": -0.03234999656505706
+    },
+    {
+      "trial": 79,
+      "excess_choice": 0.0037581066343677083,
+      "excess_validation": -0.0055229560128517985,
+      "drawdown_depth": 0.21142410647154175,
+      "trade_days_per_year": 0.3584396467124632,
+      "qualified": true,
+      "score": 0.022191278914509307
+    },
+    {
+      "trial": 80,
+      "excess_choice": 0.005322168104034963,
+      "excess_validation": -0.004776292658894787,
+      "drawdown_depth": 0.21800413797549922,
+      "trade_days_per_year": 0.1792198233562316,
+      "qualified": true,
+      "score": 0.022625999921874317
+    }
+  ],
+  "driver_sha256": "17a142becbc360b3ea61f49085ddf5f2eb634911bed184c86241335c6f4244e1",
+  "source_finance_hashes": {
+    "scripts/SA15_run_gpt61_round4.py": "d1f86d51e508f56d930e0e336078c7c4237a714d3a0febae53cb19e5c2b720a7",
+    "scripts/SA15_run_gpt61_study.py": "519fbbbe5f26e4bdb3ef4e32d317fe75cd712bf205764c439b4ba0776f025e7c",
+    "src/quant_backtester/analytics/__init__.py": "b3b8fbfdc3af7f6541b1a716f33561d8404829583749c12295c2887268264eda",
+    "src/quant_backtester/analytics/attribution.py": "38e4d093abae8f3e1044a5a4ae6da05d70e4f6d732b7736223380c7ea8dd026d",
+    "src/quant_backtester/analytics/benchmark_comparison.py": "6caf1ad606517811e175fcaa7554506c5080579e9d6fa09d6c6db80e09d5dd75",
+    "src/quant_backtester/analytics/comparison.py": "99772134d1554314235047a01083edf1048db7e8a738d0e67c4f2686c9e5730f",
+    "src/quant_backtester/analytics/config.py": "df3a0fef778370ad1fc04e9c1365bffd4240bda5d8b5be68eab837c4bf93e55b",
+    "src/quant_backtester/analytics/contribution.py": "86906d4e199c74297f5e518867ec4dd584675e82bae3cb0c0ad0ca334bec9b39",
+    "src/quant_backtester/analytics/curves.py": "d56015cecdd245655e919635f099d571a9503684b89ecc0d821895df5c313e7a",
+    "src/quant_backtester/analytics/performance.py": "8c9ac3e5aa15bf8f3bee4bbd9411cf8c95e4afad05aa0fd30ac9ed53a0484b4b",
+    "src/quant_backtester/analytics/plots.py": "061af61c19be950f4949a1cedde7a8109fc102218c7e5eae0bfd04669a0dc2a9",
+    "src/quant_backtester/analytics/quality.py": "3e58536beea1218858ee42c6f1a610aff356ad2579ebab84e9e31b7a4b9709e4",
+    "src/quant_backtester/analytics/relative.py": "292eb6eb2cdcf8716b3876e5d36d7de2609eef73e12a4457d9b01bd119689f53",
+    "src/quant_backtester/analytics/report.py": "08523d643e5db1d668d96a9a35ba1a25f570384bfa386617f394441a282177e0",
+    "src/quant_backtester/analytics/return_forecast.py": "ef336306b056c4357c5deb7ba175a8e650b70be88f65909dd696986e090da747",
+    "src/quant_backtester/analytics/segments.py": "4c96380f12d01d27850b2718a3d2ba68b5453e17c661c4654fba90b76d4c3a7a",
+    "src/quant_backtester/analytics/uncertainty.py": "1c09f06faba33b3ffbe54d8345b1c6c8fa396f24860177c61b05444f614e137d",
+    "src/quant_backtester/analytics/volatility_forecast.py": "8afb875e128bbe948b6cb1a608665100a97e7e4d162c643aa53dc546231fb10b",
+    "src/quant_backtester/backtest/__init__.py": "350a063f2777ddfcbfb6f98e0d2e68ec232df9f58e34c81a70b4e550c30bfcb0",
+    "src/quant_backtester/backtest/config.py": "f77e5944c42cfbb54ceb4645e0bf8a8a995854ee4aadf16cd557063b85005234",
+    "src/quant_backtester/backtest/context.py": "8fe66245b6f119cfe5f12d9a26b3b703fdb74126d8f5d80246ba2eb12674ccc3",
+    "src/quant_backtester/backtest/engine.py": "f9823c37b5273fd0d776df22bb61d3a0cc61c9c19693310fd23663884bc3c826",
+    "src/quant_backtester/backtest/market.py": "d6a6b8dbf2852a17b9b3e8c4c8f1ac5dcfae6d84c8c3306d3f26c6c5b4097e79",
+    "src/quant_backtester/backtest/records.py": "5cef1a516e0ea8d691056a49dc769f8090fb0730d2478e314d1122d376936a7f",
+    "src/quant_backtester/backtest/result.py": "b1cd4f58d2eff568f7b28f349c4dc081ad5f4a5087da674a7a330ea1f9e50b01",
+    "src/quant_backtester/backtest/runner.py": "ef080987f50f0b198bcb11055d5f81166ce1fdbff11d3586cf28b9b172f7a25f",
+    "src/quant_backtester/backtest/schedule.py": "907bde72e332e77f38ccd541aa6381adbabfbc447f0b498a67d37f37613d54da",
+    "src/quant_backtester/backtest/timetable.py": "b0d169c527bc03d6581a8bc778bbe14c040dd651b4aea025ae67ca3ec3ad4ab5",
+    "src/quant_backtester/data/__init__.py": "0a5335cbdcf63b10a3e31863587fda5d20b790a29bf5d1fe92f26cf3f906063c",
+    "src/quant_backtester/data/bar_corrections.py": "cd628015e7a7fb4340b23d34a9009154afa3223bdf97c698e48db45be38ca069",
+    "src/quant_backtester/data/calendars.py": "a67bdb023f65171a30c121f47a66aaf7f17b645de8faee6cc8546e231fc47414",
+    "src/quant_backtester/data/conflict_reviews.py": "95906e7b3a7da5afb1f2526398f4189936320de1d714a1ed0a4f1ba316a755ab",
+    "src/quant_backtester/data/corporate_actions.py": "eda0e91bb9b0bc7f1f61fa7a39dda5e512a91ad8e6eb6796cbde30dbc5baef78",
+    "src/quant_backtester/data/crosscheck.py": "d9a243a04dea2bbc152e000028716890b862c886ee024b5edf38e7d716e75e6f",
+    "src/quant_backtester/data/instruments.py": "8546c33d627975937f54b56ebb13ebf8efe651ce58ab3753c2f8d14d3b999a1d",
+    "src/quant_backtester/data/known_gaps.py": "49ce4518746f11166033d9cfa4d39cebe02dae9021930a8215a1d2dd29fc23e6",
+    "src/quant_backtester/data/normalizer.py": "2871e311719f392139c79244085496b01dbaf4cb57b870bec8f40ab91f138364",
+    "src/quant_backtester/data/reader.py": "13f74a84f8055949a3ea684d717c51ff92880680bb912648b74d04cccaa963d6",
+    "src/quant_backtester/data/repository.py": "56391fbbf5895c90689bd97bc5b939576c988831249909f8e513beb44b53eecc",
+    "src/quant_backtester/data/revisions.py": "436a6537f0f965d1639378a185cc86af19726fb318d37274b52c4f88947d7113",
+    "src/quant_backtester/data/schemas.py": "089862df265fa3d86f467f0d3097ea6500f8ebb01665d047e3c241ae97c5f98c",
+    "src/quant_backtester/data/sources/__init__.py": "61e6076529b3492ab9941b8261e087580d2b515584ce97340d9fd5a3792d908f",
+    "src/quant_backtester/data/sources/alfred.py": "eb18b17f097536619f95342583dbbba8e98af9df482d301859d7ff217aa9ff6e",
+    "src/quant_backtester/data/sources/base.py": "a250694e3d836d4446605bbb9de0a3986a0f9562516d1243319d4d3de9b4954c",
+    "src/quant_backtester/data/sources/ecb.py": "459b2166b67f3865ca1bafb24ac47d28cfeb8c4a8a2dbee653ae4bd83ca591e5",
+    "src/quant_backtester/data/sources/euronext.py": "0a912fdab94f39b0890e33d080430c70ed69d301f7f85a4b3c4f6979384ebf7a",
+    "src/quant_backtester/data/sources/fred.py": "84633069e88d037a3d99885ff54e9ee69fce137801c6789fef7aa02bdcf50f88",
+    "src/quant_backtester/data/sources/yahoo.py": "4b87018e2a8b5ca95f9fe4081bbe4b171acdde20e72c5e6b907eb6fc72e867f3",
+    "src/quant_backtester/data/universes.py": "d137c61bc02cbf0adf06614d76ebded7602e5b2d8d9c011abf4cc83b04d75c6b",
+    "src/quant_backtester/data/updater.py": "e35800f53ca3d5b7c47742b786d174987dd0979aff9fe281ebf704449bd5f53d",
+    "src/quant_backtester/data/validator.py": "c87cfc4b885acc0368d2a1a9c7452048a8311ddbabdb5ffc1f0978b200dd0a91",
+    "src/quant_backtester/execution/__init__.py": "dc6c90f08e5e418c33d624c688de6a2eb840656b1f06b759f167a19a4ce7ae05",
+    "src/quant_backtester/execution/costs.py": "286e516e6c855b49d64bf54738c602553af6bd07800f657acac156a79629cebd",
+    "src/quant_backtester/execution/fills.py": "6388a620a21a885d2350134fcb154641981ba23b66ee105f2cd51dc95602b4fa",
+    "src/quant_backtester/execution/model.py": "264b9e2d5f96afcd77b021728e703de49ecf01c381c237a4d001c47445e66f1c",
+    "src/quant_backtester/execution/orders.py": "b23a2c39a67ca5c88a057e425ce4ae7f0397fdb0357fde5531ba9893a613b6a3",
+    "src/quant_backtester/execution/rounding.py": "a544c91a9c541fa7dda915d407be17410201e671568a2d7f5817ef91d8d3a53e",
+    "src/quant_backtester/numbers.py": "7c926c9a343290df84296322cc464b96409ac18a24d261e29faa730156742c3c",
+    "src/quant_backtester/portfolio/__init__.py": "674bbafb768b1e8c9e8ae8dd43eec18b2415caef5861106ddb0ef4f9512b9d3a",
+    "src/quant_backtester/portfolio/allocation.py": "2794993cd476ccd7f537aecb009ed9e49be22ef8be8999c0cbffd4f9077cc87f",
+    "src/quant_backtester/portfolio/constraints.py": "b587454f64f64b374b107e9656a5879e0f1f58475cebd57bba7b7e855edfb5b6",
+    "src/quant_backtester/portfolio/holdings.py": "4668bf1e907677a4632db7c9ec4ecda3e38786168f8f339327be3ea1bc7efcec",
+    "src/quant_backtester/portfolio/limits.py": "4302345b7b8b2f21df3a5541545716c8ce397fe7870f9ce053f6d102100f353d",
+    "src/quant_backtester/portfolio/state.py": "99334e4fad46f17d0f1c5bb2689579b8862526be34f7fb74e2688d90b0957b1d",
+    "src/quant_backtester/portfolio/targets.py": "79c0111dafd9664d2821ca46e8fa3b780fdd7fa7bd57c673d4101f9fbb739265",
+    "src/quant_backtester/portfolio/view.py": "ceb7faa287815a7e8a6eb2048a8e96992784b25f7f2acbc245db1db39bd32bd9",
+    "src/quant_backtester/provenance.py": "8741c80663f14a721119e1c3a63cd2d636a613345b218a488fb4480a4b866e82",
+    "src/quant_backtester/research/references.py": "c2c027dad97831703a7e4848207b9d406ff3328f8778b6fbffce0349fbac6da3",
+    "src/quant_backtester/signals/__init__.py": "1f982f97779361c46a117942188ba16fa870eb0b74c7b9ba67fdbef2476d596a",
+    "src/quant_backtester/signals/base.py": "783a9eb2e086ddd6ee242f501185463284edf240bb231e036afd146944731eef",
+    "src/quant_backtester/signals/context.py": "1a69add0b39225a1dcf0d25409f955d7be9d1c2ee78c71c037880c62984a843c",
+    "src/quant_backtester/signals/cross_asset/__init__.py": "2f0d34888421b4909f54026e7d9d81fe0daee6e05c7cf2f5cbe78ec54b59b62a",
+    "src/quant_backtester/signals/cross_asset/correlation.py": "40075577200eb46124e4859cce9509702a163da63d79f9437fd725330ba5f1d4",
+    "src/quant_backtester/signals/cross_asset/relative_residual.py": "363176230938ace3dfc5499a371132ecf97e2f9c9767af245d3c8b453166d79f",
+    "src/quant_backtester/signals/cross_sectional/__init__.py": "81cee5c7d85f5d81e36f6e0247abc57adbd0d59814b6b04e78430722f36b0dac",
+    "src/quant_backtester/signals/cross_sectional/rank.py": "5f31ad7d42b0fb95810d50c230abcd031463d5885c5a8a44d418423d1bbe75ff",
+    "src/quant_backtester/signals/engine.py": "3291a83662ba2b60255c4452949d9a3f73c360f78c12f8d54f3597f43abf510e",
+    "src/quant_backtester/signals/level/__init__.py": "0d687fc30e157abcd8af04f452cc04e4ea724d8509ff375e9cb0bdd9c4cf31f0",
+    "src/quant_backtester/signals/level/change.py": "fa4b57ae3e2c9e7b11d390b957947078b5e4380f86ce6ab0d78101d9793235f0",
+    "src/quant_backtester/signals/level/vix_relief.py": "9c815cd1a5f0caa13e82b02f89ba227292403980b4c0f1529f612175dded01af",
+    "src/quant_backtester/signals/level/zscore.py": "249f9e9bc04367bfd8018ff2f2f107443c0f21c0c18496f952acd3e5624df151",
+    "src/quant_backtester/signals/ml/__init__.py": "caa5c7561c90659ecebeeb1e3e785c29a27881a11d2035806d80f297e1cfad9c",
+    "src/quant_backtester/signals/ml/neural_allocation.py": "8b6c209e34d4b9ee1e74f29faca23936c0fb7c80e8f13d975c205d4c9061dbe8",
+    "src/quant_backtester/signals/ml/signature_return.py": "53009f80f82477ab60ad8af5a7dd6706b1e0b433713988a7872846564ab75094",
+    "src/quant_backtester/signals/models/__init__.py": "2f5ee9dcaf9b0c093ade7b76a52968ea0d4cf6ac50337bb0b269bf73c0e0fd58",
+    "src/quant_backtester/signals/models/arima_garch.py": "a943546517f6d63a8853605fe59de8e818d18b510ef139f47c96dc9d87a33401",
+    "src/quant_backtester/signals/models/garch.py": "acfd891ac362d1790112272b3305f1f1e95cc392e6a47007121406da4d630ef6",
+    "src/quant_backtester/signals/price/__init__.py": "43b3abc64ad4f2ed02c66d17f7182f8a539e8fbe1af367f905f9d9e4c50e64cc",
+    "src/quant_backtester/signals/price/endpoint_momentum.py": "c2d993637481a8b52417d23b54edf62be006621a68b25edd153f59224968fb78",
+    "src/quant_backtester/signals/price/mean_reversion.py": "0b71ece93d58b0a8baf5bb0477f0993bb4b295ddf48ae6a20e9bc633cf685d45",
+    "src/quant_backtester/signals/price/momentum.py": "3ec4429a7b41f110209bf9cd85b3d78c8c90d351a7216e161c5a7241648e1c19",
+    "src/quant_backtester/signals/price/normalized_pullback.py": "bcb6b670c3fe640cb60f8d464793916884a1181a99ceb846994324f3eae12f5b",
+    "src/quant_backtester/signals/price/returns.py": "cf993a218a69a8fae53f83edee5e103df88598c2ae35d026e8e6934eac6a21ab",
+    "src/quant_backtester/signals/price/trend.py": "48888419a1b9a9c5b88fa2ef8f2eb719ee03d1558a78f35884de97731853907b",
+    "src/quant_backtester/signals/risk/__init__.py": "50dc9d292711f302b353d8effa06dba0c287d643c094ab17fc58d3731aa27227",
+    "src/quant_backtester/signals/risk/drawdown.py": "1fec5773c942015cf4f46a67e7b6ce56a51bee6e5746d69926dad6770d23afbc",
+    "src/quant_backtester/signals/risk/volatility.py": "d7d0128ec6308e4dc90c77dd3e917294daa43683250b850ecd7b0127d24e628e",
+    "src/quant_backtester/signals/signatures/__init__.py": "53dd64feba3c624eab30d089248a4460f590252f9b5798ec9642ab544078e396",
+    "src/quant_backtester/signals/signatures/logsignature.py": "da5872879cb70557f9d28a814569d7b646d239f5a1fa272b5322aca204b4ee26",
+    "src/quant_backtester/signals/signatures/path.py": "a9a4ecd605cabcc465ac8bd2cf4fa4d09f8d56355796df85b61f9800aac7ca70",
+    "src/quant_backtester/signals/snapshot.py": "278aa945b7401582bacb960813c879fc521a170ff8b2132056ba246a82ee9357",
+    "src/quant_backtester/signals/types.py": "dc3ba57034821563350a53aac1d3ba13473558ae42fe49de8ffe5212d9f5bac0",
+    "src/quant_backtester/signals/windows.py": "030a24fe568fca244fa080892617aeceb63b3bcb661cb9635f5399b102873906",
+    "src/quant_backtester/strategies/SA15_gpt61_riskaware.py": "bdb05df767cd4f6693defead66412c71cb94376c1a7173605c1f26b6f1fee1fc",
+    "src/quant_backtester/strategies/adaptive/__init__.py": "a1a63a0e7e4536426e5114ffda013fd31ba9cc6acbf41a7f950912bb1d0a2bde",
+    "src/quant_backtester/strategies/adaptive/inputs.py": "6148a6fee7fd2a41a7594afe19fdf319d12726261d505b8c2b4bf0507ce49d64",
+    "src/quant_backtester/strategies/adaptive/rebalance.py": "a00466db26fa72051ed00561de4b48c1865c4e7e147f525858d52219f0673ef1",
+    "src/quant_backtester/strategies/adaptive/rules.py": "eb0b8860d0220e51907c61121840069851a4974fca0d28debf6c35cdfc33d5a4",
+    "src/quant_backtester/strategies/base.py": "136de4b39bcfdd9cee79e8a98fcf3b7978ae12b92bde2e3eef3bdb270bcadc9d",
+    "uv.lock": "485d02ffc2838730f8546def1e3b10896ecfc300ca9e951b7d64354c8cdb8cf3"
+  },
+  "diagnostics_source_sha256": "779657d01b7b581aba57f3c5c2bd77c08e3023ec39ed2e491506d40ada3a1ed7"
+}

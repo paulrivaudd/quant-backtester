@@ -1,0 +1,9 @@
+{
+  "generated_at_utc": "2026-10-15T20:14:44.807063+00:00",
+  "report_source": "scripts/SA15_report_gpt61_round2.py",
+  "report_source_sha256": "1c4880aad736a62b9b05d5ccaf4c03cdbf0e3ad52ea88d4d9fe51b1b65c47027",
+  "study_sha256": "168f645c131429f74382910286500b6c79e674efaae8a7fe9bcfb4b31cc894fb",
+  "selected_json_sha256": "463709a7930c4b388bab487cb875fa86ef2b4b91a839c633d18a14d383f33367",
+  "financial_source_archive_sha256": "a6b7d2f7963728584d9dfb25f2c3abe947a6e62b7c8d7d97e61fb1c696cc73a7",
+  "note": "Presentation-only polish after financial source archival; no backtest rerun."
+}

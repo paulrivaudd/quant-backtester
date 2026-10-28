@@ -1,0 +1,2 @@
+session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
+2019-06-04,2019-06-04 09:01:00+02:00,ETF_SP500_PEA,BUY,8797.0,11.267800331115723,11.27343423128128,99172.40093258143,49.58620046629071,29.7368518538475,19.824567902565004,99.14762022270321

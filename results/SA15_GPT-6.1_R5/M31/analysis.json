@@ -1,0 +1,11 @@
+{
+  "id": "M31",
+  "decision": "La confirmation locale réduit réellement les pertes, mais son coût de rendement et de rotation ne remplit pas l’objectif. Tester la cadence de cette combinaison avant de l’abandonner.",
+  "findings": [
+    "Sur le choix continu, CAGR 23,463 %, drawdown 18,336 %, 17 dates. La confirmation coûte 2,056 points de CAGR, six dates et 1 940,49 EUR de frais, mais évite 7,590 points de drawdown. Le déficit au Nasdaq est de 0,412 point de CAGR x1 et 1,111 point x2. La durée maximale sous le sommet recule de 433 à 349 séances.",
+    "La défense ajoute 6,623 points de CAGR et évite 5,128 points de drawdown ; l’exécution ajoute 1,077 point de CAGR, évite vingt-deux dates et 6,208 points de drawdown ; le momentum long ajoute seulement 0,085 point de CAGR contre son ablation mais évite 4,069 points de drawdown. Le coût principal de croissance vient bien de la confirmation, pas d’une défense devenue inutile.",
+    "292 soirées de contrôle, 17 dates de fills, 33 fills, dix rejets, aucun signal indisponible. En reprise, l’exposition Nasdaq recule de 83,65 % à 66,42 % et le rendement actif devient −2,403 contre −1,407 points de base par jour."
+  ],
+  "next_defect": "Les franchissements du momentum intermédiaire sont vérifiés chaque semaine et ajoutent des rotations coûteuses. Ralentir seulement leur observation au mensuel pour mesurer le filtrage de ces oscillations, avec son coût de réaction.",
+  "completed_sha256": "ba4df150f0e780a9a43625ffe775638e88b56204e909f8c237be1498970ad617"
+}

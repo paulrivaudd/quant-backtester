@@ -1,0 +1,14 @@
+{
+  "reader_source_sha256": "12ba4d9851f87077ee6b4e4c16343b92bbca145d1052326c874f937a3f34b9d4",
+  "reader_dependency_sha256": "8ad561178fcd2e76e17bb804feb56d58f767e2c130ec18b066a8f0574d5df064",
+  "files": {
+    "operational_metrics.csv": "b9b4b0cb79814458b7ad6d2930e948da5c9640964a484ffce3f5a7ef0653ba78",
+    "block_effects.csv": "6f37f4333dd3502e836618f3a1922c5449212867b3cfb65f56353559fad7fdee",
+    "regime_effects.csv": "4cfd5fda9d81319b9225432aed348b8cdec2bcccb9a1d3c30ffa36000c8c9af8",
+    "reduced_episodes.csv": "fc3220168a6bba5f0b292f46723ccbeca5d339e0ccacad90faddcb2c94f6546a",
+    "rejected_inputs.csv": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "attribution.json": "cd9afb8e5c0fe5726b290e69dbae3f4abc7f507eabb4562359b228d19529e293",
+    "study.md": "e1f8721125c185ab7d6eec3e0e15fbeb143ffe85e75f17c68c128bb4d2760c98"
+  },
+  "source_evidence_untouched": true
+}

@@ -1,0 +1,11 @@
+{
+  "id": "M17",
+  "decision": "Rejeter la relaxation du cap sur simple momentum positif comme amélioration de M10. Elle ne réduit pas les interventions et son gain local de reprise ne compense pas la protection abandonnée.",
+  "findings": [
+    "M17 donne un CAGR de 23,651 %, un drawdown de 22,054 % et 25 dates d’ordres, contre 23,800 %, 22,054 % et 25 dates pour M10. Le CAGR baisse de 0,149 point sans amélioration du drawdown ni du nombre d’ordres. Les frais ne reculent que de 4,45 EUR. La perte de CAGR reste de 0,149 point aux frais doubles.",
+    "L’exposition Nasdaq en reprise augmente de 67,63 % à 68,26 % et le rendement actif moyen passe de −1,888 à −1,786 point de base par jour. Mais, pendant les baisses, l’exposition augmente de 15,36 % à 17,85 % et le rendement actif se détériore de −3,326 à −3,795 points de base par jour. Cela mesure directement le coût des faux rebonds positifs.",
+    "Dans cet assemblage, le risque apporte seulement 0,053 point de CAGR, devient légèrement négatif aux frais doubles (−0,016 point), mais évite encore 2,009 points de drawdown avec six dates supplémentaires. La défense ajoute 3,275 points de CAGR pour 1,409 point de drawdown perdu ; l’exécution ajoute 0,833 point de CAGR et évite onze dates ; la tendance ajoute 0,044 point de CAGR et évite 6,875 points de drawdown à frais normaux. Les effets conditionnels restent distincts du résultat parent."
+  ],
+  "next_defect": "Le consensus et le cap peuvent encore garder une fraction Nasdaq dans une baisse déjà importante. Les journaux existants montrent des cibles positives avec un prix sous son sommet récent de plus de 10 % ; tester un arrêt de choc explicite, avec son coût sur tous les rebonds concernés.",
+  "completed_sha256": "da4b19361b03d9e81e95ebaa4a8841e5972912b1420f07690b2c8b7a8b39b68b"
+}

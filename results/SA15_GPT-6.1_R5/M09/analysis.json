@@ -1,0 +1,11 @@
+{
+  "id": "M09",
+  "completed_sha256": "a2d998abda06b1c8a6dc43ebde4ea2524996d41f9f6e0bb0f0c62284ed8633f7",
+  "decision": "Conserver une branche sans reprise pour la parcimonie; promotion explicite d'une ablation deja connue, pas nouvelle validation independante.",
+  "findings": [
+    "CAGR23.135%,DD23.969%,16dates,30fills,2542.07EUR vsM08 23.203%,23.969%,20dates,37fills,3193.46EUR. Retirer la reprise coute0.068pointCAGR x1 mais gagne0.012point aux frais doubles, economise4dates/7fills/651.40EUR. Max underwater458vs434seances, donc vrai cout de recuperation.",
+    "Defense+2.697pointsCAGR mais0.613pointDD perdu; risque+1.092pointCAGR et4.001pointsDD evites; execution+0.836pointCAGR et10dates evitees; tendance-0.460pointCAGR pour3.292pointsDD evites. Effets conditionnels non additifs. Nasdaq reste devant0.740pointCAGR.",
+    "Les476seances classees reprise ont seulement72.13%Nasdaq et rendementactif-2.432bp/j. Au31mars2020 la MA200=-1.67% mais momentum126=+2.68%: le filtre binaire seul ignore ce desaccord, sans que cela prouve le resultat d'un autre mecanisme."
+  ],
+  "next_defect": "La direction MA200 binaire peut rester completement en defense malgre des indicateurs plus lents positifs; tester un consensus de votes fixes pour une exposition progressive sans les faux retours momentum21."
+}

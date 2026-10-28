@@ -1,0 +1,94 @@
+{
+  "verified_old_price_files": 22,
+  "note": "Administrative applied-fetch ledger grows for new funds; it is not a price series.",
+  "files": [
+    {
+      "path": "clean/bars/ETF_COMMODITY.parquet",
+      "sha256": "4f280974510b03005669684e5afe9fbd69657d5f1d3cfdea4b5dbabb52f0e70a"
+    },
+    {
+      "path": "clean/bars/ETF_EMERGING.parquet",
+      "sha256": "99df28d9e78393727f447775aa81875904fba537412ee9bff5ad19baf66eaea5"
+    },
+    {
+      "path": "clean/bars/ETF_EURO_GOV.parquet",
+      "sha256": "d99a4d0530fec59919204759b58e28ca11b62fc9fb496aa1556c51877fa50b13"
+    },
+    {
+      "path": "clean/bars/ETF_GOLD.parquet",
+      "sha256": "846ea0fec25cbca7450f3426ac2cf09b4a547649174efc5d3647227d6e2d5438"
+    },
+    {
+      "path": "clean/bars/ETF_MONETARY_EUR.parquet",
+      "sha256": "9d9e1188b0406886211fde82cb9ce13e1e324303905b27f0d83f9f74a1499a52"
+    },
+    {
+      "path": "clean/bars/ETF_NASDAQ.parquet",
+      "sha256": "668b7d4604b7cf6652a052563767f8b6c8b55e7162b94d7f65d8a2abb552b182"
+    },
+    {
+      "path": "clean/bars/ETF_SP500_PEA.parquet",
+      "sha256": "fecbbb2b95191e0973e63e70069f3877ca1ffe52b24d7838e3474ce314317da1"
+    },
+    {
+      "path": "clean/bars/ETF_WORLD.parquet",
+      "sha256": "21131129624713c6d331ae0d725740b2c7c1960ec7f0dccd7776c6a599f97cc3"
+    },
+    {
+      "path": "clean/bars/SP500.parquet",
+      "sha256": "1cf030f8e2487dfaad36b954cf7fa097712009c431a04db0a049a5f596ed5583"
+    },
+    {
+      "path": "clean/levels/US10Y.parquet",
+      "sha256": "a12e93db329ddf2fa3fbf659d7190cb37abcc3907b6355694ecfcbebecefe786"
+    },
+    {
+      "path": "clean/levels/VIX.parquet",
+      "sha256": "d85fde443746ff0d7fbf96f05229ef6f1d0ff7ecff35a845f347c3095bf8193f"
+    },
+    {
+      "path": "clean/checked_bars/ETF_COMMODITY.parquet",
+      "sha256": "b69cb6d0301a00a7b091f7bedae16d94e5e7d7bfc777b4121730fba04991e907"
+    },
+    {
+      "path": "clean/checked_bars/ETF_EMERGING.parquet",
+      "sha256": "61a4bcde3e27011d91d8a7af3faf5c23c537ec8d7b90a8ca8fb8a27e3ff4d370"
+    },
+    {
+      "path": "clean/checked_bars/ETF_EURO_GOV.parquet",
+      "sha256": "fab94b0a788c70563335fb968aa6a1720403efa9aede73bacb79da10888a8dba"
+    },
+    {
+      "path": "clean/checked_bars/ETF_GOLD.parquet",
+      "sha256": "c0ed7bb69650f506c2cf2b8566e41770eebcdfd47408063e4c14032673d28e57"
+    },
+    {
+      "path": "clean/checked_bars/ETF_MONETARY_EUR.parquet",
+      "sha256": "c5524a0a167f52ebcb09a93bf670a92a405e0ec7d0198b36b4ad4d1cd339c440"
+    },
+    {
+      "path": "clean/checked_bars/ETF_NASDAQ.parquet",
+      "sha256": "421f073e7e374d3f71f7026af877e5b13cb1f3887caf4e854c8a194dfde82127"
+    },
+    {
+      "path": "clean/checked_bars/ETF_SP500_PEA.parquet",
+      "sha256": "b4badbc8bf8b7790286c47d66f3278017f175abfb2ce969df9f1cc6b1a48b4dd"
+    },
+    {
+      "path": "clean/checked_bars/ETF_WORLD.parquet",
+      "sha256": "f69f3baf31e7a5300854edefc99a886c1389758463ad03c1e1716d9812ad3228"
+    },
+    {
+      "path": "clean/checked_bars/SP500.parquet",
+      "sha256": "1bbdb3d0ccdddb0019b1e5e3bb269894bfef0c8089b68d41b15885e384e94b17"
+    },
+    {
+      "path": "clean/check_bars/EURONEXT/ETF_SP500_PEA.parquet",
+      "sha256": "52a8b13e2b262887f6acd2f5560d7cde7b848dd42503c86bf0f7e56cba38f995"
+    },
+    {
+      "path": "clean/check_bars/EURONEXT/ETF_WORLD.parquet",
+      "sha256": "584062daf4ccdf13cc9dcaa7c29d13cf146a95accdd1c8c692aa635da73971a6"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "number": 19,
+  "reason": "L'hebdomadaire18 coûte davantage et réduit l'excès : revenir au mensuel126/252 de17. Retirer le filtre absolu du Nasdaq : s'il baisse moins que le S&P500, revenir sur l'indice encore plus faible n'est pas cohérent avec l'objectif relatif.",
+  "schedule": "monthly",
+  "parameters": {
+    "core_id": "ETF_SP500_PEA",
+    "satellite_ids": [
+      "ETF_NASDAQ"
+    ],
+    "monetary_id": "ETF_MONETARY_EUR",
+    "core_fraction": 0,
+    "top_k": 1,
+    "momentum_lookbacks": [
+      126,
+      252
+    ],
+    "momentum_weights": [
+      1,
+      1
+    ],
+    "skip_recent_sessions": 0,
+    "minimum_relative_momentum": 0,
+    "switch_buffer": 0.02,
+    "rebalance_band": 0.08,
+    "absolute_filter": false,
+    "satellite_cap": 1,
+    "core_crash_lookback": 63,
+    "core_crash_threshold": -1,
+    "defensive_fraction": 1,
+    "max_age_sessions": 1,
+    "strategy_id": "SA15_GPT-6.1_R2"
+  }
+}

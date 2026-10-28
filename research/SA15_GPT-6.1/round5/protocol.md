@@ -1,0 +1,13 @@
+# SA15_GPT-6.1 R5 — cinquante itérations de mécanismes
+
+Contrat écrit le16octobre2026 après autorisation explicite de cinquante itérations avec analyse des blocs, et avantM01. Le [protocole permanent](../mechanism_protocol.md) s'applique. [hypothesis.json](hypothesis.json) fixe les périodes, les formules, les coûts, le score, les diagnostics et les contrôles non sélectionnables.
+
+M00 reprend exactement le pilote MA200+plafond de volatilité20%+monétaire+bande10points. M01 ajoute une règle de réentrée positive21 pour mesurer le défaut de reprise observé. Chaque M suivant ne peut changer qu'un seul mécanisme ou une seule cadence depuis un parent déjà analysé ; ses bénéfices attendus, ses risques et sa réfutation sont archivés avant calcul. Aucun lot de variantes n'est préchoisi sur les gains : le diagnostic du parent motive le prochain enfant.
+
+L'univers admissible est stable : Nasdaq, monétaire, or ETC et souverains couverts EUR. Or/obligations sont initialement inactifs et ne peuvent apparaître qu'à travers un bloc défensif avec une comparaison qui isole son apport. World et émergents sont des canaris de signaux prédéclarés. Aucun produit à levier, short, nouvelle source ou secteur ajouté pour sauver une courbe.
+
+Chaque itération publie ses vrais replays appariés aux deux coûts, les effets conditionnels de tous les blocs actifs, les signaux de chaque décision avant/après leurs étapes, les reprises et les faux changements, les rejets et les données indisponibles. Les replays identiques déjà exécutés sont réutilisables uniquement sous empreintes exactes et contrôle intégral des artifacts ; une copie de courbe modifiée n'est jamais un backtest. Les analyses sont liées au hash de la complétion et exigées avant toute suite.
+
+Le choix utilise exclusivement2019–2024 en portefeuille continu. Les fenêtres2023–2024 sont des segments ancrés au dernier close2022, sans redémarrage. Après cinquante analyses, le seul gagnant est gelé selon le score annoncé ; contrôle2025–2026 et nouveau continu2019–2026 ne peuvent le remplacer. Toute l'histoire est déjà connue : étude de mécanismes rétrospective, pas validation prospective. Les séries antérieures et le pilote sont conservés intacts.
+
+La robustesse finale comprend frais doubles, quatre départs cash et deux profils temporels voisins ±20%, jamais sélectionnables. Publier également une incertitude appariée et le nombre de designs et d'ablations examinés. Une amélioration de drawdown par du cash ne suffit pas à battre Nasdaq et ne constitue pas seule une compétence de timing.

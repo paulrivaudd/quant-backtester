@@ -1,0 +1,3 @@
+session_date,instrument_id,reason,side,requested_quantity
+2023-03-14,ETF_GOLD,INSUFFICIENT_CASH,BUY,10.0
+2023-03-16,ETF_NASDAQ,INSUFFICIENT_CASH,BUY,2.0

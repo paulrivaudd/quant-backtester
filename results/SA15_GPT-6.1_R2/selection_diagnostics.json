@@ -1,0 +1,21 @@
+{
+  "total_trials_declared": 20,
+  "round_two_trials": 10,
+  "dispersion_curves": 20,
+  "usable_session_sharpes": 20,
+  "dispersion_source": "R1_and_R2_validation_curves",
+  "session_sharpe_std": 0.008599548001343478,
+  "validation_dsr": {
+    "11": 0.980971057918892,
+    "12": 0.989522128329116,
+    "13": 0.9868190901932692,
+    "14": 0.9834984708336807,
+    "15": 0.9709166529593496,
+    "16": 0.9851555144428754,
+    "17": 0.9871156725819951,
+    "18": 0.9828260933283797,
+    "19": 0.9859962437678391,
+    "20": 0.9876042332816156
+  },
+  "note": "20 correlated configurations; the estimate does not account for every historical project choice or the retrospective universe. No DSR acceptance threshold is added."
+}

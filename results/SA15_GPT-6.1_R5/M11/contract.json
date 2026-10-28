@@ -1,0 +1,226 @@
+{
+  "id": "M11",
+  "candidate": {
+    "id": "M11",
+    "parent": "M10",
+    "reason": "M10 améliore le rendement et le drawdown, mais ses 25 dates d’ordres représentent 4,48 dates par an et 3 750,53 EUR de frais. Modifier uniquement la cadence mensuelle en cadence trimestrielle pour ignorer des changements intermédiaires de votes et de risque.",
+    "changed_block": "cadence",
+    "expected_benefit": "Réduire les vérifications et les transactions, et laisser passer des oscillations courtes des indicateurs sans rechercher une bande numérique optimale.",
+    "expected_cost": "Un signal de risque ou un retournement observé après la décision trimestrielle sera traité plus tard ; des pertes et des reprises manquées peuvent augmenter. Une cadence lente ne garantit pas moins de risque.",
+    "refutation": "La réduction des interventions ne compense pas le retard de protection ou de réentrée, notamment si le drawdown dépasse 25 % ou si le rendement net se dégrade fortement.",
+    "schedule": "quarterly",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "monetary_id": "ETF_MONETARY_EUR",
+      "gold_id": "ETF_GOLD",
+      "government_id": "ETF_EURO_GOV",
+      "canary_ids": [
+        "ETF_WORLD",
+        "ETF_EMERGING"
+      ],
+      "trend_rule": "consensus",
+      "risk_rule": "conditional",
+      "recovery_rule": "off",
+      "shock_rule": "off",
+      "confirmation_rule": "off",
+      "defensive_rule": "gold_momentum",
+      "execution_rule": "hold_defense",
+      "fast_sessions": 21,
+      "medium_sessions": 63,
+      "slow_sessions": 126,
+      "ma_fast_sessions": 50,
+      "ma_slow_sessions": 200,
+      "vol_fast_returns": 20,
+      "vol_slow_returns": 60,
+      "target_volatility": 0.2,
+      "volatility_floor": 0.05,
+      "partial_exposure": 0.5,
+      "risk_relief_floor": 0.75,
+      "drawdown_sessions": 63,
+      "near_high_threshold": -0.02,
+      "shock_loss_threshold": -0.08,
+      "shock_drawdown_threshold": -0.1,
+      "defensive_sessions": 63,
+      "monetary_sessions": 21,
+      "rebalance_band": 0.1,
+      "entry_band": 0.2,
+      "reduction_band": 0.05,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R5"
+    }
+  },
+  "parent": {
+    "id": "M10",
+    "parent": "M09",
+    "reason": "M09 economise des ordres mais manque encore les reprises (72.13%Nasdaq,actif-2.432bp/j). Le31mars2020 MA200 negative et momentum126 positif divergent. Remplacer uniquement la direction binaire par la fraction de votes positifs MA200/momentum63/momentum126, votes egaux figes.",
+    "changed_block": "trend",
+    "expected_benefit": "Restaurer progressivement l'exposition quand plusieurs horizons se redressent, sans reinstaurer un signal21 de reprise ni conserver une demi-position permanente.",
+    "expected_cost": "Votes partiels faux pendant une baisse, davantage de positions intermediaires et d'ordres; le cap applique sa formule declaree a cette fraction.",
+    "refutation": "Meilleure reprise insuffisante pour le cout de drawdown/interventions, ou DDau-dessus25%; aucune optimisation de poids de votes ou d'horizons.",
+    "schedule": "monthly",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "monetary_id": "ETF_MONETARY_EUR",
+      "gold_id": "ETF_GOLD",
+      "government_id": "ETF_EURO_GOV",
+      "canary_ids": [
+        "ETF_WORLD",
+        "ETF_EMERGING"
+      ],
+      "trend_rule": "consensus",
+      "risk_rule": "conditional",
+      "recovery_rule": "off",
+      "shock_rule": "off",
+      "confirmation_rule": "off",
+      "defensive_rule": "gold_momentum",
+      "execution_rule": "hold_defense",
+      "fast_sessions": 21,
+      "medium_sessions": 63,
+      "slow_sessions": 126,
+      "ma_fast_sessions": 50,
+      "ma_slow_sessions": 200,
+      "vol_fast_returns": 20,
+      "vol_slow_returns": 60,
+      "target_volatility": 0.2,
+      "volatility_floor": 0.05,
+      "partial_exposure": 0.5,
+      "risk_relief_floor": 0.75,
+      "drawdown_sessions": 63,
+      "near_high_threshold": -0.02,
+      "shock_loss_threshold": -0.08,
+      "shock_drawdown_threshold": -0.1,
+      "defensive_sessions": 63,
+      "monetary_sessions": 21,
+      "rebalance_band": 0.1,
+      "entry_band": 0.2,
+      "reduction_band": 0.05,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R5"
+    }
+  },
+  "candidate_sha256": "6f60a776f5fc69137e2f5e12d8e39a1e4d0fdb7e5d7f875c9e902853146d0781",
+  "frozen_inputs_sha256": "262ed00f041b64e35d70cca98196de6e64474ed67ba79e3e5d04e90717892551",
+  "preceding_analyses": [
+    {
+      "id": "M01",
+      "sha256": "35adf2d3d3a337876c0351e05f1ef2da8698909e66b35145aa0bda15eecbb9bd"
+    },
+    {
+      "id": "M02",
+      "sha256": "ec75cc0f246f0c4c66dede7c40e8b283f3c735e79b2c0442d9692ecaacf1ddfa"
+    },
+    {
+      "id": "M03",
+      "sha256": "acf3a50bab6d6c57704e373d7c447b13a10cc6e1c7c0dd605fcb3877766d3a10"
+    },
+    {
+      "id": "M04",
+      "sha256": "1bda2b653d4a4e99a9e9ce3bfba0dfafcf8d240df2490816d1fc2a20e6d11506"
+    },
+    {
+      "id": "M05",
+      "sha256": "b559f5c65040b707cd6eea26add25b29c4877f39ae49066d2f20c6157f3658d8"
+    },
+    {
+      "id": "M06",
+      "sha256": "0d3ad23d8167d506f3e1226d4e03484e9c8f4f4c6c591b09b55696728571da98"
+    },
+    {
+      "id": "M07",
+      "sha256": "4411c339a204628e1963429fe99fac4ef9538f9bd5742445bad784c36a42db13"
+    },
+    {
+      "id": "M08",
+      "sha256": "e63501e102c1e4f8e7596b377dde76efd89b9326f896f09622b407d163bc8cbf"
+    },
+    {
+      "id": "M09",
+      "sha256": "4516dee6228e7cbb7d0aaace2f4b0037b360bd5ddfd5362bb736b0269e5456ee"
+    },
+    {
+      "id": "M10",
+      "sha256": "fc2235801e3ba96a98c9ee8e22beac802fc24b0a4b7feb4f4291abff49cc0baa"
+    }
+  ],
+  "period": "choice",
+  "start": "2019-06-03",
+  "end": "2024-12-31",
+  "contracts": [
+    {
+      "role": "candidate",
+      "cost_multiplier": 1.0,
+      "cache_key": "4abc92e864f85fa2cb7c12f8818cc6658607b0e010c075dfae7e1134e1e15dc1"
+    },
+    {
+      "role": "parent",
+      "cost_multiplier": 1.0,
+      "cache_key": "56b9ff425831a98c5ee33a37ddae478c057e6cf6e8d6f37bc01f47010d26a7fb"
+    },
+    {
+      "role": "Nasdaq_buy_hold",
+      "cost_multiplier": 1.0,
+      "cache_key": "1f4bea88369f738c544fc3e204409c938ff9171762563aca48aa8626c08dc476"
+    },
+    {
+      "role": "without_trend",
+      "cost_multiplier": 1.0,
+      "cache_key": "f25f83742a8d04bdc8ad1f898375df5b80873f229a3afe21d4e93ca49026de5e"
+    },
+    {
+      "role": "without_risk",
+      "cost_multiplier": 1.0,
+      "cache_key": "c13d7b96126cd07b6872f068b043afab6165e033e6a3251879c4cabf19896479"
+    },
+    {
+      "role": "without_defensive",
+      "cost_multiplier": 1.0,
+      "cache_key": "8c45b5741b3eb34e9191fa7c45bddf281ae3b0ca0c32a6ddedd8b59c2b09dbe1"
+    },
+    {
+      "role": "without_execution",
+      "cost_multiplier": 1.0,
+      "cache_key": "6409aa8df6b70af85e825b4c99b583793c3b5a5329e3a7a32e8b31eee9374b09"
+    },
+    {
+      "role": "candidate",
+      "cost_multiplier": 2.0,
+      "cache_key": "b473bae06820745defd90496179a960f8585bf7cb81f297fac6dea2ef8595120"
+    },
+    {
+      "role": "parent",
+      "cost_multiplier": 2.0,
+      "cache_key": "4e4676f8e7ff0861940f10aca0f5ec765bd26aba713940d2006468c6c405330c"
+    },
+    {
+      "role": "Nasdaq_buy_hold",
+      "cost_multiplier": 2.0,
+      "cache_key": "f8603eab0936d2329524509b004cbb29e0bad7cc48525c4b09dd52936d8dcec9"
+    },
+    {
+      "role": "without_trend",
+      "cost_multiplier": 2.0,
+      "cache_key": "4522b65eaf726ec66ef4dd197343129194d62508f9212499efaebc96ab41b6b2"
+    },
+    {
+      "role": "without_risk",
+      "cost_multiplier": 2.0,
+      "cache_key": "a508adcaf1493f2b0ecfba8d02f72aae2064e879c81b91f56296361f0e24bf2f"
+    },
+    {
+      "role": "without_defensive",
+      "cost_multiplier": 2.0,
+      "cache_key": "e23cce2d38e5c00903a2a1b9a5df8da1796f097fef0e67ea941c65dfbd44214c"
+    },
+    {
+      "role": "without_execution",
+      "cost_multiplier": 2.0,
+      "cache_key": "60ad711644ab25f41354d1d0572250afd8d69b6b2634b916102aa8211d9d2a22"
+    }
+  ],
+  "ablation_blocks": [
+    "trend",
+    "risk",
+    "defensive",
+    "execution"
+  ]
+}

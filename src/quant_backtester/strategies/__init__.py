@@ -23,7 +23,7 @@ would look identical in an import list and fail at the first decision, which is
 why there is no such thing here any more.
 
 Every strategy kept has a code and a label in ``catalogue``, ``SA1 - std MA20``
-to ``SA14 - neural allocation``, and its module carries that code:
+to ``SA15 - GPT 6 1``, and its module carries that code:
 ``SA3_smooth_moving_average``. ``SA13`` and ``SA14`` are not imported here.
 ``SA13`` is built from a schedule of models calibrated before the run, and
 ``SA14`` needs PyTorch, an optional dependency (the ``ml`` extra), which the
@@ -56,8 +56,10 @@ from quant_backtester.strategies.SA9_vix_relief_entry import VixReliefEntry
 from quant_backtester.strategies.SA10_etf_ensemble import ETFEnsemble
 from quant_backtester.strategies.SA11_garch_vol_control import EwmaVolControl, GarchVolControl
 from quant_backtester.strategies.SA12_arima_garch import ArimaGarch
+from quant_backtester.strategies.SA15_gpt61 import SA15GPT61
 
 __all__ = [
+    "SA15GPT61",
     "ArimaGarch",
     "BufferedDualMomentum",
     "ETFEnsemble",

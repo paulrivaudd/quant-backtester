@@ -1,0 +1,14 @@
+{
+  "number": 10,
+  "reason": "Le coeur25% (essai9) reste très proche du coeur50%, sans le dépasser. Dernier essai : conserver coeur50% hebdomadaire et accélérer le momentum en pondérant les horizons21/63/126/252 par12/4/2/1 pour améliorer les retournements ; ne rien sélectionner sur le contrôle final.",
+  "schedule": "weekly",
+  "parameters": {
+    "core_fraction": 0.5,
+    "momentum_weights": [
+      12,
+      4,
+      2,
+      1
+    ]
+  }
+}

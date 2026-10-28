@@ -1,0 +1,2 @@
+session_date,instrument_id,reason,side,requested_quantity
+2023-07-03,ETF_US_TECH,INSUFFICIENT_CASH,BUY,1.0

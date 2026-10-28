@@ -31,6 +31,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
+from quant_backtester.signals.types import require_identifier
 from quant_backtester.strategies.base import Strategy
 
 
@@ -61,6 +62,9 @@ class CatalogueEntry:
         The optional dependency group its module imports as soon as it is
         loaded, ``"ml"`` for PyTorch; ``None`` when the class loads without
         any extra.
+    recorded_id : str | None
+        Explicit result identifier when a retained name differs from the
+        spelling derived from the display label.
 
     Raises
     ------
@@ -75,6 +79,7 @@ class CatalogueEntry:
     label: str
     target: str
     extra: str | None = None
+    recorded_id: str | None = None
 
     def __post_init__(self) -> None:
         """Refuse an entry that cannot be written as a code, a name and a slug."""
@@ -84,6 +89,8 @@ class CatalogueEntry:
             raise ValueError(
                 f"a label is words of letters and digits separated by one space, got {self.label!r}"
             )
+        if self.recorded_id is not None:
+            require_identifier(self.recorded_id, "recorded_id")
         if self.target.count(":") != 1:
             raise ValueError(f"a target is 'module:Class', got {self.target!r}")
 
@@ -100,6 +107,8 @@ class CatalogueEntry:
     @property
     def strategy_id(self) -> str:
         """Return the identifier a result is recorded under: ``SA3_smooth_ma``."""
+        if self.recorded_id is not None:
+            return self.recorded_id
         return f"{self.code}_{self.label.lower().replace(' ', '_')}"
 
     @property
@@ -180,6 +189,13 @@ CATALOGUE: tuple[CatalogueEntry, ...] = (
         f"{_STRATEGIES}.SA14_neural_allocation:NeuralAllocationStrategy",
         extra="ml",
     ),
+    CatalogueEntry(
+        Family.SA,
+        15,
+        "GPT 6 1",
+        f"{_STRATEGIES}.SA15_gpt61:SA15GPT61",
+        recorded_id="SA15_GPT-6.1",
+    ),
 )
 """Every catalogued strategy, by number.
 
@@ -195,8 +211,11 @@ on a schedule of models calibrated before the backtest, and is built with
 ``SignaturesNeurons.from_schedule``. ``SA14`` is the neural allocation of
 2026-10-04: it was catalogued as ``ML1``, alone in a family of its own, until
 2026-10-11, and the code ``ML1`` is not given again. Its module imports PyTorch
-when it is loaded, which is what its ``extra`` says. The reference books of the
-studies (``quant_backtester.research.references``) are not candidates and carry
+when it is loaded, which is what its ``extra`` says. ``SA15`` is the diversified
+momentum and volatility-control strategy of 2026-10-15. Its recorded identifier
+``SA15_GPT-6.1`` retains the requested spelling through ``recorded_id``.
+The reference books of studies (``quant_backtester.research.references``)
+are not candidates and carry
 no code. The exercises and the baselines that came before were removed on
 2026-10-11.
 """

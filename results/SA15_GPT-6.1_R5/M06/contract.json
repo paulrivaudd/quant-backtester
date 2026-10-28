@@ -1,0 +1,217 @@
+{
+  "id": "M06",
+  "candidate": {
+    "id": "M06",
+    "parent": "M03",
+    "reason": "M05 montre que verifier plus souvent recupere les reprises mais multiplie les faux ordres. DepuisM03 mensuel, remplacer la sortie binaire sousMA200 par la reserve directionnelle fixe50% deja declaree, avant risque et confirmation.",
+    "changed_block": "trend",
+    "expected_benefit": "Conserver une participation aux rebonds durant une tendance lente faible, en gardant le cap de risque et la cadence lente.",
+    "expected_cost": "Plus de pertes lors des baisses persistantes, drawdown possiblement plus profond; aucun essai d'autres pourcentages.",
+    "refutation": "Le gain de reprise ne compense pas le risque abandonne ou l'ecart Nasdaq;50% est un budget de regime predeclare, pas une ponderation ajustee a chaque date.",
+    "schedule": "monthly",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "monetary_id": "ETF_MONETARY_EUR",
+      "gold_id": "ETF_GOLD",
+      "government_id": "ETF_EURO_GOV",
+      "canary_ids": [
+        "ETF_WORLD",
+        "ETF_EMERGING"
+      ],
+      "trend_rule": "partial",
+      "risk_rule": "conditional",
+      "recovery_rule": "dual_confirm",
+      "shock_rule": "off",
+      "confirmation_rule": "off",
+      "defensive_rule": "monetary",
+      "execution_rule": "band",
+      "fast_sessions": 21,
+      "medium_sessions": 63,
+      "slow_sessions": 126,
+      "ma_fast_sessions": 50,
+      "ma_slow_sessions": 200,
+      "vol_fast_returns": 20,
+      "vol_slow_returns": 60,
+      "target_volatility": 0.2,
+      "volatility_floor": 0.05,
+      "partial_exposure": 0.5,
+      "risk_relief_floor": 0.75,
+      "drawdown_sessions": 63,
+      "near_high_threshold": -0.02,
+      "shock_loss_threshold": -0.08,
+      "shock_drawdown_threshold": -0.1,
+      "defensive_sessions": 63,
+      "monetary_sessions": 21,
+      "rebalance_band": 0.1,
+      "entry_band": 0.2,
+      "reduction_band": 0.05,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R5"
+    }
+  },
+  "parent": {
+    "id": "M03",
+    "parent": "M02",
+    "reason": "M02 confirme mieux la reprise mais le cap20/60 ajoute14dates et limite l'exposition. Modifier seulement le cap pour le suspendre quand MA200 ET momentum21 sont positifs.",
+    "changed_block": "risk",
+    "expected_benefit": "Maintenir100% quand la hausse est confirmee, reduire les petits reajustements et recuperer du rendement.",
+    "expected_cost": "Protection abandonnee avant certains chocs en regime encore positif; verifier drawdown et faux regimes.",
+    "refutation": "Gain trop faible ou drawdown excessif/interventions non reduites; capmax reste controle de reference sans changer la cible20%.",
+    "schedule": "monthly",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "monetary_id": "ETF_MONETARY_EUR",
+      "gold_id": "ETF_GOLD",
+      "government_id": "ETF_EURO_GOV",
+      "canary_ids": [
+        "ETF_WORLD",
+        "ETF_EMERGING"
+      ],
+      "trend_rule": "ma200",
+      "risk_rule": "conditional",
+      "recovery_rule": "dual_confirm",
+      "shock_rule": "off",
+      "confirmation_rule": "off",
+      "defensive_rule": "monetary",
+      "execution_rule": "band",
+      "fast_sessions": 21,
+      "medium_sessions": 63,
+      "slow_sessions": 126,
+      "ma_fast_sessions": 50,
+      "ma_slow_sessions": 200,
+      "vol_fast_returns": 20,
+      "vol_slow_returns": 60,
+      "target_volatility": 0.2,
+      "volatility_floor": 0.05,
+      "partial_exposure": 0.5,
+      "risk_relief_floor": 0.75,
+      "drawdown_sessions": 63,
+      "near_high_threshold": -0.02,
+      "shock_loss_threshold": -0.08,
+      "shock_drawdown_threshold": -0.1,
+      "defensive_sessions": 63,
+      "monetary_sessions": 21,
+      "rebalance_band": 0.1,
+      "entry_band": 0.2,
+      "reduction_band": 0.05,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R5"
+    }
+  },
+  "candidate_sha256": "95cf303dcc227f6f6e75235ed8a5d78b44628b4a3501b9ae9c96735049db78a2",
+  "frozen_inputs_sha256": "262ed00f041b64e35d70cca98196de6e64474ed67ba79e3e5d04e90717892551",
+  "preceding_analyses": [
+    {
+      "id": "M01",
+      "sha256": "35adf2d3d3a337876c0351e05f1ef2da8698909e66b35145aa0bda15eecbb9bd"
+    },
+    {
+      "id": "M02",
+      "sha256": "ec75cc0f246f0c4c66dede7c40e8b283f3c735e79b2c0442d9692ecaacf1ddfa"
+    },
+    {
+      "id": "M03",
+      "sha256": "acf3a50bab6d6c57704e373d7c447b13a10cc6e1c7c0dd605fcb3877766d3a10"
+    },
+    {
+      "id": "M04",
+      "sha256": "1bda2b653d4a4e99a9e9ce3bfba0dfafcf8d240df2490816d1fc2a20e6d11506"
+    },
+    {
+      "id": "M05",
+      "sha256": "b559f5c65040b707cd6eea26add25b29c4877f39ae49066d2f20c6157f3658d8"
+    }
+  ],
+  "period": "choice",
+  "start": "2019-06-03",
+  "end": "2024-12-31",
+  "contracts": [
+    {
+      "role": "candidate",
+      "cost_multiplier": 1.0,
+      "cache_key": "94add0bfd052bd05ac0082e5d12a6c9809d565aa39c7516a8d29e80824b407b2"
+    },
+    {
+      "role": "parent",
+      "cost_multiplier": 1.0,
+      "cache_key": "081f91b5864bdf1b7314f23560d868748ada74f1f38dc921e6c6cff10a239eee"
+    },
+    {
+      "role": "Nasdaq_buy_hold",
+      "cost_multiplier": 1.0,
+      "cache_key": "1f4bea88369f738c544fc3e204409c938ff9171762563aca48aa8626c08dc476"
+    },
+    {
+      "role": "without_trend",
+      "cost_multiplier": 1.0,
+      "cache_key": "40fbbf2bff72dd14cd57c1fe729aa9a853265f034ad44f5ef4671a6293d377cf"
+    },
+    {
+      "role": "without_risk",
+      "cost_multiplier": 1.0,
+      "cache_key": "4532c9e38aa6f9bd630d283700cd978ddd4c19a59245b51d546e1894a81d23c1"
+    },
+    {
+      "role": "without_recovery",
+      "cost_multiplier": 1.0,
+      "cache_key": "88b1fefb8692a2743f837166f9ca969f05316d5fee88e0fe920aa0c7066f1e0e"
+    },
+    {
+      "role": "without_defensive",
+      "cost_multiplier": 1.0,
+      "cache_key": "784df4c01e297028c31c33948f1f256a14369d6167ca1c85482589537e94c059"
+    },
+    {
+      "role": "without_execution",
+      "cost_multiplier": 1.0,
+      "cache_key": "ba565e656ddf0599e790e7cac17612de5b86191f073b1010fa142d3117a91f1c"
+    },
+    {
+      "role": "candidate",
+      "cost_multiplier": 2.0,
+      "cache_key": "9a18559e7e7e5dda5035d5d8f6610a570507e3cd785178a840690f5a8740f0da"
+    },
+    {
+      "role": "parent",
+      "cost_multiplier": 2.0,
+      "cache_key": "6f15a18b0380c5ffc9eefdf7d1ead1092f2a29af3a01804feb0f8e8a09fab134"
+    },
+    {
+      "role": "Nasdaq_buy_hold",
+      "cost_multiplier": 2.0,
+      "cache_key": "f8603eab0936d2329524509b004cbb29e0bad7cc48525c4b09dd52936d8dcec9"
+    },
+    {
+      "role": "without_trend",
+      "cost_multiplier": 2.0,
+      "cache_key": "d16f1ac2abd56d34da95bf24e796fd64600fc7cfbbad7b835bff61711d835bb0"
+    },
+    {
+      "role": "without_risk",
+      "cost_multiplier": 2.0,
+      "cache_key": "c018341071fb801607e166f74553e218b1ab18d0d0c0b28e300f08ee9be45c68"
+    },
+    {
+      "role": "without_recovery",
+      "cost_multiplier": 2.0,
+      "cache_key": "43693ea9496020714178742d21b6fa3fc605bfbb48bd5289c8bbe40066626f9d"
+    },
+    {
+      "role": "without_defensive",
+      "cost_multiplier": 2.0,
+      "cache_key": "cc8d890f62609674b4c7577956a26ef128a7866425d858f124cf9abd70e9d660"
+    },
+    {
+      "role": "without_execution",
+      "cost_multiplier": 2.0,
+      "cache_key": "c7e8867c1e8e8fd90f67bd944cd3387cff090bd068db6bc33f406275e8ff7a03"
+    }
+  ],
+  "ablation_blocks": [
+    "trend",
+    "risk",
+    "recovery",
+    "defensive",
+    "execution"
+  ]
+}

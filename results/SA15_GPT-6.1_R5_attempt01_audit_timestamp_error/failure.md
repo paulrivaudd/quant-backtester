@@ -1,0 +1,5 @@
+# Tentative R5 interrompue — sérialisation du journal
+
+M01 a exécuté sa première simulation financière normale sur choix2019–2024, mais la sauvegarde du journal enrichi a refusé des représentations timezone différentes d'un même instant (heure locale et UTC). Aucun candidat n'a été complété, scoré ou analysé. Les NAV, paramètres, hypothèses et source.zip originaux sont conservés dans ce dossier.
+
+La correction autorisée concerne uniquement la normalisation UTC des clés de rapprochement de l'observateur passif, avec un test couvrant les offsets différents. Les règles, les ordres et les chiffres de recherche restent inchangés. La nouvelle tentative conserve M01 et sa même hypothèse, dans une racine propre et avec un nouveau gel des sources. Cette simulation échouée compte comme une tentative physique supplémentaire et n'est pas cachée.

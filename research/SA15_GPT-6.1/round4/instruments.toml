@@ -1,0 +1,50 @@
+# R4 sector funds. first_session is the chosen archive start, not fund inception.
+# Existing R1-R3 prices are copied unchanged into a separate R4 store.
+
+[[instrument]]
+id = "ETF_US_TECH"
+name = "iShares S&P 500 Information Technology Sector UCITS ETF USD (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "QDVE.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2017-01-02
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Accumulating unhedged USD fund, EUR Xetra listing; not currency hedged. Official share-class/listing history predates 2017. Chosen archive starts 2017-01-02. Single-source restated Yahoo snapshot, with actions checked before use. Concentrated US IT sector, not a diversified Nasdaq substitute. Issuer https://www.ishares.com/uk/individual/en/products/280510/ishares-sp-500-information-technology-sector-ucits-etf ."
+
+[[instrument]]
+id = "ETF_WORLD_HEALTH"
+name = "Xtrackers MSCI World Health Care UCITS ETF 1C, EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "XDWH.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2017-01-02
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Accumulating class IE00BM67HK77, launched 2016-03-04. Archive starts 2017-01-02; no predecessor fund history is spliced. EUR listing does not hedge foreign currency. Single-source restated Yahoo snapshot, actions checked before use. Issuer https://etf.dws.com/de-de/IE00BM67HK77-msci-world-health-care-ucits-etf-1c/ ."
+
+[[instrument]]
+id = "ETF_WORLD_UTILITIES"
+name = "Xtrackers MSCI World Utilities UCITS ETF 1C, EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "XDWU.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2017-01-02
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Accumulating class IE00BM67HQ30, launched 2016-03-16. Archive starts 2017-01-02; no predecessor fund history is spliced. EUR listing does not hedge foreign currency. Single-source restated Yahoo snapshot, actions checked before use. Issuer https://etf.dws.com/de-de/IE00BM67HQ30-msci-world-utilities-ucits-etf-1c/ ."

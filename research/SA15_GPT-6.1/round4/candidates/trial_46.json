@@ -1,0 +1,64 @@
+{
+    "number":  46,
+    "reason":  "39 contrôle mieux le risque mais trade trop. Même mensuel/cible20%, élargir la bande de10 à15points pour éviter les ajustements de risque de petite taille sans retarder une sortie complète.",
+    "schedule":  "monthly",
+    "parameters":  {
+                       "core_id":  "ETF_US_TECH",
+                       "risky_ids":  [
+                                         "ETF_US_TECH"
+                                     ],
+                       "defensive_ids":  [
+                                             "ETF_GOLD",
+                                             "ETF_EURO_GOV"
+                                         ],
+                       "monetary_id":  "ETF_MONETARY_EUR",
+                       "mode":  "vol_control",
+                       "momentum_lookbacks":  [
+                                                  21,
+                                                  63,
+                                                  126
+                                              ],
+                       "momentum_weights":  [
+                                                1.0,
+                                                1.0,
+                                                1.0
+                                            ],
+                       "trend_kind":  "momentum",
+                       "core_floor":  0.0,
+                       "top_k":  1,
+                       "allocation_mode":  "equal",
+                       "fixed_weights":  [
+
+                                         ],
+                       "absolute_filter":  true,
+                       "core_preference":  0.02,
+                       "switch_buffer":  0.02,
+                       "rebalance_band":  0.15,
+                       "canary_ids":  [
+
+                                      ],
+                       "canary_lookbacks":  [
+                                                21,
+                                                63,
+                                                126
+                                            ],
+                       "canary_weights":  [
+                                              1.0,
+                                              1.0,
+                                              1.0
+                                          ],
+                       "canary_min_breadth":  0.5,
+                       "volatility_windows":  [
+                                                  20,
+                                                  60
+                                              ],
+                       "volatility_floor":  0.05,
+                       "target_volatility":  0.2,
+                       "recovery_lookback":  0,
+                       "recovery_threshold":  0.0,
+                       "defensive_top_k":  1,
+                       "monetary_lookback":  21,
+                       "max_age_sessions":  1,
+                       "strategy_id":  "SA15_GPT-6.1_R4"
+                   }
+}

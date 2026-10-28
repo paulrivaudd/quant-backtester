@@ -1,0 +1,11 @@
+{
+  "id": "M08",
+  "completed_sha256": "31cd274c36440c51656ad77b2791d52ac407569d558554ab302b1a7028fa2169",
+  "decision": "Conserver hold_defense comme simplification du repli sous risque comparable, mais ne pas attribuer son gain aux frais.",
+  "findings": [
+    "CAGR23.203%,DD23.969%,20dates vsM07 23.046%,23.969%,21dates. Gain0.157pointCAGR et0.162point aux frais doubles. M?mes37fills, frais3193.46vs3185.24EUR: aucune economie de couts realisee.",
+    "Le journal garde100%or aux decisions31mai/30juin2022 alors que le plan voulaitcash; expositionor moyenne10.30% vs7.30%,cash2.56% vs5.56%. C'est une renonciation au filtre de momentum, pas une execution equivalente moins chere. Episode2022-23 toujours239seances, perte-1.287% au lieu-1.979%, max underwater434vs459seances.",
+    "Chaque bloc: defense+1.764pointCAGR mais0.822pointDD perdu; risque+1.072pointCAGR et4.001pointsDD evites; tendance-0.392pointCAGR et3.292pointsDD evites; execution+0.321pointCAGR et8dates evitees vs off. Reprise seulement+0.068pointCAGR,+4dates,+651EUR, et-0.012pointCAGR aux frais doubles; aucun apportDD."
+  ],
+  "next_defect": "La reprise dual_confirm apporte peu face a son cout et complique le regime de maintienor; retirer explicitement ce bloc deja diagnostique par ablation pour reduire les ordres."
+}

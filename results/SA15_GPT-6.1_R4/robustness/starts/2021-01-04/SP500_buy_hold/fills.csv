@@ -1,0 +1,2 @@
+session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
+2021-01-05,2021-01-05 09:01:00+01:00,ETF_SP500_PEA,BUY,6955.0,14.36050033569336,14.367680585861205,99927.21847466468,49.96360923733234,29.96318395042419,19.975455966949465,99.902249154706

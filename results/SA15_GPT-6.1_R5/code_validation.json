@@ -1,0 +1,17 @@
+{
+    "date":  "2026-10-16",
+    "pytest_command":  ".venv/bin/python -m pytest -q tests/strategies/test_SA15_gpt61_mechanisms.py tests/scripts/test_SA15_run_gpt61_mechanisms.py tests/scripts/test_SA15_report_gpt61_mechanisms.py tests/test_package_structure.py",
+    "pytest_output":  "609 passed in 25.27s",
+    "pytest_exit_code":  0,
+    "ruff_check":  "All checks passed!",
+    "ruff_format_check":  "6 files already formatted",
+    "files_sha256":  {
+                         "tests/scripts/test_SA15_report_gpt61_mechanisms.py":  "4bb2615839f2b66641d31d344aaaad432d6a64c1bb75c07ca68e0995482268f8",
+                         "tests/scripts/test_SA15_run_gpt61_mechanisms.py":  "6e5202e47195619cc2d78d86f95c996f4c077a61bde2711603b72f4d2b3cb9dc",
+                         "scripts/SA15_report_gpt61_mechanisms.py":  "17d404212d1e1efea791bc40902442805878219aaf8d72259dc0b1d802818dbb",
+                         "tests/strategies/test_SA15_gpt61_mechanisms.py":  "8e20f5b432278e7b25349f8edf8aea2e5ecd0e3c495b5be59d478d64afafd87c",
+                         "scripts/SA15_run_gpt61_mechanisms.py":  "ebac6af236bfb113f58bbe501680c4c9489bdbcf306cfe1e43bda1caa1b23580",
+                         "src/quant_backtester/strategies/SA15_gpt61_mechanisms.py":  "aa20d76f37584f60318ac8e0d119469fa87e1e75fddb70cfc168f87131861afc"
+                     },
+    "scope":  "Code gelé et rapport relu ; tests déterministes hors ligne. Les analyses et replays finaux ne sont pas encore achevés."
+}

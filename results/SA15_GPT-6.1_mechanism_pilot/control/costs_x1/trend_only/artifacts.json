@@ -1,0 +1,13 @@
+{
+  "configuration.json": "e1ba2306a611c98d03d307ea8c5b3f453efe8f5712957dcba3425c07f987d06c",
+  "contract.json": "5f371aaed4d657289b8e0f27bf7d84ead69d2cd0e8d066c255f3300896f2d98d",
+  "decisions.csv": "51df67c81a8adf91f335d235682099e7c3c39d3c612bc57c9709fd85bd1b3c13",
+  "equity.csv": "664eff59f652a64c091ec3beccb4336986b664bd6538270311606ba579e95bec",
+  "fills.csv": "032f8532df80f0d55fc39cb829ba14ec39afea7840c9677cc8231395fb00c979",
+  "gross_equity.csv": "d4deff4bc79b2442eacbeb4a1e6880c2cd538b06c375cf85009ecd9277b4af8c",
+  "identity.json": "23a32771dfa866591d1eec80450802d3a65ec940c6320ceaa74935f2bb1e31c3",
+  "metrics.json": "3d0deb46f34ae2ac66b0fcaa6e1ced2f08e7a4db3c35f4b3e287fd5209c2df0c",
+  "rejects.csv": "2b29a18e1cd60e025f7cc68778b2672a0c45fae8d057234124c3b38c9158e013",
+  "strategy.json": "70ebf7ce9873810bc123a7533eff0ebe1639c91fd1f49e7072e3b9ab626913cd",
+  "weights.csv": "4728202608ce0b489b4ce02ad897c5ba48e092ab6b940b87404f100c3ca3fbf2"
+}

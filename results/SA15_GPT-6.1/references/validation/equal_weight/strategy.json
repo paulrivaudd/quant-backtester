@@ -1,0 +1,16 @@
+{
+  "strategy_id": "equal_weight_rebalance",
+  "class": "quant_backtester.research.references.EqualWeightRebalance",
+  "parameters": {
+    "instruments": [
+      "ETF_SP500_PEA",
+      "ETF_NASDAQ",
+      "ETF_EMERGING",
+      "ETF_GOLD",
+      "ETF_EURO_GOV",
+      "ETF_COMMODITY"
+    ],
+    "strategy_id": "equal_weight_rebalance"
+  },
+  "signals": []
+}

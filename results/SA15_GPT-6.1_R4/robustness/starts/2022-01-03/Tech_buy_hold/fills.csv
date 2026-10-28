@@ -1,0 +1,2 @@
+session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
+2022-01-04,2022-01-04 09:01:00+01:00,ETF_US_TECH,BUY,5097.0,19.597999572753906,19.607798572540283,99940.94932423782,49.97047466211891,29.967301146697995,19.97820076446533,99.91597657328224

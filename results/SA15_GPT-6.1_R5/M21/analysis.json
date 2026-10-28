@@ -1,0 +1,12 @@
+{
+  "id": "M21",
+  "decision": "Conserver le cap comme contrôle de protection, mais corriger son retard de réentrée avant de le préférer à M20. Son avantage de rendement devient presque nul aux frais doubles.",
+  "findings": [
+    "Sur la période de choix continue, M21 donne un CAGR de 24,210 %, un drawdown de 19,893 % et 18 dates d’ordres, contre 25,215 %, 22,574 % et huit dates pour M20. Le cap coûte 1,005 point de CAGR et ajoute dix dates et dix-huit ordres, mais évite 2,681 points de drawdown. Les frais baissent néanmoins de 127,40 EUR grâce à des tailles plus petites : compter les ordres et compter les euros sont deux mesures distinctes.",
+    "L’avance de CAGR sur le Nasdaq n’est plus que de 0,334 point à frais normaux et 0,015 point aux frais doubles. Le rendement actif de reprise se dégrade de −2,193 à −3,017 points de base par jour et l’exposition Nasdaq de reprise tombe de 73,96 % à 63,07 %. La durée maximale sous le sommet s’améliore toutefois de 358 à 326 séances.",
+    "Quatre décisions conservent une cible Nasdaq inférieure à 75 % malgré MA50 et momentum21 positifs : avril, mai et juin 2020, puis mars 2022. En avril et mai 2020, le cap laisse seulement 46,44 % et 48,00 % de Nasdaq ; la volatilité à 60 séances vaut encore 43,06 % et 41,67 %. Ce diagnostic ne préjuge pas du résultat d’une exposition plus élevée.",
+    "La défense ajoute 5,025 points de CAGR mais coûte 2,456 points de drawdown ; le choc ajoute 1,053 point de CAGR et évite 4,076 points de drawdown ; la tendance ajoute 1,271 point de CAGR et évite 3,663 points de drawdown ; l’exécution ajoute 0,520 point de CAGR et évite dix-huit dates, mais coûte 0,362 point de drawdown. Le coût principal de croissance du nouveau bloc est donc bien le dimensionnement du risque."
+  ],
+  "next_defect": "La traîne de volatilité limite fortement des reprises déjà confirmées rapidement. Tester le plancher conditionnel de réentrée déclaré avant M01, sans changer sa valeur, et mesurer précisément la protection abandonnée lors des faux rebonds.",
+  "completed_sha256": "d3f0132dbaf08296f2ec5ddf5117c79771a5e570869af4b88927c9f03f6f72e6"
+}

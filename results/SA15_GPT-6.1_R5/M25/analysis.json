@@ -1,0 +1,11 @@
+{
+  "id": "M25",
+  "decision": "Rejeter la suspension complète du cap comme remplacement de M22. M20 sans cap domine également cet assemblage plus complexe sur les critères principaux.",
+  "findings": [
+    "Sur le choix continu, CAGR 24,521 %, drawdown 22,578 % et 15 dates. Contre M22 : −0,308 point de CAGR et 2,480 points de drawdown supplémentaires, malgré deux dates de moins. La perte de CAGR reste de 0,333 point x2. Le cash moyen baisse à 0,59 %, mais investir davantage ne donne pas un meilleur résultat. M20 garde 25,215 % de CAGR, huit dates et un drawdown presque identique.",
+    "Le risque coûte 0,694 point de CAGR et sept dates contre sa propre ablation, sans protection de drawdown x1 ; le gain x2 de drawdown n’est que de 0,011 point. La défense ajoute 4,267 points de CAGR mais coûte 1,077 point de drawdown ; le choc ajoute 0,844 point de CAGR et évite 1,392 point de drawdown ; la tendance ajoute 1,254 point de CAGR et évite 3,511 points de drawdown ; l’exécution ajoute 0,826 point de CAGR et évite onze dates.",
+    "Les reprises restent à −2,446 points de base actifs par jour contre −2,416 pour M22, malgré davantage de Nasdaq. Il y a 68 soirées de contrôle, 15 dates de fills, 28 fills, sept rejets d’exécution et aucune indisponibilité de signal. Les rejets restent entièrement inclus dans les patrimoines."
+  ],
+  "next_defect": "Le coût restant ne se résout pas en relâchant le cap. Sur M20, le choc fondé sur le sommet peut encore maintenir une sortie après stabilisation de la perte récente ; tester une définition de choc fondée sur la vitesse de perte, avec son risque de protection tardive.",
+  "completed_sha256": "ad0dbb0fcfb418135d0fb3b4b4f33ae5b50d832034d3182084a5d904cd9e1fa7"
+}

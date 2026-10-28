@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 
 from quant_backtester.research.references import BuyAndHold
-from quant_backtester.strategies import ETFEnsemble, WorldMA20Benchmark
+from quant_backtester.strategies import SA15GPT61, ETFEnsemble, WorldMA20Benchmark
 from quant_backtester.strategies.base import Strategy
 from quant_backtester.strategies.catalogue import (
     CATALOGUE,
@@ -30,8 +30,8 @@ def test_a_code_gives_the_three_spellings_of_a_name() -> None:
         entry("SA99")
 
 
-def test_the_catalogue_runs_from_sa1_to_sa14_and_names_the_one_that_needs_an_extra() -> None:
-    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 15)]
+def test_the_catalogue_runs_from_sa1_to_sa15_and_names_the_one_that_needs_an_extra() -> None:
+    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 16)]
     assert family(Family.SA) == CATALOGUE
     assert [(item.code, item.extra) for item in CATALOGUE if item.extra] == [("SA14", "ml")]
     assert entry("SA13").display_name == "SA13 - Signatures Neurons"
@@ -76,6 +76,9 @@ def test_the_neural_strategy_is_recorded_under_its_catalogue_id() -> None:
         ({"label": ""}, "label"),
         ({"label": "smooth  MA"}, "label"),
         ({"label": "50/50"}, "label"),
+        ({"recorded_id": ""}, "recorded_id"),
+        ({"recorded_id": "   "}, "recorded_id"),
+        ({"recorded_id": True}, "recorded_id"),
         ({"target": "no_class_here"}, "module:Class"),
     ],
 )
@@ -89,3 +92,22 @@ def test_an_entry_that_cannot_be_named_is_refused(changes, message) -> None:
 def test_a_target_that_is_not_a_strategy_is_refused_when_loaded() -> None:
     with pytest.raises(TypeError, match="not a Strategy"):
         CatalogueEntry(Family.SA, 1, "x", "pathlib:Path").load()
+
+
+def test_explicit_recorded_id_preserves_the_requested_sa15_name() -> None:
+    item = entry("SA15")
+
+    assert item.display_name == "SA15 - GPT 6 1"
+    assert item.recorded_id == "SA15_GPT-6.1"
+    assert item.strategy_id == SA15GPT61().strategy_id == "SA15_GPT-6.1"
+    assert item.slug == "sa15_gpt-6.1"
+    assert item.load() is SA15GPT61
+    assert entry_of(SA15GPT61) is item
+
+
+def test_recorded_id_override_does_not_change_the_display_name() -> None:
+    item = CatalogueEntry(Family.SA, 1, "readable label", "a.b:C", recorded_id="SA1-kept.id")
+
+    assert item.strategy_id == "SA1-kept.id"
+    assert item.display_name == "SA1 - readable label"
+    assert item.slug == "sa1-kept.id"

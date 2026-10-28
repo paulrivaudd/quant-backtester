@@ -1,0 +1,10 @@
+{
+  "status": "UNCERTAIN",
+  "reasons": [
+    "l'avantage disparait aux frais doubles face au S&P 500 standard",
+    "l'intervalle bootstrap de rendement actif moyen contient zero"
+  ],
+  "full_excess_total_return": 1.0058535777960782,
+  "final_excess_total_return": 0.004685312459914881,
+  "stressed_final_excess_vs_standard_sp500": -0.01108571741097486
+}

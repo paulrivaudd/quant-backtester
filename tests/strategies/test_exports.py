@@ -12,6 +12,7 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands() -> None:
     """
     import quant_backtester.strategies as package
     from quant_backtester.strategies import (
+        SA15GPT61,
         ArimaGarch,
         BufferedDualMomentum,
         ETFEnsemble,
@@ -41,6 +42,11 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands() -> None:
         FactorETFBlend(instrument_ids=("ETF_EU", "ETF_OTHER", "ETF_LATE")),
         MonetaryCarry(instrument_id="ETF_LATE"),
         VixReliefEntry(instrument_id="ETF_OTHER", vix_id="RATE_US"),
+        SA15GPT61(
+            risky_ids=("ETF_EU", "ETF_OTHER"),
+            monetary_id="ETF_LATE",
+            core_id="ETF_EU",
+        ),
         ETFEnsemble(
             enable_factors=False,
             enable_monetary=False,

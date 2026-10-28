@@ -1,0 +1,10 @@
+{
+  "generated_at_utc": "2026-10-15T20:59:02.127464+00:00",
+  "report_source": "scripts/SA15_report_gpt61_round3.py",
+  "report_source_sha256": "975d8809f8157f01ccd6c384cef8b08c6061981f97cfb4b953184037af634020",
+  "study_sha256": "f158e34fb800755d117ea4c4035323515231042c60fc0506021fb064cc50f55b",
+  "selected_json_sha256": "6dbb61bc567b99ffa1bf86a3a56f4bf478943f5f8a88cecf3b7e6f721a8ed7c1",
+  "financial_source_archive_sha256": "3555f06f5572a69bab48b487176c11a272a3a146b74b573c267d844a72343deb",
+  "validation_note_sha256": "2fe4b08ad406517ff67b02ef353f28b76335bb7d898dd1245d84c794179b274a",
+  "note": "Saved-results reporting only; includes the existing validation economic section when present. Financial source archive remains untouched."
+}

@@ -1,0 +1,268 @@
+{
+  "id": "M16",
+  "candidate": {
+    "id": "M16",
+    "parent": "M15",
+    "reason": "Le seul signal de reprise actif de M15 est un faux retour de juillet 2022, alors que sa tendance longue reste négative. Ajouter uniquement une confirmation de risque globale : les ETF Monde et marchés émergents doivent tous deux avoir un momentum positif à 126 séances. Ces indicateurs sont fixés et ne sont pas négociés.",
+    "changed_block": "confirmation",
+    "expected_benefit": "Éviter des retours Nasdaq isolés dans un environnement de risque mondial encore défavorable, sans sélectionner des dates historiques ou des pondérations optimales.",
+    "expected_cost": "La confirmation filtre toute la direction, y compris des hausses Nasdaq qui ne sont pas partagées par les émergents. Elle peut donc manquer des tendances rentables, réduire fortement l’exposition et multiplier les sorties ; ses données manquantes sont explicitement bloquantes.",
+    "refutation": "La protection ou la suppression des faux retours ne compense pas la croissance abandonnée, ou les interventions augmentent. Comparer les ablations de confirmation et de reprise pour isoler leur interaction, sans chercher un seuil de canari favorable.",
+    "schedule": "monthly",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "monetary_id": "ETF_MONETARY_EUR",
+      "gold_id": "ETF_GOLD",
+      "government_id": "ETF_EURO_GOV",
+      "canary_ids": [
+        "ETF_WORLD",
+        "ETF_EMERGING"
+      ],
+      "trend_rule": "consensus",
+      "risk_rule": "conditional",
+      "recovery_rule": "breakout",
+      "shock_rule": "off",
+      "confirmation_rule": "canary",
+      "defensive_rule": "gold_momentum",
+      "execution_rule": "hold_defense",
+      "fast_sessions": 21,
+      "medium_sessions": 63,
+      "slow_sessions": 126,
+      "ma_fast_sessions": 50,
+      "ma_slow_sessions": 200,
+      "vol_fast_returns": 20,
+      "vol_slow_returns": 60,
+      "target_volatility": 0.2,
+      "volatility_floor": 0.05,
+      "partial_exposure": 0.5,
+      "risk_relief_floor": 0.75,
+      "drawdown_sessions": 63,
+      "near_high_threshold": -0.02,
+      "shock_loss_threshold": -0.08,
+      "shock_drawdown_threshold": -0.1,
+      "defensive_sessions": 63,
+      "monetary_sessions": 21,
+      "rebalance_band": 0.1,
+      "entry_band": 0.2,
+      "reduction_band": 0.05,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R5"
+    }
+  },
+  "parent": {
+    "id": "M15",
+    "parent": "M10",
+    "reason": "M10 manque encore des reprises : exposition Nasdaq moyenne de 67,63 % et rendement actif de −1,888 point de base par jour dans ce régime. Les reprises sur momentum court avaient produit des faux retours. Ajouter uniquement une règle de reprise sur clôture égale au plus haut des 63 séances passées, afin d’exiger une confirmation de prix différente.",
+    "changed_block": "recovery",
+    "expected_benefit": "Restaurer la direction complète avant le redressement de tous les votes de tendance lorsque le marché atteint effectivement un nouveau plus haut récent ; le risque et les autres filtres restent actifs.",
+    "expected_cost": "Une cassure peut échouer ou disparaître à la décision suivante ; cette règle sans état caché peut donc créer des réductions et réentrées supplémentaires. Les baisses après cassure et tous les frais seront conservés.",
+    "refutation": "La reprise récupérée ne compense pas les faux retours et les ordres, ou le drawdown dépasse 25 %. La fenêtre de 63 séances et le critère de nouveau plus haut restent figés, sans recherche de seuil favorable.",
+    "schedule": "monthly",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "monetary_id": "ETF_MONETARY_EUR",
+      "gold_id": "ETF_GOLD",
+      "government_id": "ETF_EURO_GOV",
+      "canary_ids": [
+        "ETF_WORLD",
+        "ETF_EMERGING"
+      ],
+      "trend_rule": "consensus",
+      "risk_rule": "conditional",
+      "recovery_rule": "breakout",
+      "shock_rule": "off",
+      "confirmation_rule": "off",
+      "defensive_rule": "gold_momentum",
+      "execution_rule": "hold_defense",
+      "fast_sessions": 21,
+      "medium_sessions": 63,
+      "slow_sessions": 126,
+      "ma_fast_sessions": 50,
+      "ma_slow_sessions": 200,
+      "vol_fast_returns": 20,
+      "vol_slow_returns": 60,
+      "target_volatility": 0.2,
+      "volatility_floor": 0.05,
+      "partial_exposure": 0.5,
+      "risk_relief_floor": 0.75,
+      "drawdown_sessions": 63,
+      "near_high_threshold": -0.02,
+      "shock_loss_threshold": -0.08,
+      "shock_drawdown_threshold": -0.1,
+      "defensive_sessions": 63,
+      "monetary_sessions": 21,
+      "rebalance_band": 0.1,
+      "entry_band": 0.2,
+      "reduction_band": 0.05,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R5"
+    }
+  },
+  "candidate_sha256": "915cd7ea1fe4b4cf6642eb5915331f8b87b4fb40f8ac80af8a20546bd6555cc4",
+  "frozen_inputs_sha256": "262ed00f041b64e35d70cca98196de6e64474ed67ba79e3e5d04e90717892551",
+  "preceding_analyses": [
+    {
+      "id": "M01",
+      "sha256": "35adf2d3d3a337876c0351e05f1ef2da8698909e66b35145aa0bda15eecbb9bd"
+    },
+    {
+      "id": "M02",
+      "sha256": "ec75cc0f246f0c4c66dede7c40e8b283f3c735e79b2c0442d9692ecaacf1ddfa"
+    },
+    {
+      "id": "M03",
+      "sha256": "acf3a50bab6d6c57704e373d7c447b13a10cc6e1c7c0dd605fcb3877766d3a10"
+    },
+    {
+      "id": "M04",
+      "sha256": "1bda2b653d4a4e99a9e9ce3bfba0dfafcf8d240df2490816d1fc2a20e6d11506"
+    },
+    {
+      "id": "M05",
+      "sha256": "b559f5c65040b707cd6eea26add25b29c4877f39ae49066d2f20c6157f3658d8"
+    },
+    {
+      "id": "M06",
+      "sha256": "0d3ad23d8167d506f3e1226d4e03484e9c8f4f4c6c591b09b55696728571da98"
+    },
+    {
+      "id": "M07",
+      "sha256": "4411c339a204628e1963429fe99fac4ef9538f9bd5742445bad784c36a42db13"
+    },
+    {
+      "id": "M08",
+      "sha256": "e63501e102c1e4f8e7596b377dde76efd89b9326f896f09622b407d163bc8cbf"
+    },
+    {
+      "id": "M09",
+      "sha256": "4516dee6228e7cbb7d0aaace2f4b0037b360bd5ddfd5362bb736b0269e5456ee"
+    },
+    {
+      "id": "M10",
+      "sha256": "fc2235801e3ba96a98c9ee8e22beac802fc24b0a4b7feb4f4291abff49cc0baa"
+    },
+    {
+      "id": "M11",
+      "sha256": "dc51d7605adc0ce1c3e2f5a477ea45ef3fe1aa203d8cc69588cfb3f34e01c05a"
+    },
+    {
+      "id": "M12",
+      "sha256": "6757c07793c33da4296e549b08587ebacf7783f81458c6b5793d465bc03bebb2"
+    },
+    {
+      "id": "M13",
+      "sha256": "532026e3cfb2e0c1d09f0c864b634c9043074a9c082d8c447ede5a771a22a87f"
+    },
+    {
+      "id": "M14",
+      "sha256": "d6f09e25be153f1c71b4d539fed4954280da10741ec43e999e13045dc74b65c0"
+    },
+    {
+      "id": "M15",
+      "sha256": "0c6bc0c27cda91928946650cce5c1fac1ce25da1e47c0ade0e6194959bdbd380"
+    }
+  ],
+  "period": "choice",
+  "start": "2019-06-03",
+  "end": "2024-12-31",
+  "contracts": [
+    {
+      "role": "candidate",
+      "cost_multiplier": 1.0,
+      "cache_key": "66b6fac0b3d32261621b677d4c81d931e2200ac8f0d23ce11dd4e3056f3113c2"
+    },
+    {
+      "role": "parent",
+      "cost_multiplier": 1.0,
+      "cache_key": "7f3abb96832ade68fd7e26b290882e100bffdf7c3e66dd5c681a6e679fa6d1db"
+    },
+    {
+      "role": "Nasdaq_buy_hold",
+      "cost_multiplier": 1.0,
+      "cache_key": "1f4bea88369f738c544fc3e204409c938ff9171762563aca48aa8626c08dc476"
+    },
+    {
+      "role": "without_trend",
+      "cost_multiplier": 1.0,
+      "cache_key": "e75a06dd57bd85e0ece80effde5ef46a8b7e41ea76f0645189f01454c583b1a9"
+    },
+    {
+      "role": "without_risk",
+      "cost_multiplier": 1.0,
+      "cache_key": "ca8ca184737035c23c230cb9c0fccae89469742a73d8637073564c437705109e"
+    },
+    {
+      "role": "without_recovery",
+      "cost_multiplier": 1.0,
+      "cache_key": "9b58100ac2311f1678158a892cc7b468e2063fa94aebfd1564eb9bc31143786f"
+    },
+    {
+      "role": "without_confirmation",
+      "cost_multiplier": 1.0,
+      "cache_key": "7f3abb96832ade68fd7e26b290882e100bffdf7c3e66dd5c681a6e679fa6d1db"
+    },
+    {
+      "role": "without_defensive",
+      "cost_multiplier": 1.0,
+      "cache_key": "078038011b7eff15a53699b6efe46f55add6a1374f17064bfecd6cbd19d2cb97"
+    },
+    {
+      "role": "without_execution",
+      "cost_multiplier": 1.0,
+      "cache_key": "1a17c1b22410e6361ff431f6b940a13003d24d884fcca88ef438d82ce2a4bed7"
+    },
+    {
+      "role": "candidate",
+      "cost_multiplier": 2.0,
+      "cache_key": "b588062da3f4774498fc5c6eb27ad3bc4b9e276e1607188117925909f673a8f8"
+    },
+    {
+      "role": "parent",
+      "cost_multiplier": 2.0,
+      "cache_key": "c8d9c6bc79838793ff27531b31731a28cf729296cbe38878daeb21e88839f85f"
+    },
+    {
+      "role": "Nasdaq_buy_hold",
+      "cost_multiplier": 2.0,
+      "cache_key": "f8603eab0936d2329524509b004cbb29e0bad7cc48525c4b09dd52936d8dcec9"
+    },
+    {
+      "role": "without_trend",
+      "cost_multiplier": 2.0,
+      "cache_key": "84dda394effdc6f5933b0f61d7dc81dc63851617d849aa6a67f6c7fa1c5fdea7"
+    },
+    {
+      "role": "without_risk",
+      "cost_multiplier": 2.0,
+      "cache_key": "26172023c55e76e95cf5d62f61ee8d97c7870084bb6158343f5e50c1a581bd59"
+    },
+    {
+      "role": "without_recovery",
+      "cost_multiplier": 2.0,
+      "cache_key": "9c4dbf551372341593864636ba9095729667d28fb10cd82fbdcbea1e5b198365"
+    },
+    {
+      "role": "without_confirmation",
+      "cost_multiplier": 2.0,
+      "cache_key": "c8d9c6bc79838793ff27531b31731a28cf729296cbe38878daeb21e88839f85f"
+    },
+    {
+      "role": "without_defensive",
+      "cost_multiplier": 2.0,
+      "cache_key": "e98d6d4b60fed374b4cbe2fba94f2aac2311787ed638634d5996c3251b9ee286"
+    },
+    {
+      "role": "without_execution",
+      "cost_multiplier": 2.0,
+      "cache_key": "f874ac14c2386e1be5ae6f0c19009f1730462c659f7945b4ee356d7fbec90434"
+    }
+  ],
+  "ablation_blocks": [
+    "trend",
+    "risk",
+    "recovery",
+    "confirmation",
+    "defensive",
+    "execution"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "strategy_id": "SP500_buy_hold",
+  "class": "quant_backtester.research.references.BuyAndHold",
+  "parameters": {
+    "instruments": [
+      "ETF_SP500_PEA"
+    ],
+    "strategy_id": "SP500_buy_hold"
+  },
+  "signals": []
+}

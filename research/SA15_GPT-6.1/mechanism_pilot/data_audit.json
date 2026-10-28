@@ -1,0 +1,29 @@
+{
+  "audited_at_utc": "2026-10-16T20:05:27.857035+00:00",
+  "read_only": true,
+  "items": [
+    {
+      "instrument_id": "ETF_NASDAQ",
+      "calendar": "XETR",
+      "file": "runs/sa15_gpt61_r4_store/clean/checked_bars/ETF_NASDAQ.parquet",
+      "sha256": "421f073e7e374d3f71f7026af877e5b13cb1f3887caf4e854c8a194dfde82127",
+      "rows_total": 3240,
+      "checked_start": "2018-06-01",
+      "checked_end": "2026-10-09",
+      "expected_sessions": 2124,
+      "missing": []
+    },
+    {
+      "instrument_id": "ETF_MONETARY_EUR",
+      "calendar": "XETR",
+      "file": "runs/sa15_gpt61_r4_store/clean/checked_bars/ETF_MONETARY_EUR.parquet",
+      "sha256": "c5524a0a167f52ebcb09a93bf670a92a405e0ec7d0198b36b4ad4d1cd339c440",
+      "rows_total": 3240,
+      "checked_start": "2018-06-01",
+      "checked_end": "2026-10-09",
+      "expected_sessions": 2124,
+      "missing": []
+    }
+  ],
+  "note": "No price repair or store modification. Coverage audit only; provider-restated prices remain a limitation."
+}

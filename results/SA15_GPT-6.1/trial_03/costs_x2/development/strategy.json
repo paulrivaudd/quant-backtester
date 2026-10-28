@@ -1,0 +1,191 @@
+{
+  "strategy_id": "SA15_GPT-6.1",
+  "class": "quant_backtester.strategies.SA15_gpt61.SA15GPT61",
+  "parameters": {
+    "risky_ids": [
+      "ETF_SP500_PEA",
+      "ETF_NASDAQ",
+      "ETF_EMERGING",
+      "ETF_GOLD",
+      "ETF_EURO_GOV",
+      "ETF_COMMODITY"
+    ],
+    "monetary_id": "ETF_MONETARY_EUR",
+    "momentum_lookbacks": [
+      21,
+      63,
+      126,
+      252
+    ],
+    "momentum_weights": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "top_k": 2,
+    "use_trend_filter": true,
+    "trend_sessions": 200,
+    "short_returns": 20,
+    "long_returns": 60,
+    "target_volatility": 0.18,
+    "volatility_floor": 0.05,
+    "volatility_power": 1.0,
+    "renormalize_active": false,
+    "max_asset_weight": 1.0,
+    "core_fraction": 0.0,
+    "core_id": "ETF_SP500_PEA",
+    "monetary_lookback": 21,
+    "monetary_maximum_volatility": 0.02,
+    "max_age_sessions": 1,
+    "rebalance_band": 0.05,
+    "strategy_id": "SA15_GPT-6.1"
+  },
+  "signals": [
+    {
+      "signal": {
+        "type": "MomentumSignal",
+        "lookback_sessions": 21,
+        "skip_recent_sessions": 0,
+        "bar_field": "close",
+        "price_basis": "ADJUSTED",
+        "max_age_sessions": 1,
+        "window_mode": "CONSECUTIVE_SESSIONS",
+        "unit": "FRACTION"
+      },
+      "instruments": [
+        "ETF_SP500_PEA",
+        "ETF_NASDAQ",
+        "ETF_EMERGING",
+        "ETF_GOLD",
+        "ETF_EURO_GOV",
+        "ETF_COMMODITY",
+        "ETF_MONETARY_EUR"
+      ]
+    },
+    {
+      "signal": {
+        "type": "MomentumSignal",
+        "lookback_sessions": 63,
+        "skip_recent_sessions": 0,
+        "bar_field": "close",
+        "price_basis": "ADJUSTED",
+        "max_age_sessions": 1,
+        "window_mode": "CONSECUTIVE_SESSIONS",
+        "unit": "FRACTION"
+      },
+      "instruments": [
+        "ETF_SP500_PEA",
+        "ETF_NASDAQ",
+        "ETF_EMERGING",
+        "ETF_GOLD",
+        "ETF_EURO_GOV",
+        "ETF_COMMODITY"
+      ]
+    },
+    {
+      "signal": {
+        "type": "MomentumSignal",
+        "lookback_sessions": 126,
+        "skip_recent_sessions": 0,
+        "bar_field": "close",
+        "price_basis": "ADJUSTED",
+        "max_age_sessions": 1,
+        "window_mode": "CONSECUTIVE_SESSIONS",
+        "unit": "FRACTION"
+      },
+      "instruments": [
+        "ETF_SP500_PEA",
+        "ETF_NASDAQ",
+        "ETF_EMERGING",
+        "ETF_GOLD",
+        "ETF_EURO_GOV",
+        "ETF_COMMODITY"
+      ]
+    },
+    {
+      "signal": {
+        "type": "MomentumSignal",
+        "lookback_sessions": 252,
+        "skip_recent_sessions": 0,
+        "bar_field": "close",
+        "price_basis": "ADJUSTED",
+        "max_age_sessions": 1,
+        "window_mode": "CONSECUTIVE_SESSIONS",
+        "unit": "FRACTION"
+      },
+      "instruments": [
+        "ETF_SP500_PEA",
+        "ETF_NASDAQ",
+        "ETF_EMERGING",
+        "ETF_GOLD",
+        "ETF_EURO_GOV",
+        "ETF_COMMODITY"
+      ]
+    },
+    {
+      "signal": {
+        "type": "MovingAverageTrendSignal",
+        "window_sessions": 200,
+        "bar_field": "close",
+        "price_basis": "ADJUSTED",
+        "max_age_sessions": 1,
+        "window_mode": "CONSECUTIVE_SESSIONS",
+        "unit": "FRACTION"
+      },
+      "instruments": [
+        "ETF_SP500_PEA",
+        "ETF_NASDAQ",
+        "ETF_EMERGING",
+        "ETF_GOLD",
+        "ETF_EURO_GOV",
+        "ETF_COMMODITY"
+      ]
+    },
+    {
+      "signal": {
+        "type": "RealizedVolatilitySignal",
+        "window_returns": 20,
+        "annualization": 252,
+        "logarithmic": true,
+        "ddof": 1,
+        "bar_field": "close",
+        "price_basis": "ADJUSTED",
+        "max_age_sessions": 1,
+        "window_mode": "CONSECUTIVE_SESSIONS",
+        "unit": "ANNUALIZED_VOLATILITY"
+      },
+      "instruments": [
+        "ETF_SP500_PEA",
+        "ETF_NASDAQ",
+        "ETF_EMERGING",
+        "ETF_GOLD",
+        "ETF_EURO_GOV",
+        "ETF_COMMODITY"
+      ]
+    },
+    {
+      "signal": {
+        "type": "RealizedVolatilitySignal",
+        "window_returns": 60,
+        "annualization": 252,
+        "logarithmic": true,
+        "ddof": 1,
+        "bar_field": "close",
+        "price_basis": "ADJUSTED",
+        "max_age_sessions": 1,
+        "window_mode": "CONSECUTIVE_SESSIONS",
+        "unit": "ANNUALIZED_VOLATILITY"
+      },
+      "instruments": [
+        "ETF_SP500_PEA",
+        "ETF_NASDAQ",
+        "ETF_EMERGING",
+        "ETF_GOLD",
+        "ETF_EURO_GOV",
+        "ETF_COMMODITY",
+        "ETF_MONETARY_EUR"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "score": 0.08680099762268041,
+  "metrics": {
+    "development": {
+      "net_return": 0.31826865101036117,
+      "gross_return": 0.34143787924766533,
+      "cagr": 0.08034281420859402,
+      "volatility": 0.11032302269716292,
+      "sharpe": 0.7407520610138424,
+      "max_drawdown": -0.1502902844409838,
+      "calmar": 0.5345842181843973,
+      "costs_eur": 2316.9228237305374,
+      "traded_value_eur": 2309835.804152432,
+      "turnover_per_year": 5.269107996109873,
+      "average_exposure": 0.8094847163862541,
+      "fills": 104,
+      "rejects": 15,
+      "decisions_with_skipped_inputs": 0,
+      "sessions": 922
+    },
+    "validation": {
+      "net_return": 0.3652064440878797,
+      "gross_return": 0.37561772165298457,
+      "cagr": 0.1687947649591286,
+      "volatility": 0.09377027784709364,
+      "sharpe": 1.687737807971853,
+      "max_drawdown": -0.08109049064803564,
+      "calmar": 2.0815605333030196,
+      "costs_eur": 1041.1277565105777,
+      "traded_value_eur": 1035670.7785769148,
+      "turnover_per_year": 4.672555327949582,
+      "average_exposure": 0.9533732736706925,
+      "fills": 54,
+      "rejects": 9,
+      "decisions_with_skipped_inputs": 0,
+      "sessions": 511
+    }
+  }
+}

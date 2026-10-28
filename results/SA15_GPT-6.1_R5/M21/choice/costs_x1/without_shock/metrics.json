@@ -1,0 +1,21 @@
+{
+  "net_return": 2.1968636781833584,
+  "gross_return": 2.216117729072571,
+  "cagr": 0.23156281365058762,
+  "volatility": 0.16941164236977133,
+  "sharpe": 1.2925146210447216,
+  "max_drawdown": -0.23969115186609113,
+  "calmar": 0.9660882842265092,
+  "costs_eur": 1925.4050889213438,
+  "traded_value_eur": 1925429.5905814876,
+  "turnover_per_year": 1.8297722953429874,
+  "average_exposure": 0.9853721596308137,
+  "fills": 33,
+  "rejects": 8,
+  "decisions_with_skipped_inputs": 0,
+  "sessions": 1433,
+  "trade_days": 18,
+  "trade_days_per_year": 3.2259568204121685,
+  "decision_days": 68,
+  "decision_days_per_year": 12.186947988223748
+}

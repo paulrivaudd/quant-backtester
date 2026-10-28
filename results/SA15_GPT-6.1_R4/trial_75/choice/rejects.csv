@@ -1,0 +1,3 @@
+session_date,instrument_id,reason,side,requested_quantity
+2021-01-04,ETF_GOLD,INSUFFICIENT_CASH,BUY,3.0
+2022-01-03,ETF_GOLD,INSUFFICIENT_CASH,BUY,7.0

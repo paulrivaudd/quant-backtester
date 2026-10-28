@@ -1,0 +1,14 @@
+{
+  "physical_failed_serialization_replays": 1,
+  "additional_candidate_designs": 0,
+  "attempts": [
+    {
+      "path": "results/SA15_GPT-6.1_R5_attempt01_audit_timestamp_error",
+      "failed_physical_replays": 1,
+      "reason": "First M01 simulation completed financially, audit saving failed on equivalent Paris/UTC timestamp representations. UTC join correction only; rules and parameters unchanged.",
+      "source_archives": {
+        "source/source.zip": "036ee42ae850ac35a2720ea24b0aaaf0a5c7a60cf41bc1bac5b14369f7115ced"
+      }
+    }
+  ]
+}

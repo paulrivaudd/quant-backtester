@@ -1,0 +1,9 @@
+{
+  "id": "M01",
+  "completed_sha256": "a16128b6c3edef05ff2185bf6be2111050cbdbc16fa8648be817b2b92b0f938a",
+  "decision": "Conserver la reprise comme piste, mais corriger ses faux retours avant adoption.",
+  "findings": [
+    "La reprise positive21 ajoute0.737point de CAGR (20.425% vs19.688%), mais DD23.773% vs23.147%,26dates vs22 et735.88EUR de frais supplementaires. En reprise, gain actif moyen+0.613bp/j contreparent, exposition73.55%; avantageCAGR reste+0.641point aux frais doubles. Sans risque, DD29.62% : garder cap pour cette comparaison. Sans bande40dates : garder executionband."
+  ],
+  "next_defect": "Reentrees sur momentum21 seul : cout et faux rebonds, verifier confirmation par moyenne rapide."
+}

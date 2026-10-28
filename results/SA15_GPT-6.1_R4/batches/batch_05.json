@@ -1,0 +1,616 @@
+{
+  "numbers": [
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80
+  ],
+  "candidates": [
+    {
+      "number": 71,
+      "reason": "62(or/matièrespremières) gagne4,96points de CAGR mais dépasse4dates/an. Dernier voisin de trading :bande20points au lieu de15, même cible20%, même mensuel et défenses. Aucun paramètre après contrôle final.",
+      "schedule": "monthly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH"
+        ],
+        "defensive_ids": [
+          "ETF_GOLD",
+          "ETF_COMMODITY"
+        ],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "vol_control",
+        "momentum_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "equal",
+        "fixed_weights": [],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.2,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          60
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.2,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    },
+    {
+      "number": 72,
+      "reason": "63 devient meilleur score qualifié après40essais grâce aux défenses63/126. Élargir seulement sa bande à20points pour comparer le gain de simplicité et sa stabilité de rendement/drawdown.",
+      "schedule": "monthly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH"
+        ],
+        "defensive_ids": [
+          "ETF_GOLD",
+          "ETF_EURO_GOV"
+        ],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "vol_control",
+        "momentum_lookbacks": [
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1,
+          1
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "equal",
+        "fixed_weights": [],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.2,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          60
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.2,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    },
+    {
+      "number": 73,
+      "reason": "66(vol20/40) est performant mais trop actif(4,30dates/an). Tester bande20points au lieu de15, pour vérifier si la mémoire de risque courte peut rester sous la cible d'interventions sans augmenter le drawdown.",
+      "schedule": "monthly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH"
+        ],
+        "defensive_ids": [
+          "ETF_GOLD",
+          "ETF_EURO_GOV"
+        ],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "vol_control",
+        "momentum_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "equal",
+        "fixed_weights": [],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.2,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          40
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.2,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    },
+    {
+      "number": 74,
+      "reason": "Comparer la cadence du meilleur contrôle63 :hebdomadaire, bande25points pour filtrer les petites variations, mêmes cible20% et défense63/126. Les vérifications plus nombreuses et jours de fills sont publiés séparément.",
+      "schedule": "weekly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH"
+        ],
+        "defensive_ids": [
+          "ETF_GOLD",
+          "ETF_EURO_GOV"
+        ],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "vol_control",
+        "momentum_lookbacks": [
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1,
+          1
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "equal",
+        "fixed_weights": [],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.25,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          60
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.2,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    },
+    {
+      "number": 75,
+      "reason": "Voisin plus régulier du mélange65/35 protecteur42 :bande5points trimestrielle. Vérifier le risque et le gain net des rares rééquilibrages sans signal de tendance.",
+      "schedule": "quarterly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH",
+          "ETF_GOLD"
+        ],
+        "defensive_ids": [],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "balanced",
+        "momentum_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "fixed",
+        "fixed_weights": [
+          0.65,
+          0.35
+        ],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.05,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          60
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.0,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    },
+    {
+      "number": 76,
+      "reason": "Le mélange75/25 bande5points de69 reste qualifié. Vérifier mensuellement plutôt que trimestriellement pour isoler l'effet des dates de rééquilibrage, sans ajouter de filtre ou modifier les poids.",
+      "schedule": "monthly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH",
+          "ETF_GOLD"
+        ],
+        "defensive_ids": [],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "balanced",
+        "momentum_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "fixed",
+        "fixed_weights": [
+          0.75,
+          0.25
+        ],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.05,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          60
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.0,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    },
+    {
+      "number": 77,
+      "reason": "Même voisin de cadence pour le mélange70/30 bande5points de70 :mensuel. Comparer le rendement, la dérive du risque et le travail réellement demandé.",
+      "schedule": "monthly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH",
+          "ETF_GOLD"
+        ],
+        "defensive_ids": [],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "balanced",
+        "momentum_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "fixed",
+        "fixed_weights": [
+          0.7,
+          0.3
+        ],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.05,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          60
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.0,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    },
+    {
+      "number": 78,
+      "reason": "Budget inverse-volatilité sur technologie/or plutôt que Nasdaq/or, avec cadence trimestrielle, bande10points, sans cap ni filtre de momentum. Le secteur plus porteur peut-il conserver la protection du mélange inverse-vol ?",
+      "schedule": "quarterly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH",
+          "ETF_GOLD"
+        ],
+        "defensive_ids": [],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "balanced",
+        "momentum_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "inverse_vol",
+        "fixed_weights": [],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.1,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          60
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.0,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    },
+    {
+      "number": 79,
+      "reason": "Frontière de risque des mélanges toujours investis :60% technologie/40% or, bande15points trimestrielle. Le voisin65/35 reste supérieur au Nasdaq sur choix ; tester si davantage de défense peut encore préserver cette cible avec presque aucun trading.",
+      "schedule": "quarterly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH",
+          "ETF_GOLD"
+        ],
+        "defensive_ids": [],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "balanced",
+        "momentum_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "fixed",
+        "fixed_weights": [
+          0.6,
+          0.4
+        ],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.15,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          60
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.0,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    },
+    {
+      "number": 80,
+      "reason": "Dernier design autorisé :62,5% technologie/37,5% or, bande15points trimestrielle, voisin intermédiaire des poids60/40 et65/35. Publier le compromis de risque sans rechercher de poids fin après lecture du contrôle.",
+      "schedule": "quarterly",
+      "parameters": {
+        "core_id": "ETF_US_TECH",
+        "risky_ids": [
+          "ETF_US_TECH",
+          "ETF_GOLD"
+        ],
+        "defensive_ids": [],
+        "monetary_id": "ETF_MONETARY_EUR",
+        "mode": "balanced",
+        "momentum_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "momentum_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "trend_kind": "momentum",
+        "core_floor": 0.0,
+        "top_k": 1,
+        "allocation_mode": "fixed",
+        "fixed_weights": [
+          0.625,
+          0.375
+        ],
+        "absolute_filter": true,
+        "core_preference": 0.02,
+        "switch_buffer": 0.02,
+        "rebalance_band": 0.15,
+        "canary_ids": [],
+        "canary_lookbacks": [
+          21,
+          63,
+          126
+        ],
+        "canary_weights": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "canary_min_breadth": 0.5,
+        "volatility_windows": [
+          20,
+          60
+        ],
+        "volatility_floor": 0.05,
+        "target_volatility": 0.0,
+        "recovery_lookback": 0,
+        "recovery_threshold": 0.0,
+        "defensive_top_k": 1,
+        "monetary_lookback": 21,
+        "max_age_sessions": 1,
+        "strategy_id": "SA15_GPT-6.1_R4"
+      }
+    }
+  ],
+  "driver_sha256": "17a142becbc360b3ea61f49085ddf5f2eb634911bed184c86241335c6f4244e1"
+}

@@ -1,0 +1,51 @@
+# SA15_GPT-6.1 — protocole permanent des itérations par mécanismes
+
+Écrit le 16 octobre 2026 après la correction méthodologique du propriétaire. Ce document régit les nouvelles recherches qui le citent ; il ne réécrit ni les hypothèses, ni les résultats, ni les verdicts des séries R1 à R4. Il ne fixe pas un nouveau nombre d’itérations : le budget de la prochaine série et ses identifiants doivent être inscrits avant son premier calcul.
+
+## Question et contraintes stables
+
+Construire une règle quantitative exécutable qui cherche à dépasser le Nasdaq 100 acheté puis conservé, après frais, avec moins de drawdown et peu de transactions. Un meilleur Sharpe ne remplace pas la question de rendement. Un objectif de drawdown est une préférence de recherche, pas une garantie de perte maximale future.
+
+Le premier univers est stable : `ETF_NASDAQ`, cash EUR et éventuellement `ETF_MONETARY_EUR`. Aucun changement vers le secteur qui a le mieux performé pour sauver une règle. Ajouter ultérieurement un instrument exige une nouvelle hypothèse de mécanisme et une comparaison qui isole l’effet de cette extension. Aucun mélange permanent technologie/or n’est recherché par grille de pondérations.
+
+Décisions après toutes les clôtures à 23 h Europe/Paris ; exécution à l’ouverture négociable suivante selon les calendriers et les règles du moteur. Capital initial, lots, limite de levier nul, fiscalité exclue, frais, spread, slippage, calendrier, cadence et règles de disponibilité sont écrits avant calcul et identiques entre comparaisons. Les poids proviennent exclusivement des indicateurs disponibles au moment de la décision, de formules et de paramètres préalablement figés.
+
+## Cycle obligatoire de chaque itération
+
+1. **Hypothèse avant calcul.** Nommer le parent et le bloc ajouté, retiré ou remplacé ; donner sa formule, ses paramètres et son rôle économique. Inscrire ce qu’il devrait améliorer, le coût attendu de cette protection et l’observation qui le réfuterait. Une seule modification mécanistique à la fois ; les autres blocs, données, conditions et paramètres restent constants. Une correction d’erreur de code est identifiée séparément d’une innovation de stratégie.
+2. **Implémentation vérifiable.** Les signaux sont calculés sur des fenêtres strictement passées selon leur contrat. Tests sur exemple calculable, données manquantes, frontière et insensibilité aux valeurs futures. Un modèle estimé n’utilise que son historique disponible ; aucun ajustement ou normalisateur sur l’échantillon complet.
+3. **Backtests appariés réels.** Rejouer le candidat, son parent figé, le Nasdaq conservé et les ablations annoncées sur les mêmes séances, depuis le même cash initial, avec les mêmes données, amorces disponibles, règles d’exécution et coûts. Un parcours est continu, sans réinitialisation entre ses sous-périodes ; un contrôle de date de départ est au contraire un nouveau parcours depuis cash pour chaque règle et sa référence. Pas d’assemblage de meilleurs morceaux historiques. Les variantes sont aussi réellement rejouées aux frais doubles, sans changer leurs seuils.
+4. **Diagnostic de chaque bloc.** Publier les avantages et les inconvénients : rendement net et brut, CAGR, drawdown et durée sous le sommet, exposition, cash, volatilité, dates avec transactions, nombre d’ordres, rotation, frais et rejets. Examiner aussi les épisodes de réduction et de rétablissement d’exposition, les reprises manquées, les faux changements et les ordres causés par des signaux indisponibles. Conserver les mauvais résultats.
+5. **Décision motivée, puis itération suivante.** Garder, retirer ou remplacer le bloc à partir de ce diagnostic et de sa réfutation annoncée. Le prochain mécanisme répond à un défaut observé et quantifié. Il est enregistré avant son propre calcul. Rien n’impose qu’un bloc supplémentaire améliore le résultat ; simplifier une règle dont un bloc n’apporte rien est une conclusion valable.
+
+Chaque fiche comporte les raisons et empreintes de configuration, données et sources, les comparaisons attendues, les résultats, les limites et la décision. Le rapport distingue nombre de designs, nombre d’ablations et nombre total de simulations ; les contrôles n’effacent pas le coût de sélection. Les 80 configurations exploratoires antérieures restent déclarées.
+
+## Ablations : isoler un effet, pas raconter la courbe
+
+L’ablation d’un bloc est une stratégie complète dont ce seul bloc est désactivé ou remplacé par son contrôle neutre, suivant une convention écrite avant calcul. Elle est réellement simulée ; on ne retire pas a posteriori ses mauvais ordres de la courbe du candidat. Le contrôle neutre du dimensionnement de risque peut être une exposition de 100 % lorsque la direction l’autorise ; celui d’un filtre de direction peut être « direction toujours autorisée ». Le repli, la cadence et les coûts restent identiques.
+
+Pour un assemblage A+B, comparer au minimum A+B à A seul et B seul, ainsi qu’au contrôle sans les deux si la question porte sur leur interaction. Publier les différences de rendement et de drawdown, ainsi que les différences de transactions et de frais. Le gain marginal de B dans A+B peut différer de celui de B seul : les effets ne s’additionnent pas nécessairement. Ces simulations demeurent des contrôles annoncés et ne remplacent pas silencieusement le candidat après lecture.
+
+L’attribution comptable décrit d’où vient le résultat effectivement réalisé : gains/pertes des positions, cash et frais. Elle doit être réconciliée au patrimoine, ou être explicitement nommée approximation si les données ne permettent pas cette réconciliation. Une exposition moyenne ou un récit de quelques opérations ne démontre pas l’utilité d’un bloc. L’ablation mesure un effet contrefactuel dans le simulateur sous ses hypothèses ; elle ne prouve pas une causalité économique future.
+
+## Diagnostics de hausse, baisse et reprise
+
+Les régimes de diagnostic sont définis et figés avant le premier backtest de la série, puis appliqués à toutes les séances, pas seulement aux épisodes qui favorisent la règle. Convention initiale proposée à confirmer dans le contrat de série : à chaque décision, momentum Nasdaq sur 126 séances positif = hausse ; momentum 126 non positif et momentum 21 non positif = baisse ; momentum 126 non positif et momentum 21 positif = reprise. Une donnée manquante crée une catégorie indisponible distincte. Ces fenêtres de diagnostic sont constantes et ne deviennent pas des seuils optimisés ni des ordres de trading.
+
+Pour chaque régime et chaque bloc, publier effectif de séances, exposition réalisée, rendement actif apparié, transactions et coûts. Utiliser la classification connue lors de la décision pour analyser le rendement effectivement accessible après exécution, en respectant son décalage ; ne pas affecter rétrospectivement les poids de ce soir au rendement déjà réalisé aujourd’hui. Présenter toutes les entrées/sorties d’exposition et leurs délais, sans choisir seulement les meilleurs krachs ou rebonds. Les catégories ne produisent pas des parcours composites investissables.
+
+Une cible de volatilité n’est pas un détecteur de hausse : sans levier, `min(1, cible / volatilité estimée)` autorise 100 % lorsque l’estimation de risque le permet. Après un choc, elle peut rester réduite pendant la reprise. Une nouvelle règle de reprise doit mesurer séparément la hausse récupérée, la protection abandonnée et les faux retours en période baissière.
+
+## Qualité des données et interventions
+
+Auditer avant sélection la complétude des fenêtres réellement demandées. R4 a montré que deux barres manquantes pouvaient invalider plusieurs fenêtres 20/60 et déclencher de longues sorties : ce n’est pas un signal économique de volatilité élevée. Aucun prix n’est inventé et aucun trou n’est comblé pour améliorer une courbe. Le comportement en cas d’entrée indisponible est explicite, figé et testé ; le journal distingue information manquante, réduction volontaire du risque et rejet d’exécution. Une analyse de sensibilité des données reste un diagnostic annoncé, jamais une réparation opportuniste après lecture des gains.
+
+Le nombre de contrôles de signaux et le nombre de dates avec transactions sont publiés séparément. Une bande, un tampon ou une cadence lente peut réduire les ordres et retarder une reprise : mesurer les deux. Ne pas rechercher par grille la bande, la cadence, le seuil ou l’horizon qui maximise le patrimoine passé. Si un voisinage de paramètres est requis par `research/PROTOCOL.md`, le fixer avant calcul, le publier comme sensibilité et ne pas s’en servir pour couronner le point le plus favorable. Tout changement ultérieur est une nouvelle hypothèse comptée, motivée par le mécanisme.
+
+## Limite de validation et conclusion
+
+L’histoire 2019–2026 a déjà été explorée. Des sous-périodes chronologiques, des départs décalés, des ablations, un bootstrap et des frais doubles améliorent la compréhension et peuvent réfuter une idée ; ils ne rendent pas ces données vierges. Ajuster un mécanisme au fil des résultats reste de la recherche rétrospective et peut surajuster, même sans rechercher directement des poids.
+
+Un modèle complexe, notamment GARCH ou réseau neuronal, doit battre son contrôle simple avec les mêmes entrées, fenêtre d’information et exécution. Une meilleure prévision statistique ne suffit pas si le portefeuille n’en tire pas un avantage économique net. Aucun modèle complexe n’est ajouté seulement pour multiplier les essais.
+
+Le verdict répond à l’hypothèse enregistrée et tient compte des coûts, de la qualité des données, du nombre d’essais et de la stabilité du résultat. Une règle qui ne bat pas le Nasdaq sur les comparaisons annoncées n’est pas présentée comme ayant rempli cet objectif. Une proposition éventuellement conservée doit ensuite être figée avant une observation future indépendante, avec un nouveau départ effectivement disponible, des journaux d’ordres et de décisions, sans antidater sa disponibilité et sans la modifier au vu de cette observation. Les règles de durée et de lecture de `research/PROTOCOL.md` restent applicables.

@@ -1,0 +1,133 @@
+{
+  "strategy_id": "SA15_GPT-6.1_R3",
+  "class": "quant_backtester.strategies.SA15_gpt61_nasdaq.SA15NasdaqAdaptive",
+  "parameters": {
+    "core_id": "ETF_NASDAQ",
+    "defensive_ids": [
+      "ETF_GOLD",
+      "ETF_SP500_PEA"
+    ],
+    "monetary_id": "ETF_MONETARY_EUR",
+    "guard_mode": "momentum",
+    "trend_sessions": 0,
+    "fast_lookback": 10,
+    "slow_lookback": 126,
+    "fast_entry_threshold": -0.04,
+    "slow_entry_threshold": 0.0,
+    "recovery_threshold": 0.0,
+    "core_floor": 0.5,
+    "defensive_lookbacks": [
+      63,
+      126
+    ],
+    "defensive_weights": [
+      1.0,
+      1.0
+    ],
+    "top_k": 1,
+    "switch_buffer": 0.02,
+    "rebalance_band": 0.08,
+    "relative_rotation": false,
+    "relative_threshold": 0.02,
+    "monetary_lookback": 21,
+    "max_age_sessions": 1,
+    "strategy_id": "SA15_GPT-6.1_R3"
+  },
+  "signals": [
+    {
+      "signal": {
+        "type": "EndpointMomentumSignal",
+        "lookback_sessions": 10,
+        "skip_recent_sessions": 0,
+        "price_basis": "ADJUSTED",
+        "bar_field": "close",
+        "max_age_sessions": 1,
+        "window_mode": "AVAILABLE_OBSERVATIONS",
+        "endpoint_mode": "EXACT_VENUE_SESSION_OFFSETS",
+        "endpoint_session_offsets": [
+          10,
+          0
+        ],
+        "observations_consumed": 2,
+        "freshness_anchor": "LATEST_EXPECTED_AVAILABLE_VENUE_CLOSE",
+        "freshness_loader_observations": 2,
+        "unit": "FRACTION"
+      },
+      "instruments": [
+        "ETF_NASDAQ"
+      ]
+    },
+    {
+      "signal": {
+        "type": "EndpointMomentumSignal",
+        "lookback_sessions": 126,
+        "skip_recent_sessions": 0,
+        "price_basis": "ADJUSTED",
+        "bar_field": "close",
+        "max_age_sessions": 1,
+        "window_mode": "AVAILABLE_OBSERVATIONS",
+        "endpoint_mode": "EXACT_VENUE_SESSION_OFFSETS",
+        "endpoint_session_offsets": [
+          126,
+          0
+        ],
+        "observations_consumed": 2,
+        "freshness_anchor": "LATEST_EXPECTED_AVAILABLE_VENUE_CLOSE",
+        "freshness_loader_observations": 2,
+        "unit": "FRACTION"
+      },
+      "instruments": [
+        "ETF_NASDAQ",
+        "ETF_GOLD",
+        "ETF_SP500_PEA"
+      ]
+    },
+    {
+      "signal": {
+        "type": "EndpointMomentumSignal",
+        "lookback_sessions": 63,
+        "skip_recent_sessions": 0,
+        "price_basis": "ADJUSTED",
+        "bar_field": "close",
+        "max_age_sessions": 1,
+        "window_mode": "AVAILABLE_OBSERVATIONS",
+        "endpoint_mode": "EXACT_VENUE_SESSION_OFFSETS",
+        "endpoint_session_offsets": [
+          63,
+          0
+        ],
+        "observations_consumed": 2,
+        "freshness_anchor": "LATEST_EXPECTED_AVAILABLE_VENUE_CLOSE",
+        "freshness_loader_observations": 2,
+        "unit": "FRACTION"
+      },
+      "instruments": [
+        "ETF_GOLD",
+        "ETF_SP500_PEA"
+      ]
+    },
+    {
+      "signal": {
+        "type": "EndpointMomentumSignal",
+        "lookback_sessions": 21,
+        "skip_recent_sessions": 0,
+        "price_basis": "ADJUSTED",
+        "bar_field": "close",
+        "max_age_sessions": 1,
+        "window_mode": "AVAILABLE_OBSERVATIONS",
+        "endpoint_mode": "EXACT_VENUE_SESSION_OFFSETS",
+        "endpoint_session_offsets": [
+          21,
+          0
+        ],
+        "observations_consumed": 2,
+        "freshness_anchor": "LATEST_EXPECTED_AVAILABLE_VENUE_CLOSE",
+        "freshness_loader_observations": 2,
+        "unit": "FRACTION"
+      },
+      "instruments": [
+        "ETF_MONETARY_EUR"
+      ]
+    }
+  ]
+}

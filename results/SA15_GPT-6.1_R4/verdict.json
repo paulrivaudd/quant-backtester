@@ -1,0 +1,12 @@
+{
+  "status": "NOT_SUPPORTED",
+  "benchmark": "Nasdaq_buy_hold",
+  "reasons": [
+    "pas de surperformance nette du Nasdaq sur contrôle chronologique"
+  ],
+  "full_excess_total_return": 0.5169046901683423,
+  "final_excess_total_return": -0.1523961809604768,
+  "stressed_full_excess_vs_standard_nasdaq": 0.4106557115516667,
+  "stressed_final_excess_vs_standard_nasdaq": -0.16682360519243722,
+  "selected_trial": 71
+}

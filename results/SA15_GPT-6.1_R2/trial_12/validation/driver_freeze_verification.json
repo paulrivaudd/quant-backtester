@@ -1,0 +1,6 @@
+{
+  "original_preserved": "/home/anakin78/projects/quant-backtester/results/SA15_GPT-6.1_R2/trial_12/original_before_driver_freeze/validation",
+  "metrics_identical": true,
+  "equity_bytes_identical": true,
+  "purpose": "Driver cache fingerprint was extended; no policy or parameters changed"
+}

@@ -1,0 +1,14 @@
+{
+  "status": "NOT_SUPPORTED",
+  "reasons": [
+    "complete policy does not beat Nasdaq on full",
+    "complete policy does not beat Nasdaq on control"
+  ],
+  "risk_and_intervention_targets_met": false,
+  "main_policy": "full",
+  "ablations_are_not_candidates_for_replacement": true,
+  "previous_trials": 80,
+  "policies_examined": 5,
+  "cumulative_trials_declared": 85,
+  "base_simulations": 30
+}

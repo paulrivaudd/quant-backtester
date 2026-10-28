@@ -1,0 +1,8 @@
+{
+  "annualised_mean_active_return": 0.007436561782605741,
+  "lower_95": -0.07256595422290427,
+  "upper_95": 0.0844679605086346,
+  "seed": 61152,
+  "block_sessions": 20,
+  "replications": 2000
+}

@@ -1,0 +1,11 @@
+{
+  "id": "M14",
+  "decision": "Rejeter la correction comme nouveau parent principal : elle améliore un épisode défensif et le drawdown, mais détériore la croissance et augmente les interventions. Revenir à la branche M10 pour le prochain défaut distinct.",
+  "findings": [
+    "M14 donne un CAGR de 22,242 %, un drawdown de 24,063 % et 23 dates d’ordres, contre 22,483 %, 24,490 % et 19 dates pour M13. Le respect des sorties défensives évite 0,427 point de drawdown, mais coûte 0,241 point de CAGR, quatre dates et 118,14 EUR de frais supplémentaires. La dégradation de CAGR demeure de 0,251 point aux frais doubles.",
+    "Le rendement actif moyen pendant les baisses s’améliore de −4,994 à −2,415 points de base par jour, et le cash dans ce régime remonte de 0,12 % à 19,57 %. Toutefois, le rendement actif en reprise se dégrade de −1,861 à −3,104 points de base par jour. La durée maximale sous le sommet s’allonge encore, de 532 à 550 séances. Corriger un épisode ne suffit pas à améliorer le portefeuille complet.",
+    "La défense ajoute 1,351 point de CAGR contre son ablation cash, mais coûte 0,694 point de drawdown et quatre dates. La bande coûte 0,072 point de CAGR contre off, évite seulement une date et réduit le drawdown de 0,143 point. La tendance coûte 1,634 point de CAGR pour 6,986 points de drawdown évités. Les résultats M13 et M14 montrent les limites du choix obligataire et de son interaction avec l’exécution."
+  ],
+  "next_defect": "Sur M10, qui reste la branche la plus proche du Nasdaq avec moins de drawdown, les reprises restent sous-exposées et les anciens retours sur momentum court ont produit des faux signaux. Tester une reprise exigeant un nouveau plus haut observable, sans modifier le consensus ni le cap.",
+  "completed_sha256": "3e5ea7def66bf159a32de7af156aa11730a55f8be53de89938175d9d102728de"
+}

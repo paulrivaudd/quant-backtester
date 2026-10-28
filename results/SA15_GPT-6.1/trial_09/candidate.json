@@ -1,0 +1,8 @@
+{
+  "number": 9,
+  "reason": "L'hebdomadaire avec coeur50% (essai8) donne enfin le meilleur score, mais l'écart est faible. Tester son voisin coeur25% pour vérifier si un coeur plus modeste conserve la hausse tout en améliorant le développement.",
+  "schedule": "weekly",
+  "parameters": {
+    "core_fraction": 0.25
+  }
+}

@@ -1,0 +1,63 @@
+{
+    "number":  60,
+    "reason":  "Canary plus préventive sur une exposition technologie graduelle21/63/126 :coeur50%, reprise21séances, or défensif, risque tactique seulement si World/émergents/obligations sont tous positifs sur21/63. Mensuel ; une reprise ne contourne pas la canary.",
+    "schedule":  "monthly",
+    "parameters":  {
+                       "core_id":  "ETF_US_TECH",
+                       "risky_ids":  [
+                                         "ETF_US_TECH"
+                                     ],
+                       "defensive_ids":  [
+                                             "ETF_GOLD"
+                                         ],
+                       "monetary_id":  "ETF_MONETARY_EUR",
+                       "mode":  "ensemble",
+                       "momentum_lookbacks":  [
+                                                  21,
+                                                  63,
+                                                  126
+                                              ],
+                       "momentum_weights":  [
+                                                1.0,
+                                                1.0,
+                                                1.0
+                                            ],
+                       "trend_kind":  "momentum",
+                       "core_floor":  0.5,
+                       "top_k":  1,
+                       "allocation_mode":  "equal",
+                       "fixed_weights":  [
+
+                                         ],
+                       "absolute_filter":  true,
+                       "core_preference":  0.02,
+                       "switch_buffer":  0.02,
+                       "rebalance_band":  0.1,
+                       "canary_ids":  [
+                                          "ETF_WORLD",
+                                          "ETF_EMERGING",
+                                          "ETF_EURO_GOV"
+                                      ],
+                       "canary_lookbacks":  [
+                                                21,
+                                                63
+                                            ],
+                       "canary_weights":  [
+                                              1,
+                                              1
+                                          ],
+                       "canary_min_breadth":  1,
+                       "volatility_windows":  [
+                                                  20,
+                                                  60
+                                              ],
+                       "volatility_floor":  0.05,
+                       "target_volatility":  0.0,
+                       "recovery_lookback":  21,
+                       "recovery_threshold":  0.0,
+                       "defensive_top_k":  1,
+                       "monetary_lookback":  21,
+                       "max_age_sessions":  1,
+                       "strategy_id":  "SA15_GPT-6.1_R4"
+                   }
+}

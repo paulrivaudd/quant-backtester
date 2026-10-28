@@ -1,0 +1,2 @@
+session_date,instrument_id,reason,side,requested_quantity
+2020-01-03,ETF_GOLD,INSUFFICIENT_CASH,BUY,29.0

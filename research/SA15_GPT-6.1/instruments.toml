@@ -1,0 +1,88 @@
+# Additional instruments isolated to SA15_GPT-6.1; the main registry stays unchanged.
+# Yahoo snapshots are restated provider histories, assumed unchanged only after
+# split checks. No independent historical cross-check is available for these.
+
+[[instrument]]
+id = "ETF_NASDAQ"
+name = "iShares NASDAQ 100 UCITS ETF USD (Acc), traded EUR"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "SXRV.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2014-01-02
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Existing share class, archive starts at the committed Xetra calendar in 2014. EUR listing of an unhedged USD fund; USD currency exposure remains. Yahoo split-checked, single source, restated historical provider snapshot."
+
+[[instrument]]
+id = "ETF_EMERGING"
+name = "iShares Core MSCI Emerging Markets IMI UCITS ETF USD (Acc), traded EUR"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "IS3N.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+# Yahoo's 2014-06-11 row is flat with no volume, preceding its first real bar.
+first_session = 2014-06-12
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "First available real Yahoo bar 2014-06-12, after a zero-volume flat row on 2014-06-11. EUR listing; unhedged currency exposure. Yahoo split-checked, single source, restated historical provider snapshot."
+
+[[instrument]]
+id = "ETF_GOLD"
+name = "Xetra-Gold physically backed gold ETC (not a UCITS ETF)"
+# The framework has no ETC enum: ETF here selects exchange-traded security
+# validation and corporate-action handling; the security remains an ETC.
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "4GLD.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2014-01-02
+# No income distribution; ACCUMULATING is the framework's no-cash-income rule.
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Physically backed bearer debt ETC, not a diversified UCITS ETF, with issuer/custody/legal and physical delivery risks. Archive starts at committed Xetra calendar 2014. Yahoo split-checked, single source, restated provider snapshot."
+
+[[instrument]]
+id = "ETF_EURO_GOV"
+name = "Xtrackers II Global Government Bond UCITS ETF 1C EUR hedged"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+# DWS official market mnemonic. The official XGSH RIC is unknown to Yahoo.
+source_symbol = "DBZB.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2014-01-02
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Global government bonds, EUR hedged, not eurozone-only bonds. Internal id retained as the defensive bond sleeve. Archive starts at committed Xetra calendar in 2014. Yahoo split-checked, single source, restated provider snapshot."
+
+[[instrument]]
+id = "ETF_COMMODITY"
+name = "Xtrackers Bloomberg Commodity Swap UCITS ETF 1C"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "XDBC.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2014-01-02
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Synthetic commodity futures exposure with roll and collateral returns; EUR listing is not EUR hedging. Benchmark changed on 2021-05-21: the historical return series spans two index methodologies. Archive starts at committed Xetra calendar 2014. Yahoo split-checked, single source, restated provider snapshot."

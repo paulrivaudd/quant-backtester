@@ -1,0 +1,287 @@
+{
+  "policy": "volatility_only",
+  "role": "matched_control",
+  "blocks": {
+    "trend_ma200": false,
+    "volatility_cap_20pct": true
+  },
+  "period": "choice",
+  "start": "2019-06-03",
+  "end": "2024-12-31",
+  "cash_restart": true,
+  "cost_multiplier": 2.0,
+  "universe": [
+    "ETF_NASDAQ",
+    "ETF_MONETARY_EUR"
+  ],
+  "schedule": {
+    "type": "MonthlyFromStart",
+    "parameters": {
+      "initial_decision": true
+    }
+  },
+  "strategy": {
+    "strategy_id": "SA15_GPT-6.1_mechanism_pilot",
+    "class": "quant_backtester.strategies.SA15_gpt61_riskaware.SA15RiskAwareRotation",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "risky_ids": [
+        "ETF_NASDAQ"
+      ],
+      "defensive_ids": [],
+      "monetary_id": "ETF_MONETARY_EUR",
+      "mode": "vol_control",
+      "momentum_lookbacks": [
+        200
+      ],
+      "momentum_weights": [
+        1.0
+      ],
+      "trend_kind": "moving_average",
+      "core_floor": 0.0,
+      "top_k": 1,
+      "allocation_mode": "equal",
+      "fixed_weights": [],
+      "absolute_filter": true,
+      "core_preference": 0.0,
+      "switch_buffer": 0.0,
+      "rebalance_band": 0.1,
+      "canary_ids": [],
+      "canary_lookbacks": [
+        21,
+        63,
+        126
+      ],
+      "canary_weights": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "canary_min_breadth": 0.5,
+      "volatility_windows": [
+        20,
+        60
+      ],
+      "volatility_floor": 0.05,
+      "target_volatility": 0.2,
+      "recovery_lookback": 0,
+      "recovery_threshold": 0.0,
+      "defensive_top_k": 1,
+      "monetary_lookback": 21,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_mechanism_pilot"
+    },
+    "signals": [
+      {
+        "signal": {
+          "type": "EndpointMomentumSignal",
+          "lookback_sessions": 1,
+          "skip_recent_sessions": 0,
+          "price_basis": "ADJUSTED",
+          "bar_field": "close",
+          "max_age_sessions": 1,
+          "window_mode": "AVAILABLE_OBSERVATIONS",
+          "endpoint_mode": "EXACT_VENUE_SESSION_OFFSETS",
+          "endpoint_session_offsets": [
+            1,
+            0
+          ],
+          "observations_consumed": 2,
+          "freshness_anchor": "LATEST_EXPECTED_AVAILABLE_VENUE_CLOSE",
+          "freshness_loader_observations": 2,
+          "unit": "FRACTION"
+        },
+        "instruments": [
+          "ETF_NASDAQ"
+        ]
+      },
+      {
+        "signal": {
+          "type": "RealizedVolatilitySignal",
+          "window_returns": 20,
+          "annualization": 252,
+          "logarithmic": true,
+          "ddof": 1,
+          "bar_field": "close",
+          "price_basis": "ADJUSTED",
+          "max_age_sessions": 1,
+          "window_mode": "CONSECUTIVE_SESSIONS",
+          "unit": "ANNUALIZED_VOLATILITY"
+        },
+        "instruments": [
+          "ETF_NASDAQ"
+        ]
+      },
+      {
+        "signal": {
+          "type": "RealizedVolatilitySignal",
+          "window_returns": 60,
+          "annualization": 252,
+          "logarithmic": true,
+          "ddof": 1,
+          "bar_field": "close",
+          "price_basis": "ADJUSTED",
+          "max_age_sessions": 1,
+          "window_mode": "CONSECUTIVE_SESSIONS",
+          "unit": "ANNUALIZED_VOLATILITY"
+        },
+        "instruments": [
+          "ETF_NASDAQ"
+        ]
+      },
+      {
+        "signal": {
+          "type": "EndpointMomentumSignal",
+          "lookback_sessions": 21,
+          "skip_recent_sessions": 0,
+          "price_basis": "ADJUSTED",
+          "bar_field": "close",
+          "max_age_sessions": 1,
+          "window_mode": "AVAILABLE_OBSERVATIONS",
+          "endpoint_mode": "EXACT_VENUE_SESSION_OFFSETS",
+          "endpoint_session_offsets": [
+            21,
+            0
+          ],
+          "observations_consumed": 2,
+          "freshness_anchor": "LATEST_EXPECTED_AVAILABLE_VENUE_CLOSE",
+          "freshness_loader_observations": 2,
+          "unit": "FRACTION"
+        },
+        "instruments": [
+          "ETF_MONETARY_EUR"
+        ]
+      }
+    ]
+  },
+  "parameters": {
+    "core_id": "ETF_NASDAQ",
+    "risky_ids": [
+      "ETF_NASDAQ"
+    ],
+    "defensive_ids": [],
+    "monetary_id": "ETF_MONETARY_EUR",
+    "mode": "vol_control",
+    "momentum_lookbacks": [
+      200
+    ],
+    "momentum_weights": [
+      1.0
+    ],
+    "trend_kind": "moving_average",
+    "core_floor": 0.0,
+    "top_k": 1,
+    "allocation_mode": "equal",
+    "fixed_weights": [],
+    "absolute_filter": true,
+    "core_preference": 0.0,
+    "switch_buffer": 0.0,
+    "rebalance_band": 0.1,
+    "canary_ids": [],
+    "canary_lookbacks": [
+      21,
+      63,
+      126
+    ],
+    "canary_weights": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "canary_min_breadth": 0.5,
+    "volatility_windows": [
+      20,
+      60
+    ],
+    "volatility_floor": 0.05,
+    "target_volatility": 0.2,
+    "recovery_lookback": 0,
+    "recovery_threshold": 0.0,
+    "defensive_top_k": 1,
+    "monetary_lookback": 21,
+    "max_age_sessions": 1,
+    "strategy_id": "SA15_GPT-6.1_mechanism_pilot"
+  },
+  "fingerprint": "9e6dcc571d21c09a30ec313d20498149bfc6e55459821863e7c4ddb052c6a605",
+  "data_state": {
+    "digest": "ed884c0bf3cf770d42abe4953ae76e757db7c623b784569b2ee7d9214a19c862",
+    "files": {
+      "clean/applied_fetches.parquet": "b187b4954a544efba907edfc3a73598c3585c30a939af84fd5c32b6740878d08",
+      "clean/bars/ETF_COMMODITY.parquet": "4f280974510b03005669684e5afe9fbd69657d5f1d3cfdea4b5dbabb52f0e70a",
+      "clean/bars/ETF_EMERGING.parquet": "99df28d9e78393727f447775aa81875904fba537412ee9bff5ad19baf66eaea5",
+      "clean/bars/ETF_EURO_GOV.parquet": "d99a4d0530fec59919204759b58e28ca11b62fc9fb496aa1556c51877fa50b13",
+      "clean/bars/ETF_GOLD.parquet": "846ea0fec25cbca7450f3426ac2cf09b4a547649174efc5d3647227d6e2d5438",
+      "clean/bars/ETF_MONETARY_EUR.parquet": "9d9e1188b0406886211fde82cb9ce13e1e324303905b27f0d83f9f74a1499a52",
+      "clean/bars/ETF_NASDAQ.parquet": "668b7d4604b7cf6652a052563767f8b6c8b55e7162b94d7f65d8a2abb552b182",
+      "clean/bars/ETF_SP500_PEA.parquet": "fecbbb2b95191e0973e63e70069f3877ca1ffe52b24d7838e3474ce314317da1",
+      "clean/bars/ETF_US_TECH.parquet": "9cee776de7308c973891dd054d9160f0643154f217ca180e572f7b8b7bfacd6b",
+      "clean/bars/ETF_WORLD.parquet": "21131129624713c6d331ae0d725740b2c7c1960ec7f0dccd7776c6a599f97cc3",
+      "clean/bars/ETF_WORLD_HEALTH.parquet": "9a3477ff326160565662103ee9c24e776d580bafa392ae4cd9afdc2187260a3f",
+      "clean/bars/ETF_WORLD_UTILITIES.parquet": "0b193f5e161d5c7f53a88a12d3efae0a6acefc848eba62b4e9ca5db16f747922",
+      "clean/bars/SP500.parquet": "1cf030f8e2487dfaad36b954cf7fa097712009c431a04db0a049a5f596ed5583",
+      "clean/check_bars/EURONEXT/ETF_SP500_PEA.parquet": "52a8b13e2b262887f6acd2f5560d7cde7b848dd42503c86bf0f7e56cba38f995",
+      "clean/check_bars/EURONEXT/ETF_WORLD.parquet": "584062daf4ccdf13cc9dcaa7c29d13cf146a95accdd1c8c692aa635da73971a6",
+      "clean/checked_bars/ETF_COMMODITY.parquet": "b69cb6d0301a00a7b091f7bedae16d94e5e7d7bfc777b4121730fba04991e907",
+      "clean/checked_bars/ETF_EMERGING.parquet": "61a4bcde3e27011d91d8a7af3faf5c23c537ec8d7b90a8ca8fb8a27e3ff4d370",
+      "clean/checked_bars/ETF_EURO_GOV.parquet": "fab94b0a788c70563335fb968aa6a1720403efa9aede73bacb79da10888a8dba",
+      "clean/checked_bars/ETF_GOLD.parquet": "c0ed7bb69650f506c2cf2b8566e41770eebcdfd47408063e4c14032673d28e57",
+      "clean/checked_bars/ETF_MONETARY_EUR.parquet": "c5524a0a167f52ebcb09a93bf670a92a405e0ec7d0198b36b4ad4d1cd339c440",
+      "clean/checked_bars/ETF_NASDAQ.parquet": "421f073e7e374d3f71f7026af877e5b13cb1f3887caf4e854c8a194dfde82127",
+      "clean/checked_bars/ETF_SP500_PEA.parquet": "b4badbc8bf8b7790286c47d66f3278017f175abfb2ce969df9f1cc6b1a48b4dd",
+      "clean/checked_bars/ETF_US_TECH.parquet": "2d4e8f01dc12df984ca4e89cc2da4cc4183ccaf90f40b99c7d8b8f3b8d62eb51",
+      "clean/checked_bars/ETF_WORLD.parquet": "f69f3baf31e7a5300854edefc99a886c1389758463ad03c1e1716d9812ad3228",
+      "clean/checked_bars/ETF_WORLD_HEALTH.parquet": "f8f924a9e3c05c4da4bf2bd7ae2ad8b33b4172731550ee03a6421466f9124d23",
+      "clean/checked_bars/ETF_WORLD_UTILITIES.parquet": "f115b9067ff71013e51af26c9c584357a8016270b5f88b297c31ca1cf511351b",
+      "clean/checked_bars/SP500.parquet": "1bbdb3d0ccdddb0019b1e5e3bb269894bfef0c8089b68d41b15885e384e94b17",
+      "clean/corporate_actions.parquet": "1123f91743c647f2e0134169d606394c7c5f023f4d6abb5e6e395f6bd5b130a7",
+      "clean/levels/US10Y.parquet": "a12e93db329ddf2fa3fbf659d7190cb37abcc3907b6355694ecfcbebecefe786",
+      "clean/levels/VIX.parquet": "d85fde443746ff0d7fbf96f05229ef6f1d0ff7ecff35a845f347c3095bf8193f",
+      "metadata/accepted_revisions.toml": "a816861482eecd15a9b4307e74e84f065937fee36ef2cf40487826e5a853c64b",
+      "metadata/bar_corrections.toml": "06cfb7d1a197ac67d6ac80611190b21f03e8f41dd3a35d2a3cf4c74757f764a9",
+      "metadata/calendars/XETR.toml": "478f8df8601115c2a151c59752290e0d4f5024a478cfd706e20e2863cd5488ee",
+      "metadata/calendars/XNYS.toml": "197754463b32d7782e37876fb3c000e91ef3544123fca3dbf31c00eeff2d7531",
+      "metadata/calendars/XPAR.toml": "c0128a652b97227bfd7d5d92d0e9dd821c3f4fc8e036fc3f000e72376deca546",
+      "metadata/conflict_reviews.toml": "1ffe15b5fac193659ae43ca94c98356a50cef544ec6eb91ed6e5c0af2ccd0245",
+      "metadata/corporate_actions.toml": "0dd07f6fa16d4386406ea6b91c78fc20e3e6ce948c9f4281040670954da7a172",
+      "metadata/crosscheck.toml": "5ee6a396a5d9b7c602ebc18b05c15f8575cedf2c78bdb928533135af1297f5e2",
+      "metadata/instruments.toml": "ca464368208fd9f8a45c0cdccfd964edbff57cf49010a7723fe3b287b020cafc",
+      "metadata/known_gaps.toml": "e8c184831b614c8fb311d047b497a179ab75b64d8c84465aa482aced698a201b",
+      "metadata/universes.toml": "d28364d350a803cf2e7779691505ed5c8010a98d43ee928b0d2a8d0f0e3dca8b"
+    }
+  },
+  "execution": {
+    "fill_model": "DECISION_CLOSE_QUANTITIES",
+    "fill": "market order at the opening auction, sized at its price",
+    "costs": {
+      "commission_rate": 0.001,
+      "minimum_commission": 2.0,
+      "half_spread_rate": 0.0006,
+      "slippage_rate": 0.0004
+    },
+    "minimum_trade_value": 0.0
+  },
+  "initial_cash": 100000.0,
+  "base_currency": "EUR",
+  "reference_calendar": "XPAR",
+  "timetable": {
+    "decision_time": "23:00:00",
+    "execution_time": "09:01:00",
+    "valuation_time": "23:00:00",
+    "timezone": "Europe/Paris",
+    "execution": {
+      "field": "open",
+      "session_offset": 1
+    }
+  },
+  "analytics": {
+    "sessions_per_year": 252,
+    "risk_free_rate": 0.0,
+    "minimum_sessions": 60
+  },
+  "portfolio_limits": {
+    "max_weight_per_instrument": 1.0,
+    "max_gross": 1.0,
+    "long_only": true,
+    "applies_to": "target weights, before costs"
+  }
+}

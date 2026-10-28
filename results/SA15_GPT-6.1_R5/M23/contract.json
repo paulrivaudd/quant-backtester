@@ -1,0 +1,285 @@
+{
+  "id": "M23",
+  "candidate": {
+    "id": "M23",
+    "parent": "M22",
+    "reason": "M22 conserve une bonne protection mais compte encore neuf dates de plus que son ablation du risque. Remplacer uniquement hold_defense par asymmetric : les petites augmentations de cible attendent la bande d’entrée fixe de 20 points, tandis que les réductions utilisent la bande fixe de 5 points.",
+    "changed_block": "execution",
+    "expected_benefit": "Éviter des réinvestissements intermédiaires quand la volatilité se détend par petits pas, tout en répondant plus vite aux nouvelles réductions de risque ; aucune recherche de bande optimale n’est conduite.",
+    "expected_cost": "Une réentrée retardée peut manquer la hausse et les réductions plus sensibles peuvent multiplier les ordres. Le remplacement abandonne aussi le maintien d’une défense quand seul son classement change ; des rotations défensives supplémentaires sont possibles.",
+    "refutation": "Les interventions ne baissent pas ou la croissance perdue ne justifie pas la protection ; publier tous les effets, y compris ceux des sorties de défense. Les bandes numériques restent celles inscrites avant M01.",
+    "schedule": "monthly",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "monetary_id": "ETF_MONETARY_EUR",
+      "gold_id": "ETF_GOLD",
+      "government_id": "ETF_EURO_GOV",
+      "canary_ids": [
+        "ETF_WORLD",
+        "ETF_EMERGING"
+      ],
+      "trend_rule": "momentum",
+      "risk_rule": "trend_relief",
+      "recovery_rule": "off",
+      "shock_rule": "drawdown",
+      "confirmation_rule": "off",
+      "defensive_rule": "gold_momentum",
+      "execution_rule": "asymmetric",
+      "fast_sessions": 21,
+      "medium_sessions": 63,
+      "slow_sessions": 126,
+      "ma_fast_sessions": 50,
+      "ma_slow_sessions": 200,
+      "vol_fast_returns": 20,
+      "vol_slow_returns": 60,
+      "target_volatility": 0.2,
+      "volatility_floor": 0.05,
+      "partial_exposure": 0.5,
+      "risk_relief_floor": 0.75,
+      "drawdown_sessions": 63,
+      "near_high_threshold": -0.02,
+      "shock_loss_threshold": -0.08,
+      "shock_drawdown_threshold": -0.1,
+      "defensive_sessions": 63,
+      "monetary_sessions": 21,
+      "rebalance_band": 0.1,
+      "entry_band": 0.2,
+      "reduction_band": 0.05,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R5"
+    }
+  },
+  "parent": {
+    "id": "M22",
+    "parent": "M21",
+    "reason": "M21 réduit le drawdown mais coûte un point de CAGR et dix dates ; quatre décisions restent sous 75 % Nasdaq malgré MA50 et momentum21 positifs, notamment avril et mai 2020. Remplacer uniquement cap_max par trend_relief : conserver le cap normal, mais relever son facteur au plancher fixe de 75 % quand ces deux confirmations sont positives.",
+    "changed_block": "risk",
+    "expected_benefit": "Rétablir une exposition significative dans une reprise confirmée sans attendre que la volatilité longue ait entièrement baissé, et limiter des petits ajustements de risque pendant cette phase.",
+    "expected_cost": "Relâcher le cap quand des prix remontent peut perdre davantage dans un faux rebond. Le plancher de 75 % est une constante numérique figée avant M01, pas un poids optimisé pour une date ni une allocation permanente.",
+    "refutation": "Le rendement de reprise récupéré ne compense pas le drawdown ou les interventions supplémentaires, ou l’avance nette sur Nasdaq reste trop fragile. Aucun voisinage de planchers ou de seuils n’est recherché.",
+    "schedule": "monthly",
+    "parameters": {
+      "core_id": "ETF_NASDAQ",
+      "monetary_id": "ETF_MONETARY_EUR",
+      "gold_id": "ETF_GOLD",
+      "government_id": "ETF_EURO_GOV",
+      "canary_ids": [
+        "ETF_WORLD",
+        "ETF_EMERGING"
+      ],
+      "trend_rule": "momentum",
+      "risk_rule": "trend_relief",
+      "recovery_rule": "off",
+      "shock_rule": "drawdown",
+      "confirmation_rule": "off",
+      "defensive_rule": "gold_momentum",
+      "execution_rule": "hold_defense",
+      "fast_sessions": 21,
+      "medium_sessions": 63,
+      "slow_sessions": 126,
+      "ma_fast_sessions": 50,
+      "ma_slow_sessions": 200,
+      "vol_fast_returns": 20,
+      "vol_slow_returns": 60,
+      "target_volatility": 0.2,
+      "volatility_floor": 0.05,
+      "partial_exposure": 0.5,
+      "risk_relief_floor": 0.75,
+      "drawdown_sessions": 63,
+      "near_high_threshold": -0.02,
+      "shock_loss_threshold": -0.08,
+      "shock_drawdown_threshold": -0.1,
+      "defensive_sessions": 63,
+      "monetary_sessions": 21,
+      "rebalance_band": 0.1,
+      "entry_band": 0.2,
+      "reduction_band": 0.05,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R5"
+    }
+  },
+  "candidate_sha256": "2d58a7c91cc31eb6e9ef561a0fefaf0316dadfe426f021bfcb1fd5ad752e9845",
+  "frozen_inputs_sha256": "262ed00f041b64e35d70cca98196de6e64474ed67ba79e3e5d04e90717892551",
+  "preceding_analyses": [
+    {
+      "id": "M01",
+      "sha256": "35adf2d3d3a337876c0351e05f1ef2da8698909e66b35145aa0bda15eecbb9bd"
+    },
+    {
+      "id": "M02",
+      "sha256": "ec75cc0f246f0c4c66dede7c40e8b283f3c735e79b2c0442d9692ecaacf1ddfa"
+    },
+    {
+      "id": "M03",
+      "sha256": "acf3a50bab6d6c57704e373d7c447b13a10cc6e1c7c0dd605fcb3877766d3a10"
+    },
+    {
+      "id": "M04",
+      "sha256": "1bda2b653d4a4e99a9e9ce3bfba0dfafcf8d240df2490816d1fc2a20e6d11506"
+    },
+    {
+      "id": "M05",
+      "sha256": "b559f5c65040b707cd6eea26add25b29c4877f39ae49066d2f20c6157f3658d8"
+    },
+    {
+      "id": "M06",
+      "sha256": "0d3ad23d8167d506f3e1226d4e03484e9c8f4f4c6c591b09b55696728571da98"
+    },
+    {
+      "id": "M07",
+      "sha256": "4411c339a204628e1963429fe99fac4ef9538f9bd5742445bad784c36a42db13"
+    },
+    {
+      "id": "M08",
+      "sha256": "e63501e102c1e4f8e7596b377dde76efd89b9326f896f09622b407d163bc8cbf"
+    },
+    {
+      "id": "M09",
+      "sha256": "4516dee6228e7cbb7d0aaace2f4b0037b360bd5ddfd5362bb736b0269e5456ee"
+    },
+    {
+      "id": "M10",
+      "sha256": "fc2235801e3ba96a98c9ee8e22beac802fc24b0a4b7feb4f4291abff49cc0baa"
+    },
+    {
+      "id": "M11",
+      "sha256": "dc51d7605adc0ce1c3e2f5a477ea45ef3fe1aa203d8cc69588cfb3f34e01c05a"
+    },
+    {
+      "id": "M12",
+      "sha256": "6757c07793c33da4296e549b08587ebacf7783f81458c6b5793d465bc03bebb2"
+    },
+    {
+      "id": "M13",
+      "sha256": "532026e3cfb2e0c1d09f0c864b634c9043074a9c082d8c447ede5a771a22a87f"
+    },
+    {
+      "id": "M14",
+      "sha256": "d6f09e25be153f1c71b4d539fed4954280da10741ec43e999e13045dc74b65c0"
+    },
+    {
+      "id": "M15",
+      "sha256": "0c6bc0c27cda91928946650cce5c1fac1ce25da1e47c0ade0e6194959bdbd380"
+    },
+    {
+      "id": "M16",
+      "sha256": "b06804f7e456f50970349f93e73f57dcc40fe3db2ca69ae6dca3fc73dfb2612e"
+    },
+    {
+      "id": "M17",
+      "sha256": "29ee3515b608bdf8caf70fb45655b32612fe9d4e6498ed06672db2f3545bd752"
+    },
+    {
+      "id": "M18",
+      "sha256": "24e7aad317d670b2bfb52eb888bf01b2da0b8e5baf8d5a7f0d49408c99574b5c"
+    },
+    {
+      "id": "M19",
+      "sha256": "f9afc4b6901effcd91bf855f411d992facd49d314d296255bec92a5c3dd1f1df"
+    },
+    {
+      "id": "M20",
+      "sha256": "8d2ac89f7c654335596b6e186a896bc645bb11bcb1cd54fa8d00ecc3f9bd1a14"
+    },
+    {
+      "id": "M21",
+      "sha256": "a5ce5801214c0c050f9b29af0eec0aca4149af99cb1d771eb74214ac9339b898"
+    },
+    {
+      "id": "M22",
+      "sha256": "42d67e7bec69fb7286f34517145597d620ce69d836ffdd67d863eb66aa16c107"
+    }
+  ],
+  "period": "choice",
+  "start": "2019-06-03",
+  "end": "2024-12-31",
+  "contracts": [
+    {
+      "role": "candidate",
+      "cost_multiplier": 1.0,
+      "cache_key": "e5540b6f136059af07de458d0ab277a4ccdd1c00001f55f79a30d8cf23ca6058"
+    },
+    {
+      "role": "parent",
+      "cost_multiplier": 1.0,
+      "cache_key": "343664f3890f6077a06f0fd553e35da9add4313cf5c259e69b6beb9c412a13eb"
+    },
+    {
+      "role": "Nasdaq_buy_hold",
+      "cost_multiplier": 1.0,
+      "cache_key": "1f4bea88369f738c544fc3e204409c938ff9171762563aca48aa8626c08dc476"
+    },
+    {
+      "role": "without_trend",
+      "cost_multiplier": 1.0,
+      "cache_key": "a8e638faf300a61f52be33bd709bd3232bb8a04fd4b045e35874775ac41dac09"
+    },
+    {
+      "role": "without_risk",
+      "cost_multiplier": 1.0,
+      "cache_key": "ee7af328a09b799b43bd6537b704de0aebd53b2c87ee136615a947ad4c1ec2ef"
+    },
+    {
+      "role": "without_shock",
+      "cost_multiplier": 1.0,
+      "cache_key": "a1288b55f8b8011762b764e4f7c6322e0abbeb16229212ce7f393a8a84fe7693"
+    },
+    {
+      "role": "without_defensive",
+      "cost_multiplier": 1.0,
+      "cache_key": "5af9a64eecfec8af5acbb654f9e0700ac8db55470b71eeae0ff11d9b7e13ec0c"
+    },
+    {
+      "role": "without_execution",
+      "cost_multiplier": 1.0,
+      "cache_key": "e4e8f84dcbb6c30386aebf1c9c50217440d8952302bea1571d2f1edad85166df"
+    },
+    {
+      "role": "candidate",
+      "cost_multiplier": 2.0,
+      "cache_key": "56202c085589d467758e376cba1ee01e7fd9d5caecf56701fcde2b16a371980d"
+    },
+    {
+      "role": "parent",
+      "cost_multiplier": 2.0,
+      "cache_key": "4048521ffddf6b4fe72958df2b28b0fa0c0e39cb052a2cc9ff58203ccf5a2111"
+    },
+    {
+      "role": "Nasdaq_buy_hold",
+      "cost_multiplier": 2.0,
+      "cache_key": "f8603eab0936d2329524509b004cbb29e0bad7cc48525c4b09dd52936d8dcec9"
+    },
+    {
+      "role": "without_trend",
+      "cost_multiplier": 2.0,
+      "cache_key": "e0ee72240ec5893cbc652a6be259b379ee2d98e58c892b9cf1651f0d3b48a893"
+    },
+    {
+      "role": "without_risk",
+      "cost_multiplier": 2.0,
+      "cache_key": "a1cba2fa078c7bb7fc893e95499e9e4fe8ca040cb0c9ed58e0e9ec650a469aa6"
+    },
+    {
+      "role": "without_shock",
+      "cost_multiplier": 2.0,
+      "cache_key": "1a9d5677017d6985fa2b7d2dda54389601c979ce3b8dc521a11a6f9af8752956"
+    },
+    {
+      "role": "without_defensive",
+      "cost_multiplier": 2.0,
+      "cache_key": "9d144d7a6d22ef2bba4187387961ec9f686d57aba3123cdcf07fa9d4cfbb3c01"
+    },
+    {
+      "role": "without_execution",
+      "cost_multiplier": 2.0,
+      "cache_key": "fc41ea58fe9bbbc875a2d553040730c09ed98e97142ac8615d2c5b4bfa7a7d06"
+    }
+  ],
+  "ablation_blocks": [
+    "trend",
+    "risk",
+    "shock",
+    "defensive",
+    "execution"
+  ]
+}

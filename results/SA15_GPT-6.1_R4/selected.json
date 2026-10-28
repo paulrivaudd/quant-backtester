@@ -1,0 +1,134 @@
+{
+  "candidate": {
+    "number": 71,
+    "reason": "62(or/matièrespremières) gagne4,96points de CAGR mais dépasse4dates/an. Dernier voisin de trading :bande20points au lieu de15, même cible20%, même mensuel et défenses. Aucun paramètre après contrôle final.",
+    "schedule": "monthly",
+    "parameters": {
+      "core_id": "ETF_US_TECH",
+      "risky_ids": [
+        "ETF_US_TECH"
+      ],
+      "defensive_ids": [
+        "ETF_GOLD",
+        "ETF_COMMODITY"
+      ],
+      "monetary_id": "ETF_MONETARY_EUR",
+      "mode": "vol_control",
+      "momentum_lookbacks": [
+        21,
+        63,
+        126
+      ],
+      "momentum_weights": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "trend_kind": "momentum",
+      "core_floor": 0.0,
+      "top_k": 1,
+      "allocation_mode": "equal",
+      "fixed_weights": [],
+      "absolute_filter": true,
+      "core_preference": 0.02,
+      "switch_buffer": 0.02,
+      "rebalance_band": 0.2,
+      "canary_ids": [],
+      "canary_lookbacks": [
+        21,
+        63,
+        126
+      ],
+      "canary_weights": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "canary_min_breadth": 0.5,
+      "volatility_windows": [
+        20,
+        60
+      ],
+      "volatility_floor": 0.05,
+      "target_volatility": 0.2,
+      "recovery_lookback": 0,
+      "recovery_threshold": 0.0,
+      "defensive_top_k": 1,
+      "monetary_lookback": 21,
+      "max_age_sessions": 1,
+      "strategy_id": "SA15_GPT-6.1_R4"
+    }
+  },
+  "score": 0.06535559982803633,
+  "fingerprint": "ef95006960c2102347cd008e43ee2959526e576f4971ceca75b3fdb398cbe69e",
+  "parameters": {
+    "core_id": "ETF_US_TECH",
+    "risky_ids": [
+      "ETF_US_TECH"
+    ],
+    "defensive_ids": [
+      "ETF_GOLD",
+      "ETF_COMMODITY"
+    ],
+    "monetary_id": "ETF_MONETARY_EUR",
+    "mode": "vol_control",
+    "momentum_lookbacks": [
+      21,
+      63,
+      126
+    ],
+    "momentum_weights": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "trend_kind": "momentum",
+    "core_floor": 0.0,
+    "top_k": 1,
+    "allocation_mode": "equal",
+    "fixed_weights": [],
+    "absolute_filter": true,
+    "core_preference": 0.02,
+    "switch_buffer": 0.02,
+    "rebalance_band": 0.2,
+    "canary_ids": [],
+    "canary_lookbacks": [
+      21,
+      63,
+      126
+    ],
+    "canary_weights": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "canary_min_breadth": 0.5,
+    "volatility_windows": [
+      20,
+      60
+    ],
+    "volatility_floor": 0.05,
+    "target_volatility": 0.2,
+    "recovery_lookback": 0,
+    "recovery_threshold": 0.0,
+    "defensive_top_k": 1,
+    "monetary_lookback": 21,
+    "max_age_sessions": 1,
+    "strategy_id": "SA15_GPT-6.1_R4"
+  },
+  "qualified": true,
+  "selection_uses": [
+    "choice_continuous_2019_2024",
+    "validation_slice_same_book"
+  ],
+  "benchmark": "Nasdaq_buy_hold",
+  "total_trials": 80,
+  "round_trials": 50,
+  "final_period": [
+    "2025-01-02",
+    "2026-10-09"
+  ],
+  "driver_sha256": "17a142becbc360b3ea61f49085ddf5f2eb634911bed184c86241335c6f4244e1",
+  "candidate_sha256": "a121a1338e9fe952c8953a5312803aac0ab418c996e9b2e9ad37f51d88b2aceb",
+  "selection_sha256": "e44d8fd0e6ae536e1a5c36d2d18d7e20e093d395ece313077a654e43ee5ad0b3"
+}

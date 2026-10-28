@@ -45,3 +45,54 @@ statement = "A neural additive model reading the 13 coefficients of the order-3 
 universe = "ETF_WORLD and cash; models re-estimated at each month end on 1 008 candidate origins and selected on the 126 that follow, purged at both boundaries, frozen for the month. The first month tested is the first one whose calibration holds 900 valid training examples, 100 validation ones and 95% of valid features in each purged block: from the calendar and the 120 sessions of history a path needs, January 2023 (cutoff 2022-12-30), so the study runs from 2023-01-02 to 2026-10-09 with one continuous book. Frozen before any run: path, Hall basis of esig with roughpy, 4 tanh units per coefficient centred at zero, AdamW 1e-3 / 1e-3, at most 300 epochs, patience 30, seed 20261010; entry above 20 bp, hold while strictly positive, exit at zero; SA6 sizing, band 0.03. Controls, without catalogue codes: C0 same models and sizing with the filter always on; Ridge on the same 13 coefficients; NAM on order 2; NAM without the volume channel; NAM on nine classical indicators; Ridge on the raw 120-value trajectory; NAM and Ridge on World plus S&P 500 PEA (26 coefficients). XGBoost is not developed. Written after every book of this period was seen and before any signature model was fitted: retrospective."
 prediction = "Economic, main: a net Sharpe ratio of SA13 above C0's, with a paired block bootstrap interval (blocks of 60 sessions, 5 000 draws, seed 20261010, 95%; 20 and 120 reported as announced sensitivities) whose lower bound is above zero, still positive at doubled costs with the same models, and a drawdown no deeper than C0's. Representation: a lower out-of-sample MSE than the NAM on classical indicators. Model: a lower MSE than Ridge on the same log-signatures. Secondary: order 3 below order 2, and with volume below without."
 refutation = "Sufficiency first: fewer than 504 test sessions, fewer than 30 completed position episodes, or under 95% of decisions with an authorised model and usable features make the study insufficient. Then, on the economic question: not supported when the Sharpe difference is at or below zero, uncertain when it is positive with an interval that includes zero, supported retrospectively when its lower bound is above zero, it stays positive at doubled costs and the drawdown is no deeper than C0's. The contribution of signatures and that of the neurons are concluded apart, against the classical indicators, the raw trajectory and Ridge: a favourable economic score does not show either was needed. No control replaces the SA13 result after the test is read."
+
+[[hypothesis]]
+hypothesis_id = "sa15_gpt61_multiasset_momentum"
+status = "NOT_SUPPORTED"
+written_on = 2026-10-15
+statement = "Une rotation momentum multi-horizon sur six actifs risqués diversifiés et un ETF monétaire, sans levier et exécutée après décision du soir à l'ouverture suivante, peut dépasser World acheté-conservé et SA1 MA20 après frais."
+universe = "ESE.PA, SXRV.DE, IS3N.DE, 4GLD.DE (ETC), DBZB.DE, XDBC.DE, XEON.DE. Référence World CW8.PA. Développement2019-06-03/2022-12-30, sélection2023-01-02/2024-12-31, contrôle réservé2025-01-02/2026-10-09 ; période déjà vue dans le projet."
+prediction = "Maximum dix configurations, toutes publiées ; sélectionner uniquement sur développement/validation au score fixé dans research/SA15_GPT-6.1/protocol.md. Sur contrôle final : rendement net supérieur aux deux références avec drawdown contenu, frais doubles, incertitude et décompte des essais publiés."
+refutation = "Sous-performance du World, drawdown excessif, avantage ne résistant pas aux frais, ou intervalle d'incertitude recouvrant zéro empêchent de conclure à une supériorité établie. Protocole local écrit avant essai1 ; cette transcription au registre central intervient après lecture de l'essai1 et ne constitue pas un préenregistrement indépendant."
+
+[[hypothesis]]
+hypothesis_id = "sa15_gpt61_round2_relative_sp500"
+status = "UNCERTAIN"
+written_on = 2026-10-15
+statement = "Un coeur permanent S&P 500 et une poche de momentum relatif, avec décisions mensuelles et tampon de classement, battent le S&P 500 acheté-conservé après frais en demandant peu d'interventions."
+universe = "ETF_SP500_PEA, ETF_NASDAQ, ETF_GOLD (ETC), ETF_EMERGING, ETF_COMMODITY et monétaire éventuel. Même store isolé que SA15 série1. Essais11..20 ; vingt configurations cumulées. Dates19-22 développement,23-24 sélection,25-26 contrôle rétrospectif déjà vu."
+prediction = "Sélection fondée sur l'excès de CAGR net contre S&P 500, priorité aux variantes gagnantes dans les deux périodes de choix ; objectif de surperformance nette sur historique complet et contrôle chronologique, avec coûts doubles et charge opérationnelle publiés."
+refutation = "Sous-performance nette contre S&P 500 sur le contrôle ou l'historique complet réfute la cible ; contrôle simple Nasdaq ou mélange50/50 supérieur montre que la rotation peut ne pas justifier son travail. L'histoire déjà connue et les20essais empêchent toute prétention de validation prospective."
+
+[[hypothesis]]
+hypothesis_id = "sa15_gpt61_round3_nasdaq"
+status = "NOT_SUPPORTED"
+written_on = 2026-10-15
+statement = "Nasdaq par défaut, protection conditionnelle des régimes faibles et reprise rapide peuvent dépasser 100% Nasdaq conservé net de frais, avec peu d'ETF et des ordres après décision du soir à l'ouverture suivante."
+universe = "Même store isolé de huit instruments ; Nasdaq, or ETC, S&P500 et monétaire principalement. Dix candidats21–30, trente cumulés. Développement2019-2022, sélection2023-2024, contrôle2025-2026 et continu déjà vus : étude rétrospective."
+prediction = "Gagnant sélectionné uniquement sur excès net CAGR contre Nasdaq dans développement/sélection, gelé avant contrôle. Supériorité nette au Nasdaq sur contrôle et continu ; coûts doubles, redémarrages depuis cash, incertitude et charge d'intervention publiés."
+refutation = "Net inférieur ou égal à Nasdaq sur contrôle ou continu : NOT_SUPPORTED. Avantage positif mais absent aux frais doubles ou intervalle actif comprenant zéro : UNCERTAIN. Aucune sélection après lecture du contrôle ; pas de trente-et-unième candidat dans cette série."
+[[hypothesis]]
+hypothesis_id = "sa15_gpt61_round4_risk_intervention"
+status = "NOT_SUPPORTED"
+written_on = 2026-10-16
+statement = "Une allocation graduelle/diversifiée, des tampons et des cadences lentes peuvent battre Nasdaq conservé net tout en visant un drawdown historique maximal25% et au plus quatre dates de transactions annuelles."
+universe = "MagasinR4 séparé : huit véhicules SA15 plus technologieUS QDVE, santé mondiale XDWH et utilities mondiales XDWU capitalisants. Maximum50designs31–80,80cumulés ; choixcontinu2019–2024, contrôle2025–2026 et continu2019–2026 déjà vus, donc rétrospectifs."
+prediction = "Candidat choisi selon qualified/score préfixés dans research/SA15_GPT-6.1/round4/protocol.md, gel avant contrôle. Rendement net supérieur au Nasdaq sur contrôle et continu, drawdown<=25%, dates de fills/an<=4 ; voisinages, frais doubles réels de toutes les variantes et vrais redémarrages avec références publiés."
+refutation = "NOT_SUPPORTED si rendement net<=Nasdaq sur contrôle ou continu ; UNCERTAIN si avantage positif mais absent aux frais doubles, intervalle actif recouvrant zéro ou risque/interventions hors cibles. Pas de remplacement après contrôle et aucun design81 dans cette série."
+[[hypothesis]]
+hypothesis_id = "sa15_gpt61_mechanism_pilot"
+status = "NOT_SUPPORTED"
+written_on = 2026-10-16
+statement = "Un filtre Nasdaq MA200 et un plafond de volatilité20% peuvent limiter les baisses sans manquer assez de reprises pour perdre contre Nasdaq conservé. Une première itération d'attribution par blocs, sans recherche de pondérations historiques gagnantes."
+universe = "ETF_NASDAQ et ETF_MONETARY_EUR, sans nouveau fonds, secteur, short ou levier. Cinq politiques annoncées : assemblage complet, sans tendance, sans capvol, sans les deux et Nasdaq conservé. Trois périodes choice/control/full déjà examinées ; coûts normaux et doubles, trente simulations. Quatre contrôles ne remplacent jamais le candidat."
+prediction = "Hypothèse et paramètres figés avant calcul dans research/SA15_GPT-6.1/mechanism_pilot/hypothesis.json. Gain net complet supérieur au Nasdaq sur control et full, DD<=25%, dates de transactions/an<=4. Publier effets conditionnels et isolés des blocs, interactions non additives, coût des reprises et diagnostics systématiques, même défavorables."
+refutation = "NOT_SUPPORTED si complet<=Nasdaq sur control ou full ; UNCERTAIN tant que robustesse dates de départ/voisinages/incertitude non vérifiée. Cette histoire est déjà dépensée ; même un contrôle chronologique favorable ne serait pas une preuve prospective. Aucune retouche des paramètres ni promotion d'une ablation après lecture."
+[[hypothesis]]
+hypothesis_id = "sa15_gpt61_round5_mechanism_ablations"
+status = "PREREGISTERED"
+written_on = 2026-10-16
+statement = "Cinquante corrections mécanistiques avec ablations des blocs de tendance, risque, reprise, choc, confirmation, défense et exécution peuvent dépasser Nasdaq conservé net en limitant drawdown et transactions. Aucun poids historique gagnant recherché."
+universe = "Nasdaq, monétaire, or ETC, souverains couverts EUR ; univers stable. M00 reprend le pilote et M01 ajoute la reprise21 positive. Cinquante M01–M50, analyse immuable après chaque run avant tout prochain enfant, une modification de mécanisme par enfant. Histoire2019–2026 déjà connue, étude rétrospective."
+prediction = "Contrat complet research/SA15_GPT-6.1/round5/hypothesis.json avantM01. Chaque candidat,parent,bloc retiré et Nasdaq réellement simulés en2019–2024 aux frais normaux/doubles ; gel unique après50, contrôle2025–2026 et continu2019–2026 après gel, départs cash et voisins non sélectionnables."
+refutation = "NOT_SUPPORTED si le gagnant ne dépasse pas Nasdaq sur contrôle ou continu. Avantage positif mais coûts, risque25%, fréquence4dates/an ou stabilité non vérifiés : UNCERTAIN. Même un succès rétrospectif ne valide pas le futur. Aucun51edesign, aucun remplacement après lecture finale."

@@ -1,0 +1,21 @@
+{
+  "candidate": {
+    "number": 8,
+    "reason": "Le filtre126 (essai7) perd encore. Le meilleur score reste l'hebdomadaire initial ; combiner cette fréquence avec le coeur50% de l'essai5, qui améliorait fortement la participation actions en sélection.",
+    "schedule": "weekly",
+    "parameters": {
+      "core_fraction": 0.5
+    }
+  },
+  "selection_score": 0.11444770749959665,
+  "selection_uses": [
+    "development",
+    "validation"
+  ],
+  "final_period": [
+    "2025-01-02",
+    "2026-10-09"
+  ],
+  "candidate_fingerprint": "b15810466f16f9a4ef0ab974afe0c09cdd6eef7eb76e5dbc289273a05096bdf8",
+  "trials": 10
+}

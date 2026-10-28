@@ -1,0 +1,2 @@
+session_date,instrument_id,reason,side,requested_quantity
+2020-05-04,ETF_NASDAQ,INSUFFICIENT_CASH,BUY,2.0

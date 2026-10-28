@@ -1,0 +1,9 @@
+{
+  "number": 6,
+  "reason": "Le coeur50% améliore CAGR de sélection à19.73% et baisse les frais mais pénalise développement. Tester le momentum seul sans double filtre de moyenne200, pour entrer plus tôt après retournements ; coeur50% et mensuel inchangés.",
+  "schedule": "monthly",
+  "parameters": {
+    "core_fraction": 0.5,
+    "use_trend_filter": false
+  }
+}

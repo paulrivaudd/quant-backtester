@@ -1,0 +1,9 @@
+{
+  "id": "M05",
+  "completed_sha256": "e7ffd4b1cfc23f83e5de407e6d4a6bff14237b6bd94bff1b95c49d67aa6de018",
+  "decision": "Rejeter la cadence hebdomadaire pour ce parent : protection achetee trop cher en croissance et interventions; revenir a M03 mensuel.",
+  "findings": [
+    "M05 CAGR20.560% vs21.482% M03,DD21.979% vs23.147%,46dates vs20,frais5385.43EUR vs1774.08. Le coutCAGR empire a-1.307point aux frais doubles. Reprises mieux capturees(exposition90.78%,+1.4785bp/j vsparent), mais chocs et faux changements annulent le benefice. La bande evite29dates contre sans execution, insuffisant pour objectif4/an."
+  ],
+  "next_defect": "La sortie directionnelle totale coupe encore les reprises; mesurer une protection graduelle plutot que multiplier les verifications."
+}
