@@ -2,7 +2,7 @@
 
 Période commune 2021-04-01 → 2026-10-09 · capital 100 000 EUR · commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · 252 séances par an.
 
-Source : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
+Source : commit `91a2f3776759` (CLEAN), magasin `b5facce52a6f`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
 
 ## 1. Indicateurs de résultat globaux
 
@@ -12,7 +12,7 @@ Source : commit `788507bfab40` (CLEAN), magasin `750c23dfffc3`, données à jour
 | Rang au classement commun (QUALITY_V1) | 1 | n/a |
 | Score de qualité QUALITY_V1 (0-100 %) | 77.9% | n/a |
 | - bloc marché (IR et alpha contre le fonds détenu) | 0.78 | n/a |
-| - bloc significativité (Sharpe déflaté) | 0.86 | n/a |
+| - bloc significativité (Sharpe déflaté) | 0.87 | n/a |
 | - bloc risque (drawdown relatif) | 0.46 | n/a |
 | - bloc robustesse (sous-périodes ; stress approché des coûts) | 0.91 | n/a |
 | - bloc implémentation (poids des coûts) | 0.98 | n/a |
