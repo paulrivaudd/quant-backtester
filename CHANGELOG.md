@@ -15,6 +15,15 @@
   SA15 and SA16: the sessions exposed in their published results are counted
   in the pull request; no published result is rewritten by this change.
 
+### The documentation in English (2026-10-31)
+- **Every file of `docs/` is in English**, with English names:
+  `DONNEES.md` is `DATA.md`, `FORMULES.md` is `FORMULAS.md`, `GLOSSAIRE.md`
+  is `GLOSSARY.md`, `AMELIORATIONS.md` is `IMPROVEMENTS.md`,
+  `GUIDE_NOUVELLE_STRATEGIE.md` is `NEW_STRATEGY_GUIDE.md` and
+  `OPERATIONS_SUR_TITRES.md` is `CORPORATE_ACTIONS.md`. The entries below keep
+  the names the files had when they were written. No figure, formula or rule
+  changes.
+
 ### SA16: technology and gold under a budget of risk (2026-10-31)
 - **SA16 is catalogued** (`SA16 - growth gold budget`, `SA16RiskBudget`): US
   technology and gold held together at inverse-volatility weights scaled by a

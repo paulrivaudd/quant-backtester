@@ -3,6 +3,8 @@ name = "quant-backtester"
 version = "0.2.0"
 description = "A daily-frequency, look-ahead-safe backtesting framework for systematic strategies."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 classifiers = [
     "Operating System :: POSIX",
@@ -59,6 +61,10 @@ explicit = true
 line-length = 100
 target-version = "py312"
 src = ["src", "tests"]
+# results/ holds archived evidence, not source: a study may keep a byte-for-byte
+# copy of the code that produced it (results/SA15_GPT-6.1/postprocessing/), and
+# an archive is not reformatted after the fact.
+extend-exclude = ["results"]
 
 [tool.ruff.lint]
 select = [
@@ -109,6 +115,17 @@ filterwarnings = ["error"]
 
 [tool.pyright]
 include = ["src", "tests", "scripts"]
+# SA15's research code is frozen: its drivers check the SHA-256 of these
+# scripts and modules (results/SA15_GPT-6.1_R*/driver_frozen.json,
+# frozen_inputs.json) before running, so its typing debt - 241 diagnostics on
+# 2026-10-31, the three in src/ checked to be false positives - is not fixed in
+# place. Its tests still run under pytest like every other test.
+ignore = [
+    "scripts/SA15_*.py",
+    "tests/scripts/test_SA15_*.py",
+    "tests/strategies/test_SA15_*.py",
+    "src/quant_backtester/strategies/SA15_gpt61*.py",
+]
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"
