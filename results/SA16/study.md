@@ -1,290 +1,287 @@
-# SA16 — technologie et or sous budget de risque — étude du 31 octobre 2026
+# SA16 — technology and gold under a risk budget — study of 31 October 2026
 
-**Verdict.** La configuration retenue, **SA16_it2** (`SA16RiskBudget`), bat net
-de coûts le Nasdaq-100 conservé et la dernière sélection archivée de SA15, sur
-toute la fenêtre et sous tous les contrôles de robustesse déclarés : CAGR
-22,40 % contre 19,09 % et 20,97 %, Sharpe 1,321 contre 0,942 et 1,064, perte
-maximale −22,3 % contre −31,3 % et −25,7 %. Coûts doublés, 7 voisins sur 7
-et 7 redémarrages depuis le cash sur 7 tiennent l'ordre. La supériorité de
-**Sharpe** est établie par le bootstrap apparié (intervalles à 90 % au-dessus
-de zéro contre les deux références). Celle de **rendement** ne l'est pas : ses
-intervalles contiennent zéro. Statut au sens strict du protocole :
-**UNCERTAIN**.
+**Verdict.** The configuration retained, **SA16_it2** (`SA16RiskBudget`), beats,
+net of costs, the Nasdaq-100 held and the last archived selection of SA15, over
+the whole window and under all the declared robustness controls: CAGR 22.40%
+against 19.09% and 20.97%, Sharpe 1.321 against 0.942 and 1.064, maximum
+drawdown −22.3% against −31.3% and −25.7%. Doubled costs, 7 neighbours out of 7
+and 7 restarts from cash out of 7 keep the order. The **Sharpe** superiority is
+established by the paired bootstrap (90% intervals above zero against the two
+references). The **return** superiority is not: its intervals contain zero.
+Status in the strict sense of the protocol: **UNCERTAIN**.
 
-Trois limites pèsent sur la lecture :
+Three limits weigh on the reading:
 
-- **L'avantage en rendement vient surtout du choix de la technologie**,
-  hérité de SA15, qui l'a fait après avoir vu 2019–2024. La même règle sur le
-  Nasdaq bat les deux références en Sharpe, mais pas en CAGR.
-- **La technologie conservée seule fait mieux en CAGR** (24,14 %), au prix
-  d'une perte maximale de −31,4 % et d'un Sharpe de 1,041.
-- **Toute l'histoire avait déjà été examinée** : l'étude est rétrospective.
+- **The return advantage comes mostly from the choice of technology**,
+  inherited from SA15, which made it after seeing 2019–2024. The same rule on
+  the Nasdaq beats the two references in Sharpe, but not in CAGR.
+- **Technology held alone does better in CAGR** (24.14%), at the price of a
+  maximum drawdown of −31.4% and a Sharpe of 1.041.
+- **The whole history had already been examined**: the study is retrospective.
 
-Trois candidats sur les dix autorisés ont été utilisés ; le cahier des
-charges prévoit l'arrêt quand une stratégie domine ses références avec une
-robustesse documentée.
+Three candidates out of the ten allowed were used; the specification provides
+for stopping when a strategy dominates its references with a documented
+robustness.
 
-![Valeur nette (échelle log) et baisse sous le sommet](comparison.png)
+![Net value (log scale) and fall below the peak](comparison.png)
 
-![Poids détenus par SA16_it2](weights.png)
+![Weights held by SA16_it2](weights.png)
 
-## 1. Références, données, conventions
+## 1. References, data, conventions
 
-- **SA(N−1) = SA15, essai 71 de R4** (`results/SA15_GPT-6.1_R4/selected.json`,
-  `SA15RiskAwareRotation`, mensuel, empreinte `ef95006960c2…`). R5 s'est
-  arrêté à M34 sans sélection ni rapport (le README de SA15 renvoie à un
-  `selected.json` et un `study.md` de R5 qui n'existent pas) : R4 est la
-  dernière configuration explicitement retenue et archivée. Détail :
-  [protocole](../../research/SA16/protocol.md), section 1.
-- **Reproduction** : sur le magasin reconstruit, l'essai 71 et le Nasdaq
-  conservé retombent au centime sur l'archive SA15 (499 693,44 EUR et
-  448 002,97 EUR au 2026-10-09 ; écart relatif maximal 0 sur 1 886 séances ;
+- **SA(N−1) = SA15, trial 71 of R4** (`results/SA15_GPT-6.1_R4/selected.json`,
+  `SA15RiskAwareRotation`, monthly, fingerprint `ef95006960c2…`). R5 stopped at
+  M34 without a selection or a report (the README of SA15 points to a
+  `selected.json` and a `study.md` of R5 that do not exist): R4 is the last
+  configuration explicitly retained and archived. Detail:
+  [protocol](../../research/SA16/protocol.md), section 1.
+- **Reproduction**: on the rebuilt store, trial 71 and the Nasdaq held fall
+  back to the cent on the SA15 archive (499,693.44 EUR and 448,002.97 EUR at
+  2026-10-09; maximum relative gap 0 over 1,886 sessions;
   `reproduction/reproduction.json`).
-- **Magasin** `runs/sa16_store` (`scripts/SA16_download_data.py`), empreinte
-  `677397e6fb770978…` pour tous les runs de l'étude : registre du projet,
-  ajouts SA15 et séries de signal SA16 (`research/SA16/instruments.toml` :
-  `^NDX`, GLD, HYG, IEF, VIX3M). Historiques Yahoo/FRED restatés, source
-  unique, pas de millésimes. QDVE, 4GLD et trois autres fonds Xetra n'ont pas
-  de barre le 2025-10-24 ni le 2026-03-06 ; aucun prix n'est reconstitué.
-- **Conventions de SA15** : calendrier XPAR, 100 000 EUR, parts entières,
-  commission 5 pb (min. 1 EUR), demi-spread 3 pb, glissement 2 pb, quantités
-  fixées à la décision de 23:00 Paris, exécution à l'ouverture suivante du
-  fonds sur sa place, Sharpe sur 252 séances, taux sans risque nul ; coûts ×2
-  = second vrai run.
-- **Fenêtre** : 2018-08-01 → 2026-10-30, 2 113 séances : premier mois où
-  toutes les entrées des références sont lisibles, jusqu'à la dernière séance
-  complète avant l'étude.
+- **Store** `runs/sa16_store` (`scripts/SA16_download_data.py`), fingerprint
+  `677397e6fb770978…` for all the runs of the study: the project's registry,
+  the SA15 additions and the SA16 signal series
+  (`research/SA16/instruments.toml`: `^NDX`, GLD, HYG, IEF, VIX3M). Restated
+  Yahoo/FRED histories, a single source, no vintages. QDVE, 4GLD and three
+  other Xetra funds have no bar on 2025-10-24 or on 2026-03-06; no price is
+  rebuilt.
+- **Conventions of SA15**: XPAR calendar, 100,000 EUR, whole units,
+  commission 5 bp (min. 1 EUR), half spread 3 bp, slippage 2 bp, quantities
+  set at the 23:00 Paris decision, execution at the next open of the fund on
+  its venue, Sharpe over 252 sessions, zero risk-free rate; costs ×2 = a
+  second actual run.
+- **Window**: 2018-08-01 → 2026-10-30, 2,113 sessions: the first month in
+  which all the inputs of the references can be read, up to the last full
+  session before the study.
 
-## 2. La stratégie retenue : SA16_it2
+## 2. The strategy retained: SA16_it2
 
-Chaque fin de semaine (dernière séance XPAR), à 23:00 Paris :
+At the end of each week (last XPAR session), at 23:00 Paris:
 
-1. volatilité annualisée `σ` de la **technologie américaine** (QDVE.DE,
-   iShares S&P 500 Information Technology, coté en euros, non couvert) et de
-   l'**or** (4GLD.DE, ETC Xetra-Gold) sur leurs 126 derniers rendements
-   logarithmiques en euros, **chaque rendement divisé par la racine du nombre
-   de séances qu'il couvre** (nouveau signal `SpanScaledVolatilitySignal`,
-   au plus 3 séances par rendement) ; plancher 5 % ;
-2. poids cibles `w ∝ b / σ` avec un **budget de risque** `b = 0,75` pour la
-   technologie et `0,25` pour l'or, la somme faisant le livre entier ;
-3. ordre seulement si un poids s'écarte de plus de **5 points** de sa cible ;
-   exécution à l'ouverture Xetra suivante ;
-4. une entrée illisible garde le livre (aucune ne l'a été).
+1. annualised volatility `σ` of **US technology** (QDVE.DE, iShares S&P 500
+   Information Technology, listed in euros, unhedged) and of **gold** (4GLD.DE,
+   ETC Xetra-Gold) over their last 126 log returns in euros, **each return
+   divided by the square root of the number of sessions it covers** (new
+   signal `SpanScaledVolatilitySignal`, at most 3 sessions per return); floor
+   5%;
+2. target weights `w ∝ b / σ` with a **risk budget** `b = 0.75` for
+   technology and `0.25` for gold, the sum making the whole book;
+3. an order only if a weight moves more than **5 points** away from its
+   target; execution at the next Xetra open;
+4. an input that cannot be read keeps the book (none could not be).
 
-Aucune prévision de direction, aucun levier, aucune vente à découvert, toujours
-investi. Quand les prix écartent les poids, la bande vend ce qui a monté
-contre l'autre et achète ce qui a baissé.
+No forecast of direction, no leverage, no short selling, always invested. When
+prices move the weights apart, the band sells what rose against the other and
+buys what fell.
 
-| Paramètre | Valeur | Paramètre | Valeur |
+| Parameter | Value | Parameter | Value |
 | --- | --- | --- | --- |
 | `growth_id` | `ETF_US_TECH` | `hedge_id` | `ETF_GOLD` |
-| `growth_risk_budget` | 0,75 | `volatility_returns` | 126 |
-| `max_span_sessions` | 3 | `volatility_floor` | 0,05 |
-| `rebalance_band` | 0,05 | `max_age_sessions` | 1 |
-| `relative_lookback` / `momentum_tilt` | 0 / 0 (inactifs) | cadence | hebdomadaire |
+| `growth_risk_budget` | 0.75 | `volatility_returns` | 126 |
+| `max_span_sessions` | 3 | `volatility_floor` | 0.05 |
+| `rebalance_band` | 0.05 | `max_age_sessions` | 1 |
+| `relative_lookback` / `momentum_tilt` | 0 / 0 (inactive) | cadence | weekly |
 
-Fichier : [`research/SA16/candidates/it02.json`](../../research/SA16/candidates/it02.json) ;
-gel : [`selected.json`](selected.json), empreinte `66b3493a8970…`. Le rerun
-avec le code final (commit `cedf642`, arbre propre) redonne la courbe au
-centime sur les 2 113 séances, aux coûts ×1 et ×2. Les valeurs par défaut de
-la classe sont celles de la configuration retenue, sauf l'identifiant
-(`SA16_growth_gold_budget` au catalogue, `SA16_it2` dans les résultats).
+File: [`research/SA16/candidates/it02.json`](../../research/SA16/candidates/it02.json);
+freeze: [`selected.json`](selected.json), fingerprint `66b3493a8970…`. The rerun
+with the final code (commit `cedf642`, clean tree) gives back the curve to the
+cent over the 2,113 sessions, at costs ×1 and ×2. The default values of the
+class are those of the configuration retained, except the identifier
+(`SA16_growth_gold_budget` in the catalogue, `SA16_it2` in the results).
 
-## 3. Résultats sur la fenêtre complète
+## 3. Results over the full window
 
-| Livre | Net total | Brut total | CAGR net | Vol. | Sharpe | Perte max. | Coûts EUR | Jours d'interv./an |
+| Book | Total net | Total gross | Net CAGR | Vol. | Sharpe | Max. drawdown | Costs EUR | Trading days/yr |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **SA16_it2** | **+429,5 %** | +430,2 % | **22,40 %** | 16,03 % | **1,321** | **−22,3 %** | 698 | 2,5 |
-| SA16_it2, coûts ×2 | +427,6 % | +429,0 % | 22,35 % | 16,03 % | 1,319 | −22,3 % | 1 390 | 2,5 |
-| Nasdaq conservé (SXRV) | +322,3 % | +322,4 % | 19,09 % | 20,49 % | 0,942 | −31,3 % | 100 | 0,1 |
-| SA15 essai 71 | +380,6 % | +387,9 % | 20,97 % | 19,39 % | 1,064 | −25,7 % | 7 265 | 3,8 |
-| SA15 essai 71, coûts ×2 | +369,8 % | +384,2 % | 20,64 % | 19,40 % | 1,049 | −25,8 % | 14 322 | 3,8 |
-| *Technologie conservée (QDVE)* | +495,0 % | +495,1 % | 24,14 % | 22,99 % | 1,041 | −31,4 % | 100 | 0,1 |
-| *Cible constante 2/3 techno – 1/3 or (C1)* | +409,4 % | +409,8 % | 21,83 % | 16,31 % | 1,273 | −22,7 % | 373 | 1,1 |
-| *Même règle, Nasdaq au lieu de techno (C2)* | +304,0 % | +304,4 % | 18,45 % | 14,63 % | 1,212 | −21,1 % | 433 | 1,8 |
-| *Nasdaq + or 50/50 dérivant* | +277,0 % | +277,1 % | 17,46 % | 13,39 % | 1,249 | −17,5 % | 100 | 0,1 |
-| *Or conservé (4GLD)* | +233,2 % | +233,3 % | 15,71 % | 15,60 % | 0,999 | −22,8 % | 100 | 0,1 |
+| **SA16_it2** | **+429.5%** | +430.2% | **22.40%** | 16.03% | **1.321** | **−22.3%** | 698 | 2.5 |
+| SA16_it2, costs ×2 | +427.6% | +429.0% | 22.35% | 16.03% | 1.319 | −22.3% | 1,390 | 2.5 |
+| Nasdaq held (SXRV) | +322.3% | +322.4% | 19.09% | 20.49% | 0.942 | −31.3% | 100 | 0.1 |
+| SA15 trial 71 | +380.6% | +387.9% | 20.97% | 19.39% | 1.064 | −25.7% | 7,265 | 3.8 |
+| SA15 trial 71, costs ×2 | +369.8% | +384.2% | 20.64% | 19.40% | 1.049 | −25.8% | 14,322 | 3.8 |
+| *Technology held (QDVE)* | +495.0% | +495.1% | 24.14% | 22.99% | 1.041 | −31.4% | 100 | 0.1 |
+| *Constant target 2/3 tech – 1/3 gold (C1)* | +409.4% | +409.8% | 21.83% | 16.31% | 1.273 | −22.7% | 373 | 1.1 |
+| *Same rule, Nasdaq instead of tech (C2)* | +304.0% | +304.4% | 18.45% | 14.63% | 1.212 | −21.1% | 433 | 1.8 |
+| *Nasdaq + gold 50/50 drifting* | +277.0% | +277.1% | 17.46% | 13.39% | 1.249 | −17.5% | 100 | 0.1 |
+| *Gold held (4GLD)* | +233.2% | +233.3% | 15.71% | 15.60% | 0.999 | −22.8% | 100 | 0.1 |
 
-En italique : contrôles passifs ou d'ablation, jamais candidats. Le brut
-garde les mêmes transactions sans frais (pas un portefeuille contrefactuel).
+In italics: passive or ablation controls, never candidates. The gross keeps the
+same transactions without fees (not a counterfactual portfolio).
 
-**Bootstrap apparié** (`paired_block_bootstrap`, blocs de 20 séances,
-2 000 tirages, graine 1616, 90 %), SA16_it2 moins :
+**Paired bootstrap** (`paired_block_bootstrap`, blocks of 20 sessions,
+2,000 draws, seed 1616, 90%), SA16_it2 minus:
 
-| Contre | ΔSharpe [IC 90 %] | Δrendement moyen annualisé [IC 90 %] |
+| Against | ΔSharpe [90% CI] | Δannualised mean return [90% CI] |
 | --- | --- | --- |
-| Nasdaq conservé | **+0,380 [+0,209 ; +0,618]** | +1,9 pt [−2,2 ; +7,0] |
-| SA15 essai 71 | **+0,258 [+0,028 ; +0,560]** | +0,6 pt [−4,1 ; +6,4] |
-| C1, cible constante 2/3 – 1/3 | +0,048 [+0,001 ; +0,103] | +0,4 pt [−0,4 ; +1,3] |
-| C2, Nasdaq comme croissance | +0,109 [−0,020 ; +0,239] | **+3,4 pts [+1,5 ; +5,5]** |
+| Nasdaq held | **+0.380 [+0.209; +0.618]** | +1.9 pt [−2.2; +7.0] |
+| SA15 trial 71 | **+0.258 [+0.028; +0.560]** | +0.6 pt [−4.1; +6.4] |
+| C1, constant target 2/3 – 1/3 | +0.048 [+0.001; +0.103] | +0.4 pt [−0.4; +1.3] |
+| C2, Nasdaq as growth | +0.109 [−0.020; +0.239] | **+3.4 pts [+1.5; +5.5]** |
 
-Lecture : la pondération par la volatilité n'ajoute presque rien au mélange
-constant (C1 bat lui aussi les deux références) ; l'avantage en rendement sur
-le Nasdaq vient du choix de la technologie (contre C2) ; le gain robuste de
-SA16 est un gain de **risque** (Sharpe, perte maximale), pas de rendement.
+Reading: the volatility weighting adds almost nothing to the constant mix (C1
+also beats the two references); the return advantage over the Nasdaq comes from
+the choice of technology (against C2); the robust gain of SA16 is a gain in
+**risk** (Sharpe, maximum drawdown), not in return.
 
-## 4. Années et épisodes, défavorables compris
+## 4. Years and episodes, unfavourable ones included
 
-| Année | SA16_it2 | Nasdaq | SA15 | Technologie | C1 |
+| Year | SA16_it2 | Nasdaq | SA15 | Technology | C1 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 2018 (dès août) | −6,3 % | −11,2 % | −7,7 % | −11,3 % | −7,3 % |
-| 2019 | 39,5 % | 42,8 % | 46,6 % | 53,9 % | 41,5 % |
-| 2020 | 24,1 % | 34,4 % | 21,7 % | 29,7 % | 24,3 % |
-| 2021 | 32,5 % | 39,3 % | 48,8 % | 46,8 % | 32,3 % |
-| 2022 | −13,7 % | −30,0 % | −17,2 % | −25,8 % | −15,3 % |
-| 2023 | 35,3 % | 51,1 % | 41,9 % | 54,1 % | 38,1 % |
-| 2024 | 42,2 % | 33,5 % | 48,8 % | 46,1 % | 42,2 % |
-| 2025 | 23,4 % | 7,0 % | 13,6 % | 10,0 % | 22,6 % |
-| 2026 (au 30 oct.) | 20,2 % | 17,7 % | −1,2 % | 24,7 % | 15,8 % |
+| 2018 (from August) | −6.3% | −11.2% | −7.7% | −11.3% | −7.3% |
+| 2019 | 39.5% | 42.8% | 46.6% | 53.9% | 41.5% |
+| 2020 | 24.1% | 34.4% | 21.7% | 29.7% | 24.3% |
+| 2021 | 32.5% | 39.3% | 48.8% | 46.8% | 32.3% |
+| 2022 | −13.7% | −30.0% | −17.2% | −25.8% | −15.3% |
+| 2023 | 35.3% | 51.1% | 41.9% | 54.1% | 38.1% |
+| 2024 | 42.2% | 33.5% | 48.8% | 46.1% | 42.2% |
+| 2025 | 23.4% | 7.0% | 13.6% | 10.0% | 22.6% |
+| 2026 (to 30 Oct.) | 20.2% | 17.7% | −1.2% | 24.7% | 15.8% |
 
-**Années défavorables** : SA16 perd contre le Nasdaq en 2019 (−3,3 points),
-2020 (−10,3), 2021 (−6,8) et 2023 (−15,8), et contre SA15 en 2019, 2021, 2023
-et 2024. Ce sont les grandes années de la technologie, où le tiers d'or
-freine. Il gagne en 2018, 2022, 2024, 2025 et 2026 contre le Nasdaq.
+**Unfavourable years**: SA16 loses against the Nasdaq in 2019 (−3.3 points),
+2020 (−10.3), 2021 (−6.8) and 2023 (−15.8), and against SA15 in 2019, 2021,
+2023 and 2024. These are the great years of technology, in which the third in
+gold holds it back. It wins in 2018, 2022, 2024, 2025 and 2026 against the
+Nasdaq.
 
-| Épisode | SA16_it2 | Nasdaq | SA15 | Technologie |
+| Episode | SA16_it2 | Nasdaq | SA15 | Technology |
 | --- | ---: | ---: | ---: | ---: |
-| 2018T4 (oct.–déc.) | −6,7 % | −15,9 % | −12,8 % | −16,2 % |
-| Krach 2020 (19 févr. – 31 mars) | −13,3 % | −18,0 % | −16,3 % | −19,3 % |
-| Rebond 2020 (avril – août) | +27,3 % | +39,1 % | +21,0 % | +36,2 % |
-| 2022 | −13,7 % | −30,0 % | −17,2 % | −25,8 % |
-| Krach 2025 (19 févr. – 30 avril) | −12,3 % | −19,2 % | −16,4 % | −20,9 % |
-| Rebond 2025 (mai – sept.) | +25,8 % | +22,9 % | +16,2 % | +33,7 % |
+| 2018Q4 (Oct.–Dec.) | −6.7% | −15.9% | −12.8% | −16.2% |
+| 2020 crash (19 Feb. – 31 March) | −13.3% | −18.0% | −16.3% | −19.3% |
+| 2020 rebound (April – August) | +27.3% | +39.1% | +21.0% | +36.2% |
+| 2022 | −13.7% | −30.0% | −17.2% | −25.8% |
+| 2025 crash (19 Feb. – 30 April) | −12.3% | −19.2% | −16.4% | −20.9% |
+| 2025 rebound (May – Sept.) | +25.8% | +22.9% | +16.2% | +33.7% |
 
-**Pertes maximales de SA16_it2** : −22,3 % du 2020-02-20 au 2020-03-23
-(l'or baisse aussi pendant la crise de liquidité ; sommet retrouvé le
-2020-06-23) ; −20,0 % du 2025-02-20 au 2025-04-07 (retrouvé le 2025-07-17) ;
-−15,3 % d'août à décembre 2022, quand or et technologie baissent ensemble
-(retrouvé le 2023-05-18). SA15 est, au 2026-10-30, dans une perte de −22,6 %
-ouverte depuis le 2026-01-29.
+**Maximum drawdowns of SA16_it2**: −22.3% from 2020-02-20 to 2020-03-23 (gold
+falls too during the liquidity crisis; peak back on 2020-06-23); −20.0% from
+2025-02-20 to 2025-04-07 (back on 2025-07-17); −15.3% from August to December
+2022, when gold and technology fall together (back on 2023-05-18). SA15 is, at
+2026-10-30, in a drawdown of −22.6% open since 2026-01-29.
 
-## 5. Robustesse
+## 5. Robustness
 
-| Contrôle | Résultat |
+| Control | Result |
 | --- | --- |
-| Coûts doublés (vrai run) | CAGR 22,35 %, Sharpe 1,319 : bat SA15 ×2 (20,64 % ; 1,049) et le Nasdaq |
-| 7 voisins déclarés (budget 0,70/0,80, volatilité 63/189, bande 0,03/0,08, mensuel) | 7/7 battent les deux références ; CAGR 21,77 à 22,85 %, Sharpe 1,273 à 1,361, perte max. −20,9 à −24,0 % |
-| 7 redémarrages depuis le cash (2019 à 2025, jusqu'au 2026-10-30) | 7/7 battent les deux références en CAGR et en Sharpe |
-| Sharpe déflaté (Bailey et López de Prado) | 0,999 pour 13 essais au registre |
+| Doubled costs (actual run) | CAGR 22.35%, Sharpe 1.319: beats SA15 ×2 (20.64%; 1.049) and the Nasdaq |
+| 7 declared neighbours (budget 0.70/0.80, volatility 63/189, band 0.03/0.08, monthly) | 7/7 beat the two references; CAGR 21.77 to 22.85%, Sharpe 1.273 to 1.361, max. drawdown −20.9 to −24.0% |
+| 7 restarts from cash (2019 to 2025, up to 2026-10-30) | 7/7 beat the two references in CAGR and in Sharpe |
+| Deflated Sharpe (Bailey and López de Prado) | 0.999 for 13 trials in the register |
 
-Détail : [`robustness/SA16_it2/tables.md`](robustness/SA16_it2/tables.md).
-Limites de ces tests :
+Detail: [`robustness/SA16_it2/tables.md`](robustness/SA16_it2/tables.md).
+Limits of these tests:
 
-- Les redémarrages partagent la même fin (2025–2026, très favorable à l'or)
-  et ne sont pas indépendants.
-- Les voisins ne varient qu'un paramètre à la fois.
-- Le Sharpe déflaté mesure un Sharpe absolu contre le hasard, pas la
-  probabilité de battre le Nasdaq. Il ne compte ni les 85 politiques de SA15,
-  ni les choix d'univers antérieurs du projet.
+- The restarts share the same end (2025–2026, very favourable to gold) and are
+  not independent.
+- The neighbours vary only one parameter at a time.
+- The deflated Sharpe measures an absolute Sharpe against chance, not the
+  probability of beating the Nasdaq. It counts neither the 85 policies of SA15
+  nor the earlier choices of universe of the project.
 
-## 6. Toutes les itérations
+## 6. All the iterations
 
-| Itération | Famille, mécanisme | CAGR | Sharpe | Perte max. | Coûts EUR | Statut |
+| Iteration | Family, mechanism | CAGR | Sharpe | Max. drawdown | Costs EUR | Status |
 | --- | --- | ---: | ---: | ---: | ---: | --- |
-| [it1](../../research/SA16/it01.md) | Nasdaq tenu à la part des rendements 1/3/6/12 mois positifs du `^NDX` (clôture de New York), reliquat vers l'or selon sa propre tendance, puis monétaire | 15,54 % | 0,996 | −24,5 % | 15 024 | NOT_SUPPORTED |
-| it1 C1 | même règle sans or | 12,48 % | 0,862 | −24,8 % | 10 275 | témoin |
-| [**it2**](../../research/SA16/it02.md) | **technologie + or au budget de risque 75/25, inverse de la volatilité à portée normalisée** | **22,40 %** | **1,321** | **−22,3 %** | 698 | **retenue, UNCERTAIN** |
-| it2 C1 | cible constante 2/3 – 1/3 | 21,83 % | 1,273 | −22,7 % | 373 | témoin |
-| it2 C2 | même règle, Nasdaq comme croissance | 18,45 % | 1,212 | −21,1 % | 433 | témoin |
-| [it3](../../research/SA16/it03.md) | it2 + budget incliné ±0,10 vers l'actif au meilleur rendement 6 mois | 20,48 % | 1,207 | −23,9 % | 4 028 | NOT_SUPPORTED |
+| [it1](../../research/SA16/it01.md) | Nasdaq held at the share of positive 1/3/6/12-month returns of `^NDX` (New York close), the remainder to gold according to its own trend, then money market | 15.54% | 0.996 | −24.5% | 15,024 | NOT_SUPPORTED |
+| it1 C1 | same rule without gold | 12.48% | 0.862 | −24.8% | 10,275 | control |
+| [**it2**](../../research/SA16/it02.md) | **technology + gold at a 75/25 risk budget, inverse of the span-normalised volatility** | **22.40%** | **1.321** | **−22.3%** | 698 | **retained, UNCERTAIN** |
+| it2 C1 | constant target 2/3 – 1/3 | 21.83% | 1.273 | −22.7% | 373 | control |
+| it2 C2 | same rule, Nasdaq as growth | 18.45% | 1.212 | −21.1% | 433 | control |
+| [it3](../../research/SA16/it03.md) | it2 + budget tilted ±0.10 towards the asset with the best 6-month return | 20.48% | 1.207 | −23.9% | 4,028 | NOT_SUPPORTED |
 
-- **it1**, timing directionnel par paliers : il vend dans les V et revient
-  tard. En 2020, 0 % de Nasdaq les 20 mars et 3 avril, puis 75 % le 9 avril,
-  après le rebond. Krach à −20,2 % contre −18,0 % pour le Nasdaq conservé,
-  2023 à +34,4 % contre +51,1 %. L'or n'y est utile que **tenu** : contre son
-  témoin sans or, Δrendement +2,8 pts [+0,2 ; +5,9]. De 2018-08 à 2018-12, le
-  livre est resté en cash, faute de 252 séances d'historique pour l'or : son
-  2018 n'est pas un effet de la règle.
-- **it2** change de famille : diversification structurelle, rééquilibrage
-  contrariant, aucune vente au creux. En 2020, la cible et le livre dérivent
-  ensemble dans la bande et la règle ne passe aucun ordre.
-- **it3** incline le budget selon le momentum relatif à 6 mois : en retard à
-  chaque retournement (2019, 2020, début 2022). ΔSharpe contre it2 −0,115
-  [−0,234 ; −0,005] ; coûts multipliés par six.
-- **Écarté sans backtest**, après contrôle des données : un achat contrariant
-  pendant les inversions VIX/VIX3M, trop précoce dans 3 des 6 inversions
-  longues. Écarté sur les enseignements d'it1 et des filtres de SA15 R3/R5 :
-  un plafond de volatilité du portefeuille vers le monétaire (même retard au
-  rebond).
+- **it1**, directional timing in steps: it sells in the Vs and comes back late.
+  In 2020, 0% of Nasdaq on 20 March and 3 April, then 75% on 9 April, after the
+  rebound. Crash at −20.2% against −18.0% for the Nasdaq held, 2023 at +34.4%
+  against +51.1%. Gold is useful in it only when **held**: against its control
+  without gold, Δreturn +2.8 pts [+0.2; +5.9]. From 2018-08 to 2018-12, the
+  book stayed in cash, for lack of 252 sessions of history for gold: its 2018
+  is not an effect of the rule.
+- **it2** changes family: structural diversification, contrarian rebalancing,
+  no sale at the trough. In 2020, the target and the book drift together within
+  the band and the rule places no order.
+- **it3** tilts the budget according to the 6-month relative momentum: late at
+  each turn (2019, 2020, early 2022). ΔSharpe against it2 −0.115
+  [−0.234; −0.005]; costs multiplied by six.
+- **Set aside without a backtest**, after a control of the data: a contrarian
+  purchase during the VIX/VIX3M inversions, too early in 3 of the 6 long
+  inversions. Set aside on the lessons of it1 and of the filters of SA15 R3/R5:
+  a cap on the portfolio's volatility towards the money market (the same delay
+  at the rebound).
 
-## 7. Exécution manuelle
+## 7. Manual execution
 
-SA16_it2 : 42 ordres en 21 jours d'intervention sur 8,25 ans (**2,5 jours par
-an, exactement 2 ordres par jour d'intervention**, maximum 2 ; limite 20, cible
-1 à 10). Rotation 0,35 fois le livre par an ; cash résiduel moyen 0,16 %.
-Onze rejets, tous `INSUFFICIENT_CASH` : un achat réduit faute de cash après
-une vente en parts entières et frais, comme les 19 de SA15. Aucune décision
-n'a eu d'entrée illisible : la volatilité à portée normalisée traverse les deux
-séances que Yahoo ne sert pas, là où SA15 perd la technologie six mois de
-suite.
+SA16_it2: 42 orders on 21 trading days over 8.25 years (**2.5 days a year,
+exactly 2 orders per trading day**, maximum 2; limit 20, target 1 to 10).
+Turnover 0.35 times the book a year; average residual cash 0.16%. Eleven
+rejects, all `INSUFFICIENT_CASH`: a purchase reduced for lack of cash after a
+sale in whole units and fees, like the 19 of SA15. No decision had an input
+that could not be read: the span-normalised volatility crosses the two sessions
+that Yahoo does not serve, where SA15 loses technology six months in a row.
 
-## 8. Ce qui est documenté et ce qui est propre à SA16
+## 8. What is documented and what is specific to SA16
 
-Briques documentées :
+Documented building blocks:
 
-- **Budget de risque**, poids `b/σ` sans corrélation : Maillard, Roncalli,
+- **Risk budget**, weights `b/σ` without correlation: Maillard, Roncalli,
   Teiletche (2010).
-- **L'or couvre les actions** en moyenne et sert de refuge dans les chocs
-  extrêmes ; l'acheter après le krach sous-performe : Baur, Lucey (2010).
-- **Rendement de diversification par le rééquilibrage** : Willenbrock
-  (2011), avec les critiques de Chambers (2014) et de Cuthbertson et al.
-- **Volatilité et momentum** : la gestion par la volatilité améliore les
-  actions (Harvey et al., 2018) mais déçoit souvent hors échantillon
-  (Cederburg et al., 2020) ; l'avantage du momentum temporel vient surtout
-  de la pondération par la volatilité (Kim, Tse, Wald, 2016).
-- **Momentum** temporel et transversal : Moskowitz, Ooi, Pedersen (2012) ;
-  Hurst, Ooi, Pedersen (2017) ; Asness, Moskowitz, Pedersen (2013) ;
+- **Gold hedges equities** on average and serves as a haven in extreme shocks;
+  buying it after the crash underperforms: Baur, Lucey (2010).
+- **Diversification return through rebalancing**: Willenbrock (2011), with the
+  criticisms of Chambers (2014) and of Cuthbertson et al.
+- **Volatility and momentum**: volatility management improves equities
+  (Harvey et al., 2018) but often disappoints out of sample (Cederburg et al.,
+  2020); the advantage of time-series momentum comes mostly from the
+  volatility weighting (Kim, Tse, Wald, 2016).
+- Time-series and cross-sectional **momentum**: Moskowitz, Ooi, Pedersen
+  (2012); Hurst, Ooi, Pedersen (2017); Asness, Moskowitz, Pedersen (2013);
   Goulding, Harvey, Mazzoleni (2023).
 
-Propre à SA16, et à juger comme tel :
+Specific to SA16, and to be judged as such:
 
-1. **`SpanScaledVolatilitySignal`** : un estimateur de volatilité au contrat
-   `AVAILABLE_OBSERVATIONS` déclaré, qui divise chaque rendement par la racine
-   des séances qu'il couvre et refuse un trou de plus de trois séances. Testé
-   à la main, contre l'estimateur consécutif sans trou, et contre le futur.
-2. **« Une entrée illisible garde le livre »** au lieu d'exclure le fonds,
-   la cause des sorties forcées de SA15 en 2025–2026.
-3. **Le choix de diversifier plutôt que de prévoir**, et sa mesure honnête :
-   deux signaux directionnels (absolu, relatif) réfutés sur cette période
-   avant de retenir une règle sans direction.
+1. **`SpanScaledVolatilitySignal`**: a volatility estimator with the declared
+   `AVAILABLE_OBSERVATIONS` contract, which divides each return by the square
+   root of the sessions it covers and refuses a gap of more than three
+   sessions. Tested by hand, against the consecutive estimator without a gap,
+   and against the future.
+2. **"An input that cannot be read keeps the book"** instead of excluding the
+   fund, the cause of the forced exits of SA15 in 2025–2026.
+3. **The choice to diversify rather than forecast**, and its honest measure:
+   two directional signals (absolute, relative) refuted over this period before
+   retaining a rule without direction.
 
-## 9. Limites
+## 9. Limits
 
-- **Rétrospectif** : toute la fenêtre a été vue par SA1–SA15.
-- **Univers choisi après coup** : la technologie vient de SA15 R4, et SA15
-  avait déjà publié des mélanges technologie/or constants (« compagnons » 55
-  et 79). SA16 n'a pas cherché de poids sur l'historique : son budget 0,75 a
-  été posé avant le run et ses voisins 0,70/0,80 tiennent. Mais son
-  avantage en rendement dépend de ce choix (C2).
-- **Concentration** : deux lignes, un secteur américain (quelques grandes
-  capitalisations) et un ETC or (risque d'émetteur et de dépositaire, pas un
-  OPCVM). Pas éligible au PEA.
-- **Change** : les deux fonds sont cotés en euros mais exposés au dollar ;
-  rien n'est couvert.
-- **L'or a vécu une période exceptionnelle** (+34,6 % en 2024, +49,3 % en
-  2025 en euros) qui pèse dans le résultat récent.
-- **Données** : source unique (Yahoo pour les fonds), historiques restatés,
-  pas de millésimes point-in-time ; deux séances Xetra absentes.
-- **Statistique** : la différence de rendement n'est pas significative ; 8,25
-  années seulement.
-- **Provenance** : certains runs d'itération portent `dirty = True`. La cause
-  est la présence d'exports non suivis sous `results/SA16` au moment du run,
-  l'arbre de code étant celui du commit nommé. Le rerun final de la
-  configuration retenue est sur arbre propre.
+- **Retrospective**: the whole window was seen by SA1–SA15.
+- **Universe chosen after the fact**: technology comes from SA15 R4, and SA15
+  had already published constant technology/gold mixes ("companions" 55 and
+  79). SA16 did not search for weights on the history: its 0.75 budget was set
+  before the run and its 0.70/0.80 neighbours hold. But its return advantage
+  depends on this choice (C2).
+- **Concentration**: two lines, a US sector (a few large caps) and a gold ETC
+  (issuer and custodian risk, not a UCITS). Not eligible for the PEA.
+- **Exchange rate**: both funds are listed in euros but exposed to the dollar;
+  nothing is hedged.
+- **Gold lived through an exceptional period** (+34.6% in 2024, +49.3% in 2025
+  in euros) which weighs on the recent result.
+- **Data**: a single source (Yahoo for the funds), restated histories, no
+  point-in-time vintages; two Xetra sessions missing.
+- **Statistics**: the return difference is not significant; only 8.25 years.
+- **Provenance**: some iteration runs carry `dirty = True`. The cause is the
+  presence of untracked exports under `results/SA16` at the time of the run,
+  the code tree being that of the commit named. The final rerun of the
+  configuration retained is on a clean tree.
 
-Une vérification prospective reste la seule preuve possible
-(`research/PROTOCOL.md`, section 6) : configuration et magasin figés, départ à
-la première séance XPAR suivant la mise à disposition du code, lecture après
-252 séances.
+A prospective check remains the only possible proof (`research/PROTOCOL.md`,
+section 6): configuration and store frozen, start at the first XPAR session
+after the code is made available, reading after 252 sessions.
 
-## 10. Reproduire
+## 10. Reproduce
 
-Linux, macOS ou WSL (verrou `fcntl`), Python 3.12, `uv` :
+Linux, macOS or WSL (`fcntl` lock), Python 3.12, `uv`:
 
 ```bash
 uv sync --frozen --extra stats
-uv run python scripts/SA16_download_data.py           # runs/sa16_store, fin 2026-10-30
-uv run python scripts/SA16_run_study.py reproduce      # SA15 et Nasdaq contre l'archive SA15
+uv run python scripts/SA16_download_data.py           # runs/sa16_store, up to 2026-10-30
+uv run python scripts/SA16_run_study.py reproduce      # SA15 and the Nasdaq against the SA15 archive
 uv run python scripts/SA16_run_study.py references
 for n in 01 02 03; do
     uv run python scripts/SA16_run_study.py candidate research/SA16/candidates/it$n.json
@@ -294,20 +291,20 @@ uv run python scripts/SA16_run_study.py finalise research/SA16/candidates/it02.j
 uv run python scripts/SA16_report.py
 ```
 
-Utiliser un nouveau dossier (`--output`) pour ne pas mêler un rerun aux
-exports commités : le script refuse d'écraser un run différent dans un dossier
-existant. Retélécharger ne garantit pas le même magasin (empreinte de l'étude
-`677397e6fb770978…`) : les historiques sont restatés par le fournisseur.
+Use a new folder (`--output`) so as not to mix a rerun with the committed
+exports: the script refuses to overwrite a different run in an existing
+folder. Downloading again does not guarantee the same store (fingerprint of the
+study `677397e6fb770978…`): the histories are restated by the provider.
 
-| Fichier | Contenu |
+| File | Content |
 | --- | --- |
-| `selected.json` | configuration gelée, empreinte, vérification du rerun |
-| `register.csv` | les 13 essais comptés (candidats, témoins, voisins) |
-| `itNN/tables.md`, `itNN/report.json` | tableaux générés de chaque itération |
-| `itNN/x1/<livre>/`, `x2/` | courbes, poids, ordres, exécutions, rejets, décisions |
-| `references/`, `reproduction/` | les références sur la fenêtre SA16 ; la reproduction de SA15 |
-| `robustness/SA16_it2/` | voisins et redémarrages |
-| `final/` | rerun de la configuration retenue avec le code final |
+| `selected.json` | frozen configuration, fingerprint, check of the rerun |
+| `register.csv` | the 13 trials counted (candidates, controls, neighbours) |
+| `itNN/tables.md`, `itNN/report.json` | generated tables of each iteration |
+| `itNN/x1/<book>/`, `x2/` | curves, weights, orders, fills, rejects, decisions |
+| `references/`, `reproduction/` | the references over the SA16 window; the reproduction of SA15 |
+| `robustness/SA16_it2/` | neighbours and restarts |
+| `final/` | rerun of the configuration retained with the final code |
 | `comparison.png`, `weights.png` | figures (`scripts/SA16_report.py`) |
 
 ## Archived exports (2026-10-31)

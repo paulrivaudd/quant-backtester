@@ -274,7 +274,7 @@ def test_each_secondary_question_is_concluded_on_its_own_difference() -> None:
         "compression_vs_raw": "NOT_MEASURED",
         "second_process": "LOWER_MSE_INTERVAL_EXCLUDES_ZERO",
     }
-    assert set(SCRIPT.SECONDARY_FRENCH) == {name for name, _, _ in SCRIPT.SECONDARY_QUESTIONS}
+    assert set(SCRIPT.SECONDARY_LABELS) == {name for name, _, _ in SCRIPT.SECONDARY_QUESTIONS}
 
 
 # --- small pieces ------------------------------------------------------------------------
@@ -561,7 +561,7 @@ def test_the_whole_route_holds_together_and_leaks_nothing(
         register,
         {"everything": 1.0},
     )
-    french = SCRIPT.report_extra(
+    extra = SCRIPT.report_extra(
         coverage,
         summary,
         errors,
@@ -574,8 +574,8 @@ def test_the_whole_route_holds_together_and_leaks_nothing(
         secondary,
     )
     assert "**INSUFFICIENT_EVIDENCE.**" in written and "C0 to C7 are controls" in written
-    assert "Statut de l'hypothèse préinscrite `sa13_signatures_neurons`" in french
-    assert "Toutes les décisions utilisables" in french and " nan" not in french.lower()
+    assert "Status of the preregistered hypothesis `sa13_signatures_neurons`" in extra
+    assert "Every usable decision" in extra and " nan" not in extra.lower()
 
     # The models come back from their folders the very models that were used.
     for found in core.entries:

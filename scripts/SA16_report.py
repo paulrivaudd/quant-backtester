@@ -53,10 +53,10 @@ def comparison(output: Path) -> None:
     selected = json.loads((output / "selected.json").read_text(encoding="utf-8"))
     name = selected["candidate"]["id"]
     books = {
-        f"{name} (retenue)": output / "final" / "x1" / name,
-        "Nasdaq conservé": output / "references" / "x1" / "Nasdaq_buy_hold",
-        "SA15 essai 71": output / "references" / "x1" / "SA15_R4_trial71",
-        "Technologie conservée": output / "references" / "x1" / "Tech_buy_hold",
+        f"{name} (retained)": output / "final" / "x1" / name,
+        "Nasdaq held": output / "references" / "x1" / "Nasdaq_buy_hold",
+        "SA15 trial 71": output / "references" / "x1" / "SA15_R4_trial71",
+        "Technology held": output / "references" / "x1" / "Tech_buy_hold",
     }
     figure, (top, bottom) = plt.subplots(
         2, 1, figsize=(11, 7.5), sharex=True, gridspec_kw={"height_ratios": [2, 1]}
@@ -78,13 +78,13 @@ def comparison(output: Path) -> None:
         drawdown = values / values.cummax() - 1.0
         bottom.plot(drawdown.index, 100.0 * drawdown, color=colour, linewidth=1.5)
     top.set_yscale("log")
-    top.set_ylabel("Valeur nette, base 100 (échelle log)", color=MUTED, fontsize=9)
-    bottom.set_ylabel("Baisse sous le sommet (%)", color=MUTED, fontsize=9)
+    top.set_ylabel("Net value, base 100 (log scale)", color=MUTED, fontsize=9)
+    bottom.set_ylabel("Fall below the peak (%)", color=MUTED, fontsize=9)
     for axis in (top, bottom):
         style(axis)
     top.legend(frameon=False, fontsize=9, labelcolor=INK, loc="upper left")
     top.set_title(
-        "SA16 : net de coûts, 2018-08-01 → 2026-10-30, 100 000 EUR",
+        "SA16: net of costs, 2018-08-01 → 2026-10-30, 100,000 EUR",
         color=INK,
         fontsize=11,
         loc="left",
@@ -102,7 +102,7 @@ def weights(output: Path) -> None:
     index = pd.DatetimeIndex([date.fromisoformat(value) for value in frame["session_date"]])
     held = frame.drop(columns="session_date").set_index(index)
     held = held.loc[:, held.sum() > 0]
-    labels = {"ETF_US_TECH": "Technologie (QDVE)", "ETF_GOLD": "Or (4GLD)"}
+    labels = {"ETF_US_TECH": "Technology (QDVE)", "ETF_GOLD": "Gold (4GLD)"}
     figure, axis = plt.subplots(figsize=(11, 3.2))
     figure.patch.set_facecolor(SURFACE)
     bottom = pd.Series(0.0, index=held.index)
@@ -120,9 +120,9 @@ def weights(output: Path) -> None:
         bottom = top
     style(axis)
     axis.set_ylim(0, 100)
-    axis.set_ylabel("Poids détenu (%)", color=MUTED, fontsize=9)
+    axis.set_ylabel("Weight held (%)", color=MUTED, fontsize=9)
     axis.legend(frameon=False, fontsize=9, labelcolor=INK, loc="lower left", ncols=2)
-    axis.set_title(f"{name} : poids détenus", color=INK, fontsize=11, loc="left")
+    axis.set_title(f"{name}: weights held", color=INK, fontsize=11, loc="left")
     figure.tight_layout()
     figure.savefig(output / "weights.png", dpi=130, facecolor=SURFACE)
     plt.close(figure)

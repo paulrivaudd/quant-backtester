@@ -110,20 +110,20 @@ def test_a_month_is_measured_from_the_last_value_of_the_month_before() -> None:
 def test_the_facts_give_the_book_the_fund_and_the_exposure_over_each_stretch() -> None:
     market = curve([100.0, 110.0, 88.0, 99.0, 132.0, 120.0])
 
-    facts = SCRIPT.facts_table(history(), market).set_index("Période")
+    facts = SCRIPT.facts_table(history(), market).set_index("Stretch")
 
-    worst = facts.loc["Plus forte baisse (sommet → creux)"]
-    assert (worst["Du"], worst["Au"]) == (DAYS[1], DAYS[2])
+    worst = facts.loc["Deepest fall (peak → trough)"]
+    assert (worst["From"], worst["To"]) == (DAYS[1], DAYS[2])
     # Two valuations are one return: the two are never confused.
-    assert (worst["Valorisations"], worst["Rendements"]) == (2, 1)
-    assert worst["Stratégie"] == pytest.approx(-0.10)
-    assert worst["ETF_WORLD (clôture)"] == pytest.approx(-0.20)
+    assert (worst["Valuations"], worst["Returns"]) == (2, 1)
+    assert worst["Strategy"] == pytest.approx(-0.10)
+    assert worst["ETF_WORLD (close)"] == pytest.approx(-0.20)
     # The relative return is geometric: 0.90 / 0.80 - 1, not -10% + 20%.
-    assert worst["Écart relatif"] == pytest.approx(0.125)
-    assert worst["Poids de clôture moyen"] == pytest.approx(0.5)
-    best = facts.loc["Plus forte hausse (creux → sommet ultérieur, durée libre)"]
-    assert (best["Du"], best["Au"]) == (DAYS[2], DAYS[4])
-    assert best["Poids de clôture max."] == 1.0
+    assert worst["Relative gap"] == pytest.approx(0.125)
+    assert worst["Average close weight"] == pytest.approx(0.5)
+    best = facts.loc["Largest rise (trough → later peak, any length)"]
+    assert (best["From"], best["To"]) == (DAYS[2], DAYS[4])
+    assert best["Max. close weight"] == 1.0
     assert len(facts) == 8
     text = SCRIPT.facts_markdown(facts.reset_index())
     assert "-10.00%" in text and "| 50% |" in text
@@ -145,16 +145,16 @@ def test_the_global_table_shows_the_strategy_beside_the_fund_and_never_a_zero_fo
 
     text = SCRIPT.global_table(row, market, {"net_return": 0.61, "sharpe": 0.82})
 
-    assert "| Période mesurée | 2021-04-01 → 2026-10-09 (1416 séances) | idem |" in text
-    assert "| Score de qualité QUALITY_V1 (0-100 %) | 48.6% | n/a |" in text
-    assert "| Rendement net total | +66.00% | +94.80% |" in text
-    assert "| Rendement net, second run réel à coûts doublés | +61.00% | n/a |" in text
-    assert "| Coûts payés (EUR) | n/a | n/a |" in text
+    assert "| Period measured | 2021-04-01 → 2026-10-09 (1416 sessions) | same |" in text
+    assert "| QUALITY_V1 quality score (0-100%) | 48.6% | n/a |" in text
+    assert "| Total net return | +66.00% | +94.80% |" in text
+    assert "| Net return, second actual run at doubled costs | +61.00% | n/a |" in text
+    assert "| Costs paid (EUR) | n/a | n/a |" in text
     # An indicator only some studies measure is left out, not printed as missing.
     assert "Sortino" not in text
     assert text.count("\n") == 2 + len(SCRIPT.GLOBAL_ROWS) - len(SCRIPT.OPTIONAL_ROWS)
     measured = SCRIPT.global_table({**row, "sortino": 1.19}, market, None)
-    assert "| Ratio de Sortino net (taux sans risque 0) | +1.19 | n/a |" in measured
+    assert "| Net Sortino ratio (risk-free rate 0) | +1.19 | n/a |" in measured
 
 
 def test_the_history_has_a_row_per_session_and_hides_what_the_strategy_does_not_use() -> None:
@@ -162,8 +162,8 @@ def test_the_history_has_a_row_per_session_and_hides_what_the_strategy_does_not_
 
     assert len(lines) == 2 + len(DAYS)
     assert lines[0] == (
-        "| Séance | Clôture ETF_WORLD | `volatility_20r[ETF_WORLD]` | Poids cible ETF_WORLD | "
-        "Poids détenu ETF_WORLD | Valeur nette (EUR) |"
+        "| Session | Close ETF_WORLD | `volatility_20r[ETF_WORLD]` | Target weight ETF_WORLD | "
+        "Held weight ETF_WORLD | Net value (EUR) |"
     )
     # No value for the signal on the first day; no position is a weight of zero.
     assert lines[2] == "| 2026-01-29 | 100.00 |  | 50.0% | 0.0% | 100.00 |"
@@ -177,7 +177,7 @@ def test_a_fund_of_its_own_that_a_book_holds_is_named_in_the_history() -> None:
     table = SCRIPT.history_markdown(frame)
 
     header = table.splitlines()[0]
-    assert "Clôture ETF_VALUE_WORLD" in header and "Poids détenu ETF_VALUE_WORLD" in header
+    assert "Close ETF_VALUE_WORLD" in header and "Held weight ETF_VALUE_WORLD" in header
     assert "`close_ETF_VALUE_WORLD`" not in header
     assert "| 47.50 |" in table.splitlines()[2]
 
@@ -188,16 +188,16 @@ def test_the_second_fund_is_shown_when_the_strategy_reads_or_holds_it() -> None:
 
     header = SCRIPT.history_markdown(frame).splitlines()[0]
 
-    assert "Clôture ETF_SP500_PEA" in header and "Poids détenu ETF_SP500_PEA" in header
+    assert "Close ETF_SP500_PEA" in header and "Held weight ETF_SP500_PEA" in header
 
 
 def test_the_commentary_is_written_or_said_to_be_missing() -> None:
     notes = {
-        "summary": "Une phrase.",
+        "summary": "One sentence.",
         "strengths": ["a", "b"],
         "weaknesses": ["c"],
-        "worst": "La baisse.",
-        "best": "La hausse.",
+        "worst": "The fall.",
+        "best": "The rise.",
         "risks": ["d"],
         "measured": ["m"],
         "to_test": ["e"],
@@ -205,16 +205,16 @@ def test_the_commentary_is_written_or_said_to_be_missing() -> None:
 
     text = SCRIPT.commentary_markdown(notes)
 
-    assert text.index("### Points forts") < text.index("### Points faibles")
-    assert "- a\n- b" in text and "La baisse." in text
-    assert "Situations de marché les plus risquées" in text
-    measured = text.index("Mesures complémentaires")
-    assert text.index("Situations de marché") < measured
-    assert measured < text.index("Ce que ces résultats n'établissent pas")
+    assert text.index("### Strengths") < text.index("### Weaknesses")
+    assert "- a\n- b" in text and "The fall." in text
+    assert "The market situations most risky" in text
+    measured = text.index("Complementary measures")
+    assert text.index("The market situations") < measured
+    assert measured < text.index("What these results do not establish")
     # Unless its own study wrote them, the measures of a strategy are the diagnostics'.
-    assert "### Mesures complémentaires (voir results/summary/diagnostics.md)" in text
-    assert "Aucun commentaire" in SCRIPT.commentary_markdown(None)
-    assert "Aucun commentaire" in SCRIPT.commentary_markdown({})
+    assert "### Complementary measures (see results/summary/diagnostics.md)" in text
+    assert "No commentary" in SCRIPT.commentary_markdown(None)
+    assert "No commentary" in SCRIPT.commentary_markdown({})
 
 
 def test_a_report_has_its_three_sections_with_the_analysis_above_the_history() -> None:
@@ -228,15 +228,15 @@ def test_a_report_has_its_three_sections_with_the_analysis_above_the_history() -
         "SA6 - vol control", row, {}, None, history(), market, yearly, None, ["Provenance."]
     )
 
-    assert text.startswith("# SA6 - vol control — résultats et analyse")
-    first = text.index("## 1. Indicateurs de résultat globaux")
-    second = text.index("## 2. Analyse")
-    third = text.index("## 3. Historique")
+    assert text.startswith("# SA6 - vol control — results and analysis")
+    first = text.index("## 1. Global result indicators")
+    second = text.index("## 2. Analysis")
+    third = text.index("## 3. History")
     assert first < second < third
-    assert "| 2026 (partielle, depuis le 2026-01-29) (partielle, au 2026-03-02) | +21.00% " in text
-    assert "Pire mois : **2026-03**" in text
-    assert "moyenne géométrique pondérée" in text and "stress approché" in text
-    assert text.index("### Faits mesurés") < text.index("### Baisses sous un sommet") < third
+    assert "| 2026 (partial, from 2026-01-29) (partial, to 2026-03-02) | +21.00% " in text
+    assert "Worst month: **2026-03**" in text
+    assert "weighted geometric mean" in text and "approximate stress" in text
+    assert text.index("### Measured facts") < text.index("### Falls below a peak") < third
     assert text[third:].count("\n| 2026-0") == len(DAYS)
 
 
@@ -261,19 +261,19 @@ def test_a_drawdown_is_reported_with_the_day_its_peak_was_reached_again() -> Non
     assert (second.peak, second.trough, second.recovery) == (DAYS[4], DAYS[5], None)
     assert "| 1 | 2026-01-30 | 2026-02-02 | -20.00% | 2026-02-04 | 5 |" in text
     assert (
-        "| 2 | 2026-02-04 | 2026-03-02 | -9.09% | non récupéré au 2026-03-02 | 26 (en cours) |"
+        "| 2 | 2026-02-04 | 2026-03-02 | -9.09% | not recovered at 2026-03-02 | 26 (ongoing) |"
         in text
     )
-    assert "Drawdown au 2026-03-02 : **-9.09%**" in text
-    assert "Plus longue période sous un sommet : **26 jours calendaires**" in text
-    assert "(en cours" in text
+    assert "Drawdown at 2026-03-02: **-9.09%**" in text
+    assert "Longest stretch below a peak: **26 calendar days**" in text
+    assert "(ongoing" in text
 
 
 def test_a_curve_that_never_falls_has_no_drawdown_to_recover() -> None:
     text = SCRIPT.drawdown_markdown(curve([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]))
 
     assert SCRIPT.underwater_episodes(curve([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])) == []
-    assert "aucune baisse sous un sommet" in text and "**0.00%**" in text
+    assert "no fall below a peak" in text and "**0.00%**" in text
 
 
 def test_months_are_counted_by_sign_and_an_idle_month_is_not_a_losing_one() -> None:
@@ -285,15 +285,13 @@ def test_months_are_counted_by_sign_and_an_idle_month_is_not_a_losing_one() -> N
 
     text = SCRIPT.calendar_markdown(flat, market, yearly, "a", "50/50 rebalanced")
 
-    assert "**0 positifs, 1 négatifs, 2 sans variation** sur 3" in text
-    assert (
-        "mois incomplets : 2026-01 commence le 2026-01-29 ; 2026-03 s'arrête au 2026-03-02" in text
-    )
-    assert "| Année | Stratégie | Fonds détenu | 50/50 rebalancé | Séances |" in text
+    assert "**0 positive, 1 negative, 2 unchanged** out of 3" in text
+    assert "incomplete months: 2026-01 starts on 2026-01-29; 2026-03 stops at 2026-03-02" in text
+    assert "| Year | Strategy | Fund held | 50/50 rebalanced | Sessions |" in text
     assert "| -10.00% | +20.00% | +25.00% | 6 |" in text
     # The even split is not shown beside itself.
     own = SCRIPT.calendar_markdown(flat, market, yearly, "50/50 rebalanced", "50/50 rebalanced")
-    assert "50/50 rebalancé" not in own
+    assert "50/50 rebalanced |" not in own
 
 
 def test_the_activity_says_how_often_anything_was_held() -> None:
@@ -301,8 +299,8 @@ def test_the_activity_says_how_often_anything_was_held() -> None:
     idle = history()
     idle["held_ETF_WORLD"] = 0.0
 
-    assert "**5 valorisations sur 6**" in text and "de 50.0% à 100.0%" in text
-    assert "aucune position détenue" in SCRIPT.activity_markdown(idle)
+    assert "**5 valuations out of 6**" in text and "from 50.0% to 100.0%" in text
+    assert "no position held" in SCRIPT.activity_markdown(idle)
 
 
 def test_the_control_and_the_references_get_a_report_under_a_name_of_their_own() -> None:
@@ -331,15 +329,15 @@ def test_the_columns_a_study_adds_to_a_history_have_a_heading_and_a_unit() -> No
     lines = SCRIPT.history_markdown(frame).splitlines()
 
     for heading in (
-        "Ouverture ETF_WORLD",
-        "Modèle du mois (AAAAMM)",
-        "Prévision (pb)",
-        "Prix-volume (pb)",
-        "Filtre (1 = ouvert)",
-        "Poids avant bande",
-        "Prévision mu_2 (pb)",
-        "Volatilité prévue (annualisée)",
-        "Repli EWMA (1 = oui)",
+        "Open ETF_WORLD",
+        "Model of the month (YYYYMM)",
+        "Forecast (bp)",
+        "Price-volume (bp)",
+        "Gate (1 = open)",
+        "Weight before the band",
+        "Forecast mu_2 (bp)",
+        "Forecast volatility (annualised)",
+        "EWMA fallback (1 = yes)",
     ):
         assert f"| {heading} |" in lines[0]
     # A day without a model or a forecast is an empty cell, never a zero.
@@ -368,13 +366,13 @@ def test_every_book_of_the_study_is_listed_with_the_strategy_in_bold() -> None:
     alone = SCRIPT.peers_markdown(summary, None, "SA12 - ARIMA GARCH")
 
     lines = text.splitlines()
-    assert lines[0].startswith("| Livre | Rang | Score | Net | Net, coûts x2 | Sharpe |")
+    assert lines[0].startswith("| Book | Rank | Score | Net | Net, costs x2 | Sharpe |")
     assert lines[2].startswith("| D0 - same risk no filter | 1 | 52.0% | +61.00% | +56.00% | +0.85")
     assert lines[3].startswith("| **SA12 - ARIMA GARCH** | 2 | 0.0% | -1.70% | -5.70% | -0.14")
     # A reference has no rank and no score: said, not zero. An unmeasured column too.
     assert lines[4].startswith("| buy & hold World | n/a | n/a | +95.00% | +94.00% |")
     assert "| n/a | n/a | 100 |" in lines[4]
-    assert "coûts x2" not in alone and alone.count("\n") == 4
+    assert "costs x2" not in alone and alone.count("\n") == 4
 
 
 def test_the_section_of_the_study_sits_in_the_analysis_above_the_commentary() -> None:
@@ -383,7 +381,7 @@ def test_the_section_of_the_study_sits_in_the_analysis_above_the_commentary() ->
         {"2026": {"SA12 - ARIMA GARCH": 0.21, "buy & hold World": 0.20, "sessions": 6.0}}
     )
     row = {"first_session": "2026-01-29", "last_session": "2026-03-02", "sessions": 6}
-    notes = {"summary": "Une phrase.", "measured": ["m"], "measured_source": "SA12_study.md"}
+    notes = {"summary": "One sentence.", "measured": ["m"], "measured_source": "SA12_study.md"}
 
     text = SCRIPT.report(
         "SA12 - ARIMA GARCH",
@@ -395,22 +393,22 @@ def test_the_section_of_the_study_sits_in_the_analysis_above_the_commentary() ->
         yearly,
         notes,
         ["Provenance."],
-        peers="| Livre | Rang |\n|---|---:|\n| **SA12 - ARIMA GARCH** | 10 |",
-        extra="### Statut de l'hypothèse préinscrite : **INSUFFICIENT_EVIDENCE**\n",
+        peers="| Book | Rank |\n|---|---:|\n| **SA12 - ARIMA GARCH** | 10 |",
+        extra="### Status of the preregistered hypothesis: **INSUFFICIENT_EVIDENCE**\n",
     )
 
-    peers = text.index("### Classement de tous les livres de l'étude")
-    status = text.index("### Statut de l'hypothèse préinscrite")
-    assert text.index("## 1. Indicateurs") < peers < text.index("## 2. Analyse")
-    assert "ne se comparent pas à ceux d'une autre étude" in text
-    assert text.index("### Par année et par mois") < status < text.index("### En résumé")
-    assert status < text.index("## 3. Historique")
-    assert "### Mesures complémentaires (voir SA12_study.md)" in text
+    peers = text.index("### Ranking of every book of the study")
+    status = text.index("### Status of the preregistered hypothesis")
+    assert text.index("## 1. Global result indicators") < peers < text.index("## 2. Analysis")
+    assert "not comparable with those of another study" in text
+    assert text.index("### By year and by month") < status < text.index("### In short")
+    assert status < text.index("## 3. History")
+    assert "### Complementary measures (see SA12_study.md)" in text
     # Without them a report is what it was before: no empty heading is left behind.
     plain = SCRIPT.report(
         "SA12 - ARIMA GARCH", row, {}, None, history(), market, yearly, None, ["Provenance."]
     )
-    assert "Classement de tous les livres" not in plain and "Statut" not in plain
+    assert "Ranking of every book" not in plain and "Status" not in plain
 
 
 def test_a_study_says_what_its_period_is_and_why() -> None:
@@ -422,14 +420,14 @@ def test_a_study_says_what_its_period_is_and_why() -> None:
 
     common = SCRIPT.study_provenance(config)
     test = SCRIPT.study_provenance(
-        config, period_label="Période de test", context="Un modèle par mois. "
+        config, period_label="Test period", context="One model a month. "
     )
 
-    assert common[0].startswith("Période commune 2023-01-02 → 2026-10-09 · capital 100 000 EUR")
-    assert "commit `2b7d147abcde` (CLEAN), magasin `750c23dfffc3`" in common[2]
+    assert common[0].startswith("Common period 2023-01-02 → 2026-10-09 · capital 100,000 EUR")
+    assert "commit `2b7d147abcde` (CLEAN), store `750c23dfffc3`" in common[2]
     assert len(common) == 3
-    assert test[0].startswith("Période de test 2023-01-02 → 2026-10-09")
-    assert test[-2:] == ["", "Un modèle par mois."]
+    assert test[0].startswith("Test period 2023-01-02 → 2026-10-09")
+    assert test[-2:] == ["", "One model a month."]
 
 
 FILLS = pd.DataFrame(
@@ -485,7 +483,7 @@ def study_folder(root: Path) -> Path:
         "data_state": "750c23dfffc3",
     }
     (root / "config.json").write_text(json.dumps(config), encoding="utf-8")
-    (root / "report_extra_SA12.md").write_text("### Statut : **INSUFFICIENT_EVIDENCE**\n")
+    (root / "report_extra_SA12.md").write_text("### Status: **INSUFFICIENT_EVIDENCE**\n")
     (root / "study.md").write_text("# The study of SA12\n", encoding="utf-8")
     (root / "SA12_forecasts.png").write_bytes(b"a figure of the study")
     (root / "SA11_other.png").write_bytes(b"a figure about another strategy")
@@ -497,9 +495,9 @@ def test_only_the_folders_asked_for_are_written_and_a_control_has_none(tmp_path:
     output = tmp_path / "results"
     commentary = tmp_path / "commentary.toml"
     commentary.write_text(
-        '[SA12]\nsummary = "Une phrase."\nperiod_label = "Période de test"\n'
-        'context = "Contexte de l\'étude."\nmeasured_source = "study.md"\n'
-        'measured = ["m"]\nhistory_note = "Colonnes propres à cette étude."\n',
+        '[SA12]\nsummary = "One sentence."\nperiod_label = "Test period"\n'
+        'context = "Context of the study."\nmeasured_source = "study.md"\n'
+        'measured = ["m"]\nhistory_note = "Columns of this study only."\n',
         encoding="utf-8",
     )
     arguments = ["--study", str(study), "--output", str(output), "--commentary", str(commentary)]
@@ -520,14 +518,14 @@ def test_only_the_folders_asked_for_are_written_and_a_control_has_none(tmp_path:
         "yearly.csv",
     ]
     text = (output / "SA12" / "analysis.md").read_text(encoding="utf-8")
-    assert text.startswith("# SA12 - ARIMA GARCH — résultats et analyse")
-    assert "Période de test 2026-01-29 → 2026-03-02" in text and "Contexte de l'étude." in text
+    assert text.startswith("# SA12 - ARIMA GARCH — results and analysis")
+    assert "Test period 2026-01-29 → 2026-03-02" in text and "Context of the study." in text
     assert "| **SA12 - ARIMA GARCH** | 2 |" in text and "| D0 - same risk no filter | 1 |" in text
-    assert "### Statut : **INSUFFICIENT_EVIDENCE**" in text
-    assert "| Ratio de Sortino net (taux sans risque 0) | -0.17 | +1.30 |" in text
-    assert "Mesures complémentaires (voir study.md)" in text
-    assert text.index("## 3. Historique") < text.index("Colonnes propres à cette étude.")
-    assert "ils sont dans `fills.csv`, à côté de ce fichier" in text
+    assert "### Status: **INSUFFICIENT_EVIDENCE**" in text
+    assert "| Net Sortino ratio (risk-free rate 0) | -0.17 | +1.30 |" in text
+    assert "Complementary measures (see study.md)" in text
+    assert text.index("## 3. History") < text.index("Columns of this study only.")
+    assert "they are in `fills.csv`, beside this file" in text
     with pytest.raises(SystemExit, match="no book for SA13"):
         SCRIPT.main([*arguments, "--only", "SA13"])
 
@@ -586,7 +584,7 @@ def test_without_a_selection_a_control_of_a_later_study_is_skipped(tmp_path: Pat
     assert (summary / "REF_WorldBuyHold" / "analysis.md").is_file()
     # No ranking and no study section unless the folder was asked for by its code.
     text = (output / "SA12" / "analysis.md").read_text(encoding="utf-8")
-    assert "Classement de tous les livres" not in text and "### Statut" not in text
+    assert "Ranking of every book" not in text and "### Status" not in text
     # The summary compares every book of the study, the control included.
     ranking = pd.read_csv(summary / "ranking.csv", index_col="book")
     assert list(ranking.index) == ["D0 - same risk no filter", "SA12 - ARIMA GARCH", HELD]

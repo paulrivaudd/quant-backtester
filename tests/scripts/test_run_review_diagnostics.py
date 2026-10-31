@@ -357,19 +357,19 @@ def test_the_variants_are_the_ensemble_less_one_rule_and_the_other_decays() -> N
     decays = SCRIPT.ewma_variants()
 
     assert list(variants) == [
-        "sans momentum",
-        "sans trend",
-        "sans pullback",
-        "sans relative",
-        "sans relief",
-        "sans contrôle de risque",
+        "without momentum",
+        "without trend",
+        "without pullback",
+        "without relative",
+        "without relief",
+        "without risk control",
     ]
-    without = variants["sans trend"]
+    without = variants["without trend"]
     assert isinstance(without, ETFEnsemble)
     assert without.trend_budget == 0.0 and without.momentum_budget == base.momentum_budget
     # The budget removed stays in cash: nothing else is raised to fill it.
     assert without.relative_budget == base.relative_budget
-    uncontrolled = variants["sans contrôle de risque"]
+    uncontrolled = variants["without risk control"]
     assert isinstance(uncontrolled, ETFEnsemble)
     assert uncontrolled.target_volatility == 10.0 and uncontrolled.trend_budget == base.trend_budget
     ids = {strategy.strategy_id for strategy in (*variants.values(), *decays.values())}
@@ -387,9 +387,9 @@ def test_the_variants_are_the_ensemble_less_one_rule_and_the_other_decays() -> N
 def test_a_missing_figure_is_printed_as_such() -> None:
     frame = pd.DataFrame({"a": [0.5, float("nan")]}, index=["x", "y"])
 
-    lines = SCRIPT.table(frame, [("a", "A", "{:.0%}")], "Livre").splitlines()
+    lines = SCRIPT.table(frame, [("a", "A", "{:.0%}")], "Book").splitlines()
 
-    assert lines[0] == "| Livre | A |"
+    assert lines[0] == "| Book | A |"
     assert lines[2:] == ["| x | 50% |", "| y | n/a |"]
 
 
@@ -487,12 +487,12 @@ def test_a_stay_still_running_is_named_with_its_dates_and_no_final_sale() -> Non
     lines = SCRIPT.open_stays_lines(frames)
 
     assert len(lines) == 2 and lines[-1] == ""
-    assert lines[0].startswith("- SA1 - std MA20 : un séjour encore ouvert")
-    assert str(DAYS[5]) in lines[0] and "+4.85%" in lines[0] and "sans vente finale" in lines[0]
+    assert lines[0].startswith("- SA1 - std MA20: a stay still open")
+    assert str(DAYS[5]) in lines[0] and "+4.85%" in lines[0] and "without a final sale" in lines[0]
     assert SCRIPT.open_stays_lines({name: stays.iloc[:1] for name in frames}) == []
 
 
 def test_the_frozen_model_and_its_recalibration_never_share_a_label() -> None:
     assert SCRIPT.FROZEN != SCRIPT.RECALIBRATED
-    assert "modèle figé" in SCRIPT.FROZEN and "recalibrée" in SCRIPT.RECALIBRATED
+    assert "frozen model" in SCRIPT.FROZEN and "recalibrated" in SCRIPT.RECALIBRATED
     assert SCRIPT.COST_STRESS == 2.0

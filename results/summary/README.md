@@ -1,382 +1,378 @@
-# Résultats et analyses du 10 octobre 2026
+# Results and analyses of 10 October 2026
 
-`results/` a un dossier par stratégie, `SA1` à `SA14`, et ce dossier-ci, qui
-les compare. Tout est écrit par `scripts/write_strategy_reports.py` à partir
-des exports de `scripts/SA11_run_garch_study.py`, après mise à jour du magasin
-jusqu'au 2026-10-09 ; seul ce fichier est rédigé à la main.
+`results/` has one folder per strategy, `SA1` to `SA14`, and this folder, which
+compares them. Everything is written by `scripts/write_strategy_reports.py` from
+the exports of `scripts/SA11_run_garch_study.py`, after the store was updated to
+2026-10-09; only this file is written by hand.
 
-| Dans le dossier d'une stratégie | Ce que c'est |
+| In the folder of a strategy | What it is |
 |---|---|
-| `analysis.md` | son rapport : indicateurs, analyse rédigée, historique |
-| `metrics.csv` | ses indicateurs, aux coûts déclarés et à coûts doublés |
-| `yearly.csv` | ses rendements par année, à côté du fonds détenu |
-| `history.csv` | séance par séance : cours, signaux lus, poids visés et détenus, valeur |
-| `fills.csv` | ses ordres exécutés, un par ligne, avec leur prix et leurs coûts |
-| `equity.png` | sa valeur nette et brute, contre le fonds détenu |
-| `drawdown.png` | sa baisse sous son propre sommet |
-| `weights.png` | ce qu'elle a détenu dans chaque fonds, le reste étant du cash |
-| `orders.png` | ses ordres sur les cours des fonds, ses poids et sa valeur |
-| `study.md` | pour `SA11`, `SA12` et `SA13` : le document de leur propre étude |
+| `analysis.md` | its report: indicators, written analysis, history |
+| `metrics.csv` | its indicators, at the declared costs and at doubled costs |
+| `yearly.csv` | its returns by year, beside the fund held |
+| `history.csv` | session by session: prices, signals read, weights targeted and held, value |
+| `fills.csv` | its filled orders, one per row, with their price and their costs |
+| `equity.png` | its net and gross value, against the fund held |
+| `drawdown.png` | its fall below its own peak |
+| `weights.png` | what it held in each fund, the rest being cash |
+| `orders.png` | its orders on the prices of the funds, its weights and its value |
+| `study.md` | for `SA11`, `SA12` and `SA13`: the document of their own study |
 
-| Dans ce dossier | Ce que c'est |
+| In this folder | What it is |
 |---|---|
-| `ranking.csv`, `ranking_costs_x2.csv` | le tableau de tous les livres, aux coûts déclarés et doublés |
-| `yearly.csv` | les rendements par année de tous les livres |
-| `overview.png` | toutes les courbes sur une échelle |
-| `equity_all.png`, `drawdowns_all.png` | un panneau par livre, contre `SA1` et le fonds détenu |
-| `costs.png` | ce que chaque livre a payé pour traiter |
-| `diagnostics.md` | les mesures complémentaires demandées par la revue |
-| `REF_WorldBuyHold/`, `REF_5050Rebalanced/`, `EWMA94control/` | les deux références et le témoin de `SA11`, sans code de catalogue |
+| `ranking.csv`, `ranking_costs_x2.csv` | the table of all the books, at the declared and doubled costs |
+| `yearly.csv` | the returns by year of all the books |
+| `overview.png` | all the curves on one scale |
+| `equity_all.png`, `drawdowns_all.png` | one panel per book, against `SA1` and the fund held |
+| `costs.png` | what each book paid to trade |
+| `diagnostics.md` | the complementary measures the review asked for |
+| `REF_WorldBuyHold/`, `REF_5050Rebalanced/`, `EWMA94control/` | the two references and the control of `SA11`, without a catalogue code |
 
-![Valeur nette de chaque livre, base 100](overview.png)
+![Net value of every book, base 100](overview.png)
 
-Chaque `analysis.md` a trois
-sections : (1) les indicateurs de résultat globaux, à côté du fonds détenu ;
-(2) l'analyse — périodes mesurées, baisses sous un sommet avec leur date de
-récupération, années et mois, puis points forts, points faibles, pire et
-meilleure période, situations de marché les plus risquées et ce qui reste à
-mesurer ; (3) l'historique séance par séance du sous-jacent, des indicateurs
-lus par la stratégie, de ses poids et de sa valeur.
+Each `analysis.md` has three sections: (1) the global result indicators, beside
+the fund held; (2) the analysis — measured stretches, falls below a peak with
+their recovery date, years and months, then strengths, weaknesses, worst and
+best stretch, the market situations most risky for the strategy and what
+remains to be measured; (3) the session-by-session history of the underlying,
+of the indicators the strategy read, of its weights and of its value.
 
-**Version 2 des analyses.** Les commentaires ont été réécrits après une revue
-indépendante faite sur le commit `4e04eae`
-(`revue_analyses_strategies_resultats_10102026.md`). Les chiffres globaux
-n'ont pas changé. Ont changé : les chronologies de positions (SA3, SA4, SA6,
-SA9, SA10, SA11, SA14), les conclusions causales non démontrées, la
-distinction entre fait mesuré et lecture, l'ajout de la récupération des
-baisses, des mois sans variation, des périodes partielles, du contrôle 50/50,
-des deux rapports de référence et d'un intervalle sur les écarts de QLIKE.
+**Version 2 of the analyses.** The commentaries were rewritten after an
+independent review made on commit `4e04eae`
+(`revue_analyses_strategies_resultats_10102026.md`). The global figures did not
+change. What changed: the chronologies of positions (SA3, SA4, SA6, SA9, SA10,
+SA11, SA14), the causal conclusions that were not demonstrated, the distinction
+between measured fact and reading, and the addition of the recovery of the
+falls, of the unchanged months, of the partial periods, of the 50/50 control,
+of the two reference reports and of an interval on the QLIKE gaps.
 
-**Version 3 des analyses.** Une vérification indépendante faite sur le commit
-`ad310bc` (`verification_resultats_corriges_10102026.md`) a retrouvé les
-chiffres globaux et les historiques, et demandé de borner plusieurs lectures.
-Les chiffres globaux n'ont pas changé. Ont changé : le résidu de l'attribution
-de `SA2` et `SA5` n'est plus appelé « exécution » ; les témoins sont dits « à
-cible constante » et la comparaison ne prétend plus isoler le timing ; l'écart
-de prix clôture-ouverture est remesuré à quantités données et n'est plus
-présenté comme un coût ; le séjour encore ouvert de `SA1` est compté à part ;
-`SA14` est rejoué à coûts doublés avec son modèle figé ; les contradictions
-relevées dans les textes de `SA2`, `SA3`, `SA4`, `SA9`, `SA10`, `SA11`, de
-l'EWMA et de `SA14` sont corrigées.
+**Version 3 of the analyses.** An independent check made on commit `ad310bc`
+(`verification_resultats_corriges_10102026.md`) found the global figures and the
+histories again, and asked for several readings to be bounded. The global
+figures did not change. What changed: the residual of the attribution of `SA2`
+and `SA5` is no longer called "execution"; the controls are called
+"constant-target" and the comparison no longer claims to isolate the timing;
+the close-to-open price gap is measured again at given quantities and is no
+longer presented as a cost; the still-open stay of `SA1` is counted apart;
+`SA14` is replayed at doubled costs with its frozen model; the contradictions
+found in the texts of `SA2`, `SA3`, `SA4`, `SA9`, `SA10`, `SA11`, the EWMA and
+`SA14` are corrected.
 
-**SA7 et SA8, le 2026-10-11.** Elles étaient cataloguées avec les autres
-règles ETF mais n'avaient jamais tourné, faute de fonds choisis. Leurs fonds,
-cotés sur Xetra, ont été enregistrés ce jour-là et l'étude commune a été
-relancée : le magasin change (`b5facce52a6f`), mais les chiffres des autres
-livres sont identiques, au centime, à ceux du run précédent. `SA7` entre au
-classement ; `SA8` est rapportée à part (voir plus bas).
+**SA7 and SA8, on 2026-10-11.** They were catalogued with the other ETF rules
+but had never run, for lack of chosen funds. Their funds, listed on Xetra, were
+registered that day and the common study was run again: the store changes
+(`b5facce52a6f`), but the figures of the other books are identical, to the
+cent, to those of the previous run. `SA7` enters the ranking; `SA8` is reported
+apart (see below).
 
-## Comment lire
+**In English since 2026-10-31.** The analyses, this file and the diagnostics
+were translated from French; the reports were regenerated from the same
+exports, and no figure changes.
 
-- Une décision est prise le soir de la séance t (signal et poids cible de la
-  ligne t) et exécutée à l'ouverture de t + 1 ; elle n'apparaît dans le poids
-  détenu qu'à la ligne t + 1.
-- Dans les commentaires, **Fait** désigne ce qui est relu dans les exports,
-  **Lecture** une interprétation plausible non démontrée, **Observé** et
-  **Plausible** un risque vu dans ces historiques ou seulement attendu.
-- Le cash n'est pas rémunéré et le taux sans risque est nul.
-- 2021 commence le 1er avril et 2026 s'arrête au 9 octobre : ce sont des
-  années partielles, et octobre 2026 un mois incomplet.
+## How to read
 
-## Classement commun (exploratoire)
+- A decision is taken on the evening of session t (signal and target weight of
+  row t) and executed at the open of t + 1; it appears in the weight held only
+  at row t + 1.
+- In the commentaries, **Fact** means what is read again in the exports,
+  **Reading** a plausible interpretation that is not demonstrated, **Observed**
+  and **Plausible** a risk seen in these histories or only expected.
+- Cash earns nothing and the risk-free rate is zero.
+- 2021 starts on 1 April and 2026 stops on 9 October: they are partial years,
+  and October 2026 an incomplete month.
 
-Période 2021-04-01 → 2026-10-09 (1 416 valorisations), 100 000 EUR, commission
-5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb, quantités fixées à la
-décision. Score `QUALITY_V1` contre `ETF_WORLD` détenu, déflaté par 11 essais.
+## Common ranking (exploratory)
 
-| Rang | Livre | Score | Net | Sharpe | Perte max. | Retour au sommet | Coûts (EUR) | Rapport |
+Period 2021-04-01 → 2026-10-09 (1,416 valuations), 100,000 EUR, commission
+5 bp (minimum 1 EUR), half spread 3 bp, slippage 2 bp, quantities set at the
+decision. `QUALITY_V1` score against `ETF_WORLD` held, deflated by 11 trials.
+
+| Rank | Book | Score | Net | Sharpe | Max. drawdown | Back at peak | Costs (EUR) | Report |
 |---:|---|---:|---:|---:|---:|---:|---:|---|
-| 1 | 50/50 rebalancé (référence, hors catalogue) | 77,9 % | +103,3 % | 0,96 | -22,5 % | 232 j | 736 | [rapport](REF_5050Rebalanced/analysis.md) |
-| 2 | EWMA 0,94 (témoin de SA11, sans code) | 53,6 % | +73,4 % | 0,93 | -15,4 % | 321 j | 1 519 | [rapport](EWMA94control/analysis.md) |
-| 3 | SA6 - vol control | 52,0 % | +67,4 % | 0,90 | -15,7 % | 330 j | 1 445 | [rapport](../SA6/analysis.md) |
-| 4 | SA10 - ensemble, **sans facteurs ni monétaire** | 51,1 % | +32,1 % | 0,86 | -11,8 % | 442 j | 1 986 | [rapport](../SA10/analysis.md) |
-| 5 | SA7 - factor blend, **fonds Xetra** | 49,8 % | +60,2 % | 0,83 | -16,4 % | 242 j | 1 983 | [rapport](../SA7/analysis.md) |
-| 6 | SA3 - smooth MA | 49,1 % | +57,9 % | 0,79 | -21,6 % | 540 j | 680 | [rapport](../SA3/analysis.md) |
-| 7 | **SA11 - GARCH vol control** | 48,7 % | +66,0 % | 0,87 | -16,5 % | 324 j | 3 749 | [rapport](../SA11/analysis.md) |
-| 8 | SA2 - dual momentum | 44,2 % | +69,2 % | 0,78 | -22,8 % | 422 j | 4 629 | [rapport](../SA2/analysis.md) |
-| 9 | SA5 - relative tilt | 29,5 % | +72,8 % | 0,76 | -22,9 % | 252 j | 20 517 | [rapport](../SA5/analysis.md) |
-| 10 | SA1 - std MA20 | 0,0 % | +20,5 % | 0,42 | -18,9 % | 794 j | 15 730 | [rapport](../SA1/analysis.md) |
-| 10 | SA4 - pullback | 0,0 % | +4,4 % | 0,41 | -3,4 % | non récupéré | 4 572 | [rapport](../SA4/analysis.md) |
-| 10 | SA9 - VIX relief | 0,0 % | -0,7 % | -0,04 | -8,0 % | non récupéré | 2 041 | [rapport](../SA9/analysis.md) |
-| — | SA8 - monetary carry (placement monétaire, hors classement) | — | +10,5 % | 7,10 | -0,4 % | 75 j | 963 | [rapport](../SA8/analysis.md) |
-| — | ETF_WORLD détenu (étalon, non noté) | — | +94,8 % | 0,93 | -21,6 % | 229 j | 100 | [rapport](REF_WorldBuyHold/analysis.md) |
+| 1 | 50/50 rebalanced (reference, outside the catalogue) | 77.9% | +103.3% | 0.96 | -22.5% | 232 d | 736 | [report](REF_5050Rebalanced/analysis.md) |
+| 2 | EWMA 0.94 (control of SA11, no code) | 53.6% | +73.4% | 0.93 | -15.4% | 321 d | 1,519 | [report](EWMA94control/analysis.md) |
+| 3 | SA6 - vol control | 52.0% | +67.4% | 0.90 | -15.7% | 330 d | 1,445 | [report](../SA6/analysis.md) |
+| 4 | SA10 - ensemble, **without factors or money market** | 51.1% | +32.1% | 0.86 | -11.8% | 442 d | 1,986 | [report](../SA10/analysis.md) |
+| 5 | SA7 - factor blend, **Xetra funds** | 49.8% | +60.2% | 0.83 | -16.4% | 242 d | 1,983 | [report](../SA7/analysis.md) |
+| 6 | SA3 - smooth MA | 49.1% | +57.9% | 0.79 | -21.6% | 540 d | 680 | [report](../SA3/analysis.md) |
+| 7 | **SA11 - GARCH vol control** | 48.7% | +66.0% | 0.87 | -16.5% | 324 d | 3,749 | [report](../SA11/analysis.md) |
+| 8 | SA2 - dual momentum | 44.2% | +69.2% | 0.78 | -22.8% | 422 d | 4,629 | [report](../SA2/analysis.md) |
+| 9 | SA5 - relative tilt | 29.5% | +72.8% | 0.76 | -22.9% | 252 d | 20,517 | [report](../SA5/analysis.md) |
+| 10 | SA1 - std MA20 | 0.0% | +20.5% | 0.42 | -18.9% | 794 d | 15,730 | [report](../SA1/analysis.md) |
+| 10 | SA4 - pullback | 0.0% | +4.4% | 0.41 | -3.4% | not recovered | 4,572 | [report](../SA4/analysis.md) |
+| 10 | SA9 - VIX relief | 0.0% | -0.7% | -0.04 | -8.0% | not recovered | 2,041 | [report](../SA9/analysis.md) |
+| — | SA8 - monetary carry (money-market investment, outside the ranking) | — | +10.5% | 7.10 | -0.4% | 75 d | 963 | [report](../SA8/analysis.md) |
+| — | ETF_WORLD held (yardstick, not scored) | — | +94.8% | 0.93 | -21.6% | 229 d | 100 | [report](REF_WorldBuyHold/analysis.md) |
 
-« Retour au sommet » : jours calendaires entre le sommet qui précède la perte
-maximale et la première valorisation revenue à ce niveau.
+"Back at peak": calendar days between the peak that precedes the maximum
+drawdown and the first valuation back at that level.
 
-Ce classement est **exploratoire**. Le score est une moyenne géométrique
-pondérée de cinq blocs : un seul bloc à zéro donne un score nul, ce qui
-explique les trois zéros du rang 10 et ne signifie ni égalité économique ni
-probabilité de gain nulle. Il est déflaté par les onze essais de cette étude,
-pas par les variantes des exercices antérieurs. Un écart de quelques points
-(53,6 / 52,0 / 49,8 / 48,7) n'est pas un test de supériorité. Aucune stratégie
-du catalogue ne bat le panier passif 50/50 des deux mêmes fonds.
+This ranking is **exploratory**. The score is a weighted geometric mean of five
+blocks: a single block at zero gives a zero score, which explains the three
+zeros of rank 10 and means neither an economic tie nor a zero probability of
+gain. It is deflated by the eleven trials of this study, not by the variants of
+earlier exercises. A gap of a few points (53.6 / 52.0 / 49.8 / 48.7) is not a
+test of superiority. No strategy of the catalogue beats the passive 50/50
+basket of the same two funds.
 
-`SA8` tourne sur la même période et aux mêmes coûts, mais n'est ni notée ni
-comptée parmi les essais, comme le fonds détenu. Elle ne détient qu'un fonds
-monétaire : avec un taux sans risque nul, son Sharpe de 7,10 est celui d'un
-cours qui ne bouge presque pas, pas une mesure de timing. Comptée parmi les
-essais, elle multipliait par six la dispersion des Sharpe qui déflate les
-scores et ramenait tous les autres autour de 1 %.
+`SA8` runs over the same period and at the same costs, but is neither scored
+nor counted among the trials, like the fund held. It holds only a money-market
+fund: with a zero risk-free rate, its Sharpe of 7.10 is that of a price that
+hardly moves, not a measure of timing. Counted among the trials, it multiplied
+by six the dispersion of the Sharpe ratios that deflates the scores and brought
+all the others down to about 1%.
 
-## SA11 : les critères préinscrits ne sont pas satisfaits
+## SA11: the preregistered criteria are not met
 
-Le statut `REFUTED` de l'hypothèse `sa11_garch_vol_control` est **opérationnel** :
-les critères écrits avant le run sont atteints, puisque le Sharpe net de
-`SA11` (0,87) n'est pas au-dessus de celui de `SA6` (0,90) ni du témoin EWMA
-(0,93) et que sa perte maximale est plus profonde. Ce n'est pas une preuve
-statistique d'infériorité : aux coûts de base, les intervalles à 95 % de la
-différence de Sharpe incluent zéro ([-0,141 ; +0,076] contre `SA6`,
-[-0,147 ; +0,009] contre l'EWMA) ; dans le second run à coûts doublés,
-celui contre l'EWMA est négatif ([-0,172 ; -0,014]).
+The `REFUTED` status of the hypothesis `sa11_garch_vol_control` is
+**operational**: the criteria written before the run are met, since the net
+Sharpe of `SA11` (0.87) is above neither that of `SA6` (0.90) nor that of the
+EWMA control (0.93) and its maximum drawdown is deeper. It is not a statistical
+proof of inferiority: at the base costs, the 95% intervals of the Sharpe
+difference include zero ([-0.141; +0.076] against `SA6`, [-0.147; +0.009]
+against the EWMA); in the second run at doubled costs, the one against the EWMA
+is negative ([-0.172; -0.014]).
 
-`SA11` a la **plus faible QLIKE moyenne observée** (-8,6225, contre -8,6033
-pour l'EWMA et -8,5649 pour l'estimateur de `SA6`). L'avance est établie contre
-`SA6` (différence appariée -0,058, intervalle [-0,108 ; -0,017]) et ne l'est
-pas contre l'EWMA (-0,019, intervalle [-0,051 ; +0,009]). Aucun fit n'a été
-rejeté sur 1 416 décisions. Mieux prévoir la variance de clôture à clôture ne
-s'est pas traduit par une meilleure allocation après exécution à l'ouverture,
-bande et coûts (2,5 fois ceux de `SA6`). Les témoins simples sont conservés ;
-`SA11` reste au catalogue comme référence fixe. Cela ne dit rien des modèles
-GARCH en général. Détail : [SA11/study.md](../SA11/study.md).
+`SA11` has the **lowest mean QLIKE observed** (-8.6225, against -8.6033 for the
+EWMA and -8.5649 for the estimator of `SA6`). The lead is established against
+`SA6` (paired difference -0.058, interval [-0.108; -0.017]) and not against the
+EWMA (-0.019, interval [-0.051; +0.009]). No fit was rejected over 1,416
+decisions. Forecasting the close-to-close variance better did not translate
+into a better allocation after execution at the open, band and costs (2.5 times
+those of `SA6`). The simple controls are kept; `SA11` stays in the catalogue as
+a fixed reference. This says nothing about GARCH models in general. Detail:
+[SA11/study.md](../SA11/study.md).
 
-## SA12 : une étude à part, sur la même période
+## SA12: a study apart, over the same period
 
-[SA12/analysis.md](../SA12/analysis.md)
-vient de sa propre étude (`scripts/SA12_run_arima_garch_study.py`, commit `10f6d90`,
-même magasin, même période 2021-04-01 → 2026-10-09), qui exécute aussi trois
-contrôles sans code de catalogue : D0 (même ARIMA et même variance, filtre de
-direction toujours ouvert), D1 (variance EWMA), D2 (moyenne constante). Son
-registre compte 14 essais : ses scores ne se lisent pas dans le tableau
-ci-dessus, déflaté par 10. Détail : [SA12/study.md](../SA12/study.md).
+[SA12/analysis.md](../SA12/analysis.md) comes from its own study
+(`scripts/SA12_run_arima_garch_study.py`, commit `10f6d90`, same store, same
+period 2021-04-01 → 2026-10-09), which also runs three controls without a
+catalogue code: D0 (same ARIMA and same variance, direction gate always open),
+D1 (EWMA variance), D2 (constant mean). Its register counts 14 trials: its
+scores are not read in the table above, deflated by 10. Detail:
+[SA12/study.md](../SA12/study.md).
 
-| Livre | Net | Net, coûts ×2 | Sharpe | Perte max. | Exposition | Coûts (EUR) |
+| Book | Net | Net, costs ×2 | Sharpe | Max. drawdown | Exposure | Costs (EUR) |
 |---|---:|---:|---:|---:|---:|---:|
-| **SA12 - ARIMA GARCH** | -1,72 % | -5,70 % | -0,14 | -6,99 % | 4 % | 4 022 |
-| D0, même risque sans filtre | +64,07 % | +56,33 % | 0,85 | -17,77 % | 86 % | 5 788 |
-| D1, ARIMA et variance EWMA | -2,46 % | -6,52 % | -0,20 | -7,32 % | 4 % | 4 126 |
-| D2, moyenne constante et GARCH | 0,00 % | 0,00 % | n/a | 0,00 % | 0 % | 0 |
-| SA6 - vol control | +67,43 % | +65,50 % | 0,90 | -15,72 % | 85 % | 1 445 |
-| ETF_WORLD détenu | +94,79 % | +94,34 % | 0,93 | -21,64 % | 100 % | 100 |
+| **SA12 - ARIMA GARCH** | -1.72% | -5.70% | -0.14 | -6.99% | 4% | 4,022 |
+| D0, same risk without the gate | +64.07% | +56.33% | 0.85 | -17.77% | 86% | 5,788 |
+| D1, ARIMA and EWMA variance | -2.46% | -6.52% | -0.20 | -7.32% | 4% | 4,126 |
+| D2, constant mean and GARCH | 0.00% | 0.00% | n/a | 0.00% | 0% | 0 |
+| SA6 - vol control | +67.43% | +65.50% | 0.90 | -15.72% | 85% | 1,445 |
+| ETF_WORLD held | +94.79% | +94.34% | 0.93 | -21.64% | 100% | 100 |
 
-- **Statut de l'hypothèse `sa12_arima_garch` : `INSUFFICIENT_EVIDENCE`.** Les
-  critères écrits avant le run demandaient 30 épisodes de position terminés ;
-  il y en a 29. Le seuil n'a pas été modifié après lecture. L'écart de Sharpe
-  mesuré contre D0 est de -0,987 (intervalle à 95 % [-2,101 ; +0,252]) aux
-  coûts de base et de -1,241 ([-2,335 ; -0,032]) à coûts doublés.
-- **La prévision ne franchit le seuil de 20 pb que 31 soirs sur 1 413**, tous à
-  partir du 2025-04-10 : le livre reste en cash quatre ans, puis prend 29
-  positions dont 22 ne durent qu'une valorisation. Les coûts (4 022 EUR)
-  dépassent le gain brut (+2,30 %).
-- **La moyenne prévue ne bat pas deux prévisions naïves** (erreur quadratique
-  9,2497e-05 contre 9,2133e-05 pour zéro et 9,2002e-05 pour la moyenne de la
-  fenêtre ; signe juste 56,1 % contre 56,7 % pour « toujours en hausse »).
-- **GARCH et EWMA ne sont pas départagés** (écart de Sharpe contre D1 +0,061,
-  intervalle [-0,037 ; +0,170]) ; D2 n'a jamais pris de position.
+- **Status of the hypothesis `sa12_arima_garch`: `INSUFFICIENT_EVIDENCE`.** The
+  criteria written before the run asked for 30 finished position episodes;
+  there are 29. The threshold was not changed after reading. The Sharpe gap
+  measured against D0 is -0.987 (95% interval [-2.101; +0.252]) at the base
+  costs and -1.241 ([-2.335; -0.032]) at doubled costs.
+- **The forecast crosses the 20 bp threshold on only 31 evenings out of
+  1,413**, all from 2025-04-10: the book stays in cash for four years, then
+  takes 29 positions, of which 22 last only one valuation. The costs
+  (4,022 EUR) exceed the gross gain (+2.30%).
+- **The forecast mean does not beat two naive forecasts** (squared error
+  9.2497e-05 against 9.2133e-05 for zero and 9.2002e-05 for the mean of the
+  window; right sign 56.1% against 56.7% for "always up").
+- **GARCH and EWMA are not told apart** (Sharpe gap against D1 +0.061, interval
+  [-0.037; +0.170]); D2 never took a position.
 
-Cela ne dit rien des modèles ARIMA-GARCH en général, et aucun contrôle n'est
-candidat : en adopter un serait une nouvelle hypothèse.
+This says nothing about ARIMA-GARCH models in general, and no control is a
+candidate: adopting one would be a new hypothesis.
 
-## SA13 : une étude à part, sur une période de test plus courte
+## SA13: a study apart, over a shorter test period
 
-[SA13/analysis.md](../SA13/analysis.md)
-vient de sa propre étude (`scripts/SA13_run_signature_study.py`, commit `2b7d147`,
-même magasin). Un modèle par mois est calibré sur ce qui était connu au soir
-de la dernière séance du mois précédent ; le premier mois calibrable est
-janvier 2023, donc la **période de test est 2023-01-02 → 2026-10-09** (964
-séances), avec un portefeuille continu. Toutes les stratégies comparables y
-sont rejouées, avec huit contrôles sans code de catalogue (C0 à C7) : 19
-essais. **Ces chiffres ne se comparent pas à ceux du tableau du haut**, mesurés
-depuis 2021. Détail : [SA13/study.md](../SA13/study.md).
+[SA13/analysis.md](../SA13/analysis.md) comes from its own study
+(`scripts/SA13_run_signature_study.py`, commit `2b7d147`, same store). One
+model a month is calibrated on what was known on the evening of the last
+session of the previous month; the first month that can be calibrated is
+January 2023, so the **test period is 2023-01-02 → 2026-10-09** (964 sessions),
+with a continuous portfolio. All the comparable strategies are replayed over
+it, with eight controls without a catalogue code (C0 to C7): 19 trials. **These
+figures are not comparable with those of the table at the top**, measured since
+2021. Detail: [SA13/study.md](../SA13/study.md).
 
-| Livre | Net | Net, coûts ×2 | Sharpe | Perte max. | Exposition | Coûts (EUR) |
+| Book | Net | Net, costs ×2 | Sharpe | Max. drawdown | Exposure | Costs (EUR) |
 |---|---:|---:|---:|---:|---:|---:|
-| **SA13 - Signatures Neurons** | -3,53 % | -5,11 % | -0,10 | -18,56 % | 23 % | 1 579 |
-| C0, même risque sans filtre (identique à SA6 ici) | +62,09 % | +61,08 % | 1,25 | -15,70 % | 89 % | 924 |
-| C1, Ridge sur les mêmes 13 coefficients | +11,25 % | +10,40 % | 0,57 | -10,72 % | 16 % | 914 |
-| C2, réseau additif à l'ordre 2 | -3,75 % | -3,92 % | -0,29 | -9,02 % | 3 % | 172 |
-| C3, réseau additif sans volume | -3,47 % | -5,07 % | -0,09 | -15,68 % | 31 % | 1 534 |
-| C4, réseau additif sur indicateurs classiques | +14,05 % | +12,66 % | 0,48 | -22,98 % | 44 % | 1 291 |
-| C5, Ridge sur la trajectoire brute | -1,19 % | -25,72 % | -0,02 | -10,56 % | 31 % | 29 410 |
-| C6, réseau additif, World + S&P 500 | -2,49 % | -4,90 % | -0,09 | -15,06 % | 24 % | 2 449 |
-| C7, Ridge, World + S&P 500 | +17,87 % | +16,56 % | 0,78 | -13,95 % | 19 % | 1 337 |
-| SA11 - GARCH vol control | +65,53 % | +63,31 % | 1,27 | -16,52 % | 92 % | 1 896 |
-| SA12 - ARIMA GARCH | -1,72 % | -5,70 % | -0,16 | -6,99 % | 6 % | 4 022 |
-| ETF_WORLD détenu | +86,73 % | +86,63 % | 1,35 | -21,57 % | 99 % | 99 |
+| **SA13 - Signatures Neurons** | -3.53% | -5.11% | -0.10 | -18.56% | 23% | 1,579 |
+| C0, same risk without the gate (identical to SA6 here) | +62.09% | +61.08% | 1.25 | -15.70% | 89% | 924 |
+| C1, Ridge on the same 13 coefficients | +11.25% | +10.40% | 0.57 | -10.72% | 16% | 914 |
+| C2, additive network at order 2 | -3.75% | -3.92% | -0.29 | -9.02% | 3% | 172 |
+| C3, additive network without volume | -3.47% | -5.07% | -0.09 | -15.68% | 31% | 1,534 |
+| C4, additive network on classic indicators | +14.05% | +12.66% | 0.48 | -22.98% | 44% | 1,291 |
+| C5, Ridge on the raw path | -1.19% | -25.72% | -0.02 | -10.56% | 31% | 29,410 |
+| C6, additive network, World + S&P 500 | -2.49% | -4.90% | -0.09 | -15.06% | 24% | 2,449 |
+| C7, Ridge, World + S&P 500 | +17.87% | +16.56% | 0.78 | -13.95% | 19% | 1,337 |
+| SA11 - GARCH vol control | +65.53% | +63.31% | 1.27 | -16.52% | 92% | 1,896 |
+| SA12 - ARIMA GARCH | -1.72% | -5.70% | -0.16 | -6.99% | 6% | 4,022 |
+| ETF_WORLD held | +86.73% | +86.63% | 1.35 | -21.57% | 99% | 99 |
 
-- **Statut de l'hypothèse `sa13_signatures_neurons` : `INSUFFICIENT_EVIDENCE`.**
-  Les critères écrits avant le premier ajustement demandaient 30 épisodes de
-  position terminés ; il y en a 8. Le seuil n'a pas été modifié après lecture.
-  L'écart de Sharpe mesuré contre C0 est de -1,353, intervalle à 95 %
-  [-1,999 ; -0,627] (blocs de 60 séances ; négatif aussi par blocs de 20 et de
-  120), et de -1,401 ([-2,052 ; -0,678]) à coûts doublés.
-- **Couverture complète** : 46 mois sur 46 ont un modèle, 964 décisions sur 964
-  une prévision utilisable. L'échec n'est pas opérationnel.
-- **Les prévisions sont moins bonnes que la moyenne d'apprentissage** (erreur
-  quadratique 8,7648e-05 contre 8,5353e-05, écart dont l'intervalle exclut
-  zéro) **et que la Ridge sur les mêmes coefficients**. Signe juste 52,4 %
-  contre 57,1 % pour « toujours en hausse ».
-- **Le livre est investi pendant les deux baisses** (août 2024, février à avril
-  2025), où la prévision monte avec la baisse, et en cash pendant de longues
-  hausses : le fonds gagne +3,0 pb par séance quand le livre est investi et
-  +8,3 pb quand il est en cash.
-- **Ni l'ordre 3, ni le volume, ni un second processus n'abaissent l'erreur**
-  de prévision ; contre les indicateurs classiques et la trajectoire brute,
-  l'erreur de SA13 est plus basse sans que l'écart soit distingué de zéro.
-- 22 modèles sur 46 s'arrêtent au plafond de 300 époques, gelé avant le
-  premier ajustement.
+- **Status of the hypothesis `sa13_signatures_neurons`:
+  `INSUFFICIENT_EVIDENCE`.** The criteria written before the first fit asked
+  for 30 finished position episodes; there are 8. The threshold was not changed
+  after reading. The Sharpe gap measured against C0 is -1.353, 95% interval
+  [-1.999; -0.627] (blocks of 60 sessions; negative also with blocks of 20 and
+  of 120), and -1.401 ([-2.052; -0.678]) at doubled costs.
+- **Full coverage**: 46 months out of 46 have a model, 964 decisions out of 964
+  a usable forecast. The failure is not operational.
+- **The forecasts are worse than the training mean** (squared error 8.7648e-05
+  against 8.5353e-05, a gap whose interval excludes zero) **and than the Ridge
+  on the same coefficients**. Right sign 52.4% against 57.1% for "always up".
+- **The book is invested during the two falls** (August 2024, February to April
+  2025), in which the forecast rises with the fall, and in cash during long
+  rises: the fund gains +3.0 bp per session when the book is invested and
+  +8.3 bp when it is in cash.
+- **Neither order 3, nor the volume, nor a second process lowers the error** of
+  the forecast; against the classic indicators and the raw path, the error of
+  SA13 is lower without the gap being told from zero.
+- 22 models out of 46 stop at the ceiling of 300 epochs, frozen before the first
+  fit.
 
-Cela ne dit rien des signatures de chemin en général. Les contrôles Ridge font
-mieux que `SA13` ici, mais aucun contrôle n'est candidat : en adopter un
-serait une nouvelle hypothèse.
+This says nothing about path signatures in general. The Ridge controls do
+better than `SA13` here, but no control is a candidate: adopting one would be a
+new hypothesis.
 
-## Hors classement
+## Outside the ranking
 
-- **SA14**, appelée `ML1` jusqu'au 2026-10-11
-  ([rapport](../SA14/analysis.md)) : son
-  information s'arrête au 2024-12-31. Il est mesuré sur 2025-01-02 →
-  2026-10-09 (+13,4 % contre +24,5 % pour le fonds, Sharpe 0,76 contre 0,93).
-  Son score, déflaté pour un seul essai, ne se compare pas à ceux du tableau.
-  Le test d'origine (jusqu'au 2026-09-30) a déjà été lu le 2026-10-04 ; les
-  graines 43 et 44 et les deux runs à coûts doublés (modèle figé, modèle
-  recalibré) sont dans les diagnostics.
+- **SA14**, called `ML1` until 2026-10-11 ([report](../SA14/analysis.md)): its
+  information stops at 2024-12-31. It is measured over 2025-01-02 → 2026-10-09
+  (+13.4% against +24.5% for the fund, Sharpe 0.76 against 0.93). Its score,
+  deflated for a single trial, is not comparable with those of the table. The
+  original test (up to 2026-09-30) was already read on 2026-10-04; seeds 43 and
+  44 and the two runs at doubled costs (frozen model, recalibrated model) are
+  in the diagnostics.
 
-## SA7 et SA8 : exécutées sur des fonds Xetra, avec deux réserves
+## SA7 and SA8: run on Xetra funds, with two reservations
 
-| Stratégie | Fonds | Net | Sharpe | Rang |
+| Strategy | Funds | Net | Sharpe | Rank |
 |---|---|---:|---:|---|
-| [SA7 - factor blend](../SA7/analysis.md) | iShares Edge MSCI World Value, Quality, Minimum Volatility (`IS3S.DE`, `IS3Q.DE`, `IQQ0.DE`) | +60,2 % | 0,83 | 5 |
-| [SA8 - monetary carry](../SA8/analysis.md) | Xtrackers II EUR Overnight Rate Swap (`XEON.DE`) | +10,5 % | 7,10 | hors classement |
+| [SA7 - factor blend](../SA7/analysis.md) | iShares Edge MSCI World Value, Quality, Minimum Volatility (`IS3S.DE`, `IS3Q.DE`, `IQQ0.DE`) | +60.2% | 0.83 | 5 |
+| [SA8 - monetary carry](../SA8/analysis.md) | Xtrackers II EUR Overnight Rate Swap (`XEON.DE`) | +10.5% | 7.10 | outside the ranking |
 
-Les premiers fonds choisis étaient cotés à Paris (trois fonds de style BNP
-Paribas Easy, et `OBLI.PA`) ; le contrôle des données les a refusés, une barre
-sur cinq des fonds de style ayant depuis 2023 une clôture hors de sa propre
-fourchette. Les fonds retenus sont cotés sur Xetra, en euros, ne sont pas
-éligibles au PEA, et n'ont qu'une source de cours.
+The first funds chosen were listed in Paris (three BNP Paribas Easy style
+funds, and `OBLI.PA`); the data control refused them, one bar in five of the
+style funds having since 2023 a close outside its own range. The funds retained
+are listed on Xetra, in euros, are not eligible for the PEA, and have only one
+price source.
 
-Les deux réserves pèsent sur les chiffres et sont mesurées dans chaque
-analyse :
+The two reservations weigh on the figures and are measured in each analysis:
 
-- **Le calendrier.** Le run est mené sur celui de Paris. Une séance que Paris
-  tient et Xetra non (lundi de Pentecôte 2021, 24 et 31 décembre) laisse les
-  fonds sans clôture ; les deux règles visent alors le cash, vendent et
-  rachètent le lendemain. Cela fait 30 des 72 ordres de `SA7` (1 215 EUR) et 8
-  des 9 ordres de `SA8` (863 EUR de ses 963 EUR de coûts).
-- **Deux séances que le fournisseur ne sert pas**, le 2025-10-24 et le
-  2026-03-06, rompent la fenêtre de 61 clôtures consécutives de `SA7`, qui
-  reste en cash 62 puis 60 valorisations pendant que le fonds Value gagne
-  +9,3 % puis +29,4 %. Aucune seconde source ne permet de les combler, et un
-  cours n'est jamais reconstitué.
+- **The calendar.** The run is made on the Paris one. A session that Paris
+  holds and Xetra does not (Whit Monday 2021, 24 and 31 December) leaves the
+  funds without a close; the two rules then target cash, sell and buy back the
+  next day. That makes 30 of the 72 orders of `SA7` (1,215 EUR) and 8 of the 9
+  orders of `SA8` (863 EUR of its 963 EUR of costs).
+- **Two sessions the provider does not serve**, 2025-10-24 and 2026-03-06,
+  break the window of 61 consecutive closes of `SA7`, which stays in cash for 62
+  then 60 valuations while the Value fund gains +9.3% then +29.4%. No second
+  source allows them to be filled, and a price is never rebuilt.
 
-`SA10` reste exécutée sans fonds de style ni fonds monétaire, comme dans tous
-ses runs précédents : sa version complète est un autre run, à décider.
+`SA10` is still run without style funds or a money-market fund, as in all its
+previous runs: its full version is another run, still to be decided.
 
-## SA16 : une étude à part, sur une autre fenêtre
+## SA16: a study apart, over another window
 
-[SA16/study.md](../SA16/study.md) vient de sa propre étude
-(`scripts/SA16_run_study.py`, magasin `runs/sa16_store`, fenêtre
-2018-08-01 → 2026-10-30, conventions de SA15 : Sharpe sur 252 séances à taux
-nul). Ses chiffres ne se lisent pas dans le classement ci-dessus. La
-configuration retenue (technologie et or au budget de risque 75/25) fait
-22,40 % par an, Sharpe 1,321, perte maximale −22,3 %, contre 19,09 % / 0,942 /
-−31,3 % pour le Nasdaq conservé et 20,97 % / 1,064 / −25,7 % pour SA15 essai
-71 ; avantage de Sharpe établi par bootstrap, avantage de rendement non
-établi et dépendant du choix de la technologie.
+[SA16/study.md](../SA16/study.md) comes from its own study
+(`scripts/SA16_run_study.py`, store `runs/sa16_store`, window
+2018-08-01 → 2026-10-30, conventions of SA15: Sharpe over 252 sessions at a
+zero rate). Its figures are not read in the ranking above. The configuration
+retained (technology and gold at a 75/25 risk budget) makes 22.40% a year,
+Sharpe 1.321, maximum drawdown −22.3%, against 19.09% / 0.942 / −31.3% for the
+Nasdaq held and 20.97% / 1.064 / −25.7% for SA15 trial 71; a Sharpe advantage
+established by bootstrap, a return advantage not established and dependent on
+the choice of technology.
 
-## Diagnostics complémentaires
+## Complementary diagnostics
 
-[diagnostics.md](diagnostics.md) mesure ce que les analyses
-listaient comme restant à mesurer ; c'est sa version 2, recalculée après la
-vérification. Tout y est **descriptif** : les témoins sont construits sur des
-poids constatés après coup, et aucune variante n'est candidate. Ce qu'on y lit :
+[diagnostics.md](diagnostics.md) measures what the analyses listed as remaining
+to be measured; it is its version 2, recomputed after the check. Everything in
+it is **descriptive**: the controls are built on weights observed after the
+fact, and no variant is a candidate. What it shows:
 
-- **Aucune règle à exposition variable ne bat nettement son témoin à cible
-  constante.** Ce témoin vise les poids moyens de la règle, avec la même bande
-  de 3 points ; son exposition réalisée est de 0,7 à 2,4 points plus haute. La
-  comparaison décrit donc deux règles exécutables et n'isole pas la valeur du
-  timing à exposition identique. `SA3` (Sharpe 0,79) et `SA10` (0,86) font
-  moins bien que le leur (0,93 chacun), y compris en perte maximale. `SA6`
-  (0,90) et `SA11` (0,87) ont une perte maximale inférieure d'environ trois
-  points à celle du leur, pour un Sharpe plus bas ; seule l'EWMA égale le sien
-  (0,93 contre 0,92) avec quatre points de perte maximale en moins.
-- **`SA2` et `SA5` contre le 50/50** : une attribution approchée, qui valorise
-  les poids de la clôture précédente au rendement de clôture à clôture. Pour
-  `SA2` la contribution de l'exposition y est négative (-0,140 en rendement
-  logarithmique) et celle du choix entre fonds presque nulle (+0,004). Pour
-  `SA5` le choix entre fonds pèse +0,003, les coûts -0,112 et le résidu -0,060.
-  Ce résidu n'est pas une mesure de l'exécution : il contient aussi le
-  rendement de la journée sur ce qui a été traité le matin même, donc une
-  partie de l'effet du signal. L'apport de l'inclinaison de `SA5` n'est pas
-  isolé ; les corrélations de son signal avec le rendement relatif qui suit
-  sont proches de zéro (+0,03 à +0,06, sans intervalle).
-- **L'écart de prix signé clôture → ouverture, à quantités données**, vaut
-  -14 568 EUR pour `SA1`, du même ordre que ses coûts explicites, et -4 944 EUR
-  pour `SA9`, plus du double des siens ; `SA4` est le seul livre où il est
-  positif (+2 303 EUR). Ce n'est ni un coût payé ni le résultat d'un backtest
-  exécuté à la clôture : le signal lit cette clôture.
-- **Par séjour dans le marché** : `SA1` a 71 séjours clos, dont 39 % gagnants,
-  et un séjour encore ouvert ; `SA4` a 66 % de séjours gagnants (gain net moyen
-  de 0,06 %) ; `SA9` en a 9 sur 21, soit 4 groupes de séjours gagnants sur 7,
-  des groupes formés par une convention de 20 valorisations et non sept
-  paniques indépendantes.
-- **`SA10`** : l'effet agrégé de son contrôle de risque est faible sur ce run,
-  sans que sa fréquence soit exportée, et aucune de ses règles ne porte son
+- **No rule with a variable exposure clearly beats its constant-target
+  control.** This control aims at the rule's average weights, with the same
+  3-point band; its realised exposure is 0.7 to 2.4 points higher. The
+  comparison therefore describes two executable rules and does not isolate the
+  value of the timing at identical exposure. `SA3` (Sharpe 0.79) and `SA10`
+  (0.86) do worse than theirs (0.93 each), including in maximum drawdown. `SA6`
+  (0.90) and `SA11` (0.87) have a maximum drawdown about three points smaller
+  than theirs, for a lower Sharpe; only the EWMA equals its own (0.93 against
+  0.92) with four points less maximum drawdown.
+- **`SA2` and `SA5` against the 50/50**: an approximate attribution, which
+  values the weights of the previous close at the close-to-close return. For
+  `SA2` the contribution of the exposure is negative (-0.140 in log return) and
+  that of the choice between funds almost zero (+0.004). For `SA5` the choice
+  between funds weighs +0.003, the costs -0.112 and the residual -0.060. This
+  residual is not a measure of the execution: it also contains the return of
+  the day on what was traded that very morning, hence part of the effect of the
+  signal. The contribution of the tilt of `SA5` is not isolated; the
+  correlations of its signal with the relative return that follows are close to
+  zero (+0.03 to +0.06, without an interval).
+- **The signed close → open price gap, at given quantities**, is -14,568 EUR
+  for `SA1`, of the same order as its explicit costs, and -4,944 EUR for `SA9`,
+  more than twice its own; `SA4` is the only book in which it is positive
+  (+2,303 EUR). It is neither a cost paid nor the result of a backtest executed
+  at the close: the signal reads that close.
+- **By stay in the market**: `SA1` has 71 closed stays, 39% of them winners,
+  and one stay still open; `SA4` has 66% winning stays (average net gain of
+  0.06%); `SA9` has 9 out of 21, i.e. 4 groups of winning stays out of 7, groups
+  formed by a convention of 20 valuations and not seven independent panics.
+- **`SA10`**: the aggregate effect of its risk control is small on this run,
+  without its frequency being exported, and none of its rules carries its
   Sharpe.
-- **`SA6` contre l'EWMA** : différence de Sharpe de -0,036, intervalle
-  [-0,104 ; +0,027] ; les deux témoins ne sont pas départagés.
-- **`SA14`** fait moins bien que son témoin à cible constante (Sharpe 0,76
-  contre 0,93) ; les graines 43 et 44 échouent comme la graine 42 (Sharpe 0,68
-  à 0,71 contre 0,86 pour le fonds, score sous 50 %), et à coûts doublés le
-  modèle figé (0,64) comme le modèle recalibré (0,69) restent sous le fonds.
+- **`SA6` against the EWMA**: Sharpe difference of -0.036, interval
+  [-0.104; +0.027]; the two controls are not told apart.
+- **`SA14`** does worse than its constant-target control (Sharpe 0.76 against
+  0.93); seeds 43 and 44 fail like seed 42 (Sharpe 0.68 to 0.71 against 0.86
+  for the fund, score below 50%), and at doubled costs the frozen model (0.64)
+  as the recalibrated model (0.69) stay below the fund.
 
-## Ce que ces fichiers ne contiennent pas
+## What these files do not contain
 
-Chaque dossier couvre toutes les séances de sa stratégie mais n'est pas
-l'archive d'un run. Les rejets, les coûts par séance, les prévisions et les
-courbes de tous les livres sont dans les exports bruts de chaque étude
-(`runs/garch_study/`, `runs/arima_garch_study/`, `runs/signature_study/`,
-`runs/sa14/`), et le détail des diagnostics dans `runs/review_diagnostics/`
-(séjours un par un, entrées de `SA14`, tables des témoins). `runs/` n'est pas
-commité : il se reproduit. Restent non produits : une attribution exacte de `SA2` et `SA5`
-aux quantités et aux prix d'ouverture ; un témoin à exposition ou à risque
-réellement rapprochés ; la décomposition des cibles de `SA10` règle par règle
-à chaque décision, et le facteur de réduction de son contrôle de risque ; une
-analyse des entrées de `SA14`.
+Each folder covers all the sessions of its strategy but is not the archive of a
+run. The rejects, the costs per session, the forecasts and the curves of all
+the books are in the raw exports of each study (`runs/garch_study/`,
+`runs/arima_garch_study/`, `runs/signature_study/`, `runs/sa14/`), and the
+detail of the diagnostics in `runs/review_diagnostics/` (stays one by one,
+inputs of `SA14`, tables of the controls). `runs/` is not committed: it is
+reproduced. Still not produced: an exact attribution of `SA2` and `SA5` at the
+quantities and opening prices; a control with an exposure or a risk truly
+matched; the breakdown of the targets of `SA10` rule by rule at each decision,
+and the reduction factor of its risk control; an analysis of the inputs of
+`SA14`.
 
-## Reproduire
+## Reproduce
 
 ```bash
 uv sync --extra ml --extra stats
 uv run python scripts/update_market_data.py
 uv run python scripts/SA11_run_garch_study.py --output runs/garch_study
-# les diagnostics chargent d'abord le modèle de SA14 : il doit exister
+# the diagnostics first load the model of SA14: it must exist
 uv run python scripts/SA14_run_neural_strategy.py --seed 42 --calibrate-only
 uv run python scripts/run_review_diagnostics.py
 uv run python scripts/write_strategy_reports.py --study runs/garch_study
 
-# SA12, son étude et son rapport (une heure environ, un seul fil de calcul)
+# SA12, its study and its report (about an hour, a single thread)
 OMP_NUM_THREADS=1 uv run python scripts/SA12_run_arima_garch_study.py \
     --output runs/arima_garch_study
 uv run python scripts/write_strategy_reports.py --study runs/arima_garch_study --only SA12
 
-# SA13, ses calibrations mensuelles, son étude et son rapport (vingt minutes environ)
+# SA13, its monthly calibrations, its study and its report (about twenty minutes)
 uv sync --extra ml --extra stats --extra signatures
 OMP_NUM_THREADS=1 uv run python scripts/SA13_run_signature_study.py \
     --output runs/signature_study
 uv run python scripts/write_strategy_reports.py --study runs/signature_study --only SA13
 ```
 
-Cette recette refait la procédure, pas forcément les mêmes nombres : relancer
-`update_market_data.py` ne garantit pas de retrouver le magasin de l'étude
-commune (`b5facce52a6f`) ni celui des études de `SA12` et `SA13`
-(`750c23dfffc3`), et une calibration refaite sur des données révisées n'est
-pas le modèle publié
-(`d9bfd125bf69`). Les diagnostics refusent de mettre un run à côté des exports
-d'une étude faite sur un autre magasin, un autre capital ou d'autres coûts.
+This recipe redoes the procedure, not necessarily the same numbers: running
+`update_market_data.py` again does not guarantee finding the store of the
+common study (`b5facce52a6f`) nor that of the studies of `SA12` and `SA13`
+(`750c23dfffc3`), and a calibration redone on revised data is not the published
+model (`d9bfd125bf69`). The diagnostics refuse to put a run beside the exports
+of a study made on another store, another capital or other costs.
 
-Le commentaire rédigé est dans
-[research/commentary.toml](../../research/commentary.toml) ; les
-tableaux et les faits mesurés sont recalculés à chaque exécution. Tout est une
-évaluation rétrospective : l'historique d'`ETF_WORLD` a déjà été regardé, et la
-vérification prospective de `SA11` commence à la première séance XPAR après le
-2026-10-10.
+The written commentary is in
+[research/commentary.toml](../../research/commentary.toml); the tables and the
+measured facts are recomputed at each run. Everything is a retrospective
+evaluation: the history of `ETF_WORLD` has already been looked at, and the
+prospective check of `SA11` starts at the first XPAR session after 2026-10-10.

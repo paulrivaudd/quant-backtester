@@ -1,618 +1,623 @@
-# Commentaire rédigé de chaque stratégie, lu par scripts/write_strategy_reports.py,
-# qui l'écrit dans results/<CODE>/analysis.md.
+# The written commentary of each strategy, read by scripts/write_strategy_reports.py,
+# which writes it into results/<CODE>/analysis.md.
 #
-# Version 2, du 2026-10-10, réécrite après la revue indépendante
-# `revue_analyses_strategies_resultats_10102026.md` (faite sur le commit
-# 4e04eae). Ce qui a changé : les chronologies sont données en dates, signaux
-# et poids tels que les historiques les publient ; chaque point dit s'il est
-# un fait mesuré, une lecture ou une question ouverte ; les conclusions
-# causales non démontrées ont été retirées ou renvoyées à « ce qui reste à
-# mesurer » ; la récupération des baisses et le contrôle 50/50 sont cités.
+# Translated into English on 2026-10-31 from the French text of version 3
+# below. No figure, date or conclusion changes; only the number format does
+# (21.64% for "21,64 %", 15,730 EUR for "15 730 EUR").
 #
-# Version 3, du 2026-10-10, après la vérification indépendante
-# `verification_resultats_corriges_10102026.md` (faite sur le commit ad310bc).
-# Aucun chiffre global ne change. Ce qui a changé : le résidu de l'attribution
-# de SA2 et SA5 n'est plus appelé « exécution » ; les témoins sont dits « à
-# cible constante », leur exposition réalisée est citée et la comparaison ne
-# prétend plus isoler le timing ; l'écart de prix clôture-ouverture est
-# remesuré à quantités données et n'est plus présenté comme un coût ; le séjour
-# encore ouvert de SA1 est compté à part ; SA14 a deux runs à coûts doublés,
-# modèle figé et modèle recalibré ; les contradictions relevées une à une sont
-# corrigées (SA2 en 2021 et 2024, seuil de SA3, séjours de SA4, meilleur
-# épisode et groupes de SA9, contrôle de risque de SA10, lenteur de SA11,
-# test de l'EWMA, sensibilités de SA14).
+# Version 2, of 2026-10-10, rewritten after the independent review
+# `revue_analyses_strategies_resultats_10102026.md` (made on commit
+# 4e04eae). What changed: the chronologies are given in dates, signals and
+# weights as the histories publish them; each point says whether it is a
+# measured fact, a reading or an open question; the causal conclusions that
+# were not demonstrated were removed or moved to "what remains to be
+# measured"; the recovery of the falls and the 50/50 control are cited.
 #
-# Le 2026-10-11 la stratégie cataloguée ML1 est devenue SA14 : sa section
-# s'appelle [SA14] et son texte la nomme ainsi. Rien d'autre n'y change.
+# Version 3, of 2026-10-10, after the independent check
+# `verification_resultats_corriges_10102026.md` (made on commit ad310bc).
+# No global figure changes. What changed: the residual of the attribution of
+# SA2 and SA5 is no longer called "execution"; the controls are called
+# "constant-target", their realised exposure is cited and the comparison no
+# longer claims to isolate the timing; the close-to-open price gap is
+# measured again at given quantities and is no longer presented as a cost;
+# the still-open stay of SA1 is counted apart; SA14 has two runs at doubled
+# costs, frozen model and recalibrated model; the contradictions found one by
+# one are corrected (SA2 in 2021 and 2024, threshold of SA3, stays of SA4,
+# best episode and groups of SA9, risk control of SA10, slowness of SA11,
+# test of the EWMA, sensitivities of SA14).
 #
-# Conventions de lecture, valables partout ci-dessous :
-# - « Fait » : relu dans les exports de runs/garch_study (summary.csv,
-#   history_*.csv, fills.csv, comparison.csv, forecast_*.csv), run du commit
-#   91a2f37 sur le magasin b5facce52a6f, période 2021-04-01 -> 2026-10-09. C'est
-#   le run du 2026-10-11, qui ajoute SA7 et SA8 : les chiffres des autres livres
-#   y sont ceux du run 788507b sur le magasin 750c23dfffc3, à l'identique ; seuls
-#   leurs scores bougent de moins d'un dixième de point (onze essais au lieu de dix).
-#   Les « mesures complémentaires » sont relues dans results/summary/diagnostics.md,
-#   version 2, écrit par scripts/run_review_diagnostics.py sur le même magasin.
-# - « Lecture » : une interprétation plausible de ces faits, non démontrée.
-# - Une décision est prise le soir de t (signal et poids cible de la ligne t)
-#   et exécutée à l'ouverture de t + 1 : elle n'apparaît dans le poids détenu
-#   qu'à la ligne t + 1. Le « poids détenu » est celui de la valorisation du
-#   soir. Une variation de clôture du fonds entre deux dates est un mouvement
-#   du sous-jacent, pas une perte ni un manque à gagner comptable.
-# - Repères : ETF_WORLD détenu fait +94,8 % net (Sharpe 0,93), perd -21,64 % du
-#   2025-02-19 au 2025-04-09 et retrouve ce sommet le 2025-10-06, 229 jours
-#   plus tard. Le panier 50/50 rebalancé des deux fonds fait +103,3 % net.
-# - Rien de ceci n'est un échantillon vierge : l'historique a déjà été regardé.
+# On 2026-10-11 the catalogued strategy ML1 became SA14: its section is
+# called [SA14] and its text names it so. Nothing else changes in it.
+#
+# Reading conventions, valid everywhere below:
+# - "Fact": read again in the exports of runs/garch_study (summary.csv,
+#   history_*.csv, fills.csv, comparison.csv, forecast_*.csv), the run of
+#   commit 91a2f37 on store b5facce52a6f, period 2021-04-01 -> 2026-10-09. It
+#   is the run of 2026-10-11, which adds SA7 and SA8: the figures of the other
+#   books are those of run 788507b on store 750c23dfffc3, identical; only
+#   their scores move, by less than a tenth of a point (eleven trials instead
+#   of ten). The "complementary measures" are read in
+#   results/summary/diagnostics.md, version 2, written by
+#   scripts/run_review_diagnostics.py on the same store.
+# - "Reading": a plausible interpretation of these facts, not demonstrated.
+# - A decision is taken on the evening of t (signal and target weight of row
+#   t) and executed at the open of t + 1: it appears in the weight held only
+#   at row t + 1. The "weight held" is that of the evening valuation. A change
+#   in the fund's close between two dates is a move of the underlying, not a
+#   loss nor an accounting shortfall.
+# - Landmarks: ETF_WORLD held makes +94.8% net (Sharpe 0.93), loses -21.64%
+#   from 2025-02-19 to 2025-04-09 and is back at that peak on 2025-10-06, 229
+#   days later. The rebalanced 50/50 basket of the two funds makes +103.3% net.
+# - None of this is an untouched sample: the history has already been looked at.
 
 [SA1]
-summary = "Détenir ETF_WORLD au-dessus de sa moyenne mobile 20 jours, être en cash en dessous. Sur cette période la règle amortit fortement la chute de février-avril 2025, mais cette protection n'est pas régulière : sa pire baisse se produit en 2021-2022 malgré une exposition réduite, et les passages répétés entre cash et fonds, puis les frais, dégradent le résultat. Elle reste un étalon de timing réactif, sans avantage net démontré sur le fonds détenu : +20,5 % net contre +94,8 %."
+summary = "Hold ETF_WORLD above its 20-day moving average, be in cash below it. Over this period the rule strongly cushions the fall of February-April 2025, but this protection is not consistent: its worst fall happens in 2021-2022 despite a reduced exposure, and the repeated switches between cash and the fund, then the fees, erode the result. It remains a yardstick of reactive timing, with no net advantage shown over the fund held: +20.5% net against +94.8%."
 strengths = [
-  "**Fait.** Pendant la plus forte baisse du fonds (2025-02-19 au 2025-04-09, -21,64 %), la règle perd -6,58 %, avec un poids de clôture moyen de 22 %.",
-  "**Fait.** Volatilité de 8,9 % contre 13,8 % pour le fonds, bêta de 0,41.",
-  "**Fait.** Aucun paramètre estimé : un seul indicateur, la distance du cours à sa MM20.",
+  "**Fact.** During the deepest fall of the fund (2025-02-19 to 2025-04-09, -21.64%), the rule loses -6.58%, with an average close weight of 22%.",
+  "**Fact.** Volatility of 8.9% against 13.8% for the fund, beta of 0.41.",
+  "**Fact.** No estimated parameter: a single indicator, the distance of the price to its MA20.",
 ]
 weaknesses = [
-  "**Fait.** L'une des règles les plus coûteuses, surtout au regard du gain obtenu : 15 730 EUR de coûts et une rotation de 25,5 fois l'actif par an (seule SA5 coûte plus, 20 517 EUR). Les coûts représentent environ 43 % du gain brut : +36,2 % brut, +20,5 % net, et +4,4 % dans le second run réel à coûts doublés.",
-  "**Fait.** Ses 143 ordres portent presque tous sur la totalité du portefeuille : dans les exécutions, la valeur traitée va de 0,9 à 1,2 fois le capital initial par ordre.",
-  "**Fait.** Score de qualité nul : les blocs robustesse et implémentation sont à zéro, et un seul bloc nul suffit à annuler une moyenne géométrique. Ce zéro n'est pas une probabilité de gain nulle.",
-  "**Fait.** Sa pire baisse (-18,95 %) n'est récupérée que le 2024-01-25, 794 jours après le sommet du 2021-11-22 ; une deuxième, partie du 2025-11-03 (-10,1 % au creux), n'est pas récupérée au 2026-10-09.",
-  "**Lecture.** L'ordre décidé le soir est exécuté à l'ouverture suivante : la règle agit après le mouvement qui l'a déclenchée. Le gap de nuit peut jouer dans les deux sens ; son solde est mesuré plus bas, comme un écart de prix signé clôture-ouverture à quantités données, qui n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.",
+  "**Fact.** One of the most expensive rules, above all relative to the gain obtained: 15,730 EUR of costs and a turnover of 25.5 times the assets a year (only SA5 costs more, 20,517 EUR). Costs are about 43% of the gross gain: +36.2% gross, +20.5% net, and +4.4% in the second actual run at doubled costs.",
+  "**Fact.** Its 143 orders almost all concern the whole portfolio: in the fills, the value traded ranges from 0.9 to 1.2 times the initial capital per order.",
+  "**Fact.** Zero quality score: the robustness and implementation blocks are at zero, and a single zero block is enough to cancel a geometric mean. This zero is not a zero probability of gain.",
+  "**Fact.** Its worst fall (-18.95%) is recovered only on 2024-01-25, 794 days after the peak of 2021-11-22; a second one, started on 2025-11-03 (-10.1% at the trough), is not recovered at 2026-10-09.",
+  "**Reading.** The order decided in the evening is executed at the next open: the rule acts after the move that triggered it. The overnight gap can play both ways; its balance is measured below, as a signed close-to-open price gap at given quantities, which is neither a cost paid nor the result of a backtest executed at the close.",
 ]
-worst = "**Fait.** Du 2021-11-22 au 2022-07-14, la stratégie perd -18,95 % alors que le fonds perd -12,0 %, avec un poids de clôture moyen de 36 %. Sur cet intervalle les poids publiés montrent 12 passages du cash au fonds et 12 passages du fonds au cash. Avril 2022 est son pire mois (-5,08 % contre -2,67 % pour le fonds). **Lecture.** Perdre plus que le fonds en étant investi un tiers du temps suppose d'avoir été investi pendant les rechutes et absent d'une partie des rebonds : c'est ce que produisent des allers-retours autour d'une moyenne courte dans un marché baissier irrégulier. Le résultat et les frais de chacun de ces 24 passages ne sont pas isolés dans ce rapport."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2022-07-14 au 2025-11-03 (+37,3 %, le fonds +59,1 %, poids moyen 70 %) : c'est une mesure de durée libre, pas une position tenue trois ans. Les 63 meilleurs rendements consécutifs (2023-11-10 au 2024-02-12, +13,51 %) coïncident avec une fenêtre où le poids de clôture reste à 99,9 % : la règle y est déjà investie, aucun ordre n'y est exécuté, et le rendement est très proche de celui du fonds (+13,52 % en clôture). **Lecture.** La règle fait le rendement du fonds quand le cours reste au-dessus de sa moyenne, et rien de plus."
+worst = "**Fact.** From 2021-11-22 to 2022-07-14, the strategy loses -18.95% while the fund loses -12.0%, with an average close weight of 36%. Over this interval the published weights show 12 switches from cash to the fund and 12 from the fund to cash. April 2022 is its worst month (-5.08% against -2.67% for the fund). **Reading.** Losing more than the fund while invested a third of the time implies having been invested during the relapses and absent from part of the rebounds: that is what round trips around a short average produce in an irregular falling market. The result and the fees of each of these 24 switches are not isolated in this report."
+best = "**Fact.** The largest rise from a trough to a later peak runs from 2022-07-14 to 2025-11-03 (+37.3%, the fund +59.1%, average weight 70%): it is a measure of any length, not a position held for three years. The 63 best consecutive returns (2023-11-10 to 2024-02-12, +13.51%) coincide with a window in which the close weight stays at 99.9%: the rule is already invested, no order is executed in it, and the return is very close to the fund's (+13.52% at the close). **Reading.** The rule makes the fund's return when the price stays above its average, and nothing more."
 risks = [
-  "**Observé.** Marché baissier irrégulier (2021-2022) : passages répétés entre cash et fonds, chacun payant un aller-retour.",
-  "**Observé.** En 2026, jusqu'au 9 octobre, la règle fait -0,04 % quand le fonds fait +17,7 %, avec 26 changements d'état dans les poids publiés. Les faux signaux sont une explication plausible, non chiffrée ici.",
-  "**Plausible.** Rebond rapide après un krach : la règle est en cash au point bas et ne rachète qu'une fois le cours repassé au-dessus de sa moyenne.",
-  "**Observé.** Hausse des coûts d'exécution : à coûts doublés le gain disparaît presque entièrement.",
+  "**Observed.** Irregular falling market (2021-2022): repeated switches between cash and the fund, each paying a round trip.",
+  "**Observed.** In 2026, up to 9 October, the rule makes -0.04% when the fund makes +17.7%, with 26 changes of state in the published weights. False signals are a plausible explanation, not quantified here.",
+  "**Plausible.** Fast rebound after a crash: the rule is in cash at the low and buys back only once the price is above its average again.",
+  "**Observed.** Higher execution costs: at doubled costs the gain almost entirely disappears.",
 ]
 measured = [
-  "**Fait.** Par séjour dans le marché : 72 séjours, dont 71 clos et 1 encore ouvert. Sur les 71 clos, 28 gagnants et 43 perdants (39,4 % de gagnants). Le séjour ouvert, entré à la valorisation du 2026-09-18, vaut +2,96 % au 2026-10-09, valorisé au marché, sans vente finale ni son coût. Sur les 72, l'ouvert compris : net moyen +0,31 %, net médian -0,28 %, pire -6,14 %, meilleur +17,48 %, pour 13 valorisations en moyenne ; leur produit retrouve les +20,45 % de la stratégie. **Lecture.** Le résultat tient à quelques longs séjours gagnants, pas à la fréquence des bons signaux.",
-  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : -14 568 EUR nets, soit -14,6 % du capital initial (écarts favorables +28 201 EUR, défavorables -42 768 EUR), mesuré sur le prix de marché de l'ouverture, donc hors spread, slippage et commission. C'est du même ordre que ses coûts explicites (15 730 EUR) et, de loin, le solde le plus défavorable de tous les livres. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture : le signal lit cette clôture, l'ordre ne pouvait pas y être exécuté, et un autre prix d'exécution aurait changé toutes les quantités suivantes.",
-  "**Lecture.** Les écarts de nuit jouent dans les deux sens, mais leur solde est nettement défavorable ici : une règle qui achète après une clôture au-dessus de sa moyenne et vend après une clôture en dessous exécute en moyenne après une partie du mouvement.",
+  "**Fact.** By stay in the market: 72 stays, of which 71 closed and 1 still open. Of the 71 closed, 28 winners and 43 losers (39.4% winners). The open stay, entered at the valuation of 2026-09-18, is worth +2.96% at 2026-10-09, marked to market, without a final sale or its cost. Over the 72, the open one included: mean net +0.31%, median net -0.28%, worst -6.14%, best +17.48%, for 13 valuations on average; their product gives back the +20.45% of the strategy. **Reading.** The result rests on a few long winning stays, not on the frequency of good signals.",
+  "**Fact.** Signed close-to-open price gap, at given quantities: -14,568 EUR net, i.e. -14.6% of the initial capital (favourable gaps +28,201 EUR, unfavourable -42,768 EUR), measured on the market price of the open, hence excluding spread, slippage and commission. It is of the same order as its explicit costs (15,730 EUR) and, by far, the most unfavourable balance of all the books. It is neither a cost paid nor the result of a backtest executed at the close: the signal reads that close, the order could not be executed at it, and another execution price would have changed all the following quantities.",
+  "**Reading.** The overnight gaps play both ways, but their balance is clearly unfavourable here: a rule that buys after a close above its average and sells after a close below it executes, on average, after part of the move.",
 ]
 to_test = [
-  "Le détail des 72 séjours est dans `episodes_sa1.csv` (dossier des diagnostics) ; le sous-ensemble 2021-2022 n'est pas commenté séparément.",
-  "L'alpha de -1,6 % par an reste une estimation ponctuelle, sans intervalle.",
+  "The detail of the 72 stays is in `episodes_sa1.csv` (folder of the diagnostics); the 2021-2022 subset is not commented on separately.",
+  "The alpha of -1.6% a year remains a point estimate, without an interval.",
 ]
 
 [SA2]
-summary = "Répartir entre ETF_WORLD et ETF_SP500_PEA selon l'écart de leurs momentums 6 et 12 mois, les 21 dernières séances exclues, et sortir d'un fonds dont le momentum 12 mois n'est pas positif. Pendant la chute de 2025 la règle réduit son inclinaison vers le S&P 500 mais garde une exposition actions presque totale ; sa sortie en cash de mai arrive ensuite pendant la reprise. +69,2 % net contre +94,8 % pour le fonds et +103,3 % pour le panier 50/50 des mêmes fonds."
+summary = "Split between ETF_WORLD and ETF_SP500_PEA according to the gap between their 6- and 12-month momentums, the last 21 sessions excluded, and leave a fund whose 12-month momentum is not positive. During the fall of 2025 the rule reduces its tilt towards the S&P 500 but keeps an almost full equity exposure; its exit to cash in May comes afterwards, during the recovery. +69.2% net against +94.8% for the fund and +103.3% for the 50/50 basket of the same funds."
 strengths = [
-  "**Fait.** Deux années au-dessus du fonds détenu : +21,2 % en 2021 (partielle) et +30,7 % en 2024, contre +18,4 % et +27,1 %.",
-  "**Fait.** Les 63 meilleurs rendements consécutifs (2026-03-31 au 2026-07-01) font +17,2 %, contre +16,3 % pour le fonds.",
-  "**Fait.** La répartition entre les deux fonds s'adapte : le poids du fonds S&P 500 passe de 66,9 % le 2025-02-19 à 50,1 % le 2025-04-09.",
+  "**Fact.** Two years above the fund held: +21.2% in 2021 (partial) and +30.7% in 2024, against +18.4% and +27.1%.",
+  "**Fact.** The 63 best consecutive returns (2026-03-31 to 2026-07-01) make +17.2%, against +16.3% for the fund.",
+  "**Fact.** The split between the two funds adapts: the weight of the S&P 500 fund goes from 66.9% on 2025-02-19 to 50.1% on 2025-04-09.",
 ]
 weaknesses = [
-  "**Fait.** Ces deux bonnes années dépassent légèrement le panier 50/50, qui fait déjà +20,74 % en 2021 (partielle) et +30,19 % en 2024, contre +21,21 % et +30,73 % pour la règle : environ 0,47 et 0,54 point d'avance, sans démonstration de supériorité statistique. **Lecture.** L'avance sur le fonds monde tient donc surtout au panier détenu, qui fait déjà 2,3 et 3,1 points de mieux que lui, pas au momentum.",
-  "**Fait.** Sur toute la période la règle fait +69,2 % net contre +103,3 % pour le panier 50/50 ; ses 4 629 EUR de coûts n'expliquent qu'une petite partie de cet écart de 34 points.",
-  "**Fait.** Perte maximale de -22,78 %, plus profonde que celle du fonds (-21,64 %), récupérée le 2026-04-17 seulement, 422 jours après le sommet (229 jours pour le fonds).",
-  "**Fait.** -17,6 % en 2022 (fonds -13,7 %), puis +9,1 % en 2023 (fonds +19,6 %) ; sa plus longue période sous un sommet dure 807 jours, du 2022-01-04 au 2024-03-21.",
-  "**Fait.** Sharpe de 0,78, puis 0,72 dans le second run à coûts doublés ; alpha de -1,0 % par an, sans intervalle.",
+  "**Fact.** These two good years slightly beat the 50/50 basket, which already makes +20.74% in 2021 (partial) and +30.19% in 2024, against +21.21% and +30.73% for the rule: about 0.47 and 0.54 point ahead, with no demonstration of statistical superiority. **Reading.** The lead over the world fund therefore rests mostly on the basket held, which already does 2.3 and 3.1 points better than it, not on the momentum.",
+  "**Fact.** Over the whole period the rule makes +69.2% net against +103.3% for the 50/50 basket; its 4,629 EUR of costs explain only a small part of this 34-point gap.",
+  "**Fact.** Maximum drawdown of -22.78%, deeper than the fund's (-21.64%), recovered only on 2026-04-17, 422 days after the peak (229 days for the fund).",
+  "**Fact.** -17.6% in 2022 (fund -13.7%), then +9.1% in 2023 (fund +19.6%); its longest stretch below a peak lasts 807 days, from 2022-01-04 to 2024-03-21.",
+  "**Fact.** Sharpe of 0.78, then 0.72 in the second run at doubled costs; alpha of -1.0% a year, without an interval.",
 ]
-worst = "**Fait.** Du 2025-02-19 au 2025-04-09, la stratégie perd -22,78 % avec un poids de clôture total de 100 % d'un bout à l'autre. Sur cet intervalle le fonds S&P 500 perd -23,3 % en clôture et le fonds monde -21,7 %, et la règle ramène le premier de 66,9 % à 50,1 % du portefeuille. **Lecture.** La règle a adapté sa répartition, pas son exposition totale : les conditions d'éligibilité, qui lisent des momentums arrêtés 21 séances plus tôt, restent positives pendant toute la baisse. **Fait.** La suite pèse autant : la stratégie est entièrement en cash du 2025-05-09 au 2025-05-26 et reprend une position le 27 mai ; entre ces deux clôtures le fonds monde monte de +3,4 %. L'année 2025 se termine à +0,6 % contre +6,6 % pour le fonds."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2023-05-04 au 2026-10-06 (+74,3 %, poids moyen 96 %) : une durée libre, pas un signal unique. Le meilleur trimestre glissant (2026-03-31 au 2026-07-01, +17,2 % contre +16,3 %) a un poids de clôture de 100 %. Son plus fort retard relatif court du 2022-07-14 au 2025-05-16 : +18,1 % contre +43,7 % pour le fonds, soit un écart relatif de -17,8 %. **Lecture.** Ce retard additionne la sortie de 2022, le retour de 2023 et la sortie de mai 2025."
+worst = "**Fact.** From 2025-02-19 to 2025-04-09, the strategy loses -22.78% with a total close weight of 100% from start to finish. Over this interval the S&P 500 fund loses -23.3% at the close and the world fund -21.7%, and the rule brings the first one down from 66.9% to 50.1% of the portfolio. **Reading.** The rule adapted its split, not its total exposure: the eligibility conditions, which read momentums stopped 21 sessions earlier, stay positive throughout the fall. **Fact.** What follows weighs as much: the strategy is entirely in cash from 2025-05-09 to 2025-05-26 and takes a position again on 27 May; between these two closes the world fund rises by +3.4%. The year 2025 ends at +0.6% against +6.6% for the fund."
+best = "**Fact.** The largest rise from a trough to a later peak runs from 2023-05-04 to 2026-10-06 (+74.3%, average weight 96%): any length, not a single signal. The best rolling quarter (2026-03-31 to 2026-07-01, +17.2% against +16.3%) has a close weight of 100%. Its largest relative lag runs from 2022-07-14 to 2025-05-16: +18.1% against +43.7% for the fund, a relative gap of -17.8%. **Reading.** This lag adds up the exit of 2022, the return of 2023 and the exit of May 2025."
 risks = [
-  "**Observé.** Chute rapide partie de plus hauts (février-avril 2025) : les momentums longs, lus avec 21 séances de retard, restent positifs et l'exposition totale reste à 100 %.",
-  "**Observé.** Reprise après une baisse (début 2023, mai 2025) : la règle est en cash ou sous-investie quand le marché remonte.",
-  "**Plausible.** Inversion du leadership entre les États-Unis et le reste du monde : l'inclinaison suit le fonds qui a le mieux monté.",
+  "**Observed.** Fast fall from highs (February-April 2025): the long momentums, read with a lag of 21 sessions, stay positive and the total exposure stays at 100%.",
+  "**Observed.** Recovery after a fall (early 2023, May 2025): the rule is in cash or under-invested when the market rises again.",
+  "**Plausible.** Reversal of leadership between the United States and the rest of the world: the tilt follows the fund that rose best.",
 ]
 measured = [
-  "**Fait.** Attribution approchée contre le panier 50/50, en rendements logarithmiques sur la période : panier +0,727 ; exposition totale -0,140 ; choix entre les deux fonds +0,004 ; résidu de l'approximation aux poids de clôture -0,039 ; coûts -0,027 ; soit +0,526 pour la stratégie, contre +0,710 pour le panier exécuté par le moteur. Les trois premiers termes valorisent les poids détenus à la clôture précédente avec le rendement de clôture à clôture, ce qui n'est pas la façon dont le livre a traité.",
-  "**Lecture.** Dans cette approximation la contribution de l'exposition totale est négative et celle du choix entre les fonds, objet du momentum relatif, proche de zéro ; les coûts pèsent 2,7 points logarithmiques. Le résidu n'est pas une mesure de l'exécution : il contient aussi le rendement de la journée sur ce qui a été acheté ou vendu le matin même, donc une partie de l'effet du signal. Ces termes ne sont pas l'apport complet d'un timing, et une attribution exacte reste à faire.",
-  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : -1 838 EUR nets. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.",
+  "**Fact.** Approximate attribution against the 50/50 basket, in log returns over the period: basket +0.727; total exposure -0.140; choice between the two funds +0.004; residual of the approximation at the close weights -0.039; costs -0.027; i.e. +0.526 for the strategy, against +0.710 for the basket executed by the engine. The first three terms value the weights held at the previous close with the close-to-close return, which is not how the book traded.",
+  "**Reading.** In this approximation the contribution of the total exposure is negative and that of the choice between the funds, the object of the relative momentum, close to zero; the costs weigh 2.7 log points. The residual is not a measure of the execution: it also contains the return of the day on what was bought or sold that very morning, hence part of the effect of the signal. These terms are not the full contribution of a timing, and an exact attribution remains to be made.",
+  "**Fact.** Signed close-to-open price gap, at given quantities: -1,838 EUR net. It is neither a cost paid nor the result of a backtest executed at the close.",
 ]
 to_test = [
-  "Une attribution exacte, à partir des quantités avant et après chaque exécution et des prix d'ouverture (quantités avant fois l'écart clôture-ouverture, quantités après fois l'écart ouverture-clôture, puis les frais), comparée à celle du panier 50/50 : elle n'est pas produite ici.",
-  "Les dates d'éligibilité de chaque fonds, pour dater les sorties en cash une à une.",
+  "An exact attribution, from the quantities before and after each fill and the opening prices (quantities before times the close-to-open gap, quantities after times the open-to-close gap, then the fees), compared with that of the 50/50 basket: it is not produced here.",
+  "The eligibility dates of each fund, to date the exits to cash one by one.",
 ]
 
 [SA3]
-summary = "Exposition à ETF_WORLD proportionnelle à l'écart entre ses moyennes mobiles 50 et 200 jours : cash quand la MM50 est sous la MM200, 100 % à partir de 2 % d'écart, de façon continue entre les deux. En 2025 la règle subit presque toute la baisse jusqu'au 9 avril, réduit ensuite progressivement du 11 au 22 avril, puis reste en cash 84 séances : pas de protection de la chute, puis une faible participation au rebond. +57,9 % net, et la règle la moins chère du catalogue."
+summary = "Exposure to ETF_WORLD proportional to the gap between its 50- and 200-day moving averages: cash when the MA50 is below the MA200, 100% from a gap of 2%, continuously in between. In 2025 the rule takes almost the whole fall up to 9 April, then reduces progressively from 11 to 22 April, then stays in cash for 84 sessions: no protection from the fall, then a weak participation in the rebound. +57.9% net, and the cheapest rule of the catalogue."
 strengths = [
-  "**Fait.** 78 ordres en cinq ans et demi, 680 EUR de coûts, une rotation de 0,98 fois l'actif par an ; +56,9 % dans le second run à coûts doublés.",
-  "**Fait.** -9,1 % en 2022 contre -13,7 % pour le fonds ; du 2022-04-05 au 2022-06-17 elle est en cash pendant que le fonds perd -15,0 %.",
-  "**Fait.** Alpha de +0,4 % par an pour un bêta de 0,65 : une estimation ponctuelle, sans intervalle, qui ne démontre pas une prime.",
+  "**Fact.** 78 orders in five and a half years, 680 EUR of costs, a turnover of 0.98 times the assets a year; +56.9% in the second run at doubled costs.",
+  "**Fact.** -9.1% in 2022 against -13.7% for the fund; from 2022-04-05 to 2022-06-17 it is in cash while the fund loses -15.0%.",
+  "**Fact.** Alpha of +0.4% a year for a beta of 0.65: a point estimate, without an interval, which does not demonstrate a premium.",
 ]
 weaknesses = [
-  "**Fait.** Perte maximale de -21,64 %, la même que le fonds, mais récupérée le 2026-08-13 seulement : 540 jours après le sommet, contre 229 pour le fonds. C'est son point faible le plus instructif.",
-  "**Fait.** -9,6 % en 2025 alors que le fonds finit à +6,6 % ; avril 2025 est son pire mois (-8,0 % contre -3,9 %).",
-  "**Fait.** +8,6 % en 2023 contre +19,6 % ; 748 jours sous le sommet du 2022-01-04.",
-  "**Fait.** 12 mois sur 67 sans aucune variation : la règle passe de longues périodes entièrement en cash.",
+  "**Fact.** Maximum drawdown of -21.64%, the same as the fund's, but recovered only on 2026-08-13: 540 days after the peak, against 229 for the fund. It is its most instructive weak point.",
+  "**Fact.** -9.6% in 2025 while the fund ends at +6.6%; April 2025 is its worst month (-8.0% against -3.9%).",
+  "**Fact.** +8.6% in 2023 against +19.6%; 748 days below the peak of 2022-01-04.",
+  "**Fact.** 12 months out of 67 without any change: the rule spends long stretches entirely in cash.",
 ]
-worst = "**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -21,64 %, avec un poids de clôture de 100 %. Les deux moyennes bougent pendant ces 35 rendements, mais leur écart reste assez proche du seuil de pleine exposition (2 %) pour que la cible reste élevée et que la bande conserve la position : le 9 avril il vaut encore +1,94 %. La sortie est progressive et vient après le creux : poids de clôture de 99,9 % le 10 avril, 80,1 % le 11, 62,1 % le 14, 46,1 % le 15, 30,5 % le 16, 14,9 % le 17, 0 % le 22. La cible baisse avant le croisement, constaté le 17 avril (écart de -0,05 %). Le portefeuille reste ensuite à zéro pendant 84 séances, du 2025-04-22 au 2025-08-18, rentre à 2,7 % le 19 août et ne revient vers 100 % que fin septembre. Entre les clôtures du 22 avril et du 19 août le fonds monte de +18,1 % : c'est un mouvement du sous-jacent, pas une perte comptable de SA3."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur couvre presque toute la période (2021-05-19 au 2026-10-06, +62,2 % contre +100,2 % pour le fonds) : une durée libre qui contient les sorties de 2022 et de 2025. Les 63 meilleurs rendements consécutifs (2026-03-31 au 2026-07-01, +16,25 %) ont un poids de clôture de 99,7 % en moyenne, aucun ordre exécuté, et un rendement presque égal à celui du fonds (+16,29 %). **Lecture.** La règle gagne quand il n'y a rien à faire."
+worst = "**Fact.** From 2025-02-19 to 2025-04-09 the strategy loses -21.64%, with a close weight of 100%. The two averages move during these 35 returns, but their gap stays close enough to the threshold of full exposure (2%) for the target to stay high and for the band to keep the position: on 9 April it is still +1.94%. The exit is progressive and comes after the trough: close weight of 99.9% on 10 April, 80.1% on the 11th, 62.1% on the 14th, 46.1% on the 15th, 30.5% on the 16th, 14.9% on the 17th, 0% on the 22nd. The target falls before the crossing, seen on 17 April (gap of -0.05%). The portfolio then stays at zero for 84 sessions, from 2025-04-22 to 2025-08-18, comes back in at 2.7% on 19 August and returns towards 100% only at the end of September. Between the closes of 22 April and 19 August the fund rises by +18.1%: it is a move of the underlying, not an accounting loss of SA3."
+best = "**Fact.** The largest rise from a trough to a later peak covers almost the whole period (2021-05-19 to 2026-10-06, +62.2% against +100.2% for the fund): any length, and it contains the exits of 2022 and 2025. The 63 best consecutive returns (2026-03-31 to 2026-07-01, +16.25%) have an average close weight of 99.7%, no order executed, and a return almost equal to the fund's (+16.29%). **Reading.** The rule gains when there is nothing to do."
 risks = [
-  "**Observé.** Chute rapide partie de plus hauts puis rebond (2025) : toute la baisse est subie, la sortie se fait après le creux, le retour après la reprise ; la récupération s'en trouve allongée de dix mois par rapport au fonds.",
-  "**Plausible.** Écart des moyennes oscillant près de zéro : la règle étant continue (0,1 % d'écart donne 5 % d'exposition avant bande), elle n'alterne pas entre 0 et 100 %, mais de petits ajustements répétés peuvent coûter.",
-  "**Observé.** Reprise après un marché baissier long (2023) : le retour à l'exposition vient plusieurs mois après le point bas.",
+  "**Observed.** Fast fall from highs then rebound (2025): the whole fall is taken, the exit comes after the trough, the return after the recovery; the recovery is lengthened by ten months compared with the fund.",
+  "**Plausible.** Gap between the averages oscillating near zero: the rule being continuous (a gap of 0.1% gives 5% exposure before the band), it does not alternate between 0 and 100%, but small repeated adjustments can cost.",
+  "**Observed.** Recovery after a long falling market (2023): the return to exposure comes several months after the low.",
 ]
 measured = [
-  "**Fait.** À côté d'un témoin à cible constante de 71,5 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : le témoin fait +63,2 % net, Sharpe 0,93, perte maximale -15,9 %, sommet retrouvé en 226 jours, 7 ordres et 94 EUR de coûts, pour une exposition moyenne réalisée de 72,2 % ; SA3 fait +57,9 %, Sharpe 0,79, -21,6 %, 540 jours, pour 71,5 %.",
-  "**Lecture.** Sur cette période SA3 fait moins bien que ce témoin, en rendement comme en risque. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing des deux moyennes : le niveau d'exposition, les coûts et la trajectoire changent aussi. Le témoin est choisi après coup : c'est un constat, pas une règle qu'on aurait pu fixer à l'avance.",
-  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : -645 EUR nets, le plus faible de tous les livres en valeur absolue. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.",
+  "**Fact.** Beside a constant-target control at 71.5% of the fund (its average weight), with the same 3-point band and the same costs: the control makes +63.2% net, Sharpe 0.93, maximum drawdown -15.9%, peak back in 226 days, 7 orders and 94 EUR of costs, for an average realised exposure of 72.2%; SA3 makes +57.9%, Sharpe 0.79, -21.6%, 540 days, for 71.5%.",
+  "**Reading.** Over this period SA3 does worse than this control, in return as in risk. The comparison describes two executable rules and does not isolate, at exactly the same exposure, the value of the timing of the two averages: the level of exposure, the costs and the path change too. The control is chosen after the fact: it is an observation, not a rule that could have been set in advance.",
+  "**Fact.** Signed close-to-open price gap, at given quantities: -645 EUR net, the smallest of all the books in absolute value. It is neither a cost paid nor the result of a backtest executed at the close.",
 ]
 to_test = [
-  "Le résultat de la seule séquence de sortie du 11 au 22 avril 2025 n'est pas isolé du reste.",
+  "The result of the exit sequence alone, from 11 to 22 April 2025, is not isolated from the rest.",
 ]
 
 [SA4]
-summary = "Acheter ETF_WORLD, à hauteur de 50 % au plus, après une baisse de cinq séances inhabituelle par rapport à sa volatilité, seulement au-dessus de sa moyenne 200 jours. La faible perte du portefeuille vient largement de sa faible fréquence d'investissement : une position n'est détenue qu'à 198 clôtures sur 1 416. Quand elle s'active, la poche peut atteindre 50 % et acheter plusieurs fois une baisse qui s'installe. +4,4 % net en cinq ans et demi, concentré sur 2024."
+summary = "Buy ETF_WORLD, up to 50% at most, after a five-session fall that is unusual relative to its volatility, only above its 200-day average. The small loss of the portfolio comes largely from how rarely it invests: a position is held at only 198 closes out of 1,416. When it is active, the pocket can reach 50% and buy a settling fall several times. +4.4% net in five and a half years, concentrated in 2024."
 strengths = [
-  "**Fait.** Au niveau du portefeuille entier : volatilité de 1,9 %, perte maximale de -3,42 %, bêta de 0,05.",
-  "**Fait.** Du 2025-02-19 au 2025-04-09 elle perd -2,92 % quand le fonds perd -21,64 %, avec un poids de clôture moyen de 10 %.",
-  "**Fait.** Alpha de +0,18 % par an contre le fonds : pratiquement nul, sans intervalle. Il ne démontre pas que les replis achetés ont été payés en moyenne.",
+  "**Fact.** At the level of the whole portfolio: volatility of 1.9%, maximum drawdown of -3.42%, beta of 0.05.",
+  "**Fact.** From 2025-02-19 to 2025-04-09 it loses -2.92% when the fund loses -21.64%, with an average close weight of 10%.",
+  "**Fact.** Alpha of +0.18% a year against the fund: practically zero, without an interval. It does not demonstrate that the dips bought paid on average.",
 ]
 weaknesses = [
-  "**Fait.** La volatilité de 1,9 % est celle d'un portefeuille en cash 86 % du temps. Le risque porté quand le signal est actif est celui d'une position allant jusqu'à 50,4 % du capital.",
-  "**Fait.** +9,0 % brut, +4,4 % net pour 237 ordres et 4 572 EUR de coûts ; -0,16 % dans le second run à coûts doublés.",
-  "**Fait.** Sa perte maximale, pourtant de -3,42 % seulement, n'est pas récupérée au 2026-10-09 (589 jours) ; la précédente (-2,55 %) a duré 1 039 jours, du 2021-10-05 au 2024-08-09.",
-  "**Fait.** 28 mois positifs, 14 négatifs et 25 sans variation. Le résultat dépend de 2024 (+5,5 %) : le produit des rendements des autres années est d'environ -1,0 %. Ce n'est pas un nouveau backtest, c'est un indicateur de concentration.",
-  "**Fait.** Score de qualité nul, par les blocs robustesse et implémentation.",
+  "**Fact.** The volatility of 1.9% is that of a portfolio in cash 86% of the time. The risk carried when the signal is active is that of a position of up to 50.4% of the capital.",
+  "**Fact.** +9.0% gross, +4.4% net for 237 orders and 4,572 EUR of costs; -0.16% in the second run at doubled costs.",
+  "**Fact.** Its maximum drawdown, though only -3.42%, is not recovered at 2026-10-09 (589 days); the previous one (-2.55%) lasted 1,039 days, from 2021-10-05 to 2024-08-09.",
+  "**Fact.** 28 positive months, 14 negative and 25 unchanged. The result depends on 2024 (+5.5%): the product of the returns of the other years is about -1.0%. It is not a new backtest, it is an indicator of concentration.",
+  "**Fact.** Zero quality score, through the robustness and implementation blocks.",
 ]
-worst = "**Fait.** Du 2025-02-27 au 2025-03-07 la stratégie perd -3,42 % pendant que le fonds perd -7,0 % en clôture. Ce n'est pas un achat unique gardé jusqu'au bout : le poids de clôture est de 12,7 % le 28 février, 49,9 % le 3 mars, 4,9 % le 4, puis de nouveau 49,4 % le 5, 49,5 % le 6 et 49,0 % le 7. La règle allège quand le signal faiblit, puis rachète après une nouvelle baisse. Le 7 mars le cours passe sous sa MM200 : la cible du soir est zéro, mais le poids détenu est encore de 49,0 %, et le cash n'est constaté que le 10 mars, après exécution à l'ouverture. **Lecture.** Le filtre de tendance ne protège pas à la clôture du franchissement, et un achat de repli ne distingue pas un repli du début d'une baisse durable."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2024-04-19 au 2025-02-27 (+6,1 %, le fonds +20,7 %, poids moyen 6 %) : une suite d'épisodes courts, pas une position. Le meilleur trimestre glissant (2024-09-06 au 2024-12-04) fait +2,9 %. **Lecture.** Dans une hausse régulière, les replis de quelques séances ont été suivis d'un retour vers les plus hauts ; le taux de réussite et le gain net des séjours de cette seule fenêtre ne sont pas isolés ici ; ceux des 71 séjours de toute la période sont dans les mesures complémentaires."
+worst = "**Fact.** From 2025-02-27 to 2025-03-07 the strategy loses -3.42% while the fund loses -7.0% at the close. It is not a single purchase kept to the end: the close weight is 12.7% on 28 February, 49.9% on 3 March, 4.9% on the 4th, then again 49.4% on the 5th, 49.5% on the 6th and 49.0% on the 7th. The rule lightens when the signal weakens, then buys back after a new fall. On 7 March the price goes below its MA200: the evening target is zero, but the weight held is still 49.0%, and the cash is seen only on 10 March, after execution at the open. **Reading.** The trend filter does not protect at the close of the crossing, and a dip purchase does not tell a dip from the start of a lasting fall."
+best = "**Fact.** The largest rise from a trough to a later peak runs from 2024-04-19 to 2025-02-27 (+6.1%, the fund +20.7%, average weight 6%): a series of short episodes, not a position. The best rolling quarter (2024-09-06 to 2024-12-04) makes +2.9%. **Reading.** In a steady rise, the dips of a few sessions were followed by a return towards the highs; the success rate and the net gain of the stays of this window alone are not isolated here; those of the 71 stays of the whole period are in the complementary measures."
 risks = [
-  "**Observé.** Début d'une baisse durable quand le cours est encore au-dessus de sa MM200 (mars 2025) : la poche achète à pleine taille, parfois deux fois, et la sortie se fait à l'ouverture suivant le franchissement.",
-  "**Plausible.** Baisse par gaps de nuit successifs : la vente est exécutée après le gap.",
-  "**Observé.** Frais : à coûts doublés le gain disparaît.",
+  "**Observed.** Start of a lasting fall while the price is still above its MA200 (March 2025): the pocket buys at full size, sometimes twice, and the exit comes at the open following the crossing.",
+  "**Plausible.** Fall through successive overnight gaps: the sale is executed after the gap.",
+  "**Observed.** Fees: at doubled costs the gain disappears.",
 ]
 measured = [
-  "**Fait.** Par séjour : 71 séjours, tous clos, de 2,8 valorisations en moyenne, 47 gagnants et 24 perdants (66 %) ; net moyen +0,06 %, net médian +0,04 %, pire -2,92 %, meilleur +1,85 %. Les séjours ont donc été gagnants deux fois sur trois, pour un gain net moyen d'environ 6,3 points de base par séjour, après 64 EUR de coûts en moyenne.",
-  "**Fait.** C'est le seul livre dont l'écart de prix signé clôture-ouverture, à quantités données, est positif : +2 303 EUR nets (écarts favorables +14 660 EUR, défavorables -12 358 EUR). Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture : ce solde n'est pas un gain encaissé.",
-  "**Lecture.** Les séjours ont un gain net moyen historique positif, d'environ 6,3 points de base ; une prime propre au signal n'est pas établie sans contrôle d'exposition ni mesure d'incertitude. Elle serait mince : la moitié du gain brut part en coûts, et le pire séjour efface près de cinquante séjours moyens.",
+  "**Fact.** By stay: 71 stays, all closed, of 2.8 valuations on average, 47 winners and 24 losers (66%); mean net +0.06%, median net +0.04%, worst -2.92%, best +1.85%. The stays were therefore winners two times out of three, for an average net gain of about 6.3 basis points per stay, after 64 EUR of costs on average.",
+  "**Fact.** It is the only book whose signed close-to-open price gap, at given quantities, is positive: +2,303 EUR net (favourable gaps +14,660 EUR, unfavourable -12,358 EUR). It is neither a cost paid nor the result of a backtest executed at the close: this balance is not a gain collected.",
+  "**Reading.** The stays have a positive historical average net gain, of about 6.3 basis points; a premium specific to the signal is not established without an exposure control or a measure of uncertainty. It would be thin: half of the gross gain goes in costs, and the worst stay wipes out nearly fifty average stays.",
 ]
 to_test = [
-  "Ces fréquences sont données sans intervalle ; 71 séjours concentrés sur quelques années ne font pas un échantillon indépendant.",
-  "La règle comme poche d'un portefeuille déjà investi, plutôt que seule face au cash.",
+  "These frequencies are given without an interval; 71 stays concentrated in a few years do not make an independent sample.",
+  "The rule as a pocket of a portfolio already invested, rather than alone against cash.",
 ]
 
 [SA5]
-summary = "Détenir les deux fonds autour d'une répartition 50/50 et pencher, jusqu'à 25 points, vers celui dont le résidu récent est négatif : le résidu des cinq derniers rendements du fonds monde dans une régression sur ceux du fonds S&P 500 estimée sur les 126 rendements précédents, normalisé. La stratégie reste presque pleinement investie et change souvent la répartition. Les frais sont un handicap majeur, mais l'apport de l'inclinaison n'est pas établi face au panier neutre : +72,8 % net contre +103,3 % pour le 50/50."
+summary = "Hold the two funds around a 50/50 split and lean, by up to 25 points, towards the one whose recent residual is negative: the residual of the last five returns of the world fund in a regression on those of the S&P 500 fund estimated on the 126 previous returns, normalised. The strategy stays almost fully invested and often changes the split. The fees are a major handicap, but the contribution of the tilt is not established against the neutral basket: +72.8% net against +103.3% for the 50/50."
 strengths = [
-  "**Fait.** Presque pleinement investie après l'achat initial : le poids de clôture total ne descend pas sous 99,6 %, donc elle participe à toutes les hausses.",
-  "**Fait.** Perte maximale récupérée le 2025-10-29, 252 jours après le sommet, presque aussi vite que le fonds (229 jours).",
-  "**Fait.** Du 2022-05-24 au 2022-08-22 elle fait +13,2 % contre +11,7 % pour le fonds monde, un écart relatif de +1,3 %. Ce n'est pas mesuré contre le panier 50/50, donc cela ne dit pas que l'inclinaison a payé.",
+  "**Fact.** Almost fully invested after the initial purchase: the total close weight never goes below 99.6%, so it takes part in every rise.",
+  "**Fact.** Maximum drawdown recovered on 2025-10-29, 252 days after the peak, almost as fast as the fund (229 days).",
+  "**Fact.** From 2022-05-24 to 2022-08-22 it makes +13.2% against +11.7% for the world fund, a relative gap of +1.3%. It is not measured against the 50/50 basket, so it does not say that the tilt paid.",
 ]
 weaknesses = [
-  "**Fait.** Même sa comptabilité brute (+93,35 %, les mêmes ordres sans coûts) reste sous le panier 50/50 net (+103,35 %). On ne peut donc pas résumer la règle à « un bon signal détruit par les frais ».",
-  "**Fait.** 1 904 ordres, une rotation de 29,2 fois l'actif par an, 20 517 EUR de coûts : la règle la plus coûteuse en valeur. +93,4 % brut, +72,8 % net.",
-  "**Fait.** Forte sensibilité aux frais : +46,4 % net et Sharpe de 0,55 dans le second run à coûts doublés, où les quantités et la trajectoire changent ; le score tombe à zéro.",
-  "**Fait.** Aucune réduction du risque : bêta de 1,03, volatilité de 14,2 %, perte maximale de -22,86 %, alpha de -2,4 % par an (sans intervalle).",
+  "**Fact.** Even its gross accounting (+93.35%, the same orders without costs) stays below the net 50/50 basket (+103.35%). The rule therefore cannot be summed up as \"a good signal destroyed by the fees\".",
+  "**Fact.** 1,904 orders, a turnover of 29.2 times the assets a year, 20,517 EUR of costs: the most expensive rule in value. +93.4% gross, +72.8% net.",
+  "**Fact.** Strong sensitivity to the fees: +46.4% net and a Sharpe of 0.55 in the second run at doubled costs, in which the quantities and the path change; the score falls to zero.",
+  "**Fact.** No reduction of risk: beta of 1.03, volatility of 14.2%, maximum drawdown of -22.86%, alpha of -2.4% a year (without an interval).",
 ]
-worst = "**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -22,86 %, à comparer à -21,64 % pour le fonds monde et -22,47 % pour le panier 50/50 : presque toute la perte est celle du panier. L'inclinaison change de sens pendant la chute : le fonds S&P 500 pèse 67,2 % le 7 mars, 31,4 % le 2 avril, 27,6 % le 9 avril, puis 74,4 % le 22 avril, pour une moyenne de 48,6 % sur l'intervalle. **Lecture.** La règle n'a donc pas renforcé continûment le fonds qui baissait le plus ; rien ne réduit l'exposition totale, et l'écart de 0,4 point avec le 50/50 mélange inclinaison et coûts sans qu'on puisse les séparer ici."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2022-06-16 au 2026-10-06 (+78,6 % contre +96,6 % pour le fonds, écart relatif -9,1 %). Les 63 meilleurs rendements consécutifs sont ceux du rebond (2025-04-09 au 2025-07-10) : +18,4 %, contre +19,3 % pour le fonds monde comme pour le panier 50/50. **Lecture.** Être restée investie explique l'essentiel de ce gain ; la contribution propre de l'inclinaison sur cette fenêtre, positive ou négative, n'est pas isolée."
+worst = "**Fact.** From 2025-02-19 to 2025-04-09 the strategy loses -22.86%, to be compared with -21.64% for the world fund and -22.47% for the 50/50 basket: almost all of the loss is the basket's. The tilt changes direction during the fall: the S&P 500 fund weighs 67.2% on 7 March, 31.4% on 2 April, 27.6% on 9 April, then 74.4% on 22 April, for an average of 48.6% over the interval. **Reading.** The rule therefore did not continuously reinforce the fund that fell most; nothing reduces the total exposure, and the 0.4-point gap with the 50/50 mixes tilt and costs without it being possible to separate them here."
+best = "**Fact.** The largest rise from a trough to a later peak runs from 2022-06-16 to 2026-10-06 (+78.6% against +96.6% for the fund, relative gap -9.1%). The 63 best consecutive returns are those of the rebound (2025-04-09 to 2025-07-10): +18.4%, against +19.3% for the world fund as for the 50/50 basket. **Reading.** Having stayed invested explains most of this gain; the own contribution of the tilt over this window, positive or negative, is not isolated."
 risks = [
-  "**Observé.** Toute baisse du marché actions : l'exposition totale reste proche de 100 %.",
-  "**Observé.** Frais et spread : avec près d'un ordre par séance, le résultat y est très sensible.",
-  "**Plausible.** Divergence durable entre les deux fonds (leadership, change) : un résidu qui ne revient pas fait pencher du mauvais côté tant qu'il dure.",
+  "**Observed.** Any fall of the equity market: the total exposure stays close to 100%.",
+  "**Observed.** Fees and spread: with nearly one order per session, the result is very sensitive to them.",
+  "**Plausible.** Lasting divergence between the two funds (leadership, exchange rate): a residual that does not come back makes it lean the wrong way for as long as it lasts.",
 ]
 measured = [
-  "**Fait.** Attribution approchée contre le panier 50/50, en rendements logarithmiques : panier +0,727 ; exposition totale -0,011 ; choix entre les fonds +0,003 ; résidu de l'approximation aux poids de clôture -0,060 ; coûts -0,112 ; soit +0,547, contre +0,710 pour le panier exécuté. Les trois premiers termes valorisent les poids détenus à la clôture précédente avec le rendement de clôture à clôture.",
-  "**Fait.** Le résidu de régression qui commande l'inclinaison change de signe 293 fois, soit un signe tenu 4,8 valorisations en moyenne. Sa corrélation de Pearson avec le rendement relatif monde moins S&P 500, de clôture à clôture, est de +0,029 à la séance t + 1 (en partie avant l'exécution), +0,028 à la séance t + 2, la première entière après l'exécution, et +0,064 sur les séances t + 2 à t + 6, rendements composés (1 415, 1 414 et 1 410 paires) ; en rangs (Spearman) elle est de +0,030, +0,004 et +0,005.",
-  "**Lecture.** SA5 sous-performe le panier 50/50 et supporte des frais élevés. L'attribution approchée aux poids de clôture montre une faible contribution du choix entre fonds, mais laisse un résidu important, qui n'est pas une mesure de l'exécution : elle ne permet pas d'isoler complètement l'apport du signal et les effets de la réallocation à l'ouverture. Les corrélations, proches de zéro, ne montrent pas que le signal prévoit le rendement relatif sur lequel il mise ; elles n'excluent pas une relation non linéaire.",
-  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : -2 571 EUR nets, solde d'écarts favorables et défavorables de plus de 44 000 EUR chacun. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.",
+  "**Fact.** Approximate attribution against the 50/50 basket, in log returns: basket +0.727; total exposure -0.011; choice between the funds +0.003; residual of the approximation at the close weights -0.060; costs -0.112; i.e. +0.547, against +0.710 for the executed basket. The first three terms value the weights held at the previous close with the close-to-close return.",
+  "**Fact.** The regression residual that drives the tilt changes sign 293 times, i.e. a sign held for 4.8 valuations on average. Its Pearson correlation with the relative return of world minus S&P 500, close to close, is +0.029 at session t + 1 (partly before the execution), +0.028 at session t + 2, the first full one after the execution, and +0.064 over sessions t + 2 to t + 6, compounded returns (1,415, 1,414 and 1,410 pairs); in ranks (Spearman) it is +0.030, +0.004 and +0.005.",
+  "**Reading.** SA5 underperforms the 50/50 basket and bears high fees. The approximate attribution at the close weights shows a small contribution of the choice between funds, but leaves a large residual, which is not a measure of the execution: it does not allow the contribution of the signal and the effects of the reallocation at the open to be fully isolated. The correlations, close to zero, do not show that the signal forecasts the relative return it bets on; they do not rule out a non-linear relation.",
+  "**Fact.** Signed close-to-open price gap, at given quantities: -2,571 EUR net, the balance of favourable and unfavourable gaps of more than 44,000 EUR each. It is neither a cost paid nor the result of a backtest executed at the close.",
 ]
 to_test = [
-  "Ces corrélations sont données sans intervalle, sur des clôtures : une cible définie sur l'horizon réellement porté après la décision, d'ouverture à ouverture, n'est pas calculée.",
-  "Une attribution exacte, à partir des quantités avant et après chaque exécution et des prix d'ouverture, n'est pas produite : elle seule séparerait l'apport de l'inclinaison de celui de la réallocation à l'ouverture.",
+  "These correlations are given without an interval, on closes: a target defined on the horizon actually carried after the decision, open to open, is not computed.",
+  "An exact attribution, from the quantities before and after each fill and the opening prices, is not produced: it alone would separate the contribution of the tilt from that of the reallocation at the open.",
 ]
 
 [SA6]
-summary = "Détenir ETF_WORLD à hauteur de min(1, 12 % / max(vol 20 jours, vol 60 jours, 5 %)). Sur cet historique la règle diminue le risque au prix d'une exposition et d'un rendement plus faibles : +67,4 % net, Sharpe 0,90, perte maximale de -15,7 % au lieu de -21,6 %. Son avantage sur SA11 tient ici à un retour au risque plus lent et à des coûts plus faibles, sans preuve générale de supériorité."
+summary = "Hold ETF_WORLD at min(1, 12% / max(20-day vol, 60-day vol, 5%)). Over this history the rule reduces the risk at the price of a lower exposure and return: +67.4% net, Sharpe 0.90, maximum drawdown of -15.7% instead of -21.6%. Its advantage over SA11 rests here on a slower return to risk and lower costs, with no general proof of superiority."
 strengths = [
-  "**Fait.** Perte maximale de -15,72 % contre -21,64 % pour le fonds, volatilité de 10,9 % contre 13,8 %, Sharpe de 0,90 contre 0,93.",
-  "**Fait.** 180 ordres, 1 445 EUR de coûts, rotation de 2,1 fois l'actif par an ; +65,5 % et Sharpe de 0,88 dans le second run à coûts doublés.",
-  "**Fait.** Le 2025-04-02, à la veille de la seconde vague, son poids de clôture est de 65,0 %, contre 77,7 % pour SA11 et 67,2 % pour le témoin EWMA.",
-  "**Fait.** Troisième du classement commun (52,0 %). L'écart avec le témoin EWMA (53,6 %) et SA11 (48,7 %) n'est pas un test de supériorité.",
+  "**Fact.** Maximum drawdown of -15.72% against -21.64% for the fund, volatility of 10.9% against 13.8%, Sharpe of 0.90 against 0.93.",
+  "**Fact.** 180 orders, 1,445 EUR of costs, turnover of 2.1 times the assets a year; +65.5% and a Sharpe of 0.88 in the second run at doubled costs.",
+  "**Fact.** On 2025-04-02, on the eve of the second wave, its close weight is 65.0%, against 77.7% for SA11 and 67.2% for the EWMA control.",
+  "**Fact.** Third in the common ranking (52.0%). The gap with the EWMA control (53.6%) and SA11 (48.7%) is not a test of superiority.",
 ]
 weaknesses = [
-  "**Fait.** +67,4 % contre +94,8 % pour le fonds : poids de clôture moyen de 84,7 %. L'alpha de +0,03 % par an est pratiquement nul et sans intervalle : c'est un outil de réduction du risque, pas une création d'alpha démontrée.",
-  "**Fait.** La baisse est moins profonde mais plus longue à effacer : sommet retrouvé le 2026-01-15, 330 jours après, contre 229 jours pour le fonds.",
-  "**Fait.** +1,6 % en 2025 contre +6,6 % : le poids de clôture reste entre 28 % et 41 % du 2025-04-15 au 2025-05-19, pendant la reprise.",
-  "**Lecture.** La règle ne prévoit ni le sens du marché ni le déclenchement d'un choc : la volatilité réalisée passée sert d'estimateur du risque à venir, et l'ajustement est réactif. Le 2025-02-19 la plus grande des deux estimations vaut 11,1 % et le poids est de 99,7 %.",
+  "**Fact.** +67.4% against +94.8% for the fund: average close weight of 84.7%. The alpha of +0.03% a year is practically zero and without an interval: it is a tool for reducing risk, not a demonstrated creation of alpha.",
+  "**Fact.** The fall is shallower but longer to erase: peak back on 2026-01-15, 330 days later, against 229 days for the fund.",
+  "**Fact.** +1.6% in 2025 against +6.6%: the close weight stays between 28% and 41% from 2025-04-15 to 2025-05-19, during the recovery.",
+  "**Reading.** The rule forecasts neither the direction of the market nor the onset of a shock: past realised volatility serves as an estimator of the risk to come, and the adjustment is reactive. On 2025-02-19 the larger of the two estimates is 11.1% and the weight is 99.7%.",
 ]
-worst = "**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -15,72 % contre -21,64 % pour le fonds, avec un poids de clôture allant de 100 % à 36 %. La première réduction suit le signal du 4 mars (cible de 72,7 %) et apparaît dans le portefeuille le 5 mars (72,6 % au lieu de 99,7 %). Le poids descend ensuite vers 60 % fin mars, est de 65,0 % le 2 avril et de 41,3 % le 7 avril. Sur les 63 pires rendements consécutifs (2025-01-21 au 2025-04-22) elle perd -12,65 % contre -16,75 % pour le fonds. **Lecture.** La mémoire de l'estimateur long freine le retour au risque après le premier choc, ce qui protège avant la seconde vague et limite ensuite la participation au rebond ; elle ne l'empêche pas, les observations sortant progressivement de la fenêtre."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur couvre presque toute la période (2021-05-19 au 2026-10-06, +72,0 % contre +100,2 %). Sur les 63 meilleurs rendements consécutifs (2023-10-30 au 2024-01-30, +15,08 % contre +15,58 %), le poids de clôture est de 98 % en moyenne et descend à 85,0 % ; l'estimation courte monte jusqu'à 14,2 % et la plus grande des deux dépasse 12 % à 14 valorisations. Cinq ordres y sont exécutés, pour 29 EUR de coûts. **Lecture.** Un risque estimé généralement assez faible pour garder une exposition élevée."
+worst = "**Fact.** From 2025-02-19 to 2025-04-09 the strategy loses -15.72% against -21.64% for the fund, with a close weight going from 100% to 36%. The first reduction follows the signal of 4 March (target of 72.7%) and appears in the portfolio on 5 March (72.6% instead of 99.7%). The weight then falls towards 60% at the end of March, is 65.0% on 2 April and 41.3% on 7 April. Over the 63 worst consecutive returns (2025-01-21 to 2025-04-22) it loses -12.65% against -16.75% for the fund. **Reading.** The memory of the long estimator slows the return to risk after the first shock, which protects before the second wave and then limits the participation in the rebound; it does not prevent it, as the observations leave the window progressively."
+best = "**Fact.** The largest rise from a trough to a later peak covers almost the whole period (2021-05-19 to 2026-10-06, +72.0% against +100.2%). Over the 63 best consecutive returns (2023-10-30 to 2024-01-30, +15.08% against +15.58%), the close weight is 98% on average and goes down to 85.0%; the short estimate rises to 14.2% and the larger of the two exceeds 12% at 14 valuations. Five orders are executed in it, for 29 EUR of costs. **Reading.** An estimated risk generally low enough to keep a high exposure."
 risks = [
-  "**Observé.** Choc soudain en marché calme : poids proche de 100 % au moment du choc, la réduction est exécutée après la première perte.",
-  "**Observé.** Rebond rapide après une panique : le poids reste bas plusieurs semaines pendant la reprise, et la récupération est plus longue que celle du fonds.",
-  "**Plausible.** Long régime de volatilité au-dessus de 12 % dans un marché qui monte : sous-investissement durable.",
+  "**Observed.** Sudden shock in a calm market: weight close to 100% at the time of the shock, the reduction is executed after the first loss.",
+  "**Observed.** Fast rebound after a panic: the weight stays low for several weeks during the recovery, and the recovery is longer than the fund's.",
+  "**Plausible.** Long regime of volatility above 12% in a rising market: lasting under-investment.",
 ]
 measured = [
-  "**Fait.** À côté d'un témoin à cible constante de 84,7 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : le témoin fait +78,0 % net, Sharpe 0,93, perte maximale -18,5 %, sommet retrouvé en 229 jours, 97 EUR de coûts, pour une exposition moyenne réalisée de 86,1 % ; SA6 fait +67,4 %, Sharpe 0,90, -15,7 %, 330 jours, pour 84,7 %.",
-  "**Lecture.** À exposition comparable mais non identique, SA6 a une perte maximale inférieure de 2,8 points à celle de ce témoin, pour 10,6 points de rendement en moins, un Sharpe un peu plus bas et une récupération plus longue de cent jours. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 1,4 point d'exposition de plus en moyenne. Il est choisi après coup.",
-  "**Fait.** SA6 contre le témoin EWMA : différence de Sharpe de -0,036, intervalle bootstrap à 95 % [-0,104 ; +0,027]. Les deux ne sont pas départagés.",
-  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : -2 503 EUR nets. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.",
+  "**Fact.** Beside a constant-target control at 84.7% of the fund (its average weight), with the same 3-point band and the same costs: the control makes +78.0% net, Sharpe 0.93, maximum drawdown -18.5%, peak back in 229 days, 97 EUR of costs, for an average realised exposure of 86.1%; SA6 makes +67.4%, Sharpe 0.90, -15.7%, 330 days, for 84.7%.",
+  "**Reading.** At a comparable but not identical exposure, SA6 has a maximum drawdown 2.8 points smaller than this control's, for 10.6 points less return, a slightly lower Sharpe and a recovery a hundred days longer. The comparison describes two executable rules and does not isolate, at exactly the same exposure, the value of the timing: the control carried 1.4 points more exposure on average. It is chosen after the fact.",
+  "**Fact.** SA6 against the EWMA control: Sharpe difference of -0.036, 95% bootstrap interval [-0.104; +0.027]. The two are not told apart.",
+  "**Fact.** Signed close-to-open price gap, at given quantities: -2,503 EUR net. It is neither a cost paid nor the result of a backtest executed at the close.",
 ]
 to_test = [
-  "Un témoin à risque équivalent fixé à l'avance, plutôt qu'au poids moyen constaté.",
+  "A control at equivalent risk set in advance, rather than at the average weight observed.",
 ]
 
 [SA7]
-summary = "Répartir le capital entre trois fonds de style - iShares Edge MSCI World Value, Quality et Minimum Volatility - pour moitié à parts égales et pour moitié en raison inverse de leur volatilité sur 60 rendements, chaque fonds plafonné à 40 %. La règle tient un panier presque constant, un tiers environ dans chaque fonds, et n'a rééquilibré que neuf fois. Son résultat, +60,2 % net contre +94,8 % pour le fonds monde, n'est pas celui de la règle sur des données complètes : sept fois elle a tout vendu parce qu'un cours manquait, dont deux fois pour une soixantaine de séances."
-context = "Fonds cotés sur Xetra, en euros, servis par un seul fournisseur et non recoupés par une seconde source. Le run est mené sur le calendrier de Paris : une séance que Paris tient et que Xetra ne tient pas est valorisée au dernier cours connu."
+summary = "Split the capital between three style funds - iShares Edge MSCI World Value, Quality and Minimum Volatility - half in equal parts and half in inverse proportion to their volatility over 60 returns, each fund capped at 40%. The rule holds an almost constant basket, about a third in each fund, and rebalanced only nine times. Its result, +60.2% net against +94.8% for the world fund, is not the rule's on complete data: seven times it sold everything because a price was missing, twice for some sixty sessions."
+context = "Funds listed on Xetra, in euros, served by a single provider and not cross-checked by a second source. The run is made on the Paris calendar: a session that Paris holds and Xetra does not is valued at the last known price."
 strengths = [
-  "**Fait.** Volatilité de 10,8 % contre 13,8 % pour le fonds monde, perte maximale de -16,36 % contre -21,64 %, bêta de 0,72.",
-  "**Fait.** Cinquième du classement commun (49,8 %), entre SA10 (51,1 %) et SA3 (49,1 %) ; ces écarts ne sont pas un test.",
-  "**Fait.** -8,3 % en 2022 contre -13,7 % pour le fonds monde et -14,0 % pour le panier 50/50.",
-  "**Fait.** La règle elle-même traite peu : neuf rééquilibrages en cinq ans et demi, 27 ordres, 76 EUR de coûts. +57,7 % net et Sharpe de 0,80 dans le second run à coûts doublés.",
+  "**Fact.** Volatility of 10.8% against 13.8% for the world fund, maximum drawdown of -16.36% against -21.64%, beta of 0.72.",
+  "**Fact.** Fifth in the common ranking (49.8%), between SA10 (51.1%) and SA3 (49.1%); these gaps are not a test.",
+  "**Fact.** -8.3% in 2022 against -13.7% for the world fund and -14.0% for the 50/50 basket.",
+  "**Fact.** The rule itself trades little: nine rebalancings in five and a half years, 27 orders, 76 EUR of costs. +57.7% net and a Sharpe of 0.80 in the second run at doubled costs.",
 ]
 weaknesses = [
-  "**Fait.** +60,2 % contre +94,8 % pour le fonds monde ; derrière lui chaque année de hausse (+14,1 % contre +18,4 % en 2021, +13,0 % contre +19,6 % en 2023, +17,7 % contre +27,1 % en 2024, +9,1 % contre +17,7 % en 2026). Alpha de -0,2 % par an, ratio d'information de -0,66, sans intervalle.",
-  "**Fait.** 91 % de ses coûts (1 808 EUR sur 1 983) viennent de sept sorties complètes que la règle n'a pas décidées sur un signal de marché : elle ne détient rien dès qu'il manque une clôture à l'un des trois fonds.",
-  "**Fait.** Cinq de ces sorties durent une séance et suivent une séance que Paris a tenue et que Xetra n'a pas tenue (lundi de Pentecôte 2021, 24 et 31 décembre 2021 et 2024) : tout est vendu à l'ouverture suivante et racheté le lendemain, 30 ordres pour 1 215 EUR.",
-  "**Fait.** Les deux autres suivent les deux séances que le fournisseur ne sert pas (2025-10-24 et 2026-03-06) : la fenêtre de 61 clôtures consécutives est rompue, et le livre reste en cash 62 puis 60 valorisations, du 2025-10-28 au 2026-01-26 et du 2026-03-10 au 2026-06-04.",
-  "**Fait.** Pendant ces deux absences les trois fonds font, en clôture : Value +9,3 % puis +29,4 %, Quality +2,5 % puis +8,2 %, Minimum Volatility -1,2 % puis -2,0 %. Le livre, de la veille de chaque sortie au jour du rachat, fait -0,8 % puis +1,2 %.",
+  "**Fact.** +60.2% against +94.8% for the world fund; behind it in every rising year (+14.1% against +18.4% in 2021, +13.0% against +19.6% in 2023, +17.7% against +27.1% in 2024, +9.1% against +17.7% in 2026). Alpha of -0.2% a year, information ratio of -0.66, without an interval.",
+  "**Fact.** 91% of its costs (1,808 EUR out of 1,983) come from seven complete exits that the rule did not decide on a market signal: it holds nothing as soon as a close is missing for one of the three funds.",
+  "**Fact.** Five of these exits last one session and follow a session that Paris held and Xetra did not (Whit Monday 2021, 24 and 31 December 2021 and 2024): everything is sold at the next open and bought back the day after, 30 orders for 1,215 EUR.",
+  "**Fact.** The other two follow the two sessions the provider does not serve (2025-10-24 and 2026-03-06): the window of 61 consecutive closes is broken, and the book stays in cash for 62 then 60 valuations, from 2025-10-28 to 2026-01-26 and from 2026-03-10 to 2026-06-04.",
+  "**Fact.** During these two absences the three funds make, at the close: Value +9.3% then +29.4%, Quality +2.5% then +8.2%, Minimum Volatility -1.2% then -2.0%. The book, from the eve of each exit to the day of the buy-back, makes -0.8% then +1.2%.",
 ]
-worst = "**Fait.** Du 2025-02-27 au 2025-04-09 la stratégie perd -16,36 % avec un poids de clôture de 99 % d'un bout à l'autre, quand le fonds monde perd -20,0 % en clôture ; elle retrouve son sommet le 2025-10-27, 242 jours après. Sur les 63 pires rendements consécutifs (2025-01-10 au 2025-04-09) elle perd -11,86 % contre -18,17 %. **Lecture.** La règle ne réduit jamais son exposition : la perte plus faible vient des fonds détenus, qui ont moins baissé que le fonds monde, pas d'une décision prise pendant la chute."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur couvre presque toute la période (2021-05-19 au 2026-10-07, +63,3 % contre +99,7 % pour le fonds monde). Sur les 63 meilleurs rendements consécutifs (2025-04-09 au 2025-07-10) elle fait +12,54 % contre +19,34 %, pleinement investie. Son plus fort retard relatif va du 2023-01-06 au 2026-06-02 : +39,6 % contre +75,9 %, soit un écart relatif de -20,6 %. **Lecture.** Le panier des trois styles monte moins que le fonds monde dans les hausses de cette période, et la fin de ce retard coïncide avec la seconde absence du livre."
+worst = "**Fact.** From 2025-02-27 to 2025-04-09 the strategy loses -16.36% with a close weight of 99% from start to finish, when the world fund loses -20.0% at the close; it is back at its peak on 2025-10-27, 242 days later. Over the 63 worst consecutive returns (2025-01-10 to 2025-04-09) it loses -11.86% against -18.17%. **Reading.** The rule never reduces its exposure: the smaller loss comes from the funds held, which fell less than the world fund, not from a decision taken during the fall."
+best = "**Fact.** The largest rise from a trough to a later peak covers almost the whole period (2021-05-19 to 2026-10-07, +63.3% against +99.7% for the world fund). Over the 63 best consecutive returns (2025-04-09 to 2025-07-10) it makes +12.54% against +19.34%, fully invested. Its largest relative lag runs from 2023-01-06 to 2026-06-02: +39.6% against +75.9%, a relative gap of -20.6%. **Reading.** The basket of the three styles rises less than the world fund in the rises of this period, and the end of this lag coincides with the second absence of the book."
 risks = [
-  "**Observé.** Marché haussier porté par des valeurs que les trois styles sous-pondèrent (2023, 2024) : le panier suit avec un bêta de 0,72.",
-  "**Observé.** Une clôture manquante sur un seul des trois fonds : la règle sort entièrement, pour une séance ou pour soixante.",
-  "**Plausible.** Hausse simultanée des volatilités : la part en raison inverse ne change presque rien quand les trois montent ensemble, et rien ne réduit l'exposition totale.",
+  "**Observed.** Rising market carried by stocks the three styles underweight (2023, 2024): the basket follows with a beta of 0.72.",
+  "**Observed.** A missing close on a single one of the three funds: the rule exits entirely, for one session or for sixty.",
+  "**Plausible.** Simultaneous rise of the volatilities: the inverse-proportion part changes almost nothing when all three rise together, and nothing reduces the total exposure.",
 ]
 measured = [
-  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : +3 015 EUR nets (écarts favorables +6 602 EUR, défavorables -3 587 EUR). Ce n'est ni un gain encaissé ni le résultat d'un backtest exécuté à la clôture, et la plupart de ses ordres sont ceux des sept sorties décrites plus haut.",
-  "**Fait.** Poids détenus en moyenne sur toutes les valorisations : 32,5 % de Minimum Volatility, 29,2 % de Value, 29,1 % de Quality, le reste en cash (exposition moyenne 90,9 %).",
+  "**Fact.** Signed close-to-open price gap, at given quantities: +3,015 EUR net (favourable gaps +6,602 EUR, unfavourable -3,587 EUR). It is neither a gain collected nor the result of a backtest executed at the close, and most of its orders are those of the seven exits described above.",
+  "**Fact.** Weights held on average over all valuations: 32.5% of Minimum Volatility, 29.2% of Value, 29.1% of Quality, the rest in cash (average exposure 90.9%).",
 ]
 to_test = [
-  "Le même run avec des décisions prises seulement aux séances que Xetra tient : les cinq sorties d'une séance sont un effet du calendrier de référence, pas de la règle.",
-  "Ce que la règle aurait fait sans les deux séances manquantes n'est pas mesuré : aucune seconde source ne sert ces fonds, et un cours n'est jamais reconstitué.",
-  "La comparaison que sa spécification demande, à l'équipondération des trois mêmes fonds, n'est pas produite.",
-  "Les trois fonds ont été choisis le 2026-10-11 après le refus de trois fonds parisiens par le contrôle des données ; ce choix précède le premier run, mais leur historique existait déjà.",
+  "The same run with decisions taken only at the sessions Xetra holds: the five one-session exits are an effect of the reference calendar, not of the rule.",
+  "What the rule would have done without the two missing sessions is not measured: no second source serves these funds, and a price is never rebuilt.",
+  "The comparison its specification asks for, with the equal weighting of the same three funds, is not produced.",
+  "The three funds were chosen on 2026-10-11 after the data control refused three Paris funds; this choice precedes the first run, but their history already existed.",
 ]
 
 [SA8]
-summary = "Placer tout le capital dans un fonds monétaire en euros - Xtrackers II EUR Overnight Rate Swap - quand son rendement des 63 dernières séances, annualisé, couvre en un trimestre un coût d'aller-retour de 0,20 % et que sa volatilité reste sous 2 %. La règle reste en cash tant que les taux sont négatifs ou trop bas, achète le fonds le 2022-12-05 et le garde : +10,5 % net. Elle n'a pas de rang : c'est un placement de trésorerie, et son Sharpe de 7,1 ne se compare pas à celui d'une stratégie actions."
-context = "Fonds cotés sur Xetra, en euros, servis par un seul fournisseur et non recoupés par une seconde source. Le run est mené sur le calendrier de Paris : une séance que Paris tient et que Xetra ne tient pas est valorisée au dernier cours connu. SA8 est rapportée hors classement : avec un taux sans risque nul, le Sharpe d'un fonds monétaire est celui d'un cours qui ne bouge presque pas ; comptée parmi les essais, elle multipliait par six la dispersion qui déflate les scores et ramenait tous les autres à environ 1 %."
+summary = "Place all the capital in a euro money-market fund - Xtrackers II EUR Overnight Rate Swap - when its return over the last 63 sessions, annualised, covers a round-trip cost of 0.20% in one quarter and its volatility stays below 2%. The rule stays in cash as long as rates are negative or too low, buys the fund on 2022-12-05 and keeps it: +10.5% net. It has no rank: it is a cash investment, and its Sharpe of 7.1 is not comparable with that of an equity strategy."
+context = "Funds listed on Xetra, in euros, served by a single provider and not cross-checked by a second source. The run is made on the Paris calendar: a session that Paris holds and Xetra does not is valued at the last known price. SA8 is reported outside the ranking: with a zero risk-free rate, the Sharpe of a money-market fund is that of a price that hardly moves; counted among the trials, it multiplied by six the dispersion that deflates the scores and brought all the others down to about 1%."
 strengths = [
-  "**Fait.** Volatilité de 0,25 % et perte maximale de -0,35 %.",
-  "**Fait.** En cash du 2021-04-01 au 2022-12-02, pendant que le fonds monétaire perd de la valeur (de 135,72 à un plus bas de 134,64 le 2022-08-04) : la règle n'achète pas un portage négatif. Son signal devient positif le 2022-10-04 et l'achat est exécuté le 2022-12-05, à 134,95.",
-  "**Fait.** +3,3 % en 2023, +3,6 % en 2024, +1,8 % en 2025, +1,4 % en 2026 jusqu'au 9 octobre : le rendement du fonds une fois détenu.",
+  "**Fact.** Volatility of 0.25% and maximum drawdown of -0.35%.",
+  "**Fact.** In cash from 2021-04-01 to 2022-12-02, while the money-market fund loses value (from 135.72 to a low of 134.64 on 2022-08-04): the rule does not buy a negative carry. Its signal turns positive on 2022-10-04 and the purchase is executed on 2022-12-05, at 134.95.",
+  "**Fact.** +3.3% in 2023, +3.6% in 2024, +1.8% in 2025, +1.4% in 2026 up to 9 October: the fund's return once held.",
 ]
 weaknesses = [
-  "**Fait.** +10,5 % net en cinq ans et demi contre +94,8 % pour le fonds monde : la règle ne porte aucun risque actions, ce n'est pas une alternative à un fonds d'actions.",
-  "**Fait.** 963 EUR de coûts pour 9 ordres, soit environ 8 % du gain brut (+11,4 % brut, +10,5 % net). L'achat initial coûte 100 EUR ; les huit autres ordres, 863 EUR, sont quatre ventes suivies d'un rachat le lendemain.",
-  "**Fait.** Ces quatre allers-retours suivent les 24 et 31 décembre 2024 et 2025 : Paris tient une séance, Xetra non, le fonds n'a pas de clôture, le signal est illisible et la règle vise alors le cash. Ce sont ses deux plus fortes baisses (-0,33 % et -0,35 %).",
-  "**Fait.** +9,5 % net dans le second run à coûts doublés, où ces allers-retours coûtent deux fois plus.",
+  "**Fact.** +10.5% net in five and a half years against +94.8% for the world fund: the rule carries no equity risk, it is not an alternative to an equity fund.",
+  "**Fact.** 963 EUR of costs for 9 orders, about 8% of the gross gain (+11.4% gross, +10.5% net). The initial purchase costs 100 EUR; the other eight orders, 863 EUR, are four sales each followed by a buy-back the next day.",
+  "**Fact.** These four round trips follow 24 and 31 December 2024 and 2025: Paris holds a session, Xetra does not, the fund has no close, the signal cannot be read and the rule then targets cash. They are its two deepest falls (-0.33% and -0.35%).",
+  "**Fact.** +9.5% net in the second run at doubled costs, in which these round trips cost twice as much.",
 ]
-worst = "**Fait.** Du 2025-12-24 au 2026-01-05 la stratégie perd -0,35 % : elle vend le 2025-12-29, rachète le 30, vend le 2026-01-02 et rachète le 5, pour 435 EUR de coûts, pendant que le cours du fonds monte de 148,01 à 148,12. Le sommet est retrouvé le 2026-03-09, 75 jours après. La même séquence un an plus tôt coûte -0,33 %. **Lecture.** Cette perte est entièrement un coût d'exécution provoqué par deux séances sans cours, pas un mouvement du fonds."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2022-12-05 au 2026-10-09 (+10,57 %) : c'est la détention du fonds depuis l'achat. Sur les 63 meilleurs rendements consécutifs (2023-12-06 au 2024-03-07) elle fait +1,06 %, quand le rendement annualisé lu par le signal est proche de +3,9 %. **Lecture.** La règle ne produit rien de plus que le taux monétaire, ce qui est son objet."
+worst = "**Fact.** From 2025-12-24 to 2026-01-05 the strategy loses -0.35%: it sells on 2025-12-29, buys back on the 30th, sells on 2026-01-02 and buys back on the 5th, for 435 EUR of costs, while the fund's price rises from 148.01 to 148.12. The peak is back on 2026-03-09, 75 days later. The same sequence a year earlier costs -0.33%. **Reading.** This loss is entirely an execution cost caused by two sessions without a price, not a move of the fund."
+best = "**Fact.** The largest rise from a trough to a later peak runs from 2022-12-05 to 2026-10-09 (+10.57%): it is the holding of the fund since the purchase. Over the 63 best consecutive returns (2023-12-06 to 2024-03-07) it makes +1.06%, when the annualised return read by the signal is close to +3.9%. **Reading.** The rule produces nothing more than the money-market rate, which is its purpose."
 risks = [
-  "**Observé.** Une séance sans cours du fonds : la règle vend et rachète, et chaque aller-retour coûte environ 0,2 % du capital.",
-  "**Observé.** Taux négatifs ou nuls (2021-2022) : la règle reste en cash, qui ne rapporte rien ici.",
-  "**Plausible.** Baisse rapide des taux : le portage est mesuré sur les 63 séances passées et tarde à le voir.",
+  "**Observed.** A session without a price of the fund: the rule sells and buys back, and each round trip costs about 0.2% of the capital.",
+  "**Observed.** Negative or zero rates (2021-2022): the rule stays in cash, which earns nothing here.",
+  "**Plausible.** Fast fall of rates: the carry is measured over the past 63 sessions and is slow to see it.",
 ]
 measured = [
-  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : +47 EUR nets. Sur un fonds monétaire l'écart entre une clôture et l'ouverture suivante est de l'ordre du rendement d'une nuit.",
-  "**Fait.** Rendement annualisé lu par le signal : +1,2 % fin 2022, +3,2 % mi-2023, +3,9 % fin 2023, +3,8 % mi-2024, +3,3 % fin 2024, +2,2 % mi-2025 et au 2026-10-09.",
-  "**Fait.** Investie à 979 valorisations sur 1 416 ; le fonds lui-même fait +10,9 % sur toute la période et +11,5 % depuis le cours d'achat.",
+  "**Fact.** Signed close-to-open price gap, at given quantities: +47 EUR net. On a money-market fund the gap between a close and the next open is of the order of one night's return.",
+  "**Fact.** Annualised return read by the signal: +1.2% at the end of 2022, +3.2% in mid-2023, +3.9% at the end of 2023, +3.8% in mid-2024, +3.3% at the end of 2024, +2.2% in mid-2025 and at 2026-10-09.",
+  "**Fact.** Invested at 979 valuations out of 1,416; the fund itself makes +10.9% over the whole period and +11.5% since the purchase price.",
 ]
 to_test = [
-  "Le même run avec des décisions prises seulement aux séances que Xetra tient : les quatre allers-retours disparaîtraient, et avec eux 863 EUR de coûts sur 963.",
-  "Un Sharpe calculé contre le taux monétaire, et non contre zéro : il serait proche de zéro, et c'est la mesure qui permettrait de la classer.",
-  "Son rôle prévu, placer le capital que SA10 laisse en cash : SA10 est encore exécutée sans elle.",
-  "Six barres du fonds, plates et sans volume, sont gardées telles que servies sur la période ; aucune seconde source ne les arbitre.",
+  "The same run with decisions taken only at the sessions Xetra holds: the four round trips would disappear, and with them 863 EUR of costs out of 963.",
+  "A Sharpe computed against the money-market rate, and not against zero: it would be close to zero, and it is the measure that would allow it to be ranked.",
+  "Its intended role, placing the capital SA10 leaves in cash: SA10 is still run without it.",
+  "Six bars of the fund, flat and without volume, are kept as served over the period; no second source arbitrates them.",
 ]
 
 [SA9]
-summary = "Acheter le fonds S&P 500 à 50 % quand le VIX est retombé à 80 % ou moins d'un pic récent d'au moins 30 et que le fonds remonte sur cinq séances. SA9 évite la baisse de février-début avril 2025 en restant en cash, mais sa première tentative de reprise, du 15 au 22 avril, perd de l'argent ; la seconde est profitable, close en mai, puis le portefeuille reste inactif près de onze mois. Le principal risque est le faux apaisement, observé en 2022 et de nouveau en 2025. -0,7 % net."
+summary = "Buy the S&P 500 fund at 50% when the VIX has fallen back to 80% or less of a recent peak of at least 30 and the fund is rising over five sessions. SA9 avoids the fall of February to early April 2025 by staying in cash, but its first attempt at the recovery, from 15 to 22 April, loses money; the second is profitable, closed in May, then the portfolio stays idle for nearly eleven months. The main risk is the false calm, observed in 2022 and again in 2025. -0.7% net."
 strengths = [
-  "**Fait.** En cash du 2025-02-19 au 2025-04-09 : aucune variation pendant la plus forte baisse du fonds (-21,64 %).",
-  "**Fait.** Une position n'est détenue qu'à 104 clôtures sur 1 416 ; volatilité de 2,3 % et bêta de 0,05 au niveau du portefeuille entier.",
-  "**Fait.** La séquence ouverte le 2025-04-28 et close le 2025-05-21 est profitable : la valeur passe de 92 753 EUR le 22 avril à 96 131 EUR le 21 mai.",
+  "**Fact.** In cash from 2025-02-19 to 2025-04-09: no change during the deepest fall of the fund (-21.64%).",
+  "**Fact.** A position is held at only 104 closes out of 1,416; volatility of 2.3% and beta of 0.05 at the level of the whole portfolio.",
+  "**Fact.** The sequence opened on 2025-04-28 and closed on 2025-05-21 is profitable: the value goes from 92,753 EUR on 22 April to 96,131 EUR on 21 May.",
 ]
 weaknesses = [
-  "**Fait.** -0,70 % net, +1,34 % brut : les 2 041 EUR de coûts dépassent le gain brut. -2,8 % dans le second run à coûts doublés ; Sharpe de -0,04 ; score nul.",
-  "**Fait.** Le bêta de 0,05 masque l'intermittence : quand elle est investie, la règle porte entre 49 % et 53 % du capital sur un seul fonds.",
-  "**Fait.** 8 mois positifs, 7 négatifs et 52 sans variation sur 67. Avril 2025, mois de la panique que la règle est censée exploiter, est son pire mois (-2,68 %).",
-  "**Fait.** Sa perte maximale (-8,00 %), partie du sommet du 2022-03-29, n'est toujours pas récupérée au 2026-10-09 : 1 655 jours.",
-  "**Fait.** 42 exécutions, soit 21 séquences d'entrée et de sortie : trop peu pour juger, et ce ne sont pas 21 paniques indépendantes.",
+  "**Fact.** -0.70% net, +1.34% gross: the 2,041 EUR of costs exceed the gross gain. -2.8% in the second run at doubled costs; Sharpe of -0.04; zero score.",
+  "**Fact.** The beta of 0.05 hides the intermittence: when it is invested, the rule carries between 49% and 53% of the capital on a single fund.",
+  "**Fact.** 8 positive months, 7 negative and 52 unchanged out of 67. April 2025, the month of the panic the rule is meant to exploit, is its worst month (-2.68%).",
+  "**Fact.** Its maximum drawdown (-8.00%), started from the peak of 2022-03-29, is still not recovered at 2026-10-09: 1,655 days.",
+  "**Fact.** 42 fills, i.e. 21 entry and exit sequences: too few to judge, and they are not 21 independent panics.",
 ]
-worst = "**Fait.** La plus forte baisse va du 2022-03-29 au 2025-04-28 (-8,00 %, poids de clôture moyen 3 %) : des pertes prises par à-coups et jamais rattrapées. Le cœur en est le printemps 2022 (2022-03-31 au 2022-06-30, -4,84 %). Le creux lui-même vient d'un faux départ en 2025 : en cash jusqu'au 14 avril (95 272 EUR), la règle ouvre une position constatée le 15 avril et en sort le 22 (92 753 EUR), soit -2,64 % en une semaine. **Lecture.** Dans les deux cas une détente du VIX est suivie d'une rechute : la règle achète le soulagement à 50 % et revend plus bas."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2025-04-28 au 2026-04-29 (+7,53 %), mais ce n'est pas une position tenue un an. Son origine, la clôture du 28 avril (92 347,82 EUR), est le premier soir de la seconde entrée et contient déjà une perte de cette entrée : le portefeuille valait 92 753,47 EUR avant elle, après le faux départ du 15 au 22 avril. Le séjour complet de cette seconde entrée, sorti le 21 mai 2025 à 96 131,21 EUR, rapporte +3,64 % ; mesuré depuis le creux du 28 avril, le même mouvement donne le +4,10 % des 63 meilleurs rendements consécutifs, entièrement acquis le 21 mai. Le portefeuille reste ensuite en cash, à 96 131,21 EUR exactement, jusqu'au 2026-04-02 ; de nouvelles positions prises en avril 2026 ajoutent +3,30 % depuis ce plateau. **Lecture.** Le creux qui sert d'origine à cette mesure est choisi après coup : le récit d'un rebond capté sans accroc efface l'échec de la semaine précédente et la perte du premier jour."
+worst = "**Fact.** The deepest fall runs from 2022-03-29 to 2025-04-28 (-8.00%, average close weight 3%): losses taken in fits and starts and never made up. Its core is spring 2022 (2022-03-31 to 2022-06-30, -4.84%). The trough itself comes from a false start in 2025: in cash until 14 April (95,272 EUR), the rule opens a position seen on 15 April and exits it on the 22nd (92,753 EUR), i.e. -2.64% in a week. **Reading.** In both cases an easing of the VIX is followed by a relapse: the rule buys the relief at 50% and sells lower."
+best = "**Fact.** The largest rise from a trough to a later peak runs from 2025-04-28 to 2026-04-29 (+7.53%), but it is not a position held for a year. Its origin, the close of 28 April (92,347.82 EUR), is the first evening of the second entry and already contains a loss of that entry: the portfolio was worth 92,753.47 EUR before it, after the false start from 15 to 22 April. The full stay of this second entry, exited on 21 May 2025 at 96,131.21 EUR, earns +3.64%; measured from the trough of 28 April, the same move gives the +4.10% of the 63 best consecutive returns, entirely acquired on 21 May. The portfolio then stays in cash, at exactly 96,131.21 EUR, until 2026-04-02; new positions taken in April 2026 add +3.30% from this plateau. **Reading.** The trough that serves as the origin of this measure is chosen after the fact: the story of a rebound caught without a hitch erases the failure of the week before and the loss of the first day."
 risks = [
-  "**Observé.** Faux apaisement : une détente du VIX suivie d'une rechute, au printemps 2022 comme du 15 au 22 avril 2025.",
-  "**Plausible.** Panique dont le pic reste sous 30 : la règle ne s'active pas.",
-  "**Plausible.** Série publiée avec un jour de retard : un VIX trop ancien envoie la règle en cash.",
+  "**Observed.** False calm: an easing of the VIX followed by a relapse, in spring 2022 as from 15 to 22 April 2025.",
+  "**Plausible.** A panic whose peak stays below 30: the rule does not activate.",
+  "**Plausible.** Series published a day late: a VIX that is too old sends the rule to cash.",
 ]
 measured = [
-  "**Fait.** Par séjour : 21 séjours, tous clos, de 5 valorisations en moyenne, 9 gagnants et 12 perdants ; net moyen -0,02 %, net médian -0,70 %, pire -2,64 % (le faux départ d'avril 2025), meilleur +3,64 % (la seconde entrée d'avril 2025).",
-  "**Fait.** Regroupés par convention, deux séjours séparés par 20 valorisations ou moins allant dans le même groupe, ils forment 7 groupes : trois perdants (décembre 2021 à février 2022, -2,07 % en cinq séjours ; mai à juillet 2022, -2,50 % en cinq séjours ; octobre-novembre 2022, -2,22 % en deux séjours) et quatre gagnants (mars-avril 2022, +0,30 % en trois séjours ; août-septembre 2024, +1,75 % en deux ; avril-mai 2025, +0,90 % en deux, faux départ compris ; avril 2026, +3,30 % en deux). Ce regroupement est automatique : ce ne sont pas sept paniques indépendantes identifiées économiquement.",
-  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : -4 944 EUR nets, soit -4,9 % du capital initial, plus du double de ses coûts explicites en valeur absolue (2 041 EUR). Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.",
-  "**Lecture.** Sept groupes ne permettent aucune conclusion statistique. Chacun compte plusieurs entrées, les gagnants comme les perdants : les réentrées ne sont pas propres aux groupes perdants.",
+  "**Fact.** By stay: 21 stays, all closed, of 5 valuations on average, 9 winners and 12 losers; mean net -0.02%, median net -0.70%, worst -2.64% (the false start of April 2025), best +3.64% (the second entry of April 2025).",
+  "**Fact.** Grouped by convention, two stays separated by 20 valuations or fewer going in the same group, they form 7 groups: three losers (December 2021 to February 2022, -2.07% in five stays; May to July 2022, -2.50% in five stays; October-November 2022, -2.22% in two stays) and four winners (March-April 2022, +0.30% in three stays; August-September 2024, +1.75% in two; April-May 2025, +0.90% in two, false start included; April 2026, +3.30% in two). This grouping is automatic: they are not seven independent panics identified economically.",
+  "**Fact.** Signed close-to-open price gap, at given quantities: -4,944 EUR net, i.e. -4.9% of the initial capital, more than twice its explicit costs in absolute value (2,041 EUR). It is neither a cost paid nor the result of a backtest executed at the close.",
+  "**Reading.** Seven groups allow no statistical conclusion. Each counts several entries, the winners as the losers: the re-entries are not specific to the losing groups.",
 ]
 to_test = [
-  "La règle comme poche d'un portefeuille, plutôt que seule face au cash.",
+  "The rule as a pocket of a portfolio, rather than alone against cash.",
 ]
 
 [SA10]
-summary = "SA10 sans facteurs ni monétaire : cinq règles (momentum, moyennes lissées, repli, inclinaison relative, détente du VIX) avec des budgets fixes et un contrôle de risque commun. Cette version partielle réduit fortement le risque et le rendement par son exposition limitée ; pendant avril 2025 l'exposition baisse encore, donc la protection ne vient pas uniquement d'un cash statique. L'apport propre de la diversification entre règles reste à isoler. +32,1 % net, Sharpe 0,86. Ce run ne permet pas de juger la version complète."
+summary = "SA10 without factors or money market: five rules (momentum, smoothed averages, dip, relative tilt, easing of the VIX) with fixed budgets and a common risk control. This partial version strongly reduces risk and return through its limited exposure; during April 2025 the exposure falls further, so the protection does not come only from static cash. The own contribution of the diversification between rules remains to be isolated. +32.1% net, Sharpe 0.86. This run does not allow the full version to be judged."
 strengths = [
-  "**Fait.** Volatilité de 6,0 % et perte maximale de -11,76 %, inférieures à celles de toutes les stratégies largement exposées aux actions de cette étude ; bêta de 0,41.",
-  "**Fait.** Sharpe de 0,86 pour un poids de clôture moyen de 42,4 %. Avec un cash non rémunéré et un taux sans risque nul, réduire l'échelle des rendements conserve à peu près le Sharpe : ce chiffre ne prouve pas que la diversification entre règles lisse leurs erreurs.",
-  "**Fait.** 1 986 EUR de coûts ; 42 mois positifs et 25 négatifs sur 67 ; quatrième du classement commun (51,1 %).",
+  "**Fact.** Volatility of 6.0% and maximum drawdown of -11.76%, lower than those of all the strategies of this study broadly exposed to equities; beta of 0.41.",
+  "**Fact.** Sharpe of 0.86 for an average close weight of 42.4%. With cash that earns nothing and a zero risk-free rate, scaling the returns down roughly preserves the Sharpe: this figure does not prove that the diversification between rules smooths their errors.",
+  "**Fact.** 1,986 EUR of costs; 42 positive months and 25 negative out of 67; fourth in the common ranking (51.1%).",
 ]
 weaknesses = [
-  "**Fait.** 57,6 % de cash en moyenne, et jamais plus de 55,9 % investi. Le budget des fonds de style (30 % du capital) n'est pas alloué faute d'instruments ; le reste du cash vient des règles inactives, des plafonds et du contrôle de risque. La poche monétaire, absente elle aussi, aurait placé le capital résiduel.",
-  "**Fait.** +32,1 % contre +94,8 % ; alpha de -0,12 % par an, proche de zéro, sans intervalle.",
-  "**Fait.** La baisse est peu profonde mais longue : sommet du 2025-02-19 retrouvé le 2026-05-07, 442 jours après, contre 229 pour le fonds.",
-  "**Fait.** 465 ordres : Sharpe de 0,80 et score de 44 % dans le second run à coûts doublés.",
+  "**Fact.** 57.6% of cash on average, and never more than 55.9% invested. The budget of the style funds (30% of the capital) is not allocated for lack of instruments; the rest of the cash comes from the inactive rules, the caps and the risk control. The money-market pocket, also absent, would have placed the residual capital.",
+  "**Fact.** +32.1% against +94.8%; alpha of -0.12% a year, close to zero, without an interval.",
+  "**Fact.** The fall is shallow but long: peak of 2025-02-19 back on 2026-05-07, 442 days later, against 229 for the fund.",
+  "**Fact.** 465 orders: Sharpe of 0.80 and score of 44% in the second run at doubled costs.",
 ]
-worst = "**Fait.** Du 2025-02-19 au 2025-04-09 l'ensemble perd -11,76 % contre -21,64 % pour le fonds. Le poids de clôture total est d'environ 50 % au début, 49,2 % le 2 avril, 35,1 % le 9 avril, puis 28,0 % le 22 avril et 16,0 % le 19 mai. **Lecture.** Le cash de départ explique une partie de la protection, la réduction en cours de route une autre ; leur part respective, et celle du contrôle de risque commun, ne sont pas séparées ici. **Fait.** L'exposition continue de baisser après le creux du fonds et l'année 2025 se termine à -1,7 % contre +6,6 %."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur couvre presque toute la période (2021-05-19 au 2026-10-06, +33,9 %). Sur les 63 meilleurs rendements consécutifs (2026-03-31 au 2026-07-01), l'ensemble fait +8,6 % contre +16,3 % pour le fonds, avec un poids de clôture entre 49 % et 56 %. **Lecture.** Il capte à peu près la moitié du mouvement parce qu'il en détient à peu près la moitié."
+worst = "**Fact.** From 2025-02-19 to 2025-04-09 the ensemble loses -11.76% against -21.64% for the fund. The total close weight is about 50% at the start, 49.2% on 2 April, 35.1% on 9 April, then 28.0% on 22 April and 16.0% on 19 May. **Reading.** The starting cash explains part of the protection, the reduction along the way another; their respective shares, and that of the common risk control, are not separated here. **Fact.** The exposure keeps falling after the fund's trough and the year 2025 ends at -1.7% against +6.6%."
+best = "**Fact.** The largest rise from a trough to a later peak covers almost the whole period (2021-05-19 to 2026-10-06, +33.9%). Over the 63 best consecutive returns (2026-03-31 to 2026-07-01), the ensemble makes +8.6% against +16.3% for the fund, with a close weight between 49% and 56%. **Reading.** It catches about half of the move because it holds about half of it."
 risks = [
-  "**Observé.** Chute rapide partie de plus hauts (2025) : l'exposition est à son niveau habituel au départ et baisse surtout après le début de la chute.",
-  "**Observé.** Marché haussier long : le cash, non rémunéré ici, est un coût d'opportunité permanent.",
-  "**Observé.** Reprise après une panique : l'exposition est au plus bas (16 % le 2025-05-19) pendant le rebond.",
+  "**Observed.** Fast fall from highs (2025): the exposure is at its usual level at the start and falls mostly after the fall has begun.",
+  "**Observed.** Long rising market: the cash, which earns nothing here, is a permanent opportunity cost.",
+  "**Observed.** Recovery after a panic: the exposure is at its lowest (16% on 2025-05-19) during the rebound.",
 ]
 measured = [
-  "**Fait.** À côté d'un témoin à cible constante de 15,3 % de fonds S&P 500 et 27,1 % de fonds monde (ses poids moyens), avec la même bande de 3 points et les mêmes coûts : le témoin fait +37,1 % net, Sharpe 0,93, perte maximale -10,0 %, sommet retrouvé en 231 jours, 61 EUR de coûts, pour une exposition moyenne réalisée de 44,8 % ; SA10 fait +32,1 %, Sharpe 0,86, -11,8 %, 442 jours, pour 42,4 %.",
-  "**Lecture.** Sur cette période l'ensemble fait moins bien que ce témoin, y compris en perte maximale. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 2,4 points d'exposition de plus en moyenne, et la composition, les coûts et la trajectoire diffèrent aussi. Ce run ne montre pas que la protection de l'ensemble vienne d'autre chose que de son niveau d'exposition.",
-  "**Fait.** Sans son contrôle de risque, l'ensemble fait +32,6 %, Sharpe 0,85, perte maximale -11,9 % : l'effet agrégé mesuré de ce contrôle est faible sur ce run. Cela ne dit pas combien de fois le facteur de réduction a été inférieur à 1, ni à quelles dates : ni ce facteur ni les décisions forcées par le risque du portefeuille détenu ne sont exportés.",
-  "**Fait.** En retirant une règle à la fois (son budget restant en cash) : sans momentum +18,9 % (exposition 25 %, Sharpe 0,88) ; sans moyennes lissées +20,4 % (28 %, 0,83) ; sans inclinaison relative +23,9 % (33 %, 0,82) ; sans repli +31,5 % (0,85) ; sans détente du VIX +32,6 % (0,87). Le Sharpe reste entre 0,82 et 0,88 dans tous les cas.",
-  "**Lecture.** Aucune règle ne porte le Sharpe de l'ensemble : en retirer une réduit surtout l'exposition et le rendement dans la même proportion. Les poches de repli et de détente du VIX ne contribuent presque à rien.",
+  "**Fact.** Beside a constant-target control at 15.3% of the S&P 500 fund and 27.1% of the world fund (its average weights), with the same 3-point band and the same costs: the control makes +37.1% net, Sharpe 0.93, maximum drawdown -10.0%, peak back in 231 days, 61 EUR of costs, for an average realised exposure of 44.8%; SA10 makes +32.1%, Sharpe 0.86, -11.8%, 442 days, for 42.4%.",
+  "**Reading.** Over this period the ensemble does worse than this control, including in maximum drawdown. The comparison describes two executable rules and does not isolate, at exactly the same exposure, the value of the timing: the control carried 2.4 points more exposure on average, and the composition, the costs and the path differ too. This run does not show that the protection of the ensemble comes from anything other than its level of exposure.",
+  "**Fact.** Without its risk control, the ensemble makes +32.6%, Sharpe 0.85, maximum drawdown -11.9%: the measured aggregate effect of this control is small on this run. It does not say how many times the reduction factor was below 1, nor on which dates: neither this factor nor the decisions forced by the risk of the portfolio held are exported.",
+  "**Fact.** Removing one rule at a time (its budget staying in cash): without momentum +18.9% (exposure 25%, Sharpe 0.88); without smoothed averages +20.4% (28%, 0.83); without relative tilt +23.9% (33%, 0.82); without dip +31.5% (0.85); without easing of the VIX +32.6% (0.87). The Sharpe stays between 0.82 and 0.88 in every case.",
+  "**Reading.** No rule carries the Sharpe of the ensemble: removing one mostly reduces the exposure and the return in the same proportion. The dip and VIX-easing pockets contribute almost nothing.",
 ]
 to_test = [
-  "La décomposition des cibles règle par règle à chaque décision, que le code sait calculer et qui n'est pas exportée.",
-  "Le facteur de réduction du contrôle de risque, les dates où il est inférieur à 1 et les décisions forcées par le risque du portefeuille détenu : tant qu'ils ne sont pas exportés, ni la fréquence de ce contrôle ni son rôle en avril 2025 ne peuvent être commentés.",
-  "La version complète, avec les fonds de SA7 et de SA8, enregistrés depuis le 2026-10-11 : ce run-ci est toujours exécuté sans eux.",
-  "Ces ablations sont des variantes regardées après coup : aucune n'est candidate.",
+  "The breakdown of the targets rule by rule at each decision, which the code can compute and which is not exported.",
+  "The reduction factor of the risk control, the dates when it is below 1 and the decisions forced by the risk of the portfolio held: as long as they are not exported, neither the frequency of this control nor its role in April 2025 can be commented on.",
+  "The full version, with the funds of SA7 and SA8, registered since 2026-10-11: this run is still executed without them.",
+  "These ablations are variants looked at after the fact: none is a candidate.",
 ]
 
 [SA11]
-summary = "Détenir ETF_WORLD à hauteur de w = min(1, 12 % / max(σ, 5 %)), où σ est la volatilité annualisée que prévoit pour la séance suivante un GARCH(1,1) à innovations de Student, réestimé chaque soir sur 756 rendements ; l'ordre n'est envoyé que si le poids détenu s'écarte de 3 points de cette cible. Sur cet historique le GARCH obtient la plus faible QLIKE moyenne, sans que cette avance sur l'EWMA soit démontrée, et elle ne se traduit pas par une meilleure performance nette : il se réexpose davantage que ses témoins avant la seconde vague d'avril 2025 et génère plus de coûts. La configuration ne satisfait pas les critères préinscrits ; les témoins simples sont conservés. Cela ne dit rien de l'utilité des modèles GARCH en général."
+summary = "Hold ETF_WORLD at w = min(1, 12% / max(σ, 5%)), where σ is the annualised volatility that a GARCH(1,1) with Student innovations, re-estimated every evening on 756 returns, forecasts for the next session; the order is sent only if the weight held moves 3 points away from this target. Over this history the GARCH obtains the lowest mean QLIKE, without this lead over the EWMA being demonstrated, and it does not translate into a better net performance: it re-exposes itself more than its controls before the second wave of April 2025 and generates more costs. The configuration does not meet the preregistered criteria; the simple controls are kept. This says nothing about the usefulness of GARCH models in general."
 strengths = [
-  "**Fait.** Meilleure QLIKE moyenne observée : -8,6225 contre -8,6033 pour l'EWMA 0,94 et -8,5649 pour l'estimateur de SA6, sur 1 415 paires. La QLIKE est une perte, négative ici parce que les variances sont très inférieures à un ; ce n'est pas un rendement.",
-  "**Fait.** Cette avance n'est établie que contre SA6 : la différence de QLIKE appariée vaut -0,058 contre SA6, intervalle bootstrap à 95 % [-0,108 ; -0,017], et -0,019 contre l'EWMA, intervalle [-0,051 ; +0,009], qui inclut zéro.",
-  "**Fait.** Aucun fit rejeté selon les critères numériques sur les 1 416 décisions, donc aucun repli EWMA. Cela ne démontre ni la stabilité des paramètres ni la validité des queues : la kurtosis des résidus standardisés reste de 5,7.",
-  "**Fait.** Perte maximale de -16,50 % contre -21,64 % pour le fonds, volatilité de 11,1 % contre 13,8 %.",
-  "**Fait.** Brut, elle fait un peu mieux que SA6 (+69,73 % contre +68,88 %) ; c'est après coûts qu'elle passe derrière (+65,98 % contre +67,43 %). Le témoin EWMA reste devant en brut comme en net.",
+  "**Fact.** Best mean QLIKE observed: -8.6225 against -8.6033 for the EWMA 0.94 and -8.5649 for the estimator of SA6, over 1,415 pairs. The QLIKE is a loss, negative here because the variances are much smaller than one; it is not a return.",
+  "**Fact.** This lead is established only against SA6: the paired QLIKE difference is -0.058 against SA6, 95% bootstrap interval [-0.108; -0.017], and -0.019 against the EWMA, interval [-0.051; +0.009], which includes zero.",
+  "**Fact.** No fit rejected by the numerical criteria over the 1,416 decisions, hence no EWMA fallback. It demonstrates neither the stability of the parameters nor the validity of the tails: the kurtosis of the standardised residuals stays at 5.7.",
+  "**Fact.** Maximum drawdown of -16.50% against -21.64% for the fund, volatility of 11.1% against 13.8%.",
+  "**Fact.** Gross, it does slightly better than SA6 (+69.73% against +68.88%); it is after costs that it falls behind (+65.98% against +67.43%). The EWMA control stays ahead, gross as net.",
 ]
 weaknesses = [
-  "**Fait.** Sharpe net de 0,87 contre 0,90 pour SA6 et 0,93 pour l'EWMA ; perte maximale plus profonde (-16,50 % contre -15,72 % et -15,45 %). Ce sont les critères de réfutation préinscrits.",
-  "**Fait.** Aux coûts de base, les intervalles de la différence de Sharpe incluent zéro : [-0,141 ; +0,076] contre SA6, [-0,147 ; +0,009] contre l'EWMA. Il n'y a donc pas de preuve à 95 % d'une infériorité générale. Dans le second run à coûts doublés, l'intervalle contre l'EWMA est [-0,172 ; -0,014], négatif, sous les hypothèses de ce bootstrap conditionnel.",
-  "**Fait.** 508 ordres, rotation de 5,5 fois l'actif par an, 3 749 EUR de coûts, contre 180 ordres et 1 445 EUR pour SA6 ; le poids de clôture varie de 2,3 points par séance en moyenne, contre 0,9.",
-  "**Fait.** +66,0 % contre +94,8 % pour le fonds, alpha de -0,4 % par an (sans intervalle) ; sommet retrouvé le 2026-01-09, 324 jours après, contre 229 pour le fonds.",
-  "**Fait.** Septième du classement commun (48,7 %). L'écart avec SA6 (52,0 %) et l'EWMA (53,6 %) n'est pas un test de supériorité.",
+  "**Fact.** Net Sharpe of 0.87 against 0.90 for SA6 and 0.93 for the EWMA; deeper maximum drawdown (-16.50% against -15.72% and -15.45%). These are the preregistered refutation criteria.",
+  "**Fact.** At the base costs, the intervals of the Sharpe difference include zero: [-0.141; +0.076] against SA6, [-0.147; +0.009] against the EWMA. There is therefore no proof at 95% of a general inferiority. In the second run at doubled costs, the interval against the EWMA is [-0.172; -0.014], negative, under the assumptions of this conditional bootstrap.",
+  "**Fact.** 508 orders, turnover of 5.5 times the assets a year, 3,749 EUR of costs, against 180 orders and 1,445 EUR for SA6; the close weight varies by 2.3 points per session on average, against 0.9.",
+  "**Fact.** +66.0% against +94.8% for the fund, alpha of -0.4% a year (without an interval); peak back on 2026-01-09, 324 days later, against 229 for the fund.",
+  "**Fact.** Seventh in the common ranking (48.7%). The gap with SA6 (52.0%) and the EWMA (53.6%) is not a test of superiority.",
 ]
-worst = "**Fait.** Du 2025-02-19 au 2025-04-09 la stratégie perd -16,50 % contre -21,64 % pour le fonds. Le 19 février la volatilité prévue est de 10,9 % et le poids de 99,9 %. Le poids de clôture descend à 65,8 % le 7 mars et 60,7 % le 12, puis remonte : 79,8 % le 20 mars, 77,7 % le 2 avril, quand SA6 est à 65,0 % et l'EWMA à 67,2 %. Il est de 37,7 % le 7 avril, 38,5 % le 8, 31,6 % le 9. Le creux, pour la stratégie comme pour le fonds, est le 9 avril : ce soir-là la prévision vaut 42,7 % et la cible 28,1 %, exécutée le lendemain (28,9 % détenus le 10 avril, 28,7 % le 11). La prévision de 45,2 % du 10 avril, la plus haute de la période, vient après et n'a déclenché aucune de ces ventes. **Lecture.** La remontée du risque en mars est locale et constatée ; l'attribuer au retour du GARCH vers sa moyenne est plausible, mais avec des paramètres réestimés chaque soir la trajectoire dépend des chocs et de leur recalibration, et ce n'est pas une propriété générale établie."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2022-06-17 au 2026-10-06 (+70,2 % contre +96,6 % pour le fonds, poids moyen 90 %), une durée libre. Sur les 63 meilleurs rendements consécutifs (2023-10-30 au 2024-01-30, +15,27 % contre +15,58 %), le poids de clôture est de 99 % en moyenne et descend à 88,8 % ; la prévision dépasse la cible de 12 % à 13 valorisations, jusqu'à 13,6 %. Quatre ordres y sont exécutés, pour 20 EUR de coûts. **Lecture.** Quand le risque prévu reste proche ou sous la cible, GARCH, EWMA et SA6 font à peu près la même chose, pour un coût faible."
+worst = "**Fact.** From 2025-02-19 to 2025-04-09 the strategy loses -16.50% against -21.64% for the fund. On 19 February the forecast volatility is 10.9% and the weight 99.9%. The close weight falls to 65.8% on 7 March and 60.7% on the 12th, then rises again: 79.8% on 20 March, 77.7% on 2 April, when SA6 is at 65.0% and the EWMA at 67.2%. It is 37.7% on 7 April, 38.5% on the 8th, 31.6% on the 9th. The trough, for the strategy as for the fund, is on 9 April: that evening the forecast is 42.7% and the target 28.1%, executed the next day (28.9% held on 10 April, 28.7% on the 11th). The forecast of 45.2% on 10 April, the highest of the period, comes after and triggered none of these sales. **Reading.** The rise of the risk in March is local and observed; attributing it to the GARCH's return towards its mean is plausible, but with parameters re-estimated every evening the path depends on the shocks and on their recalibration, and it is not an established general property."
+best = "**Fact.** The largest rise from a trough to a later peak runs from 2022-06-17 to 2026-10-06 (+70.2% against +96.6% for the fund, average weight 90%), any length. Over the 63 best consecutive returns (2023-10-30 to 2024-01-30, +15.27% against +15.58%), the close weight is 99% on average and goes down to 88.8%; the forecast exceeds the target of 12% at 13 valuations, up to 13.6%. Four orders are executed in it, for 20 EUR of costs. **Reading.** When the forecast risk stays close to or below the target, GARCH, EWMA and SA6 do roughly the same thing, at a low cost."
 risks = [
-  "**Observé.** Baisse en deux temps avec une accalmie entre les deux (mars-avril 2025) : la stratégie aborde la seconde vague plus exposée que ses deux témoins.",
-  "**Observé.** Choc soudain en marché calme : le poids est proche de 100 % et la réduction est exécutée à l'ouverture suivante, après la première perte.",
-  "**Plausible.** Prévision oscillant autour de la cible de 12 % : la bande de 3 points est franchie plus souvent qu'avec un estimateur plus lisse, ce qui est cohérent avec ses 508 ordres.",
-  "**Observé.** Marché baissier lent (2022) : -13,2 % contre -13,7 % pour le fonds, avec un poids moyen de 70 % ; la protection y est presque nulle.",
+  "**Observed.** Fall in two stages with a lull in between (March-April 2025): the strategy meets the second wave more exposed than its two controls.",
+  "**Observed.** Sudden shock in a calm market: the weight is close to 100% and the reduction is executed at the next open, after the first loss.",
+  "**Plausible.** Forecast oscillating around the 12% target: the 3-point band is crossed more often than with a smoother estimator, which is consistent with its 508 orders.",
+  "**Observed.** Slow falling market (2022): -13.2% against -13.7% for the fund, with an average weight of 70%; the protection there is almost zero.",
 ]
 measured = [
-  "**Fait.** À côté d'un témoin à cible constante de 87,5 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : le témoin fait +81,2 % net, Sharpe 0,92, perte maximale -19,5 %, sommet retrouvé en 229 jours, 96 EUR de coûts, pour une exposition moyenne réalisée de 89,0 % ; SA11 fait +66,0 %, Sharpe 0,87, -16,5 %, 324 jours, pour 87,5 %.",
-  "**Lecture.** À exposition comparable mais non identique, SA11 a une perte maximale inférieure de 3,0 points à celle de ce témoin, pour 15 points de rendement en moins et un Sharpe plus bas. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 1,5 point d'exposition de plus en moyenne. Il est choisi après coup.",
-  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : -2 923 EUR nets (écarts favorables +10 066 EUR, défavorables -12 989 EUR). Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.",
-  "**Fait.** La même règle sur une EWMA de coefficient 0,90 fait un Sharpe de 0,90 avec 366 ordres ; à 0,94, 0,93 avec 220 ordres ; à 0,97, 0,97 avec 127 ordres. Cet ordre ne vaut que pour ces trois EWMA : il ne définit pas une « vitesse » du GARCH réestimé chaque soir et n'établit pas qu'un estimateur plus lent serait en général meilleur.",
+  "**Fact.** Beside a constant-target control at 87.5% of the fund (its average weight), with the same 3-point band and the same costs: the control makes +81.2% net, Sharpe 0.92, maximum drawdown -19.5%, peak back in 229 days, 96 EUR of costs, for an average realised exposure of 89.0%; SA11 makes +66.0%, Sharpe 0.87, -16.5%, 324 days, for 87.5%.",
+  "**Reading.** At a comparable but not identical exposure, SA11 has a maximum drawdown 3.0 points smaller than this control's, for 15 points less return and a lower Sharpe. The comparison describes two executable rules and does not isolate, at exactly the same exposure, the value of the timing: the control carried 1.5 points more exposure on average. It is chosen after the fact.",
+  "**Fact.** Signed close-to-open price gap, at given quantities: -2,923 EUR net (favourable gaps +10,066 EUR, unfavourable -12,989 EUR). It is neither a cost paid nor the result of a backtest executed at the close.",
+  "**Fact.** The same rule on an EWMA of coefficient 0.90 makes a Sharpe of 0.90 with 366 orders; at 0.94, 0.93 with 220 orders; at 0.97, 0.97 with 127 orders. This order holds only for these three EWMAs: it does not define a \"speed\" of the GARCH re-estimated every evening and does not establish that a slower estimator would in general be better.",
 ]
 to_test = [
-  "Le statut REFUTED est opérationnel : un critère écrit avant le run est atteint. Ce n'est pas une preuve statistique d'infériorité de cette configuration, encore moins des modèles GARCH.",
-  "La distribution dans le temps des paramètres estimés est exportée (`forecast_diagnostics.csv`) mais n'est pas analysée ici.",
-  "Les coefficients 0,90 et 0,97 sont des variantes regardées après coup : en retenir un serait une nouvelle hypothèse.",
-  "La vérification prospective, configuration figée, commence à la première séance XPAR après le 2026-10-10.",
+  "The REFUTED status is operational: a criterion written before the run is met. It is not a statistical proof of the inferiority of this configuration, still less of GARCH models.",
+  "The distribution over time of the estimated parameters is exported (`forecast_diagnostics.csv`) but is not analysed here.",
+  "The coefficients 0.90 and 0.97 are variants looked at after the fact: retaining one would be a new hypothesis.",
+  "The prospective check, configuration frozen, starts at the first XPAR session after 2026-10-10.",
 ]
 
 [EWMA94control]
-summary = "Le témoin de SA11 : la même règle d'allocation, la même fenêtre et la même bande, sur une variance EWMA de coefficient 0,94 dont les coefficients ne sont pas réestimés. Il fournit ici le meilleur compromis observé entre performance nette, coût et réduction de la perte parmi les trois contrôles de volatilité : +73,4 % net, Sharpe 0,93. Ce constat ne démontre pas que son avance est significative. Il n'a pas de code de catalogue et n'était pas l'objet de l'hypothèse."
+summary = "The control of SA11: the same allocation rule, the same window and the same band, on an EWMA variance of coefficient 0.94 whose coefficients are not re-estimated. It gives here the best observed compromise between net performance, cost and reduction of the loss among the three volatility controls: +73.4% net, Sharpe 0.93. This observation does not demonstrate that its lead is significant. It has no catalogue code and was not the object of the hypothesis."
 strengths = [
-  "**Fait.** Sharpe de 0,934 contre 0,930 pour le fonds détenu : un écart économiquement minuscule, qui ne démontre aucune supériorité. Perte maximale de -15,45 % au lieu de -21,64 %.",
-  "**Fait.** 220 ordres, 1 519 EUR de coûts, rotation de 2,1 fois l'actif par an ; +70,9 % et Sharpe de 0,91 dans le second run à coûts doublés.",
-  "**Fait.** Pas d'optimisation statistique quotidienne : un seul paramètre, fixé d'avance à 0,94, une variance amorcée sur 60 rendements, puis une récurrence. Pas de dépendance à un optimiseur GARCH, donc pas de non-convergence possible.",
-  "**Fait.** Deuxième du classement commun (53,6 %), devant SA6 (52,0 %) et SA11 (48,7 %) ; ces écarts ne sont pas un test.",
+  "**Fact.** Sharpe of 0.934 against 0.930 for the fund held: an economically tiny gap, which demonstrates no superiority. Maximum drawdown of -15.45% instead of -21.64%.",
+  "**Fact.** 220 orders, 1,519 EUR of costs, turnover of 2.1 times the assets a year; +70.9% and a Sharpe of 0.91 in the second run at doubled costs.",
+  "**Fact.** No daily statistical optimisation: a single parameter, set in advance at 0.94, a variance started on 60 returns, then a recursion. No dependence on a GARCH optimiser, hence no possible non-convergence.",
+  "**Fact.** Second in the common ranking (53.6%), ahead of SA6 (52.0%) and SA11 (48.7%); these gaps are not a test.",
 ]
 weaknesses = [
-  "**Fait.** QLIKE moyenne de -8,6033, moins bonne que celle du GARCH (-8,6225) dans l'échantillon ; l'intervalle de cette différence inclut zéro. Elle est en revanche meilleure que celle de l'estimateur de SA6, avec un intervalle qui exclut zéro ([-0,075 ; -0,006]).",
-  "**Fait.** La moyenne de r²/q vaut 1,106 : les carrés des rendements dépassent en moyenne normalisée les variances prévues. Cela ne signifie pas mécaniquement une sous-prévision de 10,6 % (une moyenne de rapports n'est pas un rapport de moyennes).",
-  "**Fait.** +73,4 % contre +94,8 % pour le fonds ; sommet retrouvé le 2026-01-06, 321 jours après, contre 229 pour le fonds.",
-  "**Fait.** L'alpha de +0,39 % par an est une estimation ponctuelle sans intervalle. Son avance sur SA6 a été testée et n'est pas concluante : l'intervalle de la différence de Sharpe inclut zéro (mesures complémentaires).",
+  "**Fact.** Mean QLIKE of -8.6033, worse than the GARCH's (-8.6225) in the sample; the interval of this difference includes zero. It is, on the other hand, better than that of the estimator of SA6, with an interval that excludes zero ([-0.075; -0.006]).",
+  "**Fact.** The mean of r²/q is 1.106: the squared returns exceed the forecast variances on a normalised average. This does not mechanically mean an under-forecast of 10.6% (a mean of ratios is not a ratio of means).",
+  "**Fact.** +73.4% against +94.8% for the fund; peak back on 2026-01-06, 321 days later, against 229 for the fund.",
+  "**Fact.** The alpha of +0.39% a year is a point estimate without an interval. Its lead over SA6 was tested and is not conclusive: the interval of the Sharpe difference includes zero (complementary measures).",
 ]
-worst = "**Fait.** Du 2025-02-19 au 2025-04-09 le témoin perd -15,45 % contre -21,64 % pour le fonds, avec un poids de clôture allant de 97 % à 34 %. Le 2 avril, avant la seconde vague, il détient 67,2 %, contre 77,7 % pour SA11 et 65,0 % pour SA6. **Lecture.** Dans cet épisode l'EWMA reste moins exposée que SA11 avant le choc d'avril. On ne peut pas en déduire que sa mémoire est en général plus longue que celle d'un GARCH : le poids d'un choc y décroît de 0,94 par observation, soit une demi-vie d'environ 11 observations, et la réponse d'un GARCH réestimé dépend de plusieurs paramètres et du chemin des rendements."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur couvre presque toute la période (2021-05-19 au 2026-10-06, +78,1 % contre +100,2 %). Sur les 63 meilleurs rendements consécutifs (2023-10-30 au 2024-01-30, +15,40 % contre +15,58 %), le poids de clôture ne descend pas sous 91,2 % ; la volatilité prévue dépasse 12 % à six valorisations, jusqu'à 13,2 %. Trois ordres, 18 EUR de coûts."
+worst = "**Fact.** From 2025-02-19 to 2025-04-09 the control loses -15.45% against -21.64% for the fund, with a close weight going from 97% to 34%. On 2 April, before the second wave, it holds 67.2%, against 77.7% for SA11 and 65.0% for SA6. **Reading.** In this episode the EWMA stays less exposed than SA11 before the April shock. It cannot be inferred that its memory is in general longer than a GARCH's: the weight of a shock decays in it by 0.94 per observation, a half-life of about 11 observations, and the response of a re-estimated GARCH depends on several parameters and on the path of the returns."
+best = "**Fact.** The largest rise from a trough to a later peak covers almost the whole period (2021-05-19 to 2026-10-06, +78.1% against +100.2%). Over the 63 best consecutive returns (2023-10-30 to 2024-01-30, +15.40% against +15.58%), the close weight does not go below 91.2%; the forecast volatility exceeds 12% at six valuations, up to 13.2%. Three orders, 18 EUR of costs."
 risks = [
-  "**Observé.** Choc soudain en marché calme : poids proche de 100 % au moment du choc.",
-  "**Observé.** Rebond rapide après une panique : le poids reste entre 30 % et 44 % du 2025-04-15 au 2025-05-19.",
-  "**Plausible.** Régime de volatilité durablement au-dessus de 12 % dans un marché qui monte.",
+  "**Observed.** Sudden shock in a calm market: weight close to 100% at the time of the shock.",
+  "**Observed.** Fast rebound after a panic: the weight stays between 30% and 44% from 2025-04-15 to 2025-05-19.",
+  "**Plausible.** Regime of volatility lastingly above 12% in a rising market.",
 ]
 measured = [
-  "**Fait.** À côté d'un témoin à cible constante de 87,8 % du fonds (son poids moyen), avec la même bande de 3 points et les mêmes coûts : ce témoin fait +81,6 % net, Sharpe 0,92, perte maximale -19,5 %, sommet retrouvé en 229 jours, pour une exposition moyenne réalisée de 89,3 % ; l'EWMA fait +73,4 %, Sharpe 0,93, -15,4 %, 321 jours, pour 87,8 %.",
-  "**Lecture.** C'est le seul des trois contrôles de volatilité dont le Sharpe égale celui de son témoin à cible constante (0,93 contre 0,92), avec quatre points de perte maximale en moins et huit points de rendement en moins. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing : le témoin a porté 1,5 point d'exposition de plus en moyenne.",
-  "**Fait.** Contre SA6 : différence de Sharpe de +0,036 en sa faveur, intervalle bootstrap à 95 % [-0,027 ; +0,104], qui inclut zéro.",
-  "**Fait.** Aux coefficients 0,90 et 0,97, fixés avant leur run : Sharpe de 0,90 (366 ordres, 2 686 EUR de coûts, perte maximale -14,6 %) et de 0,97 (127 ordres, 769 EUR, -17,1 %).",
-  "**Fait.** Écart de prix signé clôture-ouverture, à quantités données : -3 076 EUR nets. Ce n'est ni un coût payé ni le résultat d'un backtest exécuté à la clôture.",
+  "**Fact.** Beside a constant-target control at 87.8% of the fund (its average weight), with the same 3-point band and the same costs: this control makes +81.6% net, Sharpe 0.92, maximum drawdown -19.5%, peak back in 229 days, for an average realised exposure of 89.3%; the EWMA makes +73.4%, Sharpe 0.93, -15.4%, 321 days, for 87.8%.",
+  "**Reading.** It is the only one of the three volatility controls whose Sharpe equals that of its constant-target control (0.93 against 0.92), with four points less maximum drawdown and eight points less return. The comparison describes two executable rules and does not isolate, at exactly the same exposure, the value of the timing: the control carried 1.5 points more exposure on average.",
+  "**Fact.** Against SA6: Sharpe difference of +0.036 in its favour, 95% bootstrap interval [-0.027; +0.104], which includes zero.",
+  "**Fact.** At the coefficients 0.90 and 0.97, set before their run: Sharpe of 0.90 (366 orders, 2,686 EUR of costs, maximum drawdown -14.6%) and of 0.97 (127 orders, 769 EUR, -17.1%).",
+  "**Fact.** Signed close-to-open price gap, at given quantities: -3,076 EUR net. It is neither a cost paid nor the result of a backtest executed at the close.",
 ]
 to_test = [
-  "Le coefficient 0,97 fait mieux ici ; le retenir pour cela serait choisir un paramètre sur l'historique qui l'a désigné.",
-  "Regardé après coup comme témoin, l'EWMA n'a pas été préinscrite comme candidate : la retenir serait une nouvelle hypothèse à écrire.",
+  "The coefficient 0.97 does better here; retaining it for that would be choosing a parameter on the history that designated it.",
+  "Looked at after the fact as a control, the EWMA was not preregistered as a candidate: retaining it would be a new hypothesis to write.",
 ]
 
 [SA14]
-summary = "Un petit réseau de neurones, entraîné sur 2019-2023 et sélectionné sur 2024, propose chaque soir des poids entre ETF_WORLD, ETF_SP500_PEA et le cash. Il réduit le risque global par sa part de cash, mais produit aussi des changements d'allocation importants : début avril 2025 il coupe fortement pendant la baisse puis remonte vite, et le portefeuille atteint son creux après celui du fonds. Sur ses dates de test (2025-01-02 au 2026-10-09) il ne montre pas d'avantage net : +13,4 % contre +24,5 % pour le fonds détenu."
+summary = "A small neural network, trained on 2019-2023 and selected on 2024, proposes every evening weights between ETF_WORLD, ETF_SP500_PEA and cash. It reduces the overall risk through its share of cash, but also produces large changes of allocation: in early April 2025 it cuts sharply during the fall then rises again fast, and the portfolio reaches its trough after the fund's. Over its test dates (2025-01-02 to 2026-10-09) it shows no net advantage: +13.4% against +24.5% for the fund held."
 strengths = [
-  "**Fait.** Volatilité de 9,9 % contre 14,3 % pour le fonds, perte maximale de -16,11 % contre -21,51 %.",
-  "**Fait.** 270 ordres pour 756 EUR de coûts.",
-  "**Fait.** Perte maximale récupérée le 2025-10-28, 251 jours après le sommet.",
+  "**Fact.** Volatility of 9.9% against 14.3% for the fund, maximum drawdown of -16.11% against -21.51%.",
+  "**Fact.** 270 orders for 756 EUR of costs.",
+  "**Fact.** Maximum drawdown recovered on 2025-10-28, 251 days after the peak.",
 ]
 weaknesses = [
-  "**Fait.** Sharpe de 0,76 contre 0,93, alpha de -1,4 % par an (sans intervalle) pour un bêta de 0,67, sur ces seules dates.",
-  "**Fait.** Score de 45,8 %, sous le seuil de 50 % de son hypothèse, et Sharpe sous celui du fonds : les deux critères de réfutation sont atteints. Ce score est déflaté pour un seul essai et ne se compare pas à ceux des autres stratégies.",
-  "**Fait.** Le test d'origine, clos au 2026-09-30, a été lu le 2026-10-04 ; ce run le prolonge de sept séances avec le même modèle. L'extension ne remet pas le compteur à zéro.",
-  "**Fait.** Les sensibilités prévues par l'hypothèse - graines 43 et 44, coûts doublés avec le modèle figé puis avec un modèle recalibré - sont dans les mesures complémentaires plus bas. Le bloc robustesse du score, lui, utilise un stress approché, pas un second run.",
-  "**Lecture.** Le réseau fait du timing ; la question ouverte est de savoir si ce timing ajoute ou retire de la valeur par rapport à une allocation constante. Un mauvais timing n'est pas une absence de timing.",
+  "**Fact.** Sharpe of 0.76 against 0.93, alpha of -1.4% a year (without an interval) for a beta of 0.67, on these dates only.",
+  "**Fact.** Score of 45.8%, below the 50% threshold of its hypothesis, and a Sharpe below the fund's: both refutation criteria are met. This score is deflated for a single trial and is not comparable with those of the other strategies.",
+  "**Fact.** The original test, closed at 2026-09-30, was read on 2026-10-04; this run extends it by seven sessions with the same model. The extension does not reset the counter.",
+  "**Fact.** The sensitivities foreseen by the hypothesis - seeds 43 and 44, doubled costs with the frozen model then with a recalibrated model - are in the complementary measures below. The robustness block of the score uses an approximate stress, not a second run.",
+  "**Reading.** The network does timing; the open question is whether this timing adds or removes value compared with a constant allocation. A bad timing is not an absence of timing.",
 ]
-worst = "**Fait.** Du 2025-02-19 au 2025-04-22 la stratégie perd -16,11 %. Hors la première séance, encore en cash, son poids de clôture total va de 47,4 % à 87,3 % sur toute la période, avec un écart-type d'environ 8 points : ce n'est pas un portefeuille à poids constants. Début avril il passe de 75,6 % le 2 à 47,4 % le 9, soit -28 points pendant la chute, puis remonte à 78,7 % le 16. Le 9 avril, creux du fonds, le portefeuille vaut 85 414 EUR ; le 22 avril il vaut 85 340 EUR, soit -0,09 %, alors que la clôture du fonds monde gagne +3,80 % entre ces deux dates. **Lecture.** Le creux tardif s'explique par cette chronologie de réallocations, et par la part de fonds S&P 500, plutôt que par le niveau moyen d'exposition. Les exécutions permettraient de séparer ce qui vient des poids, de la nuit et des frais."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2025-04-22 au 2026-10-06 (+32,9 % contre +47,7 % pour le fonds, poids moyen 68 %). Sur les 63 meilleurs rendements consécutifs (2025-04-22 au 2025-07-21) la stratégie fait +13,0 % contre +15,3 %, avec un poids de clôture entre 67 % et 87 %. **Lecture.** Le réseau est alors plus investi qu'en moyenne ; ce que cela doit à son choix plutôt qu'à la hausse générale n'est pas isolé."
+worst = "**Fact.** From 2025-02-19 to 2025-04-22 the strategy loses -16.11%. Apart from the first session, still in cash, its total close weight ranges from 47.4% to 87.3% over the whole period, with a standard deviation of about 8 points: it is not a constant-weight portfolio. In early April it goes from 75.6% on the 2nd to 47.4% on the 9th, i.e. -28 points during the fall, then rises again to 78.7% on the 16th. On 9 April, the fund's trough, the portfolio is worth 85,414 EUR; on 22 April it is worth 85,340 EUR, i.e. -0.09%, while the close of the world fund gains +3.80% between these two dates. **Reading.** The late trough is explained by this chronology of reallocations, and by the share of the S&P 500 fund, rather than by the average level of exposure. The fills would allow what comes from the weights, the night and the fees to be separated."
+best = "**Fact.** The largest rise from a trough to a later peak runs from 2025-04-22 to 2026-10-06 (+32.9% against +47.7% for the fund, average weight 68%). Over the 63 best consecutive returns (2025-04-22 to 2025-07-21) the strategy makes +13.0% against +15.3%, with a close weight between 67% and 87%. **Reading.** The network is then more invested than on average; what this owes to its choice rather than to the general rise is not isolated."
 risks = [
-  "**Observé.** Marché haussier long : un tiers du capital en cash non rémunéré est un coût d'opportunité.",
-  "**Observé.** Chute rapide suivie d'un rebond (avril 2025) : réduction pendant la baisse, retour au risque avant le second creux du portefeuille.",
-  "**Plausible.** Régime absent de son apprentissage (2019-2023) : la sortie softmax et les plafonds bornent toujours les poids, mais rien n'assure leur pertinence économique si les entrées dérivent ; l'artefact n'est pas réentraîné.",
+  "**Observed.** Long rising market: a third of the capital in cash that earns nothing is an opportunity cost.",
+  "**Observed.** Fast fall followed by a rebound (April 2025): reduction during the fall, return to risk before the second trough of the portfolio.",
+  "**Plausible.** Regime absent from its training (2019-2023): the softmax output and the caps always bound the weights, but nothing ensures their economic relevance if the inputs drift; the artifact is not retrained.",
 ]
 measured = [
-  "**Fait.** À côté d'un témoin à cible constante de 36,3 % de fonds S&P 500 et 30,3 % de fonds monde (ses poids moyens), sur les mêmes dates, avec la même bande de 3 points et les mêmes coûts : le témoin fait +17,2 % net, Sharpe 0,93, perte maximale -15,2 %, sommet retrouvé en 225 jours, 76 EUR de coûts, pour une exposition moyenne réalisée de 68,3 % ; SA14 fait +13,4 %, Sharpe 0,76, -16,1 %, 251 jours, pour 66,6 %.",
-  "**Lecture.** Sur ces dates SA14 fait moins bien que ce témoin construit sur ses propres poids moyens. La comparaison décrit deux règles exécutables et n'isole pas, à exposition exactement identique, la valeur du timing du réseau : le témoin a porté 1,7 point d'exposition de plus en moyenne, et la composition, les coûts et la trajectoire changent aussi. Le témoin est choisi après coup.",
-  "**Fait.** La part du fonds S&P 500 dans ce qui est investi va de 33 % à 66 % (moyenne 55 %) : le réseau déplace aussi la répartition entre les deux fonds.",
-  "**Fait.** Sensibilités annoncées, sur la période d'origine (jusqu'au 2026-09-30) : graine 42, score 44,5 % et Sharpe 0,68 ; graine 43, 45,9 % et 0,70 ; graine 44, 45,6 % et 0,71. Le Sharpe du fonds détenu y est de 0,86.",
-  "**Fait.** À coûts doublés, sur la même période d'origine, deux runs répondent à deux questions. Le modèle figé du test (`d9bfd125bf69`, même normalisation, mêmes poids, époque 20), rejoué en doublant seulement les coûts du moteur : score 40,7 %, +11,0 % net, Sharpe 0,64, perte maximale -16,2 %, 1 434 EUR de coûts au lieu de 752. La calibration refaite sous ces coûts retient l'époque 15 au lieu de 20 (`a5afb76183eb`) : c'est un autre modèle, score 44,3 %, +11,8 % net, Sharpe 0,69, 1 037 EUR de coûts. Dans chaque variante le Sharpe reste sous celui du fonds détenu et le score sous 50 %.",
-  "**Fait.** Les 319 caractéristiques lues par le réseau à chacune des 453 décisions sont exportées (`sa14_inputs.csv`) ; toutes les décisions ont un vecteur complet.",
+  "**Fact.** Beside a constant-target control at 36.3% of the S&P 500 fund and 30.3% of the world fund (its average weights), over the same dates, with the same 3-point band and the same costs: the control makes +17.2% net, Sharpe 0.93, maximum drawdown -15.2%, peak back in 225 days, 76 EUR of costs, for an average realised exposure of 68.3%; SA14 makes +13.4%, Sharpe 0.76, -16.1%, 251 days, for 66.6%.",
+  "**Reading.** Over these dates SA14 does worse than this control built on its own average weights. The comparison describes two executable rules and does not isolate, at exactly the same exposure, the value of the network's timing: the control carried 1.7 points more exposure on average, and the composition, the costs and the path change too. The control is chosen after the fact.",
+  "**Fact.** The share of the S&P 500 fund in what is invested ranges from 33% to 66% (average 55%): the network also moves the split between the two funds.",
+  "**Fact.** Announced sensitivities, over the original period (up to 2026-09-30): seed 42, score 44.5% and Sharpe 0.68; seed 43, 45.9% and 0.70; seed 44, 45.6% and 0.71. The Sharpe of the fund held there is 0.86.",
+  "**Fact.** At doubled costs, over the same original period, two runs answer two questions. The frozen model of the test (`d9bfd125bf69`, same normalisation, same weights, epoch 20), replayed doubling only the costs of the engine: score 40.7%, +11.0% net, Sharpe 0.64, maximum drawdown -16.2%, 1,434 EUR of costs instead of 752. The calibration redone under these costs retains epoch 15 instead of 20 (`a5afb76183eb`): it is another model, score 44.3%, +11.8% net, Sharpe 0.69, 1,037 EUR of costs. In each variant the Sharpe stays below the fund held's and the score below 50%.",
+  "**Fact.** The 319 features read by the network at each of the 453 decisions are exported (`sa14_inputs.csv`); every decision has a complete vector.",
 ]
 to_test = [
-  "Les entrées sont exportées mais pas analysées : rien ici ne dit quelles caractéristiques expliquent les réallocations d'avril 2025.",
-  "Trois graines qui échouent de la même façon ne font pas un test indépendant : même données, même période, déjà regardée.",
+  "The inputs are exported but not analysed: nothing here says which features explain the reallocations of April 2025.",
+  "Three seeds that fail in the same way do not make an independent test: same data, same period, already looked at.",
 ]
 
 [REF_WorldBuyHold]
-summary = "La référence économique de l'étude : ETF_WORLD acheté une fois par le moteur, avec les mêmes coûts, puis gardé. C'est l'étalon du score QUALITY_V1, donc il n'est pas noté. Il sert à comparer les rendements, les baisses et surtout leurs durées de récupération."
+summary = "The economic reference of the study: ETF_WORLD bought once by the engine, with the same costs, then kept. It is the yardstick of the QUALITY_V1 score, so it is not scored. It serves to compare the returns, the falls and above all their recovery times."
 strengths = [
-  "**Fait.** +94,8 % net, Sharpe de 0,93 : aucune stratégie du catalogue ne fait mieux en rendement, et seuls le témoin EWMA (0,934) et le panier 50/50 (0,96) ont un Sharpe supérieur, sans que ces écarts soient testés.",
-  "**Fait.** Un seul ordre, 100 EUR de coûts.",
-  "**Fait.** Sa plus forte baisse est aussi celle qu'il efface le plus vite parmi les livres exposés : sommet du 2025-02-19 retrouvé le 2025-10-06, 229 jours après.",
+  "**Fact.** +94.8% net, Sharpe of 0.93: no strategy of the catalogue does better in return, and only the EWMA control (0.934) and the 50/50 basket (0.96) have a higher Sharpe, without these gaps being tested.",
+  "**Fact.** A single order, 100 EUR of costs.",
+  "**Fact.** Its deepest fall is also the one it erases fastest among the exposed books: peak of 2025-02-19 back on 2025-10-06, 229 days later.",
 ]
 weaknesses = [
-  "**Fait.** Perte maximale de -21,64 % en 35 rendements, du 2025-02-19 au 2025-04-09, et volatilité de 13,8 %.",
-  "**Fait.** Sa plus longue période sous un sommet dure 696 jours, du 2022-01-04 au 2023-12-01 (creux à -16,7 %).",
-  "**Fait.** -13,7 % en 2022.",
+  "**Fact.** Maximum drawdown of -21.64% in 35 returns, from 2025-02-19 to 2025-04-09, and volatility of 13.8%.",
+  "**Fact.** Its longest stretch below a peak lasts 696 days, from 2022-01-04 to 2023-12-01 (trough at -16.7%).",
+  "**Fact.** -13.7% in 2022.",
 ]
-worst = "**Fait.** Du 2025-02-19 au 2025-04-09 le fonds perd -21,64 % ; les 63 pires rendements consécutifs (2025-01-10 au 2025-04-09) font -18,16 %. Mars 2025 est son pire mois (-7,93 %). Ce sont les cours du fonds en euros : la variation inclut celle du dollar."
-best = "**Fait.** Les 63 meilleurs rendements consécutifs suivent immédiatement le creux : +19,33 % du 2025-04-09 au 2025-07-10. C'est la fenêtre que les règles sorties du marché pendant la chute ont en partie manquée."
+worst = "**Fact.** From 2025-02-19 to 2025-04-09 the fund loses -21.64%; the 63 worst consecutive returns (2025-01-10 to 2025-04-09) make -18.16%. March 2025 is its worst month (-7.93%). These are the fund's prices in euros: the change includes the dollar's."
+best = "**Fact.** The 63 best consecutive returns immediately follow the trough: +19.33% from 2025-04-09 to 2025-07-10. It is the window that the rules out of the market during the fall partly missed."
 risks = [
-  "**Observé.** Toute baisse du marché actions mondial, subie en entier.",
-  "**Observé.** Marché baissier lent (2022) : presque deux ans sous le sommet.",
+  "**Observed.** Any fall of the world equity market, taken in full.",
+  "**Observed.** Slow falling market (2022): almost two years below the peak.",
 ]
 to_test = [
-  "Le cash des autres livres n'est pas rémunéré et le taux sans risque est nul : avec un cash rémunéré, toutes les comparaisons à ce fonds se déplaceraient en faveur des règles peu investies. Ce serait une autre hypothèse, à documenter.",
+  "The cash of the other books earns nothing and the risk-free rate is zero: with cash that earns interest, all the comparisons with this fund would shift in favour of the rules that are little invested. That would be another hypothesis, to be documented.",
 ]
 
 [REF_5050Rebalanced]
-summary = "La seconde référence : ETF_WORLD et ETF_SP500_PEA à poids égaux, redemandés à chaque décision. Elle n'est pas une stratégie du catalogue et n'est pas comptée comme un essai, mais elle est notée, et elle est première du classement commun (77,9 %). C'est le contrôle indispensable de SA2 et de SA5, qui détiennent les deux mêmes fonds."
+summary = "The second reference: ETF_WORLD and ETF_SP500_PEA at equal weights, asked for again at each decision. It is not a strategy of the catalogue and is not counted as a trial, but it is scored, and it is first in the common ranking (77.9%). It is the indispensable control of SA2 and SA5, which hold the same two funds."
 strengths = [
-  "**Fait.** +103,35 % net, Sharpe de 0,96, alpha de +0,51 % par an contre le fonds monde (sans intervalle) pour un bêta de 1,02.",
-  "**Fait.** 617 ordres mais de très petite taille : 736 EUR de coûts, rotation de 0,18 fois l'actif par an ; +102,7 % dans le second run à coûts doublés.",
-  "**Fait.** Au-dessus du fonds monde en 2021 (partielle), 2023, 2024 et 2026 (partielle) ; en dessous en 2022 et en 2025.",
+  "**Fact.** +103.35% net, Sharpe of 0.96, alpha of +0.51% a year against the world fund (without an interval) for a beta of 1.02.",
+  "**Fact.** 617 orders but of very small size: 736 EUR of costs, turnover of 0.18 times the assets a year; +102.7% in the second run at doubled costs.",
+  "**Fact.** Above the world fund in 2021 (partial), 2023, 2024 and 2026 (partial); below in 2022 and in 2025.",
 ]
 weaknesses = [
-  "**Fait.** Aucune réduction du risque : perte maximale de -22,47 %, un peu plus profonde que celle du fonds monde, et volatilité de 14,2 %.",
-  "**Fait.** Derrière le fonds monde en 2025 (+5,0 % contre +6,6 %) ; son plus fort retard relatif va du 2024-12-24 au 2026-02-27 (écart relatif de -2,8 %).",
-  "**Lecture.** Son avance vient de la moitié placée sur le S&P 500 pendant une période favorable aux actions américaines : c'est un choix de panier fait avant l'étude, pas un signal, et rien ne dit qu'il se répétera.",
+  "**Fact.** No reduction of risk: maximum drawdown of -22.47%, slightly deeper than the world fund's, and volatility of 14.2%.",
+  "**Fact.** Behind the world fund in 2025 (+5.0% against +6.6%); its largest relative lag runs from 2024-12-24 to 2026-02-27 (relative gap of -2.8%).",
+  "**Reading.** Its lead comes from the half placed on the S&P 500 during a period favourable to US equities: it is a choice of basket made before the study, not a signal, and nothing says it will repeat.",
 ]
-worst = "**Fait.** Du 2025-02-19 au 2025-04-09 le panier perd -22,47 % contre -21,64 % pour le fonds monde, le fonds S&P 500 perdant -23,3 % en clôture. Sommet retrouvé le 2025-10-09, 232 jours après."
-best = "**Fait.** Sa plus forte avance relative sur le fonds monde va du 2021-06-16 au 2024-12-24 : +61,2 % contre +52,2 %, écart relatif de +5,9 %. Les 63 meilleurs rendements consécutifs (2025-04-09 au 2025-07-10) font +19,30 %, comme le fonds monde."
+worst = "**Fact.** From 2025-02-19 to 2025-04-09 the basket loses -22.47% against -21.64% for the world fund, the S&P 500 fund losing -23.3% at the close. Peak back on 2025-10-09, 232 days later."
+best = "**Fact.** Its largest relative lead over the world fund runs from 2021-06-16 to 2024-12-24: +61.2% against +52.2%, relative gap of +5.9%. The 63 best consecutive returns (2025-04-09 to 2025-07-10) make +19.30%, like the world fund."
 risks = [
-  "**Observé.** Toute baisse du marché actions, subie en entier.",
-  "**Plausible.** Sous-performance durable des actions américaines ou baisse du dollar : la moitié du panier y est exposée.",
+  "**Observed.** Any fall of the equity market, taken in full.",
+  "**Plausible.** Lasting underperformance of US equities or a fall of the dollar: half of the basket is exposed to it.",
 ]
 to_test = [
-  "Premier du classement sans être une stratégie : cela dit surtout qu'aucune règle du catalogue ne bat un panier passif des mêmes fonds sur cette période.",
+  "First in the ranking without being a strategy: it mostly says that no rule of the catalogue beats a passive basket of the same funds over this period.",
 ]
 
-# --- SA12 et SA13 : études dédiées, ajoutées le 2026-10-10 après les rapports ci-dessus ---
+# --- SA12 and SA13: dedicated studies, added on 2026-10-10 after the reports above ---
 #
-# Les deux tables suivantes ne viennent pas de runs/garch_study. « Fait » y
-# désigne ce qui est relu dans les exports de l'étude de la stratégie :
-# - SA12 : runs/arima_garch_study (scripts/SA12_run_arima_garch_study.py), run du
-#   commit 10f6d90 sur le magasin 750c23dfffc3, période 2021-04-01 -> 2026-10-09 ;
-# - SA13 : runs/signature_study (scripts/SA13_run_signature_study.py), période de
-#   test 2023-01-02 -> 2026-10-09, un modèle par mois.
-# Leurs hypothèses, leurs contrôles et leurs statuts ont été écrits avant le
-# premier ajustement (research/hypotheses.toml, commit b0b2d7e). Les contrôles
-# (D0 à D2, C0 à C7) ne sont pas des candidats. Les chiffres de SA13, mesurés
-# depuis 2023, ne se comparent pas à ceux des rapports mesurés depuis 2021.
+# The two following tables do not come from runs/garch_study. "Fact" there
+# means what is read again in the exports of the strategy's own study:
+# - SA12: runs/arima_garch_study (scripts/SA12_run_arima_garch_study.py), the
+#   run of commit 10f6d90 on store 750c23dfffc3, period 2021-04-01 -> 2026-10-09;
+# - SA13: runs/signature_study (scripts/SA13_run_signature_study.py), test
+#   period 2023-01-02 -> 2026-10-09, one model a month.
+# Their hypotheses, their controls and their statuses were written before the
+# first fit (research/hypotheses.toml, commit b0b2d7e). The controls (D0 to
+# D2, C0 to C7) are not candidates. The figures of SA13, measured since 2023,
+# are not comparable with those of the reports measured since 2021.
 
 [SA12]
-period_label = "Période commune"
-context = "Étude dédiée (`scripts/SA12_run_arima_garch_study.py`) : les livres de la comparaison, le témoin EWMA de SA11 et trois contrôles de SA12 sans code de catalogue (D0, D1, D2), exécutés par le même moteur. L'ARIMA et le GARCH sont réestimés chaque soir sur 756 rendements d'ouverture à ouverture, avec un seul fil de calcul. L'hypothèse `sa12_arima_garch`, ses contrôles et ses statuts ont été écrits avant le premier ajustement."
+period_label = "Common period"
+context = "Dedicated study (`scripts/SA12_run_arima_garch_study.py`): the books of the comparison, the EWMA control of SA11 and three controls of SA12 without a catalogue code (D0, D1, D2), executed by the same engine. The ARIMA and the GARCH are re-estimated every evening on 756 open-to-open returns, with a single thread. The hypothesis `sa12_arima_garch`, its controls and its statuses were written before the first fit."
 measured_source = "study.md"
-history_note = "Colonnes propres à SA12 : la prévision `mu_2`, en points de base, du rendement de l'ouverture de t + 1 à l'ouverture de t + 2 ; la volatilité annualisée prévue pour ce rendement ; le repli éventuel de la variance sur l'EWMA ; le filtre, lu sur le poids détenu ce soir-là ; le poids avant application de la bande de 3 points. Le détail de chaque ajustement est dans `sa12_forecasts.csv` de l'étude."
-summary = "Détenir ETF_WORLD seulement quand un ARIMA(1,0,1), réestimé chaque soir sur 756 rendements d'ouverture à ouverture, prévoit plus de 20 pb pour le rendement de l'ouverture de t + 1 à l'ouverture de t + 2 (la position est gardée tant que la prévision reste strictement positive), au poids min(1, 12 % / max(σ, 5 %)) où σ vient d'un GARCH(1,1) ajusté sur les innovations de l'ARIMA. Sur cet historique la prévision ne franchit le seuil que 31 soirs sur 1 413, tous à partir du 10 avril 2025 : le livre reste en cash pendant quatre ans, puis prend 29 positions courtes qui, ensemble, perdent 1,72 % net, quand le même dimensionnement sans filtre (D0) gagne 64,07 %. Le statut préinscrit est INSUFFICIENT_EVIDENCE parce qu'il manque un épisode terminé (29 pour 30 requis) ; l'écart de Sharpe mesuré contre D0 est de -0,99. Cela ne dit rien des modèles ARIMA-GARCH en général."
+history_note = "Columns of SA12 only: the forecast `mu_2`, in basis points, of the return from the open of t + 1 to the open of t + 2; the annualised volatility forecast for this return; the possible fallback of the variance to the EWMA; the gate, read on the weight held that evening; the weight before the 3-point band is applied. The detail of each fit is in the study's `sa12_forecasts.csv`."
+summary = "Hold ETF_WORLD only when an ARIMA(1,0,1), re-estimated every evening on 756 open-to-open returns, forecasts more than 20 bp for the return from the open of t + 1 to the open of t + 2 (the position is kept as long as the forecast stays strictly positive), at the weight min(1, 12% / max(σ, 5%)) where σ comes from a GARCH(1,1) fitted on the innovations of the ARIMA. Over this history the forecast crosses the threshold on only 31 evenings out of 1,413, all from 10 April 2025: the book stays in cash for four years, then takes 29 short positions which, together, lose 1.72% net, when the same sizing without the gate (D0) gains 64.07%. The preregistered status is INSUFFICIENT_EVIDENCE because one finished episode is missing (29 for 30 required); the Sharpe gap measured against D0 is -0.99. This says nothing about ARIMA-GARCH models in general."
 strengths = [
-  "**Fait.** La chaîne de calcul fonctionne : prévision jointe utilisable à 1 415 décisions sur 1 416 (99,93 %), un seul ARIMA non convergé, aucun repli EWMA de la variance.",
-  "**Fait.** Perte maximale de -6,99 % contre -21,64 % pour le fonds et -17,77 % pour D0, volatilité de 2,1 %. **Lecture.** C'est la conséquence d'une exposition moyenne de 4,0 % (une position à la clôture de 69 valorisations sur 1 416), pas d'un choix heureux des séances.",
-  "**Fait.** Le livre est en cash pendant toute la baisse du fonds du 2025-02-19 au 2025-04-09 (-21,64 %). **Lecture.** Ce n'est pas une protection décidée par le modèle : avant le 10 avril 2025 la prévision n'a jamais dépassé 18,2 pb (13,5 pb de 2021 à 2024), quel que soit le marché, et aucune position n'avait encore été prise.",
-  "**Fait.** Brut de coûts, les 29 épisodes rapportent +2,30 %.",
-  "**Fait.** Sur la même moyenne, la variance GARCH a une perte jointe moyenne un peu plus basse que la variance EWMA (-8,4848 contre -8,4737) ; l'écart apparié, -0,011, a un intervalle à 95 % de [-0,065 ; +0,045], qui contient zéro.",
+  "**Fact.** The computation chain works: joint forecast usable at 1,415 decisions out of 1,416 (99.93%), a single ARIMA not converged, no EWMA fallback of the variance.",
+  "**Fact.** Maximum drawdown of -6.99% against -21.64% for the fund and -17.77% for D0, volatility of 2.1%. **Reading.** It is the consequence of an average exposure of 4.0% (a position at the close of 69 valuations out of 1,416), not of a lucky choice of sessions.",
+  "**Fact.** The book is in cash throughout the fall of the fund from 2025-02-19 to 2025-04-09 (-21.64%). **Reading.** It is not a protection decided by the model: before 10 April 2025 the forecast never exceeded 18.2 bp (13.5 bp from 2021 to 2024), whatever the market, and no position had yet been taken.",
+  "**Fact.** Gross of costs, the 29 episodes earn +2.30%.",
+  "**Fact.** On the same mean, the GARCH variance has a slightly lower mean joint loss than the EWMA variance (-8.4848 against -8.4737); the paired gap, -0.011, has a 95% interval of [-0.065; +0.045], which contains zero.",
 ]
 weaknesses = [
-  "**Fait.** -1,72 % net sur la période, contre +64,07 % pour D0, +67,43 % pour SA6 et +94,79 % pour le fonds ; Sharpe -0,14. Dans le second run à coûts doublés : -5,70 %, Sharpe -0,47.",
-  "**Fait.** La prévision de la moyenne n'est pas meilleure que deux prévisions naïves : erreur quadratique moyenne de 9,2497e-05, contre 9,2133e-05 pour la prévision nulle et 9,2002e-05 pour la moyenne de la fenêtre (les intervalles des deux écarts contiennent zéro) ; corrélation avec le rendement réalisé +0,018 ; signe juste 56,1 % contre 56,7 % pour « toujours en hausse ».",
-  "**Fait.** Les 31 signaux d'entrée ne sélectionnent pas de meilleures séances : le rendement réalisé moyen après un signal est de +0,046 %, contre +0,047 % sur toutes les origines, et 15 signaux sur 31 sont suivis d'une hausse.",
-  "**Fait.** 22 épisodes sur 29 ne durent qu'une valorisation : achat à l'ouverture, prévision redevenue négative ou nulle le soir même, vente à l'ouverture suivante. 75 ordres et 4 022 EUR de coûts pour environ 2 300 EUR de gain brut : les coûts dépassent le gain brut.",
-  "**Fait.** 10 épisodes gagnants sur 29, résultat net moyen de -0,05 % par épisode.",
-  "**Fait.** Le sommet du 2025-05-13 n'est pas retrouvé au 2026-10-09, 514 jours plus tard (-2,36 % sous ce sommet).",
-  "**Fait.** Score nul au classement de l'étude : les blocs robustesse et implémentation sont à zéro. Un score nul n'est pas une égalité économique avec les autres livres à zéro.",
+  "**Fact.** -1.72% net over the period, against +64.07% for D0, +67.43% for SA6 and +94.79% for the fund; Sharpe -0.14. In the second run at doubled costs: -5.70%, Sharpe -0.47.",
+  "**Fact.** The forecast of the mean is not better than two naive forecasts: mean squared error of 9.2497e-05, against 9.2133e-05 for the zero forecast and 9.2002e-05 for the mean of the window (the intervals of both gaps contain zero); correlation with the realised return +0.018; right sign 56.1% against 56.7% for \"always up\".",
+  "**Fact.** The 31 entry signals do not select better sessions: the average realised return after a signal is +0.046%, against +0.047% over all origins, and 15 signals out of 31 are followed by a rise.",
+  "**Fact.** 22 episodes out of 29 last only one valuation: purchase at the open, forecast back to negative or zero that same evening, sale at the next open. 75 orders and 4,022 EUR of costs for about 2,300 EUR of gross gain: the costs exceed the gross gain.",
+  "**Fact.** 10 winning episodes out of 29, average net result of -0.05% per episode.",
+  "**Fact.** The peak of 2025-05-13 is not back at 2026-10-09, 514 days later (-2.36% below this peak).",
+  "**Fact.** Zero score in the ranking of the study: the robustness and implementation blocks are at zero. A zero score is not an economic tie with the other books at zero.",
 ]
-worst = "**Fait.** La plus forte baisse va du sommet du 2025-05-13 (100 648,6 EUR) au creux du 2026-03-26 (93 610,0 EUR) : -6,99 %, pendant que le fonds gagne +8,47 %. Elle n'est pas continue : c'est la somme de 16 épisodes, dont 3 gagnants, qui coûtent 2 443 EUR de frais. Les plus lourds : le soir du 2025-07-31 la prévision vaut +20,6 pb et la cible 89,5 % ; l'achat est exécuté à l'ouverture du 2025-08-01 (568,04), le fonds clôture à 556,13, la prévision du soir tombe à -21,4 pb et la vente est exécutée à l'ouverture du 2025-08-04 (557,91) : -1,75 % sur le livre. Le soir du 2026-03-05 la prévision vaut +21,2 pb et la cible 98,8 % ; 156 parts sont achetées à l'ouverture du 2026-03-06 (617,43) ; la prévision du soir est de -6,3 pb et la vente est exécutée à l'ouverture du lundi 2026-03-09 (601,27), 2,65 % plus bas : -2,78 % sur le livre, le plus mauvais épisode. Le soir du 2026-03-18 (+21,7 pb, cible 96,1 %) conduit de même à un achat à l'ouverture du 19 et à une vente à celle du 20 (-0,87 %). Les 31 signaux d'entrée de la période suivent tous un rendement d'ouverture à ouverture positif, de +1,73 % en moyenne quand l'amplitude moyenne de ce rendement est de 0,65 % sur l'ensemble des séances ; depuis le 10 avril 2025 la corrélation entre ce dernier rendement et la prévision est de +0,82. **Lecture.** Le livre achète donc au lendemain d'une forte hausse à l'ouverture et revend le plus souvent une séance plus tard ; que ce mécanisme explique la perte, plutôt que le hasard de 16 épisodes, n'est pas établi."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2026-03-26 au 2026-08-05 : +5,46 %, contre +17,56 % pour le fonds, avec un poids de clôture moyen de 26 %. Elle tient à six épisodes dont quatre gagnants. Le principal : le soir du 2026-04-14 la prévision vaut +22,2 pb et la cible 84,8 % ; l'achat est exécuté à l'ouverture du 2026-04-15 (622,67) ; la prévision reste ensuite strictement positive treize soirs de suite (entre +0,6 et +23,3 pb) et la position est gardée, entre 80 % et 99 % du livre ; le soir du 2026-05-05 elle passe à -3,8 pb et la vente est exécutée à l'ouverture du 2026-05-06 (645,95) : +3,13 % sur le livre en 14 valorisations, l'épisode le plus long. Puis le soir du 2026-07-31 (+29,6 pb, cible 89,6 %) : achat à l'ouverture du 2026-08-03 (682,22), vente à l'ouverture du 2026-08-07 (697,95) après une prévision de -2,6 pb le soir du 6 : +1,91 %. **Lecture.** Les gains viennent des rares épisodes tenus plusieurs séances dans une hausse du fonds ; le livre n'en capte qu'une fraction."
+worst = "**Fact.** The deepest fall runs from the peak of 2025-05-13 (100,648.6 EUR) to the trough of 2026-03-26 (93,610.0 EUR): -6.99%, while the fund gains +8.47%. It is not continuous: it is the sum of 16 episodes, of which 3 winners, which cost 2,443 EUR of fees. The heaviest: on the evening of 2025-07-31 the forecast is +20.6 bp and the target 89.5%; the purchase is executed at the open of 2025-08-01 (568.04), the fund closes at 556.13, the evening forecast falls to -21.4 bp and the sale is executed at the open of 2025-08-04 (557.91): -1.75% on the book. On the evening of 2026-03-05 the forecast is +21.2 bp and the target 98.8%; 156 units are bought at the open of 2026-03-06 (617.43); the evening forecast is -6.3 bp and the sale is executed at the open of Monday 2026-03-09 (601.27), 2.65% lower: -2.78% on the book, the worst episode. The evening of 2026-03-18 (+21.7 bp, target 96.1%) likewise leads to a purchase at the open of the 19th and a sale at that of the 20th (-0.87%). The 31 entry signals of the period all follow a positive open-to-open return, of +1.73% on average when the average amplitude of this return is 0.65% over all sessions; since 10 April 2025 the correlation between this last return and the forecast is +0.82. **Reading.** The book therefore buys the day after a strong rise at the open and most often sells one session later; that this mechanism explains the loss, rather than the chance of 16 episodes, is not established."
+best = "**Fact.** The largest rise from a trough to a later peak runs from 2026-03-26 to 2026-08-05: +5.46%, against +17.56% for the fund, with an average close weight of 26%. It rests on six episodes, of which four winners. The main one: on the evening of 2026-04-14 the forecast is +22.2 bp and the target 84.8%; the purchase is executed at the open of 2026-04-15 (622.67); the forecast then stays strictly positive for thirteen evenings in a row (between +0.6 and +23.3 bp) and the position is kept, between 80% and 99% of the book; on the evening of 2026-05-05 it goes to -3.8 bp and the sale is executed at the open of 2026-05-06 (645.95): +3.13% on the book in 14 valuations, the longest episode. Then the evening of 2026-07-31 (+29.6 bp, target 89.6%): purchase at the open of 2026-08-03 (682.22), sale at the open of 2026-08-07 (697.95) after a forecast of -2.6 bp on the evening of the 6th: +1.91%. **Reading.** The gains come from the rare episodes held for several sessions in a rise of the fund; the book catches only a fraction of it."
 risks = [
-  "**Observé.** Marché heurté, où un fort rendement d'ouverture à ouverture est suivi d'un mouvement contraire : la prévision change de signe d'un soir à l'autre (+148,7 pb le 2025-04-10, -183,9 pb le 2025-04-11, +125,0 pb le 2025-04-14, -46,0 pb le 2025-04-15) ; le livre achète et revend à chaque fois et paie deux fois les coûts.",
-  "**Observé.** Entrée la veille d'un gap baissier : acheté à l'ouverture du 2026-03-06, revendu à celle du 2026-03-09, 2,65 % plus bas, avec 98,8 % du livre.",
-  "**Observé.** Hausse régulière du fonds avec des rendements quotidiens modestes (2021, 2023, 2024) : la prévision reste sous le seuil et le livre reste en cash pendant que le fonds gagne +18,4 %, +19,6 % et +27,1 %.",
-  "**Plausible.** Coefficients ARIMA qui changent d'une fenêtre à l'autre : la moyenne annuelle du coefficient autorégressif estimé passe de -0,17 en 2021 et 2022 à -0,44 en 2025 et -0,67 en 2026, celle du coefficient de moyenne mobile de +0,09 à +0,48. Les prévisions deviennent alors plus amples, ce qui coïncide avec l'apparition des signaux ; l'effet sur la décision n'est pas isolé ici.",
+  "**Observed.** Choppy market, where a strong open-to-open return is followed by a contrary move: the forecast changes sign from one evening to the next (+148.7 bp on 2025-04-10, -183.9 bp on 2025-04-11, +125.0 bp on 2025-04-14, -46.0 bp on 2025-04-15); the book buys and sells each time and pays the costs twice.",
+  "**Observed.** Entry on the eve of a downward gap: bought at the open of 2026-03-06, sold at that of 2026-03-09, 2.65% lower, with 98.8% of the book.",
+  "**Observed.** Steady rise of the fund with modest daily returns (2021, 2023, 2024): the forecast stays below the threshold and the book stays in cash while the fund gains +18.4%, +19.6% and +27.1%.",
+  "**Plausible.** ARIMA coefficients that change from one window to the next: the annual mean of the estimated autoregressive coefficient goes from -0.17 in 2021 and 2022 to -0.44 in 2025 and -0.67 in 2026, that of the moving-average coefficient from +0.09 to +0.48. The forecasts then become wider, which coincides with the appearance of the signals; the effect on the decision is not isolated here.",
 ]
 measured = [
-  "**Fait.** SA12 contre D0 (même ARIMA, même variance, filtre toujours ouvert) : écart de Sharpe de -0,987, intervalle bootstrap à 95 % [-2,101 ; +0,252] aux coûts de base ; -1,241, intervalle [-2,335 ; -0,032], dans le second run à coûts doublés.",
-  "**Fait.** SA12 contre D1 (même ARIMA, variance EWMA) : écart de Sharpe de +0,061, intervalle [-0,037 ; +0,170] ; D1 fait -2,46 % net. GARCH et EWMA ne sont pas départagés.",
-  "**Fait.** D2 (moyenne constante et GARCH) n'a pris aucune position : une moyenne constante estimée sur 756 rendements ne dépasse jamais 20 pb par séance.",
-  "**Fait.** Résidus standardisés de la prévision jointe : écart-type 1,04, kurtosis 11,1, autocorrélation de leurs carrés +0,24. La variance prévue ne rend compte ni de toutes les queues ni de toute la persistance.",
-  "**Lecture.** Le filtre de direction a surtout retiré de l'exposition : D0, investi à 86 % en moyenne, a suivi la hausse du fonds ; SA12, investi à 4 %, ne l'a pas suivie. Avec un intervalle aussi large aux coûts de base, cet écart reste une mesure sur ce chemin.",
+  "**Fact.** SA12 against D0 (same ARIMA, same variance, gate always open): Sharpe gap of -0.987, 95% bootstrap interval [-2.101; +0.252] at the base costs; -1.241, interval [-2.335; -0.032], in the second run at doubled costs.",
+  "**Fact.** SA12 against D1 (same ARIMA, EWMA variance): Sharpe gap of +0.061, interval [-0.037; +0.170]; D1 makes -2.46% net. GARCH and EWMA are not told apart.",
+  "**Fact.** D2 (constant mean and GARCH) took no position: a constant mean estimated on 756 returns never exceeds 20 bp per session.",
+  "**Fact.** Standardised residuals of the joint forecast: standard deviation 1.04, kurtosis 11.1, autocorrelation of their squares +0.24. The forecast variance accounts neither for all the tails nor for all the persistence.",
+  "**Reading.** The direction gate mostly removed exposure: D0, invested at 86% on average, followed the rise of the fund; SA12, invested at 4%, did not follow it. With an interval this wide at the base costs, this gap remains a measure on this path.",
 ]
 to_test = [
-  "Le statut INSUFFICIENT_EVIDENCE est celui des critères écrits avant le run : 29 épisodes terminés pour 30 requis. Le seuil n'a pas été modifié après lecture. Il ne dit ni que le filtre est utile ni qu'il est nuisible ; l'écart mesuré contre D0 est négatif, et son intervalle aux coûts de base contient zéro.",
-  "Le seuil d'entrée de 20 pb reprend un coût aller-retour de référence ; il a laissé la stratégie inactive pendant quatre ans. L'abaisser après avoir lu ce résultat serait une nouvelle variante, à préinscrire.",
-  "L'évolution des coefficients ARIMA dans le temps est exportée (`sa12_forecasts.csv`) mais n'est pas analysée au-delà des moyennes annuelles citées.",
-  "La moyenne et la variance sont estimées en deux étapes, et la variance à deux pas ignore l'incertitude des paramètres.",
-  "La vérification prospective, configuration figée, commence à la première séance XPAR après le 2026-10-10.",
+  "The INSUFFICIENT_EVIDENCE status is that of the criteria written before the run: 29 finished episodes for 30 required. The threshold was not changed after reading. It says neither that the gate is useful nor that it is harmful; the gap measured against D0 is negative, and its interval at the base costs contains zero.",
+  "The entry threshold of 20 bp takes up a reference round-trip cost; it left the strategy idle for four years. Lowering it after reading this result would be a new variant, to be preregistered.",
+  "The change over time of the ARIMA coefficients is exported (`sa12_forecasts.csv`) but is not analysed beyond the annual means cited.",
+  "The mean and the variance are estimated in two steps, and the two-step variance ignores the uncertainty of the parameters.",
+  "The prospective check, configuration frozen, starts at the first XPAR session after 2026-10-10.",
 ]
 
 [SA13]
-period_label = "Période de test"
-context = "Étude dédiée (`scripts/SA13_run_signature_study.py`) : un modèle par variante et par mois (46 mois, 8 variantes), calibré sur ce qui était connu au soir de la dernière séance du mois précédent - 1 008 origines d'apprentissage et 126 de validation candidates, purgées aux deux frontières - puis gelé pour le mois ; un modèle est supposé disponible 12 heures après sa date limite d'information. La période commence au premier mois que le magasin permet de calibrer (date limite 2022-12-30) et le portefeuille est continu d'un mois à l'autre. Toutes les stratégies comparables sont rejouées sur cette période : leurs chiffres ne se comparent pas à ceux des rapports mesurés depuis 2021. L'hypothèse `sa13_signatures_neurons`, ses huit contrôles (C0 à C7, sans code de catalogue) et ses statuts ont été écrits avant le premier ajustement. Un seul fil de calcul."
+period_label = "Test period"
+context = "Dedicated study (`scripts/SA13_run_signature_study.py`): one model per variant and per month (46 months, 8 variants), calibrated on what was known on the evening of the last session of the previous month - 1,008 candidate training origins and 126 validation ones, purged at both boundaries - then frozen for the month; a model is assumed available 12 hours after its information cutoff. The period starts at the first month the store allows to be calibrated (cutoff 2022-12-30) and the portfolio is continuous from one month to the next. All the comparable strategies are replayed over this period: their figures are not comparable with those of the reports measured since 2021. The hypothesis `sa13_signatures_neurons`, its eight controls (C0 to C7, without a catalogue code) and its statuses were written before the first fit. A single thread."
 measured_source = "study.md"
-history_note = "Colonnes propres à SA13 : le mois du modèle utilisé, dont l'information s'arrête au soir de la dernière séance du mois précédent ; la prévision en points de base et sa décomposition exacte - référence, déplacements de prix et d'activité, aires prix-volume, prix-temps et volume-temps, groupe d'ordre 3 - dont la somme est la prévision ; le filtre, lu sur le poids détenu ce soir-là ; le poids avant la bande de 3 points ; les deux volatilités réalisées de la règle de taille. Une contribution à la prévision n'est pas une contribution au résultat. L'identifiant complet de chaque modèle est dans `sa13_history.csv` de l'étude."
-summary = "Détenir ETF_WORLD seulement quand un petit réseau additif (4 unités tanh par coefficient, 157 paramètres), réestimé chaque mois, prévoit plus de 20 pb pour le rendement de l'ouverture de t + 1 à l'ouverture de t + 2, à partir des 13 coefficients de la log-signature d'ordre 3 des 60 dernières séances du fonds (prix, activité, temps) ; la position est gardée tant que la prévision reste strictement positive, au poids de SA6, min(1, 12 % / max(σ20, σ60, 5 %)). Sur les 964 séances de test le livre prend 8 positions, est investi à 23,5 % en moyenne et perd 3,53 % net, quand le même dimensionnement sans filtre (C0, identique ici à SA6 puisque la couverture est de 100 %) gagne 62,09 %. Le statut préinscrit est INSUFFICIENT_EVIDENCE parce qu'il n'y a que 8 épisodes terminés pour 30 requis ; l'écart de Sharpe mesuré contre C0 est de -1,35, avec un intervalle entièrement négatif. Les prévisions ont une erreur quadratique plus élevée que la moyenne d'apprentissage et que la régression Ridge sur les mêmes coefficients. Cela ne dit rien des signatures de chemin en général."
+history_note = "Columns of SA13 only: the month of the model used, whose information stops on the evening of the last session of the previous month; the forecast in basis points and its exact breakdown - reference, displacements of price and of activity, price-volume, price-time and volume-time areas, order-3 group - whose sum is the forecast; the gate, read on the weight held that evening; the weight before the 3-point band; the two realised volatilities of the sizing rule. A contribution to the forecast is not a contribution to the result. The full identifier of each model is in the study's `sa13_history.csv`."
+summary = "Hold ETF_WORLD only when a small additive network (4 tanh units per coefficient, 157 parameters), re-estimated every month, forecasts more than 20 bp for the return from the open of t + 1 to the open of t + 2, from the 13 coefficients of the order-3 log-signature of the last 60 sessions of the fund (price, activity, time); the position is kept as long as the forecast stays strictly positive, at the weight of SA6, min(1, 12% / max(σ20, σ60, 5%)). Over the 964 test sessions the book takes 8 positions, is invested at 23.5% on average and loses 3.53% net, when the same sizing without the gate (C0, identical here to SA6 since the coverage is 100%) gains 62.09%. The preregistered status is INSUFFICIENT_EVIDENCE because there are only 8 finished episodes for 30 required; the Sharpe gap measured against C0 is -1.35, with an interval entirely negative. The forecasts have a higher squared error than the training mean and than the Ridge regression on the same coefficients. This says nothing about path signatures in general."
 strengths = [
-  "**Fait.** La chaîne fonctionne et se vérifie : 46 mois sur 46 ont un modèle calibré ; 964 décisions sur 964 ont un modèle autorisé et des features utilisables ; les prévisions exportées depuis les features de la calibration sont exactement celles que le signal du run a calculées ; chaque prévision est sa référence plus ses 13 contributions.",
-  "**Fait.** Pendant la baisse du fonds du 2025-02-19 au 2025-04-09 (-21,57 %), le livre perd -15,65 % : le poids détenu passe de 100 % à 36 %. **Lecture.** Cette réduction vient de la règle de taille de SA6, pas de la prévision, qui est restée positive pendant toute la baisse.",
-  "**Fait.** Sur ses 63 meilleurs rendements consécutifs (2025-08-01 au 2025-10-29) le livre fait +8,86 % contre +9,57 % pour le fonds, avec un poids de clôture moyen de 95 %.",
-  "**Fait.** L'erreur quadratique de SA13 est un peu plus basse que celle du réseau sur indicateurs classiques (écart de -4,1e-07) et que celle de la Ridge sur trajectoire brute (-1,3e-06) ; les deux intervalles contiennent zéro.",
-  "**Fait.** Les fonctions apprises changent peu de signe d'un mois à l'autre : à z = ±1 et ±2, la contribution d'un coefficient a le signe de sa moyenne dans 84 à 86 % des mois en moyenne, et dans 67 % des mois pour l'aire prix-volume à z = 2. C'est une mesure de stabilité, pas de justesse.",
+  "**Fact.** The chain works and checks itself: 46 months out of 46 have a calibrated model; 964 decisions out of 964 have an authorised model and usable features; the forecasts exported from the features of the calibration are exactly those the signal of the run computed; each forecast is its reference plus its 13 contributions.",
+  "**Fact.** During the fall of the fund from 2025-02-19 to 2025-04-09 (-21.57%), the book loses -15.65%: the weight held goes from 100% to 36%. **Reading.** This reduction comes from the sizing rule of SA6, not from the forecast, which stayed positive throughout the fall.",
+  "**Fact.** Over its 63 best consecutive returns (2025-08-01 to 2025-10-29) the book makes +8.86% against +9.57% for the fund, with an average close weight of 95%.",
+  "**Fact.** The squared error of SA13 is slightly lower than that of the network on classic indicators (gap of -4.1e-07) and than that of the Ridge on the raw path (-1.3e-06); both intervals contain zero.",
+  "**Fact.** The learned functions rarely change sign from one month to the next: at z = ±1 and ±2, the contribution of a coefficient has the sign of its mean in 84 to 86% of the months on average, and in 67% of the months for the price-volume area at z = 2. It is a measure of stability, not of accuracy.",
 ]
 weaknesses = [
-  "**Fait.** -3,53 % net sur la période, contre +62,09 % pour C0 et SA6 et +86,73 % pour le fonds ; Sharpe -0,10 ; -5,11 % dans le second run à coûts doublés. Brut de coûts le livre perd déjà 1,95 % : la perte ne vient pas d'abord des coûts (1 579 EUR).",
-  "**Fait.** Perte maximale de -18,56 %, plus profonde que celle de C0 (-15,70 %), et non récupérée au 2026-10-09, 815 jours après le sommet du 2024-07-16.",
-  "**Fait.** Les séances investies sont moins bonnes que les séances en cash : le fonds gagne en moyenne +3,0 pb par séance sur les 269 valorisations où le livre est investi (+6,6 % composé), contre +8,3 pb sur les 694 autres (+75,0 % composé).",
-  "**Fait.** Les prévisions sont moins bonnes que deux prévisions naïves : erreur quadratique moyenne de 8,7648e-05, contre 8,5767e-05 pour la prévision nulle et 8,5353e-05 pour la moyenne d'apprentissage gelée avec chaque modèle (écart de +2,3e-06, intervalle à 95 % [+1,8e-07 ; +5,9e-06], au-dessus de zéro) ; R² hors apprentissage -0,027 ; corrélation prévision/réalisation -0,035 ; signe juste 52,4 % contre 57,1 % pour « toujours en hausse ».",
-  "**Fait.** Le réseau fait moins bien que la Ridge sur les mêmes 13 coefficients : écart d'erreur quadratique de +1,5e-06, intervalle [+1,3e-07 ; +3,5e-06] ; le livre de la Ridge (C1) fait +11,25 % net.",
-  "**Fait.** 22 modèles sur 46 sont retenus à la dernière époque autorisée (300) : leur perte de validation baissait encore à l'arrêt.",
-  "**Fait.** Seulement 8 entrées en 964 séances : 88 soirs ont une prévision au-dessus de 20 pb, mais 80 d'entre eux tombent quand le livre est déjà investi, et 438 soirs en cash ont une prévision entre 0 et 20 pb.",
+  "**Fact.** -3.53% net over the period, against +62.09% for C0 and SA6 and +86.73% for the fund; Sharpe -0.10; -5.11% in the second run at doubled costs. Gross of costs the book already loses 1.95%: the loss does not come first from the costs (1,579 EUR).",
+  "**Fact.** Maximum drawdown of -18.56%, deeper than C0's (-15.70%), and not recovered at 2026-10-09, 815 days after the peak of 2024-07-16.",
+  "**Fact.** The invested sessions are worse than the sessions in cash: the fund gains on average +3.0 bp per session over the 269 valuations at which the book is invested (+6.6% compounded), against +8.3 bp over the 694 others (+75.0% compounded).",
+  "**Fact.** The forecasts are worse than two naive forecasts: mean squared error of 8.7648e-05, against 8.5767e-05 for the zero forecast and 8.5353e-05 for the training mean frozen with each model (gap of +2.3e-06, 95% interval [+1.8e-07; +5.9e-06], above zero); out-of-sample R² -0.027; forecast/realisation correlation -0.035; right sign 52.4% against 57.1% for \"always up\".",
+  "**Fact.** The network does worse than the Ridge on the same 13 coefficients: squared-error gap of +1.5e-06, interval [+1.3e-07; +3.5e-06]; the book of the Ridge (C1) makes +11.25% net.",
+  "**Fact.** 22 models out of 46 are retained at the last allowed epoch (300): their validation loss was still falling when they stopped.",
+  "**Fact.** Only 8 entries in 964 sessions: 88 evenings have a forecast above 20 bp, but 80 of them fall when the book is already invested, and 438 evenings in cash have a forecast between 0 and 20 bp.",
 ]
-worst = "**Fait.** La plus forte baisse va du sommet du 2024-07-16 (104 024,9 EUR) au creux du 2025-04-09 (84 714,7 EUR) : -18,56 %, contre -11,77 % pour le fonds. Elle contient deux épisodes longs. Le premier : le soir du 2024-07-01 la prévision vaut +20,1 pb (dont +23,5 pb pour le groupe d'ordre 3) et la cible 100 % ; l'achat est exécuté à l'ouverture du 2024-07-02 (518,15). Le 2024-08-02 le fonds clôture à 496,61 après 517,22 la veille ; la prévision monte à +47,1 pb, puis +58,1 pb le 5 août, et reste positive : la position est gardée et seul le dimensionnement la réduit, de 100 % à 58 % le 8 août. La prévision devient négative le soir du 2024-08-20 (-1,0 pb) et la vente est exécutée à l'ouverture du 2024-08-21 (515,76) : -3,15 % sur le livre pour cet épisode, quand le fonds perd 0,53 % de clôture à clôture. Le second : le soir du 2025-01-31 la prévision vaut +22,6 pb (ordre 3 : +29,3 pb) et la cible 97 % ; l'achat est exécuté à l'ouverture du 2025-02-03 (584,79). Du 2025-02-19 au 2025-04-09 le fonds perd 21,57 % ; la prévision reste positive aux 36 décisions de cette baisse (entre +3,5 et +75,5 pb, +33,4 pb en moyenne), portée par le groupe des déplacements (+20,5 pb en moyenne) et par l'aire prix-temps (+11,4 pb), tandis que le groupe d'ordre 3 devient négatif. Le poids détenu descend de 100 % à 36 % par le seul effet de la volatilité. La prévision ne devient négative que le soir du 2025-05-19 (-9,1 pb) et la vente est exécutée à l'ouverture du 2025-05-20 (548,69) : -9,46 % sur le livre pour cet épisode de 73 valorisations. **Lecture.** Dans ces deux baisses le modèle prévoit d'autant plus de hausse que le fonds a déjà baissé : la contribution des déplacements se comporte comme un pari de retour à la moyenne, qui n'a pas été payé à l'horizon d'une séance. Ce n'est pas démontré au-delà de ces deux épisodes."
-best = "**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2025-04-09 au 2026-06-15 : +14,13 % contre +45,06 % pour le fonds, avec un poids de clôture moyen de 34 %. Elle tient d'abord à la fin de l'épisode précédent - le livre, encore investi à 36 % au creux, n'est vendu que le 2025-05-20 - puis à l'épisode le plus long : le soir du 2025-07-17 la prévision vaut +26,3 pb (ordre 3 : +33,3 pb) et la cible 94 % ; l'achat est exécuté à l'ouverture du 2025-07-18 (560,77) ; la prévision reste positive pendant 93 valorisations, passe à -1,1 pb le soir du 2025-11-25, et la vente est exécutée à l'ouverture du 2025-11-26 (603,70) : +6,75 % sur le livre, quand le fonds gagne 8,24 % de clôture à clôture. Le livre est ensuite en cash du 2025-11-26 au 2026-06-09, pendant que le fonds gagne 8,57 %. **Lecture.** Quand le livre gagne, il gagne à peu près ce que le fonds gagne sur les mêmes séances, moins les coûts : rien ici ne montre un choix de séances meilleur que la détention."
+worst = "**Fact.** The deepest fall runs from the peak of 2024-07-16 (104,024.9 EUR) to the trough of 2025-04-09 (84,714.7 EUR): -18.56%, against -11.77% for the fund. It contains two long episodes. The first: on the evening of 2024-07-01 the forecast is +20.1 bp (of which +23.5 bp for the order-3 group) and the target 100%; the purchase is executed at the open of 2024-07-02 (518.15). On 2024-08-02 the fund closes at 496.61 after 517.22 the day before; the forecast rises to +47.1 bp, then +58.1 bp on 5 August, and stays positive: the position is kept and only the sizing reduces it, from 100% to 58% on 8 August. The forecast turns negative on the evening of 2024-08-20 (-1.0 bp) and the sale is executed at the open of 2024-08-21 (515.76): -3.15% on the book for this episode, when the fund loses 0.53% close to close. The second: on the evening of 2025-01-31 the forecast is +22.6 bp (order 3: +29.3 bp) and the target 97%; the purchase is executed at the open of 2025-02-03 (584.79). From 2025-02-19 to 2025-04-09 the fund loses 21.57%; the forecast stays positive at the 36 decisions of this fall (between +3.5 and +75.5 bp, +33.4 bp on average), carried by the displacement group (+20.5 bp on average) and by the price-time area (+11.4 bp), while the order-3 group turns negative. The weight held falls from 100% to 36% through the effect of the volatility alone. The forecast turns negative only on the evening of 2025-05-19 (-9.1 bp) and the sale is executed at the open of 2025-05-20 (548.69): -9.46% on the book for this episode of 73 valuations. **Reading.** In these two falls the model forecasts all the more rise as the fund has already fallen: the contribution of the displacements behaves like a bet on mean reversion, which did not pay at the one-session horizon. It is not demonstrated beyond these two episodes."
+best = "**Fact.** The largest rise from a trough to a later peak runs from 2025-04-09 to 2026-06-15: +14.13% against +45.06% for the fund, with an average close weight of 34%. It rests first on the end of the previous episode - the book, still invested at 36% at the trough, is sold only on 2025-05-20 - then on the longest episode: on the evening of 2025-07-17 the forecast is +26.3 bp (order 3: +33.3 bp) and the target 94%; the purchase is executed at the open of 2025-07-18 (560.77); the forecast stays positive for 93 valuations, goes to -1.1 bp on the evening of 2025-11-25, and the sale is executed at the open of 2025-11-26 (603.70): +6.75% on the book, when the fund gains 8.24% close to close. The book is then in cash from 2025-11-26 to 2026-06-09, while the fund gains 8.57%. **Reading.** When the book gains, it gains about what the fund gains over the same sessions, less the costs: nothing here shows a choice of sessions better than holding."
 risks = [
-  "**Observé.** Baisse prolongée du fonds (août 2024, février à avril 2025) : la prévision monte avec la baisse et le filtre ne vend pas ; seule la règle de volatilité réduit le poids.",
-  "**Observé.** Hausse régulière et calme (du 2023-11-24 au 2024-07-02, fonds +20,18 % ; du 2025-11-26 au 2026-06-09, +8,57 %) : la prévision reste positive mais sous 20 pb et le livre reste en cash.",
-  "**Observé.** Sortie après la baisse, retour tardif : vendu à l'ouverture du 2025-05-20 (548,69), le livre ne revient qu'à celle du 2025-07-18 (560,77).",
-  "**Plausible.** Coefficients d'ordre 3 hors du domaine d'apprentissage : aux décisions de test, 1,5 % et 2,3 % des valeurs normalisées de deux coefficients d'ordre 3 dépassent +5 et sont écrêtées, alors que les entrées reposent surtout sur ce groupe (+25,8 pb pour une prévision moyenne de +23,3 pb aux 8 décisions d'entrée).",
-  "**Plausible.** Un modèle changé chaque mois peut déplacer la prévision au changement de mois sans que le marché ait bougé : la référence passe de -3,95 pb à -0,89 pb entre le soir du 2025-01-31 et celui du 2025-02-03. L'effet sur les décisions n'est pas mesuré.",
+  "**Observed.** Prolonged fall of the fund (August 2024, February to April 2025): the forecast rises with the fall and the gate does not sell; only the volatility rule reduces the weight.",
+  "**Observed.** Steady and calm rise (from 2023-11-24 to 2024-07-02, fund +20.18%; from 2025-11-26 to 2026-06-09, +8.57%): the forecast stays positive but below 20 bp and the book stays in cash.",
+  "**Observed.** Exit after the fall, late return: sold at the open of 2025-05-20 (548.69), the book comes back only at that of 2025-07-18 (560.77).",
+  "**Plausible.** Order-3 coefficients outside the training domain: at the test decisions, 1.5% and 2.3% of the normalised values of two order-3 coefficients exceed +5 and are clipped, while the entries rest mostly on this group (+25.8 bp for an average forecast of +23.3 bp at the 8 entry decisions).",
+  "**Plausible.** A model changed every month can move the forecast at the change of month without the market having moved: the reference goes from -3.95 bp to -0.89 bp between the evening of 2025-01-31 and that of 2025-02-03. The effect on the decisions is not measured.",
 ]
 measured = [
-  "**Fait.** SA13 contre C0 : écart de Sharpe de -1,353, intervalle bootstrap à 95 % [-1,999 ; -0,627] par blocs de 60 séances, [-2,028 ; -0,543] par blocs de 20 et [-1,987 ; -0,673] par blocs de 120. À coûts doublés : -1,401, intervalle [-2,052 ; -0,678].",
-  "**Fait.** Les livres des contrôles, nets : C7 (Ridge, deux processus) +17,87 % ; C4 (réseau, indicateurs classiques) +14,05 % ; C1 (Ridge) +11,25 % ; C5 (Ridge, trajectoire brute) -1,19 %, et -25,72 % à coûts doublés avec 75 rotations de l'actif par an ; C6 (réseau, deux processus) -2,49 % ; C3 (sans volume) -3,47 % ; C2 (ordre 2) -3,75 %. Aucun n'approche C0.",
-  "**Fait.** Quatre écarts d'erreur quadratique ont un intervalle qui exclut zéro : SA13 moins la moyenne d'apprentissage (+2,3e-06), SA13 moins Ridge (+1,5e-06), deux processus moins un seul (+3,8e-06), réseau moins Ridge sur deux processus (+5,3e-06). Dans les quatre cas le modèle le plus riche a l'erreur la plus élevée.",
-  "**Fait.** Ordre 3 contre ordre 2 (+1,7e-06) et avec volume contre sans (+6,9e-07) : SA13 n'a pas l'erreur la plus basse, et les deux intervalles contiennent zéro.",
-  "**Fait.** Trois comparaisons de Sharpe (contre C1, C2 et SA12) sont refusées par le bootstrap : ces livres restent si longtemps en cash que certains rééchantillonnages n'ont aucune variation. Elles sont notées n/a, jamais zéro.",
-  "**Lecture.** Sur ce chemin le filtre appris a retiré de l'exposition pendant les hausses et l'a gardée pendant les deux baisses : l'inverse de ce que l'hypothèse attendait.",
+  "**Fact.** SA13 against C0: Sharpe gap of -1.353, 95% bootstrap interval [-1.999; -0.627] with blocks of 60 sessions, [-2.028; -0.543] with blocks of 20 and [-1.987; -0.673] with blocks of 120. At doubled costs: -1.401, interval [-2.052; -0.678].",
+  "**Fact.** The books of the controls, net: C7 (Ridge, two processes) +17.87%; C4 (network, classic indicators) +14.05%; C1 (Ridge) +11.25%; C5 (Ridge, raw path) -1.19%, and -25.72% at doubled costs with a turnover of 75 times the assets a year; C6 (network, two processes) -2.49%; C3 (without volume) -3.47%; C2 (order 2) -3.75%. None comes close to C0.",
+  "**Fact.** Four squared-error gaps have an interval that excludes zero: SA13 minus the training mean (+2.3e-06), SA13 minus Ridge (+1.5e-06), two processes minus one (+3.8e-06), network minus Ridge on two processes (+5.3e-06). In all four cases the richer model has the higher error.",
+  "**Fact.** Order 3 against order 2 (+1.7e-06) and with volume against without (+6.9e-07): SA13 does not have the lowest error, and both intervals contain zero.",
+  "**Fact.** Three Sharpe comparisons (against C1, C2 and SA12) are refused by the bootstrap: these books stay so long in cash that some resamplings have no variation. They are marked n/a, never zero.",
+  "**Reading.** On this path the learned gate removed exposure during the rises and kept it during the two falls: the opposite of what the hypothesis expected.",
 ]
 to_test = [
-  "Le statut INSUFFICIENT_EVIDENCE est celui des critères écrits avant le premier ajustement : 8 épisodes terminés pour 30 requis. Le seuil n'a pas été modifié après lecture. L'écart mesuré contre C0 est négatif, avec un intervalle sous zéro aux trois longueurs de bloc ; ces intervalles sont conditionnels au chemin produit et ne portent ni l'incertitude des réestimations ni la sélection des idées.",
-  "Le plafond de 300 époques, le pas d'apprentissage et le seuil d'entrée de 20 pb étaient gelés. Les modifier après lecture - par exemple parce que 22 modèles sur 46 s'arrêtent au plafond - serait une nouvelle variante, à préinscrire.",
-  "Les contrôles Ridge (C1, C7) font mieux que SA13 ici. En adopter un serait une nouvelle hypothèse : aucun ne remplace le résultat de SA13.",
-  "Le délai de 12 heures entre la date limite d'un modèle et sa disponibilité est une hypothèse du run historique.",
-  "Les fonctions de composante et leur domaine observé sont exportés (`component_functions.csv`, `feature_domain.csv`) mais ne sont pas tracés ici.",
-  "Une contribution à la prévision n'est pas une contribution au résultat : le poids économique d'un groupe ne se lit que sur la variante réentraînée sans lui (C2 pour l'ordre 3, C3 pour le volume).",
-  "La vérification prospective commence à la première séance XPAR où les artefacts existent réellement, configuration figée ; elle n'existe pas encore.",
+  "The INSUFFICIENT_EVIDENCE status is that of the criteria written before the first fit: 8 finished episodes for 30 required. The threshold was not changed after reading. The gap measured against C0 is negative, with an interval below zero at the three block lengths; these intervals are conditional on the path produced and carry neither the uncertainty of the re-estimations nor the selection of the ideas.",
+  "The ceiling of 300 epochs, the learning rate and the entry threshold of 20 bp were frozen. Changing them after reading - for example because 22 models out of 46 stop at the ceiling - would be a new variant, to be preregistered.",
+  "The Ridge controls (C1, C7) do better than SA13 here. Adopting one would be a new hypothesis: none replaces the result of SA13.",
+  "The delay of 12 hours between the cutoff of a model and its availability is an assumption of the historical run.",
+  "The component functions and their observed domain are exported (`component_functions.csv`, `feature_domain.csv`) but are not plotted here.",
+  "A contribution to the forecast is not a contribution to the result: the economic weight of a group is read only on the variant retrained without it (C2 for order 3, C3 for volume).",
+  "The prospective check starts at the first XPAR session at which the artifacts actually exist, configuration frozen; it does not exist yet.",
 ]

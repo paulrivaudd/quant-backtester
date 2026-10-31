@@ -108,67 +108,67 @@ WINDOW_SESSIONS = 63
 """Length of the rolling window the best and worst stretches are also measured on: a quarter."""
 
 GLOBAL_ROWS: tuple[tuple[str, str, str], ...] = (
-    ("rank", "Rang au classement commun (QUALITY_V1)", "{:.0f}"),
-    ("quality", "Score de qualité QUALITY_V1 (0-100 %)", "{:.1%}"),
-    ("block_market", "- bloc marché (IR et alpha contre le fonds détenu)", "{:.2f}"),
-    ("block_significance", "- bloc significativité (Sharpe déflaté)", "{:.2f}"),
-    ("block_risk", "- bloc risque (drawdown relatif)", "{:.2f}"),
-    ("block_robustness", "- bloc robustesse (sous-périodes ; stress approché des coûts)", "{:.2f}"),
-    ("block_implementation", "- bloc implémentation (poids des coûts)", "{:.2f}"),
-    ("net_return", "Rendement net total", "{:+.2%}"),
-    ("gross_return", "Rendement brut total (mêmes ordres, sans coûts)", "{:+.2%}"),
-    ("annualised_return", "Rendement net annualisé", "{:+.2%}"),
-    ("volatility", "Volatilité annualisée", "{:.2%}"),
-    ("sharpe", "Ratio de Sharpe net (taux sans risque 0)", "{:+.2f}"),
-    ("sortino", "Ratio de Sortino net (taux sans risque 0)", "{:+.2f}"),
-    ("max_drawdown", "Perte maximale (max drawdown)", "{:.2%}"),
-    ("alpha_vs_market", "Alpha annualisé contre le fonds détenu", "{:+.2%}"),
-    ("beta_vs_market", "Bêta contre le fonds détenu", "{:.2f}"),
-    ("information_ratio_vs_market", "Ratio d'information contre le fonds détenu", "{:+.2f}"),
-    ("alpha_vs_benchmark", "Alpha annualisé contre SA1 (MA20)", "{:+.2%}"),
-    ("beta_vs_benchmark", "Bêta contre SA1 (MA20)", "{:.2f}"),
-    ("average_exposure", "Exposition moyenne (part investie)", "{:.1%}"),
-    ("fills", "Ordres exécutés", "{:.0f}"),
-    ("costs_eur", "Coûts payés (EUR)", "{:,.0f}"),
-    ("turnover_per_year", "Rotation annuelle (multiple de l'actif moyen)", "{:.2f}"),
-    ("net_return_first_two_thirds", "Rendement net, deux premiers tiers", "{:+.2%}"),
-    ("net_return_last_third", "Rendement net, dernier tiers", "{:+.2%}"),
-    ("net_return_costs_x2", "Rendement net, second run réel à coûts doublés", "{:+.2%}"),
-    ("sharpe_costs_x2", "Sharpe net, second run réel à coûts doublés", "{:+.2f}"),
+    ("rank", "Rank in the common ranking (QUALITY_V1)", "{:.0f}"),
+    ("quality", "QUALITY_V1 quality score (0-100%)", "{:.1%}"),
+    ("block_market", "- market block (IR and alpha against the fund held)", "{:.2f}"),
+    ("block_significance", "- significance block (deflated Sharpe)", "{:.2f}"),
+    ("block_risk", "- risk block (relative drawdown)", "{:.2f}"),
+    ("block_robustness", "- robustness block (sub-periods; approximate cost stress)", "{:.2f}"),
+    ("block_implementation", "- implementation block (weight of costs)", "{:.2f}"),
+    ("net_return", "Total net return", "{:+.2%}"),
+    ("gross_return", "Total gross return (same orders, no costs)", "{:+.2%}"),
+    ("annualised_return", "Annualised net return", "{:+.2%}"),
+    ("volatility", "Annualised volatility", "{:.2%}"),
+    ("sharpe", "Net Sharpe ratio (risk-free rate 0)", "{:+.2f}"),
+    ("sortino", "Net Sortino ratio (risk-free rate 0)", "{:+.2f}"),
+    ("max_drawdown", "Maximum drawdown", "{:.2%}"),
+    ("alpha_vs_market", "Annualised alpha against the fund held", "{:+.2%}"),
+    ("beta_vs_market", "Beta against the fund held", "{:.2f}"),
+    ("information_ratio_vs_market", "Information ratio against the fund held", "{:+.2f}"),
+    ("alpha_vs_benchmark", "Annualised alpha against SA1 (MA20)", "{:+.2%}"),
+    ("beta_vs_benchmark", "Beta against SA1 (MA20)", "{:.2f}"),
+    ("average_exposure", "Average exposure (share invested)", "{:.1%}"),
+    ("fills", "Orders filled", "{:.0f}"),
+    ("costs_eur", "Costs paid (EUR)", "{:,.0f}"),
+    ("turnover_per_year", "Annual turnover (multiple of average assets)", "{:.2f}"),
+    ("net_return_first_two_thirds", "Net return, first two thirds", "{:+.2%}"),
+    ("net_return_last_third", "Net return, last third", "{:+.2%}"),
+    ("net_return_costs_x2", "Net return, second actual run at doubled costs", "{:+.2%}"),
+    ("sharpe_costs_x2", "Net Sharpe, second actual run at doubled costs", "{:+.2f}"),
 )
-"""The global indicators, in order: column of the study, French label, format."""
+"""The global indicators, in order: column of the study, label, format."""
 
 OPTIONAL_ROWS = frozenset({"sortino"})
 """Indicators only some studies measure: shown when the study exports them, left
 out - not printed as missing - when it does not."""
 
 PEER_COLUMNS: tuple[tuple[str, str, str], ...] = (
-    ("rank", "Rang", "{:.0f}"),
+    ("rank", "Rank", "{:.0f}"),
     ("quality", "Score", "{:.1%}"),
     ("net_return", "Net", "{:+.2%}"),
-    ("net_return_costs_x2", "Net, coûts x2", "{:+.2%}"),
+    ("net_return_costs_x2", "Net, costs x2", "{:+.2%}"),
     ("sharpe", "Sharpe", "{:+.2f}"),
-    ("max_drawdown", "Perte max.", "{:.2%}"),
-    ("alpha_vs_market", "Alpha/an", "{:+.2%}"),
-    ("average_exposure", "Exposition", "{:.0%}"),
-    ("costs_eur", "Coûts (EUR)", "{:,.0f}"),
+    ("max_drawdown", "Max. drawdown", "{:.2%}"),
+    ("alpha_vs_market", "Alpha/yr", "{:+.2%}"),
+    ("average_exposure", "Exposure", "{:.0%}"),
+    ("costs_eur", "Costs (EUR)", "{:,.0f}"),
 )
-"""The columns of the table of every book of a study: column, French label, format."""
+"""The columns of the table of every book of a study: column, label, format."""
 
 HISTORY_COLUMNS: dict[str, tuple[str, str]] = {
-    "mu_h2_bp": ("Prévision mu_2 (pb)", "{:+.2f}"),
-    "forecast_volatility": ("Volatilité prévue (annualisée)", "{:.1%}"),
-    "ewma_fallback": ("Repli EWMA (1 = oui)", "{:.0f}"),
-    "gate": ("Filtre (1 = ouvert)", "{:.0f}"),
-    "theoretical_weight": ("Poids avant bande", "{:.1%}"),
-    "model_month": ("Modèle du mois (AAAAMM)", "{:.0f}"),
-    "forecast_bp": ("Prévision (pb)", "{:+.2f}"),
-    "reference_bp": ("Référence (pb)", "{:+.2f}"),
-    "displacements_bp": ("Déplacements (pb)", "{:+.2f}"),
-    "price_volume_bp": ("Prix-volume (pb)", "{:+.2f}"),
-    "price_time_bp": ("Prix-temps (pb)", "{:+.2f}"),
-    "volume_time_bp": ("Volume-temps (pb)", "{:+.2f}"),
-    "order_3_bp": ("Ordre 3 (pb)", "{:+.2f}"),
+    "mu_h2_bp": ("Forecast mu_2 (bp)", "{:+.2f}"),
+    "forecast_volatility": ("Forecast volatility (annualised)", "{:.1%}"),
+    "ewma_fallback": ("EWMA fallback (1 = yes)", "{:.0f}"),
+    "gate": ("Gate (1 = open)", "{:.0f}"),
+    "theoretical_weight": ("Weight before the band", "{:.1%}"),
+    "model_month": ("Model of the month (YYYYMM)", "{:.0f}"),
+    "forecast_bp": ("Forecast (bp)", "{:+.2f}"),
+    "reference_bp": ("Reference (bp)", "{:+.2f}"),
+    "displacements_bp": ("Displacements (bp)", "{:+.2f}"),
+    "price_volume_bp": ("Price-volume (bp)", "{:+.2f}"),
+    "price_time_bp": ("Price-time (bp)", "{:+.2f}"),
+    "volume_time_bp": ("Volume-time (bp)", "{:+.2f}"),
+    "order_3_bp": ("Order 3 (bp)", "{:+.2f}"),
 }
 """The columns a study adds to a history beside the signals: heading and format."""
 
@@ -309,31 +309,29 @@ def drawdown_markdown(curve: pd.Series, *, episodes: int = 3) -> str:  # type: i
     last_day = values[-1][0]
     found = underwater_episodes(curve)
     lines = [
-        "| Rang | Sommet | Creux | Profondeur | Retour au sommet | Jours calendaires |",
+        "| Rank | Peak | Trough | Depth | Back at the peak | Calendar days |",
         "|---:|---|---|---:|---|---:|",
     ]
     for rank, episode in enumerate(sorted(found, key=lambda item: item.depth)[:episodes], 1):
         end = last_day if episode.recovery is None else episode.recovery
-        back = f"non récupéré au {last_day}" if episode.recovery is None else str(episode.recovery)
-        length = f"{(end - episode.peak).days}" + (
-            " (en cours)" if episode.recovery is None else ""
-        )
+        back = f"not recovered at {last_day}" if episode.recovery is None else str(episode.recovery)
+        length = f"{(end - episode.peak).days}" + (" (ongoing)" if episode.recovery is None else "")
         lines.append(
             f"| {rank} | {episode.peak} | {episode.trough} | {episode.depth:.2%} | {back} | "
             f"{length} |"
         )
     if not found:
-        lines.append("| - | - | - | 0.00% | aucune baisse sous un sommet | 0 |")
+        lines.append("| - | - | - | 0.00% | no fall below a peak | 0 |")
     peak = max(value for _, value in values)
     current = values[-1][1] / peak - 1.0
-    lines += ["", f"Drawdown au {last_day} : **{current:.2%}** sous le plus haut de la période."]
+    lines += ["", f"Drawdown at {last_day}: **{current:.2%}** below the high of the period."]
     if found:
         longest = max(found, key=lambda item: ((item.recovery or last_day) - item.peak).days)
         end = longest.recovery or last_day
-        state = "en cours" if longest.recovery is None else "récupérée"
+        state = "ongoing" if longest.recovery is None else "recovered"
         lines.append(
-            f"Plus longue période sous un sommet : **{(end - longest.peak).days} jours "
-            f"calendaires**, du {longest.peak} au {end} ({state}, creux à {longest.depth:.2%})."
+            f"Longest stretch below a peak: **{(end - longest.peak).days} calendar "
+            f"days**, from {longest.peak} to {end} ({state}, trough at {longest.depth:.2%})."
         )
     return "\n".join(lines)
 
@@ -373,18 +371,18 @@ def episode_facts(
     own = change_over(pd.Series(history["net_equity"]), episode)
     held = change_over(market, episode)
     return {
-        "Période": label,
-        "Du": episode.start,
-        "Au": episode.end,
-        "Valorisations": len(inside),
-        "Rendements": len(inside) - 1,
-        "Stratégie": own,
-        f"{FUND} (clôture)": change_over(pd.Series(history[f"close_{FUND}"]), episode),
-        "Fonds détenu (net)": held,
-        "Écart relatif": (1.0 + own) / (1.0 + held) - 1.0,
-        "Poids de clôture moyen": float(exposure.mean()),
-        "Poids de clôture min.": float(exposure.min()),
-        "Poids de clôture max.": float(exposure.max()),
+        "Stretch": label,
+        "From": episode.start,
+        "To": episode.end,
+        "Valuations": len(inside),
+        "Returns": len(inside) - 1,
+        "Strategy": own,
+        f"{FUND} (close)": change_over(pd.Series(history[f"close_{FUND}"]), episode),
+        "Fund held (net)": held,
+        "Relative gap": (1.0 + own) / (1.0 + held) - 1.0,
+        "Average close weight": float(exposure.mean()),
+        "Min. close weight": float(exposure.min()),
+        "Max. close weight": float(exposure.max()),
     }
 
 
@@ -413,20 +411,20 @@ def facts_table(history: pd.DataFrame, market: pd.Series) -> pd.DataFrame:  # ty
     equity = pd.Series(history["net_equity"])
     relative = pd.Series(equity / market)
     stretches = (
-        ("Plus forte baisse (sommet → creux)", deepest_fall(equity)),
-        ("Plus forte hausse (creux → sommet ultérieur, durée libre)", largest_rise(equity)),
+        ("Deepest fall (peak → trough)", deepest_fall(equity)),
+        ("Largest rise (trough → later peak, any length)", largest_rise(equity)),
         (
-            f"Pires {WINDOW_SESSIONS} rendements consécutifs",
+            f"Worst {WINDOW_SESSIONS} consecutive returns",
             extreme_window(equity, WINDOW_SESSIONS, best=False),
         ),
         (
-            f"Meilleurs {WINDOW_SESSIONS} rendements consécutifs",
+            f"Best {WINDOW_SESSIONS} consecutive returns",
             extreme_window(equity, WINDOW_SESSIONS, best=True),
         ),
-        ("Plus fort retard relatif sur le fonds détenu", deepest_fall(relative)),
-        ("Plus forte avance relative sur le fonds détenu", largest_rise(relative)),
-        ("Plus forte baisse du fonds détenu", deepest_fall(market)),
-        ("Plus forte hausse du fonds détenu", largest_rise(market)),
+        ("Largest relative lag behind the fund held", deepest_fall(relative)),
+        ("Largest relative lead over the fund held", largest_rise(relative)),
+        ("Deepest fall of the fund held", deepest_fall(market)),
+        ("Largest rise of the fund held", largest_rise(market)),
     )
     rows = [episode_facts(label, episode, history, market) for label, episode in stretches]
     return pd.DataFrame(rows)
@@ -450,10 +448,10 @@ def global_table(
         own["net_return_costs_x2"] = stressed.get("net_return")
         own["sharpe_costs_x2"] = stressed.get("sharpe")
     lines = [
-        "| Indicateur | Stratégie | Fonds détenu (buy & hold ETF_WORLD) |",
+        "| Indicator | Strategy | Fund held (buy & hold ETF_WORLD) |",
         "|---|---:|---:|",
-        f"| Période mesurée | {own['first_session']} → {own['last_session']} "
-        f"({int(float(own['sessions']))} séances) | idem |",  # type: ignore[arg-type]
+        f"| Period measured | {own['first_session']} → {own['last_session']} "
+        f"({int(float(own['sessions']))} sessions) | same |",  # type: ignore[arg-type]
     ]
     for key, label, pattern in GLOBAL_ROWS:
         if key in OPTIONAL_ROWS and key not in own:
@@ -463,20 +461,20 @@ def global_table(
         )
     diagnostics = own.get("diagnostics")
     if isinstance(diagnostics, str) and diagnostics:
-        lines.append(f"| Diagnostics du score | {diagnostics} | |")
+        lines.append(f"| Score diagnostics | {diagnostics} | |")
     return "\n".join(lines)
 
 
 def facts_markdown(facts: pd.DataFrame) -> str:
     """Return the table of facts as Markdown."""
     patterns = {
-        "Stratégie": "{:+.2%}",
-        f"{FUND} (clôture)": "{:+.2%}",
-        "Fonds détenu (net)": "{:+.2%}",
-        "Écart relatif": "{:+.2%}",
-        "Poids de clôture moyen": "{:.0%}",
-        "Poids de clôture min.": "{:.0%}",
-        "Poids de clôture max.": "{:.0%}",
+        "Strategy": "{:+.2%}",
+        f"{FUND} (close)": "{:+.2%}",
+        "Fund held (net)": "{:+.2%}",
+        "Relative gap": "{:+.2%}",
+        "Average close weight": "{:.0%}",
+        "Min. close weight": "{:.0%}",
+        "Max. close weight": "{:.0%}",
     }
     columns = list(facts.columns)
     lines = ["| " + " | ".join(columns) + " |", "|" + "---|" * len(columns)]
@@ -518,14 +516,14 @@ def calendar_markdown(
     days = [day for day, _ in points(equity)]
     first, last = days[0], days[-1]
     shown = control is not None and control != name and control in yearly.index
-    head = "| Année | Stratégie | Fonds détenu |" + (" 50/50 rebalancé |" if shown else "")
-    lines = [head + " Séances |", "|---|---:|---:|" + ("---:|" if shown else "") + "---:|"]
+    head = "| Year | Strategy | Fund held |" + (" 50/50 rebalanced |" if shown else "")
+    lines = [head + " Sessions |", "|---|---:|---:|" + ("---:|" if shown else "") + "---:|"]
     for year in yearly.columns:
         label = str(year)
         if int(year) == first.year and (first.month, first.day) > (1, 7):
-            label += f" (partielle, depuis le {first})"
+            label += f" (partial, from {first})"
         if int(year) == last.year and (last.month, last.day) < (12, 24):
-            label += f" (partielle, au {last})"
+            label += f" (partial, to {last})"
         cells = [
             _cell(yearly.loc[name, year], "{:+.2%}"),
             _cell(yearly.loc[HELD, year], "{:+.2%}"),
@@ -539,17 +537,17 @@ def calendar_markdown(
     negative = int((months < -MONTH_TOLERANCE).sum())
     partial = []
     if first.day > 7:
-        partial.append(f"{first.year}-{first.month:02d} commence le {first}")
+        partial.append(f"{first.year}-{first.month:02d} starts on {first}")
     if (last + timedelta(days=4)).month == last.month:
-        partial.append(f"{last.year}-{last.month:02d} s'arrête au {last}")
+        partial.append(f"{last.year}-{last.month:02d} stops at {last}")
     lines += [
         "",
-        f"Mois : **{positive} positifs, {negative} négatifs, "
-        f"{len(months) - positive - negative} sans variation** sur {len(months)}"
-        + (f" (mois incomplets : {' ; '.join(partial)})" if partial else "")
-        + f". Pire mois : **{worst}** ({months[worst]:+.2%}, fonds détenu "
-        f"{reference[worst]:+.2%}). Meilleur mois : **{best}** ({months[best]:+.2%}, fonds "
-        f"détenu {reference[best]:+.2%}).",
+        f"Months: **{positive} positive, {negative} negative, "
+        f"{len(months) - positive - negative} unchanged** out of {len(months)}"
+        + (f" (incomplete months: {'; '.join(partial)})" if partial else "")
+        + f". Worst month: **{worst}** ({months[worst]:+.2%}, fund held "
+        f"{reference[worst]:+.2%}). Best month: **{best}** ({months[best]:+.2%}, fund "
+        f"held {reference[best]:+.2%}).",
     ]
     return "\n".join(lines)
 
@@ -559,13 +557,11 @@ def activity_markdown(history: pd.DataFrame) -> str:
     exposure = [float(value) for value in exposure_of(history)]
     invested = [value for value in exposure if value > 0.0]
     if not invested:
-        return (
-            f"Activité : aucune position détenue à une clôture sur {len(exposure)} valorisations."
-        )
+        return f"Activity: no position held at a close over {len(exposure)} valuations."
     return (
-        f"Activité : une position est détenue à la clôture de **{len(invested)} valorisations "
-        f"sur {len(exposure)}** ; le poids total détenu y va de {min(invested):.1%} à "
-        f"{max(invested):.1%} (moyenne sur toutes les valorisations : "
+        f"Activity: a position is held at the close of **{len(invested)} valuations "
+        f"out of {len(exposure)}**; the total weight held there ranges from {min(invested):.1%} "
+        f"to {max(invested):.1%} (average over all valuations: "
         f"{math.fsum(exposure) / len(exposure):.1%})."
     )
 
@@ -589,24 +585,24 @@ def history_markdown(history: pd.DataFrame) -> str:
         if column != "gross_equity" and (uses_other or column != f"close_{OTHER_FUND}")
     ]
     headings = {
-        f"close_{FUND}": f"Clôture {FUND}",
-        f"close_{OTHER_FUND}": f"Clôture {OTHER_FUND}",
-        "net_equity": "Valeur nette (EUR)",
+        f"close_{FUND}": f"Close {FUND}",
+        f"close_{OTHER_FUND}": f"Close {OTHER_FUND}",
+        "net_equity": "Net value (EUR)",
     }
 
     def heading(column: str) -> str:
         if column in headings:
             return headings[column]
         if column.startswith("target_"):
-            return f"Poids cible {column.removeprefix('target_')}"
+            return f"Target weight {column.removeprefix('target_')}"
         if column.startswith("held_"):
-            return f"Poids détenu {column.removeprefix('held_')}"
+            return f"Held weight {column.removeprefix('held_')}"
         if column.startswith("proposed_"):
-            return f"Poids proposé {column.removeprefix('proposed_')}"
+            return f"Proposed weight {column.removeprefix('proposed_')}"
         if column.startswith("open_"):
-            return f"Ouverture {column.removeprefix('open_')}"
+            return f"Open {column.removeprefix('open_')}"
         if column.startswith("close_"):
-            return f"Clôture {column.removeprefix('close_')}"
+            return f"Close {column.removeprefix('close_')}"
         if column in HISTORY_COLUMNS:
             return HISTORY_COLUMNS[column][0]
         return f"`{column}`"
@@ -623,7 +619,7 @@ def history_markdown(history: pd.DataFrame) -> str:
         return "{:.4f}"
 
     lines = [
-        "| Séance | " + " | ".join(heading(column) for column in columns) + " |",
+        "| Session | " + " | ".join(heading(column) for column in columns) + " |",
         "|---|" + "---:|" * len(columns),
     ]
     table = history[columns].to_numpy(dtype="float64")
@@ -642,19 +638,19 @@ def commentary_markdown(notes: Mapping[str, object] | None) -> str:
     """Return the written analysis of one strategy, or say that none was written."""
     if not notes:
         return (
-            "_Aucun commentaire n'a été rédigé pour cette stratégie : seuls les faits "
-            "mesurés ci-dessus sont disponibles._"
+            "_No commentary has been written for this strategy: only the facts measured "
+            "above are available._"
         )
     source = notes.get("measured_source", DIAGNOSTICS)
     sections = (
-        ("summary", "En résumé", False),
-        ("strengths", "Points forts", True),
-        ("weaknesses", "Points faibles", True),
-        ("worst", "Ce qui s'est passé pendant la période où la stratégie a le plus perdu", False),
-        ("best", "Ce qui s'est passé pendant la période où la stratégie a le plus gagné", False),
-        ("risks", "Situations de marché les plus risquées pour cette stratégie", True),
-        ("measured", f"Mesures complémentaires (voir {source})", True),
-        ("to_test", "Ce que ces résultats n'établissent pas, et ce qui reste à mesurer", True),
+        ("summary", "In short", False),
+        ("strengths", "Strengths", True),
+        ("weaknesses", "Weaknesses", True),
+        ("worst", "What happened over the stretch in which the strategy lost most", False),
+        ("best", "What happened over the stretch in which the strategy gained most", False),
+        ("risks", "The market situations most risky for this strategy", True),
+        ("measured", f"Complementary measures (see {source})", True),
+        ("to_test", "What these results do not establish, and what remains to be measured", True),
     )
     lines: list[str] = []
     for key, title, as_list in sections:
@@ -695,7 +691,7 @@ def peers_markdown(summary: pd.DataFrame, stressed: pd.DataFrame | None, name: s
     if stressed is not None:
         columns = list(PEER_COLUMNS)
     lines = [
-        "| Livre | " + " | ".join(label for _, label, _ in columns) + " |",
+        "| Book | " + " | ".join(label for _, label, _ in columns) + " |",
         "|---|" + "---:|" * len(columns),
     ]
     for book in summary.index:
@@ -709,42 +705,42 @@ def peers_markdown(summary: pd.DataFrame, stressed: pd.DataFrame | None, name: s
 
 
 SCORE_NOTE = (
-    "Le score QUALITY_V1 est une **moyenne géométrique pondérée** de cinq blocs bornés entre 0 "
-    "et 1 (marché 30 %, significativité 25 %, risque 15 %, robustesse 20 %, implémentation "
-    "10 %) : un seul bloc à zéro donne un score nul. Un score nul n'est donc ni une probabilité "
-    "de gain nulle, ni une égalité économique entre deux stratégies ; le bloc implémentation, "
-    "par exemple, tombe à zéro dès que les coûts atteignent 30 % du gain brut. Le bloc "
-    "robustesse contient un **stress approché** des coûts, `net - (brut - net)` sur les mêmes "
-    "ordres ; les deux dernières lignes du tableau viennent d'un **second run réel** à coûts "
-    "doublés, où les quantités et la trajectoire changent, et n'entrent pas dans le score. Le "
-    "score est déflaté par les essais de cette étude seulement, pas par la recherche "
-    "antérieure : le classement est exploratoire, et un écart de quelques points entre deux "
-    "scores n'est pas un test de supériorité. Les alphas sont des estimations ponctuelles sans "
-    "intervalle, avec un taux sans risque nul ; l'alpha contre SA1 compare à une règle active, "
-    "ce n'est pas un alpha de marché. Le fonds détenu est l'étalon du score et n'est pas "
-    "noté. « n/a » : la mesure n'existe pas ; elle n'est jamais remplacée par zéro."
+    "The QUALITY_V1 score is a **weighted geometric mean** of five blocks bounded between 0 "
+    "and 1 (market 30%, significance 25%, risk 15%, robustness 20%, implementation 10%): a "
+    "single block at zero gives a zero score. A zero score is therefore neither a zero "
+    "probability of gain nor an economic tie between two strategies; the implementation "
+    "block, for example, falls to zero as soon as costs reach 30% of the gross gain. The "
+    "robustness block contains an **approximate stress** of the costs, `net - (gross - net)` "
+    "on the same orders; the last two rows of the table come from a **second actual run** at "
+    "doubled costs, in which the quantities and the path change, and they do not enter the "
+    "score. The score is deflated by the trials of this study only, not by earlier research: "
+    "the ranking is exploratory, and a gap of a few points between two scores is not a test "
+    "of superiority. The alphas are point estimates without an interval, with a zero "
+    "risk-free rate; the alpha against SA1 compares with an active rule and is not a market "
+    'alpha. The fund held is the yardstick of the score and is not scored. "n/a": the '
+    "measure does not exist; it is never replaced by zero."
 )
 """What the score and the alphas of the first table do and do not say."""
 
 PEERS_NOTE = (
-    "Tous ces livres sont exécutés par le même moteur, sur la même période, avec les mêmes "
-    "coûts. Les contrôles (noms commençant par D ou C) et les deux références ne sont pas des "
-    "candidats. Ces chiffres ne se comparent pas à ceux d'une autre étude, mesurés depuis une "
-    "autre date ; un rang n'est pas une probabilité de succès."
+    "All these books are run by the same engine, over the same period, with the same costs. "
+    "The controls (names starting with D or C) and the two references are not candidates. "
+    "These figures are not comparable with those of another study, measured from another "
+    "date; a rank is not a probability of success."
 )
 """How the table of the peers is to be read."""
 
 READING_NOTE = (
-    "Chaque ligne va de la valeur de la séance « Du » à celle de la séance « Au » : N "
-    "valorisations, donc N - 1 rendements. « Plus forte hausse » est la plus grande hausse "
-    "d'un creux à un sommet ultérieur, de durée libre : ce n'est ni une position ni un trade. "
-    "Les deux périodes relatives sont choisies sur le rapport de la stratégie au fonds "
-    "détenu, dont l'« écart relatif » `(1 + stratégie) / (1 + fonds) - 1` est la variation. "
-    "Le « poids de clôture » est la part de l'actif net détenue en fonds à la valorisation du "
-    "soir, le reste étant du cash non rémunéré : il a pu dériver avec les cours, et le "
-    "multiplier par le rendement du fonds ne reconstitue pas le résultat. Une décision prise "
-    "le soir de t (signal et poids cible de la ligne t) est exécutée à l'ouverture de t + 1 "
-    "et n'apparaît dans le poids détenu qu'à la ligne t + 1."
+    'Each row runs from the value of the "From" session to that of the "To" session: N '
+    'valuations, hence N - 1 returns. "Largest rise" is the largest rise from a trough to '
+    "a later peak, of any length: it is neither a position nor a trade. The two relative "
+    "stretches are selected on the ratio of the strategy to the fund held, whose change is "
+    'the "relative gap" `(1 + strategy) / (1 + fund) - 1`. The "close weight" is the '
+    "share of the net assets held in funds at the evening valuation, the rest being cash "
+    "that earns nothing: it may have drifted with prices, and multiplying it by the fund's "
+    "return does not rebuild the result. A decision taken on the evening of t (signal and "
+    "target weight of row t) is executed at the open of t + 1 and appears in the weight held "
+    "only at row t + 1."
 )
 """How the measured stretches and the weights are to be read."""
 
@@ -800,11 +796,11 @@ def report(
     equity = pd.Series(history["net_equity"])
     return "\n".join(
         [
-            f"# {name} — résultats et analyse",
+            f"# {name} — results and analysis",
             "",
             *provenance,
             "",
-            "## 1. Indicateurs de résultat globaux",
+            "## 1. Global result indicators",
             "",
             global_table(row, market_row, stressed),
             "",
@@ -814,7 +810,7 @@ def report(
                 if peers is None
                 else [
                     "",
-                    "### Classement de tous les livres de l'étude, sur la même période",
+                    "### Ranking of every book of the study, over the same period",
                     "",
                     peers,
                     "",
@@ -822,19 +818,19 @@ def report(
                 ]
             ),
             "",
-            "## 2. Analyse",
+            "## 2. Analysis",
             "",
-            "### Faits mesurés",
+            "### Measured facts",
             "",
             facts_markdown(facts_table(history, market)),
             "",
             READING_NOTE,
             "",
-            "### Baisses sous un sommet et retour à ce sommet",
+            "### Falls below a peak and the return to it",
             "",
             drawdown_markdown(equity),
             "",
-            "### Par année et par mois",
+            "### By year and by month",
             "",
             calendar_markdown(equity, market, yearly, name, control),
             "",
@@ -843,15 +839,15 @@ def report(
             *([] if extra is None else [extra.rstrip(), ""]),
             commentary_markdown(notes),
             "",
-            "## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie",
+            "## 3. History: underlying, indicators used and value of the strategy",
             "",
-            "Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa "
-            "décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin "
-            "tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et "
-            "exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du "
-            "portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur "
-            "ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne "
-            "sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.",
+            "One row per session. The indicators are those the strategy read at its evening "
+            "decision (23:00 Paris), recomputed by its own signals on the store as the run "
+            "read it. The target weight of row t is decided that evening and executed at the "
+            "open of t + 1; the weight held of row t is the portfolio's at the valuation of t. "
+            "An empty cell is an indicator with no value that day. The orders, the execution "
+            "prices and the costs of each session are not in this table: they are in "
+            "`fills.csv`, beside this file.",
             *([] if history_note is None else ["", history_note]),
             "",
             history_markdown(history),
@@ -1127,7 +1123,7 @@ def read_history(study: Path, name: str) -> pd.DataFrame:
 
 
 def study_provenance(
-    config: Mapping[str, object], *, period_label: str = "Période commune", context: str = ""
+    config: Mapping[str, object], *, period_label: str = "Common period", context: str = ""
 ) -> list[str]:
     """Return the lines saying what a report of the study was produced from.
 
@@ -1158,15 +1154,15 @@ def study_lines(
 ) -> list[str]:
     """Return the two lines every report of a study starts with."""
     return [
-        f"{period_label} {period['start']} → {period['end']} · capital 100 000 EUR · "
-        "commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités "
-        "fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · "
-        "252 séances par an.",
+        f"{period_label} {period['start']} → {period['end']} · capital 100,000 EUR · "
+        "commission 5 bp (minimum 1 EUR), half spread 3 bp, slippage 2 bp · quantities "
+        "set at the decision, execution at the next open · cash earns nothing · "
+        "252 sessions a year.",
         "",
-        f"Source : commit `{str(source.get('git_commit'))[:12]}` ({source.get('source_state')}), "
-        f"magasin `{str(config['data_state'])[:12]}`, données à jour au {period['end']}. "
-        "Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les "
-        "exercices précédents, ce n'est pas un échantillon vierge.",
+        f"Source: commit `{str(source.get('git_commit'))[:12]}` ({source.get('source_state')}), "
+        f"store `{str(config['data_state'])[:12]}`, data up to {period['end']}. "
+        "Retrospective evaluation: the history of ETF_WORLD had already been looked at in "
+        "earlier exercises; it is not an untouched sample.",
     ]
 
 
@@ -1221,18 +1217,18 @@ def sa14_book(
     history = pd.concat(parts, axis=1).reindex(net[neural.SA14].index)
     source = results[neural.SA14].source.definition()
     provenance = [
-        f"Période de test {summary['first_session'].iloc[0]} → {summary['last_session'].iloc[0]} "
-        "(après la date limite d'information du modèle, "
-        f"{artifact.information_cutoff.date().isoformat()}) · modèle figé "
-        f"`{artifact.model_id[:12]}` (graine 42) · mêmes capital, coûts et conventions que les "
-        "autres stratégies.",
+        f"Test period {summary['first_session'].iloc[0]} → {summary['last_session'].iloc[0]} "
+        "(after the information cutoff of the model, "
+        f"{artifact.information_cutoff.date().isoformat()}) · frozen model "
+        f"`{artifact.model_id[:12]}` (seed 42) · same capital, costs and conventions as the "
+        "other strategies.",
         "",
-        f"Source : commit `{str(source.get('git_commit'))[:12]}` ({source.get('source_state')}), "
-        f"magasin `{results[neural.SA14].data_state.digest[:12]}`. **Période différente de celle "
-        "des autres stratégies** (qui commence en 2021) : ces chiffres ne se comparent pas aux "
-        "leurs, et SA14 n'a pas de rang dans le classement commun. Le test a déjà été lu une "
-        "fois le 2026-10-04 jusqu'au 2026-09-30 ; ce run le prolonge avec le même modèle. Le "
-        "score est déflaté pour un seul essai.",
+        f"Source: commit `{str(source.get('git_commit'))[:12]}` ({source.get('source_state')}), "
+        f"store `{results[neural.SA14].data_state.digest[:12]}`. **A period different from the "
+        "other strategies'** (which starts in 2021): these figures are not comparable with "
+        "theirs, and SA14 has no rank in the common ranking. The test was already read once, "
+        "on 2026-10-04, up to 2026-09-30; this run extends it with the same model. The score "
+        "is deflated for a single trial.",
     ]
     # Alone in its table, on its own period: it has no place in the common ranking.
     own = {**summary.loc[neural.SA14].to_dict(), "rank": None}
@@ -1248,9 +1244,9 @@ def sa14_book(
         provenance,
         control=neural.SPLIT,
         history_note=(
-            "Pour SA14, les colonnes « poids proposé » sont la **sortie** du réseau, pas ses "
-            "entrées : les caractéristiques qu'il lit (rendements, moyennes, volatilités des "
-            "deux fonds et du VIX sur 100 séances) ne sont pas dans ce tableau."
+            'For SA14, the "proposed weight" columns are the **output** of the network, not '
+            "its inputs: the features it reads (returns, averages, volatilities of the two "
+            "funds and of the VIX over 100 sessions) are not in this table."
         ),
     )
     return BookFolder(
@@ -1322,7 +1318,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
             notes,
             study_provenance(
                 config,
-                period_label=str((notes or {}).get("period_label", "Période commune")),
+                period_label=str((notes or {}).get("period_label", "Common period")),
                 context=str((notes or {}).get("context", "")),
             ),
             control=SPLIT,

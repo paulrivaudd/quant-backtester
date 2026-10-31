@@ -1,49 +1,49 @@
-# SA12 - ARIMA GARCH — résultats et analyse
+# SA12 - ARIMA GARCH — results and analysis
 
-Période commune 2021-04-01 → 2026-10-09 · capital 100 000 EUR · commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · 252 séances par an.
+Common period 2021-04-01 → 2026-10-09 · capital 100,000 EUR · commission 5 bp (minimum 1 EUR), half spread 3 bp, slippage 2 bp · quantities set at the decision, execution at the next open · cash earns nothing · 252 sessions a year.
 
-Source : commit `10f6d902af68` (CLEAN), magasin `750c23dfffc3`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
+Source: commit `10f6d902af68` (CLEAN), store `750c23dfffc3`, data up to 2026-10-09. Retrospective evaluation: the history of ETF_WORLD had already been looked at in earlier exercises; it is not an untouched sample.
 
-Étude dédiée (`scripts/SA12_run_arima_garch_study.py`) : les livres de la comparaison, le témoin EWMA de SA11 et trois contrôles de SA12 sans code de catalogue (D0, D1, D2), exécutés par le même moteur. L'ARIMA et le GARCH sont réestimés chaque soir sur 756 rendements d'ouverture à ouverture, avec un seul fil de calcul. L'hypothèse `sa12_arima_garch`, ses contrôles et ses statuts ont été écrits avant le premier ajustement.
+Dedicated study (`scripts/SA12_run_arima_garch_study.py`): the books of the comparison, the EWMA control of SA11 and three controls of SA12 without a catalogue code (D0, D1, D2), executed by the same engine. The ARIMA and the GARCH are re-estimated every evening on 756 open-to-open returns, with a single thread. The hypothesis `sa12_arima_garch`, its controls and its statuses were written before the first fit.
 
-## 1. Indicateurs de résultat globaux
+## 1. Global result indicators
 
-| Indicateur | Stratégie | Fonds détenu (buy & hold ETF_WORLD) |
+| Indicator | Strategy | Fund held (buy & hold ETF_WORLD) |
 |---|---:|---:|
-| Période mesurée | 2021-04-01 → 2026-10-09 (1416 séances) | idem |
-| Rang au classement commun (QUALITY_V1) | 10 | n/a |
-| Score de qualité QUALITY_V1 (0-100 %) | 0.0% | n/a |
-| - bloc marché (IR et alpha contre le fonds détenu) | 0.22 | n/a |
-| - bloc significativité (Sharpe déflaté) | 0.02 | n/a |
-| - bloc risque (drawdown relatif) | 1.00 | n/a |
-| - bloc robustesse (sous-périodes ; stress approché des coûts) | 0.00 | n/a |
-| - bloc implémentation (poids des coûts) | 0.00 | n/a |
-| Rendement net total | -1.72% | +94.79% |
-| Rendement brut total (mêmes ordres, sans coûts) | +2.30% | +94.89% |
-| Rendement net annualisé | -0.31% | +12.83% |
-| Volatilité annualisée | 2.12% | 13.79% |
-| Ratio de Sharpe net (taux sans risque 0) | -0.14 | +0.93 |
-| Ratio de Sortino net (taux sans risque 0) | -0.17 | +1.30 |
-| Perte maximale (max drawdown) | -6.99% | -21.64% |
-| Alpha annualisé contre le fonds détenu | -0.63% | n/a |
-| Bêta contre le fonds détenu | 0.03 | n/a |
-| Ratio d'information contre le fonds détenu | -0.97 | n/a |
-| Alpha annualisé contre SA1 (MA20) | -0.49% | +9.12% |
-| Bêta contre SA1 (MA20) | 0.05 | 1.00 |
-| Exposition moyenne (part investie) | 4.0% | 99.9% |
-| Ordres exécutés | 75 | 1 |
-| Coûts payés (EUR) | 4,022 | 100 |
-| Rotation annuelle (multiple de l'actif moyen) | 7.20 | 0.13 |
-| Rendement net, deux premiers tiers | +0.00% | +57.42% |
-| Rendement net, dernier tiers | -1.72% | +23.74% |
-| Rendement net, second run réel à coûts doublés | -5.70% | n/a |
-| Sharpe net, second run réel à coûts doublés | -0.47 | n/a |
+| Period measured | 2021-04-01 → 2026-10-09 (1416 sessions) | same |
+| Rank in the common ranking (QUALITY_V1) | 10 | n/a |
+| QUALITY_V1 quality score (0-100%) | 0.0% | n/a |
+| - market block (IR and alpha against the fund held) | 0.22 | n/a |
+| - significance block (deflated Sharpe) | 0.02 | n/a |
+| - risk block (relative drawdown) | 1.00 | n/a |
+| - robustness block (sub-periods; approximate cost stress) | 0.00 | n/a |
+| - implementation block (weight of costs) | 0.00 | n/a |
+| Total net return | -1.72% | +94.79% |
+| Total gross return (same orders, no costs) | +2.30% | +94.89% |
+| Annualised net return | -0.31% | +12.83% |
+| Annualised volatility | 2.12% | 13.79% |
+| Net Sharpe ratio (risk-free rate 0) | -0.14 | +0.93 |
+| Net Sortino ratio (risk-free rate 0) | -0.17 | +1.30 |
+| Maximum drawdown | -6.99% | -21.64% |
+| Annualised alpha against the fund held | -0.63% | n/a |
+| Beta against the fund held | 0.03 | n/a |
+| Information ratio against the fund held | -0.97 | n/a |
+| Annualised alpha against SA1 (MA20) | -0.49% | +9.12% |
+| Beta against SA1 (MA20) | 0.05 | 1.00 |
+| Average exposure (share invested) | 4.0% | 99.9% |
+| Orders filled | 75 | 1 |
+| Costs paid (EUR) | 4,022 | 100 |
+| Annual turnover (multiple of average assets) | 7.20 | 0.13 |
+| Net return, first two thirds | +0.00% | +57.42% |
+| Net return, last third | -1.72% | +23.74% |
+| Net return, second actual run at doubled costs | -5.70% | n/a |
+| Net Sharpe, second actual run at doubled costs | -0.47 | n/a |
 
-Le score QUALITY_V1 est une **moyenne géométrique pondérée** de cinq blocs bornés entre 0 et 1 (marché 30 %, significativité 25 %, risque 15 %, robustesse 20 %, implémentation 10 %) : un seul bloc à zéro donne un score nul. Un score nul n'est donc ni une probabilité de gain nulle, ni une égalité économique entre deux stratégies ; le bloc implémentation, par exemple, tombe à zéro dès que les coûts atteignent 30 % du gain brut. Le bloc robustesse contient un **stress approché** des coûts, `net - (brut - net)` sur les mêmes ordres ; les deux dernières lignes du tableau viennent d'un **second run réel** à coûts doublés, où les quantités et la trajectoire changent, et n'entrent pas dans le score. Le score est déflaté par les essais de cette étude seulement, pas par la recherche antérieure : le classement est exploratoire, et un écart de quelques points entre deux scores n'est pas un test de supériorité. Les alphas sont des estimations ponctuelles sans intervalle, avec un taux sans risque nul ; l'alpha contre SA1 compare à une règle active, ce n'est pas un alpha de marché. Le fonds détenu est l'étalon du score et n'est pas noté. « n/a » : la mesure n'existe pas ; elle n'est jamais remplacée par zéro.
+The QUALITY_V1 score is a **weighted geometric mean** of five blocks bounded between 0 and 1 (market 30%, significance 25%, risk 15%, robustness 20%, implementation 10%): a single block at zero gives a zero score. A zero score is therefore neither a zero probability of gain nor an economic tie between two strategies; the implementation block, for example, falls to zero as soon as costs reach 30% of the gross gain. The robustness block contains an **approximate stress** of the costs, `net - (gross - net)` on the same orders; the last two rows of the table come from a **second actual run** at doubled costs, in which the quantities and the path change, and they do not enter the score. The score is deflated by the trials of this study only, not by earlier research: the ranking is exploratory, and a gap of a few points between two scores is not a test of superiority. The alphas are point estimates without an interval, with a zero risk-free rate; the alpha against SA1 compares with an active rule and is not a market alpha. The fund held is the yardstick of the score and is not scored. "n/a": the measure does not exist; it is never replaced by zero.
 
-### Classement de tous les livres de l'étude, sur la même période
+### Ranking of every book of the study, over the same period
 
-| Livre | Rang | Score | Net | Net, coûts x2 | Sharpe | Perte max. | Alpha/an | Exposition | Coûts (EUR) |
+| Book | Rank | Score | Net | Net, costs x2 | Sharpe | Max. drawdown | Alpha/yr | Exposure | Costs (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 50/50 rebalanced | 1 | 74.0% | +103.35% | +102.72% | +0.96 | -22.47% | +0.51% | 100% | 736 |
 | EWMA 0.94 control | 2 | 50.7% | +73.37% | +70.88% | +0.93 | -15.45% | +0.39% | 88% | 1,519 |
@@ -62,146 +62,146 @@ Le score QUALITY_V1 est une **moyenne géométrique pondérée** de cinq blocs b
 | SA9 - VIX relief | 10 | 0.0% | -0.70% | -2.77% | -0.04 | -8.00% | -0.71% | 4% | 2,041 |
 | buy & hold World | n/a | n/a | +94.79% | +94.34% | +0.93 | -21.64% | n/a | 100% | 100 |
 
-Tous ces livres sont exécutés par le même moteur, sur la même période, avec les mêmes coûts. Les contrôles (noms commençant par D ou C) et les deux références ne sont pas des candidats. Ces chiffres ne se comparent pas à ceux d'une autre étude, mesurés depuis une autre date ; un rang n'est pas une probabilité de succès.
+All these books are run by the same engine, over the same period, with the same costs. The controls (names starting with D or C) and the two references are not candidates. These figures are not comparable with those of another study, measured from another date; a rank is not a probability of success.
 
-## 2. Analyse
+## 2. Analysis
 
-### Faits mesurés
+### Measured facts
 
-| Période | Du | Au | Valorisations | Rendements | Stratégie | ETF_WORLD (clôture) | Fonds détenu (net) | Écart relatif | Poids de clôture moyen | Poids de clôture min. | Poids de clôture max. |
+| Stretch | From | To | Valuations | Returns | Strategy | ETF_WORLD (close) | Fund held (net) | Relative gap | Average close weight | Min. close weight | Max. close weight |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Plus forte baisse (sommet → creux) | 2025-05-13 | 2026-03-26 | 225 | 224 | -6.99% | +8.47% | +8.47% | -14.25% | 13% | 0% | 100% |
-| Plus forte hausse (creux → sommet ultérieur, durée libre) | 2026-03-26 | 2026-08-05 | 92 | 91 | +5.46% | +17.56% | +17.55% | -10.29% | 26% | 0% | 100% |
-| Pires 63 rendements consécutifs | 2026-01-07 | 2026-04-08 | 64 | 63 | -4.77% | -0.92% | -0.92% | -3.88% | 13% | 0% | 100% |
-| Meilleurs 63 rendements consécutifs | 2026-03-19 | 2026-06-19 | 64 | 63 | +3.75% | +13.50% | +13.50% | -8.58% | 30% | 0% | 99% |
-| Plus fort retard relatif sur le fonds détenu | 2021-05-19 | 2026-10-06 | 1381 | 1380 | -1.72% | +100.27% | +100.17% | -50.90% | 4% | 0% | 100% |
-| Plus forte avance relative sur le fonds détenu | 2025-02-19 | 2025-04-09 | 36 | 35 | +0.00% | -21.66% | -21.64% | +27.62% | 0% | 0% | 0% |
-| Plus forte baisse du fonds détenu | 2025-02-19 | 2025-04-09 | 36 | 35 | +0.00% | -21.66% | -21.64% | +27.62% | 0% | 0% | 0% |
-| Plus forte hausse du fonds détenu | 2021-05-19 | 2026-10-06 | 1381 | 1380 | -1.72% | +100.27% | +100.17% | -50.90% | 4% | 0% | 100% |
+| Deepest fall (peak → trough) | 2025-05-13 | 2026-03-26 | 225 | 224 | -6.99% | +8.47% | +8.47% | -14.25% | 13% | 0% | 100% |
+| Largest rise (trough → later peak, any length) | 2026-03-26 | 2026-08-05 | 92 | 91 | +5.46% | +17.56% | +17.55% | -10.29% | 26% | 0% | 100% |
+| Worst 63 consecutive returns | 2026-01-07 | 2026-04-08 | 64 | 63 | -4.77% | -0.92% | -0.92% | -3.88% | 13% | 0% | 100% |
+| Best 63 consecutive returns | 2026-03-19 | 2026-06-19 | 64 | 63 | +3.75% | +13.50% | +13.50% | -8.58% | 30% | 0% | 99% |
+| Largest relative lag behind the fund held | 2021-05-19 | 2026-10-06 | 1381 | 1380 | -1.72% | +100.27% | +100.17% | -50.90% | 4% | 0% | 100% |
+| Largest relative lead over the fund held | 2025-02-19 | 2025-04-09 | 36 | 35 | +0.00% | -21.66% | -21.64% | +27.62% | 0% | 0% | 0% |
+| Deepest fall of the fund held | 2025-02-19 | 2025-04-09 | 36 | 35 | +0.00% | -21.66% | -21.64% | +27.62% | 0% | 0% | 0% |
+| Largest rise of the fund held | 2021-05-19 | 2026-10-06 | 1381 | 1380 | -1.72% | +100.27% | +100.17% | -50.90% | 4% | 0% | 100% |
 
-Chaque ligne va de la valeur de la séance « Du » à celle de la séance « Au » : N valorisations, donc N - 1 rendements. « Plus forte hausse » est la plus grande hausse d'un creux à un sommet ultérieur, de durée libre : ce n'est ni une position ni un trade. Les deux périodes relatives sont choisies sur le rapport de la stratégie au fonds détenu, dont l'« écart relatif » `(1 + stratégie) / (1 + fonds) - 1` est la variation. Le « poids de clôture » est la part de l'actif net détenue en fonds à la valorisation du soir, le reste étant du cash non rémunéré : il a pu dériver avec les cours, et le multiplier par le rendement du fonds ne reconstitue pas le résultat. Une décision prise le soir de t (signal et poids cible de la ligne t) est exécutée à l'ouverture de t + 1 et n'apparaît dans le poids détenu qu'à la ligne t + 1.
+Each row runs from the value of the "From" session to that of the "To" session: N valuations, hence N - 1 returns. "Largest rise" is the largest rise from a trough to a later peak, of any length: it is neither a position nor a trade. The two relative stretches are selected on the ratio of the strategy to the fund held, whose change is the "relative gap" `(1 + strategy) / (1 + fund) - 1`. The "close weight" is the share of the net assets held in funds at the evening valuation, the rest being cash that earns nothing: it may have drifted with prices, and multiplying it by the fund's return does not rebuild the result. A decision taken on the evening of t (signal and target weight of row t) is executed at the open of t + 1 and appears in the weight held only at row t + 1.
 
-### Baisses sous un sommet et retour à ce sommet
+### Falls below a peak and the return to it
 
-| Rang | Sommet | Creux | Profondeur | Retour au sommet | Jours calendaires |
+| Rank | Peak | Trough | Depth | Back at the peak | Calendar days |
 |---:|---|---|---:|---|---:|
-| 1 | 2025-05-13 | 2026-03-26 | -6.99% | non récupéré au 2026-10-09 | 514 (en cours) |
+| 1 | 2025-05-13 | 2026-03-26 | -6.99% | not recovered at 2026-10-09 | 514 (ongoing) |
 | 2 | 2025-04-15 | 2025-04-16 | -0.38% | 2025-04-25 | 10 |
 | 3 | 2025-05-05 | 2025-05-06 | -0.23% | 2025-05-13 | 8 |
 
-Drawdown au 2026-10-09 : **-2.36%** sous le plus haut de la période.
-Plus longue période sous un sommet : **514 jours calendaires**, du 2025-05-13 au 2026-10-09 (en cours, creux à -6.99%).
+Drawdown at 2026-10-09: **-2.36%** below the high of the period.
+Longest stretch below a peak: **514 calendar days**, from 2025-05-13 to 2026-10-09 (ongoing, trough at -6.99%).
 
-### Par année et par mois
+### By year and by month
 
-| Année | Stratégie | Fonds détenu | 50/50 rebalancé | Séances |
+| Year | Strategy | Fund held | 50/50 rebalanced | Sessions |
 |---|---:|---:|---:|---:|
-| 2021 (partielle, depuis le 2021-04-01) | +0.00% | +18.40% | +20.74% | 195 |
+| 2021 (partial, from 2021-04-01) | +0.00% | +18.40% | +20.74% | 195 |
 | 2022 | +0.00% | -13.73% | -14.00% | 257 |
 | 2023 | +0.00% | +19.61% | +20.88% | 255 |
 | 2024 | +0.00% | +27.07% | +30.19% | 256 |
 | 2025 | -2.94% | +6.61% | +5.02% | 255 |
-| 2026 (partielle, au 2026-10-09) | +1.26% | +17.68% | +18.49% | 198 |
+| 2026 (partial, to 2026-10-09) | +1.26% | +17.68% | +18.49% | 198 |
 
-Mois : **8 positifs, 8 négatifs, 51 sans variation** sur 67 (mois incomplets : 2026-10 s'arrête au 2026-10-09). Pire mois : **2026-03** (-4.03%, fonds détenu -4.72%). Meilleur mois : **2026-04** (+2.49%, fonds détenu +8.13%).
+Months: **8 positive, 8 negative, 51 unchanged** out of 67 (incomplete months: 2026-10 stops at 2026-10-09). Worst month: **2026-03** (-4.03%, fund held -4.72%). Best month: **2026-04** (+2.49%, fund held +8.13%).
 
-Activité : une position est détenue à la clôture de **69 valorisations sur 1416** ; le poids total détenu y va de 16.8% à 100.0% (moyenne sur toutes les valorisations : 4.0%).
+Activity: a position is held at the close of **69 valuations out of 1416**; the total weight held there ranges from 16.8% to 100.0% (average over all valuations: 4.0%).
 
-### Qualité opérationnelle et prévisions (étude SA12)
+### Operational quality and forecasts (SA12 study)
 
-- **Couverture.** 1416 décisions ; fenêtre de 757 ouvertures servie 1416 fois ; prévision jointe utilisable 1415 fois (99.93%). Moyennes ARIMA acceptées : 1415. Ajustements de variance tentés : 1415, dont GARCH accepté 1415 et repli EWMA 0 (0.00%). Échecs par étape : {'ARIMA:ARIMA_NOT_CONVERGED': 1}.
-- **Paires évaluables.** 1413 prévisions sur 1416 ont une cible connue (rendement de l'ouverture t+1 à l'ouverture t+2) ; exclues : {'no_forecast': 1, 'target_pending': 2, 'target_missing': 0}.
-- **Moyenne prévue.** MSE 9.2497e-05 pour ARIMA, 9.2133e-05 pour la prévision nulle et 9.2002e-05 pour la moyenne de la fenêtre. Corrélation prévision/réalisation +0.018. Signe juste 56.1%, contre 56.7% pour « toujours en hausse » ; justesse équilibrée 50.4%.
-- **Signaux d'entrée.** La prévision dépasse 20 pb sur 31 origines sur 1413 (2.19%) et est positive sur 1309 (92.6%). Rendement réalisé moyen après un signal d'entrée : +0.046%, contre +0.047% sur toutes les origines.
-- **Épisodes de position.** 29 épisodes, dont 29 terminés ; 10 gagnants ; net moyen -0.05%.
+- **Coverage.** 1416 decisions; window of 757 opens served 1416 times; joint forecast usable 1415 times (99.93%). ARIMA means accepted: 1415. Variance fits attempted: 1415, of which GARCH accepted 1415 and EWMA fallback 0 (0.00%). Failures by step: {'ARIMA:ARIMA_NOT_CONVERGED': 1}.
+- **Pairs that can be evaluated.** 1413 forecasts out of 1416 have a known target (return from the open of t+1 to the open of t+2); excluded: {'no_forecast': 1, 'target_pending': 2, 'target_missing': 0}.
+- **Forecast mean.** MSE 9.2497e-05 for ARIMA, 9.2133e-05 for the zero forecast and 9.2002e-05 for the mean of the window. Forecast/realisation correlation +0.018. Right sign 56.1%, against 56.7% for "always up"; balanced accuracy 50.4%.
+- **Entry signals.** The forecast exceeds 20 bp at 31 origins out of 1413 (2.19%) and is positive at 1309 (92.6%). Average realised return after an entry signal: +0.046%, against +0.047% over all origins.
+- **Position episodes.** 29 episodes, of which 29 finished; 10 winners; mean net -0.05%.
 
-### SA12 contre ses contrôles
+### SA12 against its controls
 
-| Coûts | Contrôle | Sharpe SA12 | Sharpe contrôle | Écart | Intervalle 95 % | Perte max. SA12 | Perte max. contrôle |
+| Costs | Control | Sharpe SA12 | Sharpe control | Gap | 95% interval | Max. drawdown SA12 | Max. drawdown control |
 |---|---|---:|---:|---:|---|---:|---:|
-| x1 | D0 - same risk no filter | -0.136 | +0.852 | -0.987 | [-2.101 ; +0.252] | -6.99% | -17.77% |
-| x1 | D1 - ARIMA EWMA | -0.136 | -0.196 | +0.061 | [-0.037 ; +0.170] | -6.99% | -7.32% |
-| x1 | D2 - constant mean GARCH | -0.136 | n/a | n/a | [n/a ; n/a] | -6.99% | 0.00% |
-| x1 | SA11 - GARCH vol control | -0.136 | +0.866 | -1.001 | [-2.094 ; +0.223] | -6.99% | -16.50% |
-| x1 | SA6 - vol control | -0.136 | +0.899 | -1.034 | [-2.087 ; +0.161] | -6.99% | -15.72% |
-| x1 | EWMA 0.94 control | -0.136 | +0.934 | -1.070 | [-2.142 ; +0.138] | -6.99% | -15.45% |
-| x2 | D0 - same risk no filter | -0.468 | +0.774 | -1.241 | [-2.335 ; -0.032] | -9.46% | -17.84% |
-| x2 | D1 - ARIMA EWMA | -0.468 | -0.531 | +0.063 | [-0.038 ; +0.180] | -9.46% | -9.94% |
-| x2 | D2 - constant mean GARCH | -0.468 | n/a | n/a | [n/a ; n/a] | -9.46% | 0.00% |
-| x2 | SA11 - GARCH vol control | -0.468 | +0.820 | -1.288 | [-2.359 ; -0.093] | -9.46% | -16.59% |
-| x2 | SA6 - vol control | -0.468 | +0.880 | -1.347 | [-2.376 ; -0.176] | -9.46% | -15.78% |
-| x2 | EWMA 0.94 control | -0.468 | +0.912 | -1.380 | [-2.423 ; -0.193] | -9.46% | -15.51% |
+| x1 | D0 - same risk no filter | -0.136 | +0.852 | -0.987 | [-2.101; +0.252] | -6.99% | -17.77% |
+| x1 | D1 - ARIMA EWMA | -0.136 | -0.196 | +0.061 | [-0.037; +0.170] | -6.99% | -7.32% |
+| x1 | D2 - constant mean GARCH | -0.136 | n/a | n/a | [n/a; n/a] | -6.99% | 0.00% |
+| x1 | SA11 - GARCH vol control | -0.136 | +0.866 | -1.001 | [-2.094; +0.223] | -6.99% | -16.50% |
+| x1 | SA6 - vol control | -0.136 | +0.899 | -1.034 | [-2.087; +0.161] | -6.99% | -15.72% |
+| x1 | EWMA 0.94 control | -0.136 | +0.934 | -1.070 | [-2.142; +0.138] | -6.99% | -15.45% |
+| x2 | D0 - same risk no filter | -0.468 | +0.774 | -1.241 | [-2.335; -0.032] | -9.46% | -17.84% |
+| x2 | D1 - ARIMA EWMA | -0.468 | -0.531 | +0.063 | [-0.038; +0.180] | -9.46% | -9.94% |
+| x2 | D2 - constant mean GARCH | -0.468 | n/a | n/a | [n/a; n/a] | -9.46% | 0.00% |
+| x2 | SA11 - GARCH vol control | -0.468 | +0.820 | -1.288 | [-2.359; -0.093] | -9.46% | -16.59% |
+| x2 | SA6 - vol control | -0.468 | +0.880 | -1.347 | [-2.376; -0.176] | -9.46% | -15.78% |
+| x2 | EWMA 0.94 control | -0.468 | +0.912 | -1.380 | [-2.423; -0.193] | -9.46% | -15.51% |
 
-D0 : même ARIMA, même variance, filtre de direction toujours actif. D1 : même ARIMA, variance EWMA. D2 : moyenne constante et GARCH. Ce sont des contrôles de recherche, sans code de catalogue, et aucun n'est candidat. Bootstrap apparié par blocs de 20 séances, 5000 tirages, graine 20261010.
+D0: same ARIMA, same variance, direction gate always on. D1: same ARIMA, EWMA variance. D2: constant mean and GARCH. These are research controls, without a catalogue code, and none is a candidate. Paired bootstrap by blocks of 20 sessions, 5000 draws, seed 20261010.
 
-Écart de perte jointe `log(v) + e²/v` SA12 moins D1 (même moyenne, donc une comparaison de variances) : -0.0111, intervalle [-0.0646 ; +0.0452].
+Gap of joint loss `log(v) + e²/v` SA12 minus D1 (same mean, hence a comparison of variances): -0.0111, interval [-0.0646; +0.0452].
 
-### Statut de l'hypothèse préinscrite `sa12_arima_garch` : **INSUFFICIENT_EVIDENCE**
+### Status of the preregistered hypothesis `sa12_arima_garch`: **INSUFFICIENT_EVIDENCE**
 
 - 29 completed position episodes, under 30
 
-Ce statut répond à une seule question, écrite avant le run : le filtre de direction améliore-t-il le même dimensionnement de risque sans lui (D0) ? Il ne dit pas « ARIMA-GARCH ne fonctionne jamais », et l'apport de GARCH se lit à part, contre D1.
+This status answers a single question, written before the run: does the direction gate improve the same risk sizing without it (D0)? It does not say "ARIMA-GARCH never works", and the contribution of GARCH is read separately, against D1.
 
-### En résumé
+### In short
 
-Détenir ETF_WORLD seulement quand un ARIMA(1,0,1), réestimé chaque soir sur 756 rendements d'ouverture à ouverture, prévoit plus de 20 pb pour le rendement de l'ouverture de t + 1 à l'ouverture de t + 2 (la position est gardée tant que la prévision reste strictement positive), au poids min(1, 12 % / max(σ, 5 %)) où σ vient d'un GARCH(1,1) ajusté sur les innovations de l'ARIMA. Sur cet historique la prévision ne franchit le seuil que 31 soirs sur 1 413, tous à partir du 10 avril 2025 : le livre reste en cash pendant quatre ans, puis prend 29 positions courtes qui, ensemble, perdent 1,72 % net, quand le même dimensionnement sans filtre (D0) gagne 64,07 %. Le statut préinscrit est INSUFFICIENT_EVIDENCE parce qu'il manque un épisode terminé (29 pour 30 requis) ; l'écart de Sharpe mesuré contre D0 est de -0,99. Cela ne dit rien des modèles ARIMA-GARCH en général.
+Hold ETF_WORLD only when an ARIMA(1,0,1), re-estimated every evening on 756 open-to-open returns, forecasts more than 20 bp for the return from the open of t + 1 to the open of t + 2 (the position is kept as long as the forecast stays strictly positive), at the weight min(1, 12% / max(σ, 5%)) where σ comes from a GARCH(1,1) fitted on the innovations of the ARIMA. Over this history the forecast crosses the threshold on only 31 evenings out of 1,413, all from 10 April 2025: the book stays in cash for four years, then takes 29 short positions which, together, lose 1.72% net, when the same sizing without the gate (D0) gains 64.07%. The preregistered status is INSUFFICIENT_EVIDENCE because one finished episode is missing (29 for 30 required); the Sharpe gap measured against D0 is -0.99. This says nothing about ARIMA-GARCH models in general.
 
-### Points forts
+### Strengths
 
-- **Fait.** La chaîne de calcul fonctionne : prévision jointe utilisable à 1 415 décisions sur 1 416 (99,93 %), un seul ARIMA non convergé, aucun repli EWMA de la variance.
-- **Fait.** Perte maximale de -6,99 % contre -21,64 % pour le fonds et -17,77 % pour D0, volatilité de 2,1 %. **Lecture.** C'est la conséquence d'une exposition moyenne de 4,0 % (une position à la clôture de 69 valorisations sur 1 416), pas d'un choix heureux des séances.
-- **Fait.** Le livre est en cash pendant toute la baisse du fonds du 2025-02-19 au 2025-04-09 (-21,64 %). **Lecture.** Ce n'est pas une protection décidée par le modèle : avant le 10 avril 2025 la prévision n'a jamais dépassé 18,2 pb (13,5 pb de 2021 à 2024), quel que soit le marché, et aucune position n'avait encore été prise.
-- **Fait.** Brut de coûts, les 29 épisodes rapportent +2,30 %.
-- **Fait.** Sur la même moyenne, la variance GARCH a une perte jointe moyenne un peu plus basse que la variance EWMA (-8,4848 contre -8,4737) ; l'écart apparié, -0,011, a un intervalle à 95 % de [-0,065 ; +0,045], qui contient zéro.
+- **Fact.** The computation chain works: joint forecast usable at 1,415 decisions out of 1,416 (99.93%), a single ARIMA not converged, no EWMA fallback of the variance.
+- **Fact.** Maximum drawdown of -6.99% against -21.64% for the fund and -17.77% for D0, volatility of 2.1%. **Reading.** It is the consequence of an average exposure of 4.0% (a position at the close of 69 valuations out of 1,416), not of a lucky choice of sessions.
+- **Fact.** The book is in cash throughout the fall of the fund from 2025-02-19 to 2025-04-09 (-21.64%). **Reading.** It is not a protection decided by the model: before 10 April 2025 the forecast never exceeded 18.2 bp (13.5 bp from 2021 to 2024), whatever the market, and no position had yet been taken.
+- **Fact.** Gross of costs, the 29 episodes earn +2.30%.
+- **Fact.** On the same mean, the GARCH variance has a slightly lower mean joint loss than the EWMA variance (-8.4848 against -8.4737); the paired gap, -0.011, has a 95% interval of [-0.065; +0.045], which contains zero.
 
-### Points faibles
+### Weaknesses
 
-- **Fait.** -1,72 % net sur la période, contre +64,07 % pour D0, +67,43 % pour SA6 et +94,79 % pour le fonds ; Sharpe -0,14. Dans le second run à coûts doublés : -5,70 %, Sharpe -0,47.
-- **Fait.** La prévision de la moyenne n'est pas meilleure que deux prévisions naïves : erreur quadratique moyenne de 9,2497e-05, contre 9,2133e-05 pour la prévision nulle et 9,2002e-05 pour la moyenne de la fenêtre (les intervalles des deux écarts contiennent zéro) ; corrélation avec le rendement réalisé +0,018 ; signe juste 56,1 % contre 56,7 % pour « toujours en hausse ».
-- **Fait.** Les 31 signaux d'entrée ne sélectionnent pas de meilleures séances : le rendement réalisé moyen après un signal est de +0,046 %, contre +0,047 % sur toutes les origines, et 15 signaux sur 31 sont suivis d'une hausse.
-- **Fait.** 22 épisodes sur 29 ne durent qu'une valorisation : achat à l'ouverture, prévision redevenue négative ou nulle le soir même, vente à l'ouverture suivante. 75 ordres et 4 022 EUR de coûts pour environ 2 300 EUR de gain brut : les coûts dépassent le gain brut.
-- **Fait.** 10 épisodes gagnants sur 29, résultat net moyen de -0,05 % par épisode.
-- **Fait.** Le sommet du 2025-05-13 n'est pas retrouvé au 2026-10-09, 514 jours plus tard (-2,36 % sous ce sommet).
-- **Fait.** Score nul au classement de l'étude : les blocs robustesse et implémentation sont à zéro. Un score nul n'est pas une égalité économique avec les autres livres à zéro.
+- **Fact.** -1.72% net over the period, against +64.07% for D0, +67.43% for SA6 and +94.79% for the fund; Sharpe -0.14. In the second run at doubled costs: -5.70%, Sharpe -0.47.
+- **Fact.** The forecast of the mean is not better than two naive forecasts: mean squared error of 9.2497e-05, against 9.2133e-05 for the zero forecast and 9.2002e-05 for the mean of the window (the intervals of both gaps contain zero); correlation with the realised return +0.018; right sign 56.1% against 56.7% for "always up".
+- **Fact.** The 31 entry signals do not select better sessions: the average realised return after a signal is +0.046%, against +0.047% over all origins, and 15 signals out of 31 are followed by a rise.
+- **Fact.** 22 episodes out of 29 last only one valuation: purchase at the open, forecast back to negative or zero that same evening, sale at the next open. 75 orders and 4,022 EUR of costs for about 2,300 EUR of gross gain: the costs exceed the gross gain.
+- **Fact.** 10 winning episodes out of 29, average net result of -0.05% per episode.
+- **Fact.** The peak of 2025-05-13 is not back at 2026-10-09, 514 days later (-2.36% below this peak).
+- **Fact.** Zero score in the ranking of the study: the robustness and implementation blocks are at zero. A zero score is not an economic tie with the other books at zero.
 
-### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
+### What happened over the stretch in which the strategy lost most
 
-**Fait.** La plus forte baisse va du sommet du 2025-05-13 (100 648,6 EUR) au creux du 2026-03-26 (93 610,0 EUR) : -6,99 %, pendant que le fonds gagne +8,47 %. Elle n'est pas continue : c'est la somme de 16 épisodes, dont 3 gagnants, qui coûtent 2 443 EUR de frais. Les plus lourds : le soir du 2025-07-31 la prévision vaut +20,6 pb et la cible 89,5 % ; l'achat est exécuté à l'ouverture du 2025-08-01 (568,04), le fonds clôture à 556,13, la prévision du soir tombe à -21,4 pb et la vente est exécutée à l'ouverture du 2025-08-04 (557,91) : -1,75 % sur le livre. Le soir du 2026-03-05 la prévision vaut +21,2 pb et la cible 98,8 % ; 156 parts sont achetées à l'ouverture du 2026-03-06 (617,43) ; la prévision du soir est de -6,3 pb et la vente est exécutée à l'ouverture du lundi 2026-03-09 (601,27), 2,65 % plus bas : -2,78 % sur le livre, le plus mauvais épisode. Le soir du 2026-03-18 (+21,7 pb, cible 96,1 %) conduit de même à un achat à l'ouverture du 19 et à une vente à celle du 20 (-0,87 %). Les 31 signaux d'entrée de la période suivent tous un rendement d'ouverture à ouverture positif, de +1,73 % en moyenne quand l'amplitude moyenne de ce rendement est de 0,65 % sur l'ensemble des séances ; depuis le 10 avril 2025 la corrélation entre ce dernier rendement et la prévision est de +0,82. **Lecture.** Le livre achète donc au lendemain d'une forte hausse à l'ouverture et revend le plus souvent une séance plus tard ; que ce mécanisme explique la perte, plutôt que le hasard de 16 épisodes, n'est pas établi.
+**Fact.** The deepest fall runs from the peak of 2025-05-13 (100,648.6 EUR) to the trough of 2026-03-26 (93,610.0 EUR): -6.99%, while the fund gains +8.47%. It is not continuous: it is the sum of 16 episodes, of which 3 winners, which cost 2,443 EUR of fees. The heaviest: on the evening of 2025-07-31 the forecast is +20.6 bp and the target 89.5%; the purchase is executed at the open of 2025-08-01 (568.04), the fund closes at 556.13, the evening forecast falls to -21.4 bp and the sale is executed at the open of 2025-08-04 (557.91): -1.75% on the book. On the evening of 2026-03-05 the forecast is +21.2 bp and the target 98.8%; 156 units are bought at the open of 2026-03-06 (617.43); the evening forecast is -6.3 bp and the sale is executed at the open of Monday 2026-03-09 (601.27), 2.65% lower: -2.78% on the book, the worst episode. The evening of 2026-03-18 (+21.7 bp, target 96.1%) likewise leads to a purchase at the open of the 19th and a sale at that of the 20th (-0.87%). The 31 entry signals of the period all follow a positive open-to-open return, of +1.73% on average when the average amplitude of this return is 0.65% over all sessions; since 10 April 2025 the correlation between this last return and the forecast is +0.82. **Reading.** The book therefore buys the day after a strong rise at the open and most often sells one session later; that this mechanism explains the loss, rather than the chance of 16 episodes, is not established.
 
-### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
+### What happened over the stretch in which the strategy gained most
 
-**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2026-03-26 au 2026-08-05 : +5,46 %, contre +17,56 % pour le fonds, avec un poids de clôture moyen de 26 %. Elle tient à six épisodes dont quatre gagnants. Le principal : le soir du 2026-04-14 la prévision vaut +22,2 pb et la cible 84,8 % ; l'achat est exécuté à l'ouverture du 2026-04-15 (622,67) ; la prévision reste ensuite strictement positive treize soirs de suite (entre +0,6 et +23,3 pb) et la position est gardée, entre 80 % et 99 % du livre ; le soir du 2026-05-05 elle passe à -3,8 pb et la vente est exécutée à l'ouverture du 2026-05-06 (645,95) : +3,13 % sur le livre en 14 valorisations, l'épisode le plus long. Puis le soir du 2026-07-31 (+29,6 pb, cible 89,6 %) : achat à l'ouverture du 2026-08-03 (682,22), vente à l'ouverture du 2026-08-07 (697,95) après une prévision de -2,6 pb le soir du 6 : +1,91 %. **Lecture.** Les gains viennent des rares épisodes tenus plusieurs séances dans une hausse du fonds ; le livre n'en capte qu'une fraction.
+**Fact.** The largest rise from a trough to a later peak runs from 2026-03-26 to 2026-08-05: +5.46%, against +17.56% for the fund, with an average close weight of 26%. It rests on six episodes, of which four winners. The main one: on the evening of 2026-04-14 the forecast is +22.2 bp and the target 84.8%; the purchase is executed at the open of 2026-04-15 (622.67); the forecast then stays strictly positive for thirteen evenings in a row (between +0.6 and +23.3 bp) and the position is kept, between 80% and 99% of the book; on the evening of 2026-05-05 it goes to -3.8 bp and the sale is executed at the open of 2026-05-06 (645.95): +3.13% on the book in 14 valuations, the longest episode. Then the evening of 2026-07-31 (+29.6 bp, target 89.6%): purchase at the open of 2026-08-03 (682.22), sale at the open of 2026-08-07 (697.95) after a forecast of -2.6 bp on the evening of the 6th: +1.91%. **Reading.** The gains come from the rare episodes held for several sessions in a rise of the fund; the book catches only a fraction of it.
 
-### Situations de marché les plus risquées pour cette stratégie
+### The market situations most risky for this strategy
 
-- **Observé.** Marché heurté, où un fort rendement d'ouverture à ouverture est suivi d'un mouvement contraire : la prévision change de signe d'un soir à l'autre (+148,7 pb le 2025-04-10, -183,9 pb le 2025-04-11, +125,0 pb le 2025-04-14, -46,0 pb le 2025-04-15) ; le livre achète et revend à chaque fois et paie deux fois les coûts.
-- **Observé.** Entrée la veille d'un gap baissier : acheté à l'ouverture du 2026-03-06, revendu à celle du 2026-03-09, 2,65 % plus bas, avec 98,8 % du livre.
-- **Observé.** Hausse régulière du fonds avec des rendements quotidiens modestes (2021, 2023, 2024) : la prévision reste sous le seuil et le livre reste en cash pendant que le fonds gagne +18,4 %, +19,6 % et +27,1 %.
-- **Plausible.** Coefficients ARIMA qui changent d'une fenêtre à l'autre : la moyenne annuelle du coefficient autorégressif estimé passe de -0,17 en 2021 et 2022 à -0,44 en 2025 et -0,67 en 2026, celle du coefficient de moyenne mobile de +0,09 à +0,48. Les prévisions deviennent alors plus amples, ce qui coïncide avec l'apparition des signaux ; l'effet sur la décision n'est pas isolé ici.
+- **Observed.** Choppy market, where a strong open-to-open return is followed by a contrary move: the forecast changes sign from one evening to the next (+148.7 bp on 2025-04-10, -183.9 bp on 2025-04-11, +125.0 bp on 2025-04-14, -46.0 bp on 2025-04-15); the book buys and sells each time and pays the costs twice.
+- **Observed.** Entry on the eve of a downward gap: bought at the open of 2026-03-06, sold at that of 2026-03-09, 2.65% lower, with 98.8% of the book.
+- **Observed.** Steady rise of the fund with modest daily returns (2021, 2023, 2024): the forecast stays below the threshold and the book stays in cash while the fund gains +18.4%, +19.6% and +27.1%.
+- **Plausible.** ARIMA coefficients that change from one window to the next: the annual mean of the estimated autoregressive coefficient goes from -0.17 in 2021 and 2022 to -0.44 in 2025 and -0.67 in 2026, that of the moving-average coefficient from +0.09 to +0.48. The forecasts then become wider, which coincides with the appearance of the signals; the effect on the decision is not isolated here.
 
-### Mesures complémentaires (voir study.md)
+### Complementary measures (see study.md)
 
-- **Fait.** SA12 contre D0 (même ARIMA, même variance, filtre toujours ouvert) : écart de Sharpe de -0,987, intervalle bootstrap à 95 % [-2,101 ; +0,252] aux coûts de base ; -1,241, intervalle [-2,335 ; -0,032], dans le second run à coûts doublés.
-- **Fait.** SA12 contre D1 (même ARIMA, variance EWMA) : écart de Sharpe de +0,061, intervalle [-0,037 ; +0,170] ; D1 fait -2,46 % net. GARCH et EWMA ne sont pas départagés.
-- **Fait.** D2 (moyenne constante et GARCH) n'a pris aucune position : une moyenne constante estimée sur 756 rendements ne dépasse jamais 20 pb par séance.
-- **Fait.** Résidus standardisés de la prévision jointe : écart-type 1,04, kurtosis 11,1, autocorrélation de leurs carrés +0,24. La variance prévue ne rend compte ni de toutes les queues ni de toute la persistance.
-- **Lecture.** Le filtre de direction a surtout retiré de l'exposition : D0, investi à 86 % en moyenne, a suivi la hausse du fonds ; SA12, investi à 4 %, ne l'a pas suivie. Avec un intervalle aussi large aux coûts de base, cet écart reste une mesure sur ce chemin.
+- **Fact.** SA12 against D0 (same ARIMA, same variance, gate always open): Sharpe gap of -0.987, 95% bootstrap interval [-2.101; +0.252] at the base costs; -1.241, interval [-2.335; -0.032], in the second run at doubled costs.
+- **Fact.** SA12 against D1 (same ARIMA, EWMA variance): Sharpe gap of +0.061, interval [-0.037; +0.170]; D1 makes -2.46% net. GARCH and EWMA are not told apart.
+- **Fact.** D2 (constant mean and GARCH) took no position: a constant mean estimated on 756 returns never exceeds 20 bp per session.
+- **Fact.** Standardised residuals of the joint forecast: standard deviation 1.04, kurtosis 11.1, autocorrelation of their squares +0.24. The forecast variance accounts neither for all the tails nor for all the persistence.
+- **Reading.** The direction gate mostly removed exposure: D0, invested at 86% on average, followed the rise of the fund; SA12, invested at 4%, did not follow it. With an interval this wide at the base costs, this gap remains a measure on this path.
 
-### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+### What these results do not establish, and what remains to be measured
 
-- Le statut INSUFFICIENT_EVIDENCE est celui des critères écrits avant le run : 29 épisodes terminés pour 30 requis. Le seuil n'a pas été modifié après lecture. Il ne dit ni que le filtre est utile ni qu'il est nuisible ; l'écart mesuré contre D0 est négatif, et son intervalle aux coûts de base contient zéro.
-- Le seuil d'entrée de 20 pb reprend un coût aller-retour de référence ; il a laissé la stratégie inactive pendant quatre ans. L'abaisser après avoir lu ce résultat serait une nouvelle variante, à préinscrire.
-- L'évolution des coefficients ARIMA dans le temps est exportée (`sa12_forecasts.csv`) mais n'est pas analysée au-delà des moyennes annuelles citées.
-- La moyenne et la variance sont estimées en deux étapes, et la variance à deux pas ignore l'incertitude des paramètres.
-- La vérification prospective, configuration figée, commence à la première séance XPAR après le 2026-10-10.
+- The INSUFFICIENT_EVIDENCE status is that of the criteria written before the run: 29 finished episodes for 30 required. The threshold was not changed after reading. It says neither that the gate is useful nor that it is harmful; the gap measured against D0 is negative, and its interval at the base costs contains zero.
+- The entry threshold of 20 bp takes up a reference round-trip cost; it left the strategy idle for four years. Lowering it after reading this result would be a new variant, to be preregistered.
+- The change over time of the ARIMA coefficients is exported (`sa12_forecasts.csv`) but is not analysed beyond the annual means cited.
+- The mean and the variance are estimated in two steps, and the two-step variance ignores the uncertainty of the parameters.
+- The prospective check, configuration frozen, starts at the first XPAR session after 2026-10-10.
 
-## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
+## 3. History: underlying, indicators used and value of the strategy
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
+One row per session. The indicators are those the strategy read at its evening decision (23:00 Paris), recomputed by its own signals on the store as the run read it. The target weight of row t is decided that evening and executed at the open of t + 1; the weight held of row t is the portfolio's at the valuation of t. An empty cell is an indicator with no value that day. The orders, the execution prices and the costs of each session are not in this table: they are in `fills.csv`, beside this file.
 
-Colonnes propres à SA12 : la prévision `mu_2`, en points de base, du rendement de l'ouverture de t + 1 à l'ouverture de t + 2 ; la volatilité annualisée prévue pour ce rendement ; le repli éventuel de la variance sur l'EWMA ; le filtre, lu sur le poids détenu ce soir-là ; le poids avant application de la bande de 3 points. Le détail de chaque ajustement est dans `sa12_forecasts.csv` de l'étude.
+Columns of SA12 only: the forecast `mu_2`, in basis points, of the return from the open of t + 1 to the open of t + 2; the annualised volatility forecast for this return; the possible fallback of the variance to the EWMA; the gate, read on the weight held that evening; the weight before the 3-point band is applied. The detail of each fit is in the study's `sa12_forecasts.csv`.
 
-| Séance | Clôture ETF_WORLD | Ouverture ETF_WORLD | Prévision mu_2 (pb) | Volatilité prévue (annualisée) | Repli EWMA (1 = oui) | Filtre (1 = ouvert) | Poids avant bande | Poids cible ETF_WORLD | Poids détenu ETF_WORLD | Valeur nette (EUR) |
+| Session | Close ETF_WORLD | Open ETF_WORLD | Forecast mu_2 (bp) | Forecast volatility (annualised) | EWMA fallback (1 = yes) | Gate (1 = open) | Weight before the band | Target weight ETF_WORLD | Held weight ETF_WORLD | Net value (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 2021-04-01 | 363.45 | 362.70 | +5.89 | 11.0% | 0 | 0 | 0.0% | 0.0% | 0.0% | 100,000.00 |
 | 2021-04-06 | 366.90 | 366.95 | +6.66 | 12.9% | 0 | 0 | 0.0% | 0.0% | 0.0% | 100,000.00 |

@@ -119,8 +119,8 @@ EWMA_DECAYS = (0.90, 0.97)
 PANIC_GAP_SESSIONS = 20
 """Stays of ``SA9`` closer than this many valuations belong to one panic."""
 
-FROZEN = "graine 42, modèle figé du test, coûts x2 (moteur seul)"
-RECALIBRATED = "graine 42, recalibrée sous coûts x2"
+FROZEN = "seed 42, frozen model of the test, costs x2 (engine only)"
+RECALIBRATED = "seed 42, recalibrated under costs x2"
 """The two rows of ``SA14`` at doubled costs: the same artifact run dearer, and
 the calibration redone under those costs. Two questions, two labels."""
 
@@ -629,12 +629,12 @@ def ensemble_variants() -> dict[str, Strategy]:
     """Return the ensemble without each of its rules, and without its risk control."""
     base = ETFEnsemble(enable_factors=False, enable_monetary=False)
     variants: dict[str, Strategy] = {
-        f"sans {rule}": replace(
+        f"without {rule}": replace(
             base, **{f"{rule}_budget": 0.0}, strategy_id=f"research_sa10_without_{rule}"
         )  # type: ignore[arg-type]
         for rule in ENSEMBLE_RULES
     }
-    variants["sans contrôle de risque"] = replace(
+    variants["without risk control"] = replace(
         base,
         target_volatility=NO_RISK_CONTROL_TARGET,
         strategy_id="research_sa10_without_risk_control",
@@ -685,53 +685,54 @@ def open_stays_lines(frames: Mapping[str, pd.DataFrame]) -> list[str]:
             continue
         for row in stays.loc[stays["open"]].to_dict(orient="records"):
             lines.append(
-                f"- {name} : un séjour encore ouvert, entré à la valorisation du "
-                f"{row['entry']}, valorisé {float(row['net_return']):+.2%} au "
-                f"{row['exit']}, sans vente finale."
+                f"- {name}: a stay still open, entered at the valuation of "
+                f"{row['entry']}, valued {float(row['net_return']):+.2%} at "
+                f"{row['exit']}, without a final sale."
             )
     return [*lines, ""] if lines else []
 
 
 RUN_COLUMNS = (
     ("net_return", "Net", "{:+.2%}"),
-    ("annualised_return", "Net/an", "{:+.2%}"),
+    ("annualised_return", "Net/yr", "{:+.2%}"),
     ("volatility", "Vol.", "{:.2%}"),
     ("sharpe", "Sharpe", "{:+.2f}"),
-    ("max_drawdown", "Perte max.", "{:.2%}"),
-    ("recovery_days", "Retour au sommet (j)", "{}"),
-    ("average_exposure", "Expo. moy.", "{:.1%}"),
-    ("fills", "Ordres", "{:.0f}"),
-    ("costs_eur", "Coûts EUR", "{:,.0f}"),
+    ("max_drawdown", "Max. drawdown", "{:.2%}"),
+    ("recovery_days", "Back at peak (d)", "{}"),
+    ("average_exposure", "Avg. expo.", "{:.1%}"),
+    ("fills", "Orders", "{:.0f}"),
+    ("costs_eur", "Costs EUR", "{:,.0f}"),
 )
 """The columns every table of runs shows."""
 
-HEADER = """# Diagnostics complémentaires — résultats du 10 octobre 2026
+HEADER = """# Complementary diagnostics — results of 10 October 2026
 
-Ce document mesure ce que les analyses de ce dossier listaient comme « restant à
-mesurer », à la demande de la revue indépendante du 10 octobre. Il est écrit par
-`scripts/run_review_diagnostics.py`, à partir des exports de l'étude et de
-quelques runs supplémentaires du même moteur, sur la même période
-(2021-04-01 → 2026-10-09), avec le même capital et les mêmes coûts.
+This document measures what the analyses of this folder listed as "remaining to
+be measured", at the request of the independent review of 10 October. It is
+written by `scripts/run_review_diagnostics.py`, from the exports of the study and
+a few additional runs of the same engine, over the same period
+(2021-04-01 → 2026-10-09), with the same capital and the same costs.
 
-**Tout ce qui suit est descriptif.** Un témoin à cible constante, dont la cible
-est le poids qu'une règle a détenu en moyenne, est choisi après coup : il décrit
-le passé de cette règle, ce n'est pas un paramètre qu'on aurait pu fixer à
-l'avance, et son exposition réalisée n'est pas celle de la règle. Une ablation
-de `SA10` ou un autre coefficient d'EWMA est une variante
-regardée après un backtest. Aucune n'est candidate : en retenir une serait une
-nouvelle hypothèse, à écrire avant son run, et chacune compterait comme un
-essai dans le registre qui déflate les Sharpe. Les estimations sont ponctuelles
-sauf mention d'un intervalle. Rien ici n'est un échantillon vierge.
+**Everything that follows is descriptive.** A constant-target control, whose
+target is the weight a rule held on average, is chosen after the fact: it
+describes the past of that rule, it is not a parameter that could have been set
+in advance, and its realised exposure is not the rule's. An ablation of `SA10`
+or another EWMA coefficient is a variant looked at after a backtest. None is a
+candidate: retaining one would be a new hypothesis, to be written before its
+run, and each would count as a trial in the register that deflates the Sharpe
+ratios. The estimates are point estimates unless an interval is mentioned.
+Nothing here is an untouched sample.
 
-Version 2 du 10 octobre 2026, après la vérification indépendante faite sur le
-commit `ad310bc`. Ont changé : l'écart de prix clôture-ouverture est mesuré à
-quantités données, sur le prix de marché et non sur le montant exécuté ; la
-colonne « exécution » de l'attribution est renommée en résidu, parce qu'elle
-n'isole pas l'exécution ; les séjours clos et le séjour encore ouvert sont
-comptés à part ; les corrélations de `SA5` gardent leur première décision et
-composent leurs rendements à cinq séances ; les témoins sont dits « à cible
-constante » ; `SA14` est rejoué avec son modèle figé à coûts doublés ; un run
-n'est comparé aux exports que s'il a lu le même magasin.
+Version 2 of 10 October 2026, after the independent check made on commit
+`ad310bc`. What changed: the close-to-open price gap is measured at given
+quantities, on the market price and not on the amount executed; the
+"execution" column of the attribution is renamed residual, because it does not
+isolate the execution; the closed stays and the stay still open are counted
+apart; the correlations of `SA5` keep their first decision and compound their
+returns over five sessions; the controls are called "constant-target"; `SA14`
+is replayed with its frozen model at doubled costs; a run is compared with the
+exports only if it read the same store. Written in English since 2026-10-31,
+with the same figures.
 """
 
 
@@ -760,7 +761,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     frames: dict[str, pd.DataFrame] = {}
 
     # 1. Episodes of the rarely invested rules.
-    sections += ["## 1. Résultat par séjour dans le marché (SA1, SA4, SA9)", ""]
+    sections += ["## 1. Result by stay in the market (SA1, SA4, SA9)", ""]
     summaries: dict[str, dict[str, object]] = {}
     for name in EPISODE_BOOKS:
         stays = episodes(histories[name], fills.loc[fills["book"] == name])
@@ -771,32 +772,31 @@ def main(arguments: Sequence[str] | None = None) -> int:
         table(
             frames["episodes_summary"],
             [
-                ("stays", "Séjours", "{:.0f}"),
-                ("completed", "Clos", "{:.0f}"),
-                ("open", "Ouvert", "{:.0f}"),
-                ("completed_gains", "Clos gagnants", "{:.0f}"),
-                ("completed_losses", "Clos perdants", "{:.0f}"),
-                ("completed_share_of_gains", "Part gagnante (clos)", "{:.1%}"),
-                ("mean_net_return", "Net moyen", "{:+.2%}"),
-                ("median_net_return", "Net médian", "{:+.2%}"),
-                ("worst", "Pire", "{:+.2%}"),
-                ("best", "Meilleur", "{:+.2%}"),
-                ("compounded", "Composé", "{:+.2%}"),
-                ("mean_valuations_held", "Durée moy. (valo.)", "{:.1f}"),
-                ("costs_eur", "Coûts EUR", "{:,.0f}"),
+                ("stays", "Stays", "{:.0f}"),
+                ("completed", "Closed", "{:.0f}"),
+                ("open", "Open", "{:.0f}"),
+                ("completed_gains", "Closed winners", "{:.0f}"),
+                ("completed_losses", "Closed losers", "{:.0f}"),
+                ("completed_share_of_gains", "Winning share (closed)", "{:.1%}"),
+                ("mean_net_return", "Mean net", "{:+.2%}"),
+                ("median_net_return", "Median net", "{:+.2%}"),
+                ("worst", "Worst", "{:+.2%}"),
+                ("best", "Best", "{:+.2%}"),
+                ("compounded", "Compounded", "{:+.2%}"),
+                ("mean_valuations_held", "Avg. length (val.)", "{:.1f}"),
+                ("costs_eur", "Costs EUR", "{:,.0f}"),
             ],
-            "Stratégie",
+            "Strategy",
         ),
         "",
-        "Un séjour est une suite de valorisations où une position est détenue. Le "
-        "résultat net d'un séjour **clos** va de la valorisation qui précède l'entrée à "
-        "la première valorisation revenue en cash : ses deux exécutions et leurs coûts "
-        "sont dedans. Un séjour **ouvert** court encore à la dernière séance : il est "
-        "valorisé au marché à cette séance, sans vente finale ni son coût. Les gagnants "
-        "et les perdants sont comptés sur les seuls séjours clos. Le net moyen, le "
-        "médian, le pire, le meilleur et « Composé » portent sur tous les séjours, "
-        "l'ouvert compris : « Composé » en est le produit et retrouve le rendement net "
-        "de la stratégie, puisque le cash ne rapporte rien.",
+        "A stay is a run of valuations in which a position is held. The net result of a "
+        "**closed** stay runs from the valuation before the entry to the first valuation "
+        "back in cash: its two fills and their costs are in it. An **open** stay is still "
+        "running at the last session: it is marked to market at that session, without a "
+        "final sale or its cost. The winners and the losers are counted on the closed "
+        'stays only. The mean net, the median, the worst, the best and "Compounded" '
+        'cover all the stays, the open one included: "Compounded" is their product and '
+        "gives back the net return of the strategy, since cash earns nothing.",
         "",
         *open_stays_lines(frames),
     ]
@@ -804,25 +804,24 @@ def main(arguments: Sequence[str] | None = None) -> int:
     grouped = panics(frames["episodes_sa9"], histories[relief])
     frames["episodes_sa9_panics"] = grouped
     sections += [
-        f"### SA9 : ses {len(frames['episodes_sa9'])} séjours en {len(grouped)} groupes "
-        f"(convention : {PANIC_GAP_SESSIONS} valorisations)",
+        f"### SA9: its {len(frames['episodes_sa9'])} stays in {len(grouped)} groups "
+        f"(convention: {PANIC_GAP_SESSIONS} valuations)",
         "",
         table(
             grouped.set_index("first_entry"),
             [
-                ("last_exit", "Dernière sortie", "{}"),
-                ("stays", "Séjours", "{:.0f}"),
+                ("last_exit", "Last exit", "{}"),
+                ("stays", "Stays", "{:.0f}"),
                 ("net_return", "Net", "{:+.2%}"),
-                ("costs_eur", "Coûts EUR", "{:,.0f}"),
+                ("costs_eur", "Costs EUR", "{:,.0f}"),
             ],
-            "Première entrée",
+            "First entry",
         ),
         "",
-        f"Deux séjours séparés par {PANIC_GAP_SESSIONS} valorisations ou moins sont "
-        "rattachés au même groupe. C'est un regroupement automatique par cette "
-        "convention, pas l'identification économique d'autant de paniques "
-        "indépendantes ; un groupe gagnant peut compter plusieurs entrées, comme un "
-        "groupe perdant.",
+        f"Two stays separated by {PANIC_GAP_SESSIONS} valuations or fewer are attached to "
+        "the same group. It is an automatic grouping by this convention, not the economic "
+        "identification of as many independent panics; a winning group can count several "
+        "entries, as a losing group can.",
         "",
     ]
 
@@ -839,33 +838,31 @@ def main(arguments: Sequence[str] | None = None) -> int:
     }
     frames["delay_effect"] = pd.DataFrame.from_dict(delays, orient="index")
     sections += [
-        "## 2. Écart de prix signé clôture-ouverture, à quantités données",
+        "## 2. Signed close-to-open price gap, at given quantities",
         "",
         table(
             frames["delay_effect"],
             [
-                ("orders", "Ordres", "{:.0f}"),
-                ("helped_eur", "Écarts favorables EUR", "{:+,.0f}"),
-                ("hurt_eur", "Écarts défavorables EUR", "{:+,.0f}"),
-                ("effect_eur", "Écart net EUR", "{:+,.0f}"),
-                ("effect_share", "En % du capital initial", "{:+.2%}"),
-                ("excluded_ex_date", "Ordres exclus (date de détachement)", "{:.0f}"),
+                ("orders", "Orders", "{:.0f}"),
+                ("helped_eur", "Favourable gaps EUR", "{:+,.0f}"),
+                ("hurt_eur", "Unfavourable gaps EUR", "{:+,.0f}"),
+                ("effect_eur", "Net gap EUR", "{:+,.0f}"),
+                ("effect_share", "As % of the initial capital", "{:+.2%}"),
+                ("excluded_ex_date", "Orders excluded (ex-date)", "{:.0f}"),
             ],
-            "Livre",
+            "Book",
         ),
         "",
-        "Pour chaque ordre : `-signe x quantité x (ouverture - clôture précédente)`, "
-        "signe +1 pour un achat, sur le prix de marché de l'ouverture et non sur le prix "
-        "exécuté : le spread, le slippage et la commission restent dans les coûts. "
-        "Positif : le mouvement de la nuit est allé dans le sens de l'ordre. Un ordre "
-        "exécuté à une date de détachement est exclu, les deux prix n'étant pas sur la "
-        "même base.",
+        "For each order: `-sign x quantity x (open - previous close)`, sign +1 for a "
+        "purchase, on the market price of the open and not on the price executed: the "
+        "spread, the slippage and the commission stay in the costs. Positive: the "
+        "overnight move went the order's way. An order executed on an ex-date is "
+        "excluded, the two prices not being on the same basis.",
         "",
-        "C'est un **écart de prix à quantités données**, pas le résultat d'un autre "
-        "backtest exécuté à la clôture : le signal lit cette clôture, donc l'ordre ne "
-        "pouvait pas y être exécuté, et un autre prix d'exécution aurait changé toutes "
-        "les quantités suivantes. Il ne se lit ni comme un coût payé ni comme un manque "
-        "à gagner exact.",
+        "It is a **price gap at given quantities**, not the result of another backtest "
+        "executed at the close: the signal reads that close, so the order could not be "
+        "executed at it, and another execution price would have changed all the following "
+        "quantities. It reads neither as a cost paid nor as an exact shortfall.",
         "",
     ]
 
@@ -877,40 +874,39 @@ def main(arguments: Sequence[str] | None = None) -> int:
     }
     frames["basket_attribution"] = pd.DataFrame.from_dict(attribution, orient="index")
     sections += [
-        "## 3. SA2 et SA5 contre le panier 50/50 des deux mêmes fonds",
+        "## 3. SA2 and SA5 against the 50/50 basket of the same two funds",
         "",
         table(
             frames["basket_attribution"],
             [
-                ("basket_closes", "Panier (clôtures)", "{:+.4f}"),
-                ("exposure", "Exposition totale", "{:+.4f}"),
-                ("choice", "Choix entre fonds", "{:+.4f}"),
-                ("residual", "Résidu de l'approximation aux poids de clôture", "{:+.4f}"),
-                ("costs", "Coûts", "{:+.4f}"),
-                ("book_net", "= Net de la stratégie", "{:+.4f}"),
-                ("basket_net", "Panier 50/50 exécuté, net", "{:+.4f}"),
+                ("basket_closes", "Basket (closes)", "{:+.4f}"),
+                ("exposure", "Total exposure", "{:+.4f}"),
+                ("choice", "Choice between funds", "{:+.4f}"),
+                ("residual", "Residual of the approximation at the close weights", "{:+.4f}"),
+                ("costs", "Costs", "{:+.4f}"),
+                ("book_net", "= Net of the strategy", "{:+.4f}"),
+                ("basket_net", "Executed 50/50 basket, net", "{:+.4f}"),
             ],
-            "Stratégie",
+            "Strategy",
         ),
         "",
-        "Rendements logarithmiques sur la période, qui s'additionnent ligne à ligne. "
-        "« Exposition totale » : ce que détenir le poids total de la veille dans le "
-        "panier ajoute au panier. « Choix entre fonds » : ce que détenir les poids par "
-        "fonds de la veille ajoute à cela. Ces trois premières colonnes sont une "
-        "**approximation** : elles valorisent les poids détenus à la clôture précédente "
-        "avec le rendement de clôture à clôture, ce qui n'est pas la façon dont le livre "
-        "a traité.",
+        'Log returns over the period, which add up row by row. "Total exposure": what '
+        "holding the previous day's total weight in the basket adds to the basket. "
+        '"Choice between funds": what holding the previous day\'s weights by fund adds to '
+        "that. These first three columns are an **approximation**: they value the weights "
+        "held at the previous close with the close-to-close return, which is not how the "
+        "book traded.",
         "",
-        "Le **résidu** est l'écart entre cette approximation et la comptabilité brute du "
-        "moteur. Ce n'est pas une mesure de l'exécution : outre l'écart entre la clôture "
-        "et le prix exécuté, la bande et les quantités entières, il contient le rendement "
-        "de la journée sur ce qui a été acheté ou vendu le matin même - une partie de "
-        "l'effet du signal. Un livre en cash qui achète à l'ouverture, au prix de la "
-        "clôture précédente, et gagne 10 % dans la journée voit tout ce gain dans le "
-        "résidu, avec une « exposition » négative d'autant. Les colonnes « exposition » "
-        "et « choix » ne sont donc pas l'apport complet d'un timing, et le résidu n'est "
-        "pas un handicap d'exécution. Une attribution exacte demande les quantités avant "
-        "et après chaque exécution et les prix d'ouverture ; elle n'est pas produite ici.",
+        "The **residual** is the gap between this approximation and the gross accounting "
+        "of the engine. It is not a measure of the execution: besides the gap between the "
+        "close and the price executed, the band and the whole quantities, it contains the "
+        "return of the day on what was bought or sold that very morning - part of the "
+        "effect of the signal. A book in cash that buys at the open, at the price of the "
+        "previous close, and gains 10% during the day sees all this gain in the residual, "
+        'with an "exposure" negative by as much. The "exposure" and "choice" '
+        "columns are therefore not the full contribution of a timing, and the residual is "
+        "not an execution handicap. An exact attribution requires the quantities before "
+        "and after each fill and the opening prices; it is not produced here.",
         "",
     ]
     tilt_book = entry("SA5").display_name
@@ -918,31 +914,31 @@ def main(arguments: Sequence[str] | None = None) -> int:
     tilt = tilt_diagnostics(histories[tilt_book], tilt_column, FUND, OTHER_FUND)
     frames["sa5_tilt"] = pd.DataFrame([tilt])
     sections += [
-        "### SA5 : le signal d'inclinaison et ce que les fonds ont fait ensuite",
+        "### SA5: the tilt signal and what the funds did next",
         "",
-        f"- {tilt['decisions']} décisions avec un résidu non nul ; le résidu change de "
-        f"signe **{tilt['sign_changes']} fois**, soit un signe tenu en moyenne "
-        f"{tilt['mean_run']:.1f} valorisations.",
-        "- Corrélation du résidu (positif quand le fonds monde a pris du retard, donc "
-        "surpondéré) avec le rendement relatif monde moins S&P 500 :",
+        f"- {tilt['decisions']} decisions with a non-zero residual; the residual changes "
+        f"sign **{tilt['sign_changes']} times**, i.e. a sign held "
+        f"{tilt['mean_run']:.1f} valuations on average.",
+        "- Correlation of the residual (positive when the world fund has fallen behind, "
+        "hence overweighted) with the relative return of world minus S&P 500:",
         "",
-        "| Horizon | Pearson | Spearman | Paires |",
+        "| Horizon | Pearson | Spearman | Pairs |",
         "|---|---:|---:|---:|",
         *[
             f"| {label} | {tilt[f'pearson_{key}']:+.3f} | {tilt[f'spearman_{key}']:+.3f} | "
             f"{tilt[f'pairs_{key}']} |"
             for key, label in (
-                ("next_1", "séance t + 1 (en partie avant l'exécution à son ouverture)"),
-                ("after_fill_1", "séance t + 2, la première entière après l'exécution"),
-                ("after_fill_5", "séances t + 2 à t + 6, rendements composés"),
+                ("next_1", "session t + 1 (partly before the execution at its open)"),
+                ("after_fill_1", "session t + 2, the first full one after the execution"),
+                ("after_fill_5", "sessions t + 2 to t + 6, compounded returns"),
             )
         ],
         "",
-        "Un signal qui prévoirait le rendement relatif sur lequel il mise montrerait une "
-        "corrélation positive. Ces coefficients sont donnés sans intervalle, sur des "
-        "rendements de clôture à clôture : ils ne mesurent pas l'intervalle d'ouverture à "
-        "ouverture réellement porté après la décision, qui n'est pas calculé ici, et une "
-        "corrélation proche de zéro n'exclut pas toute relation non linéaire.",
+        "A signal that forecast the relative return it bets on would show a positive "
+        "correlation. These coefficients are given without an interval, on close-to-close "
+        "returns: they do not measure the open-to-open interval actually carried after the "
+        "decision, which is not computed here, and a correlation close to zero does not "
+        "rule out every non-linear relation.",
         "",
     ]
 
@@ -950,9 +946,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
     source = runner.source.definition()
     sections.insert(
         1,
-        f"Exports de l'étude : commit `{str(config['source']['git_commit'])[:12]}` "
-        f"({config['source']['source_state']}), magasin `{str(config['data_state'])[:12]}`. "
-        f"Runs de ce document : commit `{str(source.get('git_commit'))[:12]}` "
+        f"Exports of the study: commit `{str(config['source']['git_commit'])[:12]}` "
+        f"({config['source']['source_state']}), store `{str(config['data_state'])[:12]}`. "
+        f"Runs of this document: commit `{str(source.get('git_commit'))[:12]}` "
         f"({source.get('source_state')}).\n",
     )
     controls: dict[str, dict[str, object]] = {}
@@ -963,24 +959,23 @@ def main(arguments: Sequence[str] | None = None) -> int:
         require_same_provenance(config, result)
         weights = ", ".join(f"{fund} {weight:.1%}" for fund, weight in control.weights)
         controls[name] = history_row(histories[name], summary.loc[name].to_dict())
-        controls[f"↳ témoin à cible constante ({weights})"] = run_row(result)
+        controls[f"↳ constant-target control ({weights})"] = run_row(result)
     frames["constant_weight_controls"] = pd.DataFrame.from_dict(controls, orient="index")
     low, high = exposure_gaps(frames["constant_weight_controls"])
     sections += [
-        "## 4. Chaque règle à exposition variable à côté d'un témoin à cible constante",
+        "## 4. Each rule with a variable exposure beside a constant-target control",
         "",
-        table(frames["constant_weight_controls"], RUN_COLUMNS, "Livre"),
+        table(frames["constant_weight_controls"], RUN_COLUMNS, "Book"),
         "",
-        "Témoin à **cible constante** égale aux poids moyens historiques de la règle, "
-        "avec la même bande de rééquilibrage de 3 points et les mêmes coûts : il ne "
-        "traite que lorsque la dérive des cours l'écarte de sa cible de 3 points. Son "
-        "exposition **réalisée** diffère donc de celle de la règle, comme la colonne "
-        f"« Expo. moy. » le montre (témoin moins règle : de {low:+.1f} à {high:+.1f} "
-        "points ici). "
-        "La comparaison décrit le résultat de deux règles exécutables ; elle n'isole pas, "
-        "à exposition exactement identique, la valeur du timing : le niveau d'exposition, "
-        "la composition, les coûts et la trajectoire changent aussi. Ces poids étant "
-        "connus après coup, elle est descriptive.",
+        "Control at a **constant target** equal to the rule's historical average weights, "
+        "with the same 3-point rebalancing band and the same costs: it trades only when "
+        "the drift of prices moves it 3 points away from its target. Its **realised** "
+        'exposure therefore differs from the rule\'s, as the "Avg. expo." column shows '
+        f"(control minus rule: from {low:+.1f} to {high:+.1f} points here). "
+        "The comparison describes the result of two executable rules; it does not isolate, "
+        "at exactly the same exposure, the value of the timing: the level of exposure, the "
+        "composition, the costs and the path change too. These weights being known after "
+        "the fact, it is descriptive.",
         "",
     ]
 
@@ -994,19 +989,19 @@ def main(arguments: Sequence[str] | None = None) -> int:
         variants[f"SA10 {label}"] = run_row(ablated)
     frames["sa10_ablations"] = pd.DataFrame.from_dict(variants, orient="index")
     sections += [
-        "## 5. SA10 sans chacune de ses règles, et sans son contrôle de risque",
+        "## 5. SA10 without each of its rules, and without its risk control",
         "",
         table(frames["sa10_ablations"], RUN_COLUMNS, "Version"),
         "",
-        "Chaque ligne « sans » remet le budget d'une règle à zéro : ce budget reste en "
-        "cash, il n'est pas redistribué. « Sans contrôle de risque » fixe la cible de "
-        "risque à un niveau jamais atteint, donc le facteur de réduction vaut toujours "
-        "1. Toutes ces versions sont, comme SA10 ici, sans fonds de style ni monétaire.",
+        'Each "without" row sets the budget of one rule to zero: this budget stays in '
+        'cash, it is not redistributed. "Without risk control" sets the risk target at '
+        "a level never reached, so the reduction factor is always 1. All these versions "
+        "are, like SA10 here, without style or money-market funds.",
         "",
-        "L'écart entre SA10 et sa version sans contrôle de risque mesure l'**effet "
-        "agrégé** de ce contrôle sur ce run. Il ne dit pas combien de fois le facteur de "
-        "réduction a été inférieur à 1, ni à quelles dates : ce facteur et les décisions "
-        "forcées par le risque du portefeuille détenu ne sont pas exportés.",
+        "The gap between SA10 and its version without risk control measures the "
+        "**aggregate effect** of this control on this run. It does not say how many times "
+        "the reduction factor was below 1, nor on which dates: this factor and the "
+        "decisions forced by the risk of the portfolio held are not exported.",
         "",
     ]
 
@@ -1023,30 +1018,30 @@ def main(arguments: Sequence[str] | None = None) -> int:
     curves = pd.read_csv(study / "equity.csv", index_col="session_date")
     measured = sharpe_difference(pd.Series(curves[VOL_CONTROL]), pd.Series(curves[EWMA]))
     sections += [
-        "## 6. SA6 contre le témoin EWMA, et l'EWMA à d'autres coefficients",
+        "## 6. SA6 against the EWMA control, and the EWMA at other coefficients",
         "",
         (
-            f"Différence de Sharpe SA6 moins EWMA 0,94 : **{measured.estimate:+.3f}**, "
-            f"intervalle bootstrap à {measured.level:.0%} "
-            f"[{measured.low:+.3f} ; {measured.high:+.3f}] (blocs de {measured.block} "
-            f"séances, {measured.draws} tirages, graine {measured.seed}). "
+            f"Sharpe difference SA6 minus EWMA 0.94: **{measured.estimate:+.3f}**, "
+            f"{measured.level:.0%} bootstrap interval "
+            f"[{measured.low:+.3f}; {measured.high:+.3f}] (blocks of {measured.block} "
+            f"sessions, {measured.draws} draws, seed {measured.seed}). "
             + (
-                "L'intervalle inclut zéro : les deux témoins ne sont pas départagés."
+                "The interval includes zero: the two controls are not told apart."
                 if measured.low <= 0.0 <= measured.high
-                else "L'intervalle exclut zéro."
+                else "The interval excludes zero."
             )
             if isinstance(measured, PairedBootstrap)
-            else f"Différence de Sharpe SA6 moins EWMA : bootstrap {measured}."
+            else f"Sharpe difference SA6 minus EWMA: bootstrap {measured}."
         ),
         "",
-        table(frames["ewma_decays"], RUN_COLUMNS, "Livre"),
+        table(frames["ewma_decays"], RUN_COLUMNS, "Book"),
         "",
-        "Les coefficients 0,90 et 0,97 ont été fixés dans le script avant leur run, de "
-        "part et d'autre de 0,94 ; ils ne sont pas le résultat d'une recherche du "
-        "meilleur coefficient, et ne doivent pas le devenir sur ce même historique. "
-        "L'ordre de ces trois EWMA ne vaut que pour elles : il ne définit pas une "
-        "« vitesse » du GARCH réestimé chaque soir et n'établit pas une règle générale "
-        "selon laquelle un estimateur plus lent serait meilleur.",
+        "The coefficients 0.90 and 0.97 were set in the script before their run, on "
+        "either side of 0.94; they are not the result of a search for the best "
+        "coefficient, and must not become one on this same history. The order of these "
+        'three EWMAs holds only for them: it does not define a "speed" of the GARCH '
+        "re-estimated every evening and does not establish a general rule by which a "
+        "slower estimator would be better.",
         "",
     ]
 
@@ -1103,7 +1098,7 @@ def sa14_section(
     fixed = runner.run(control, neural.TRADABLE, start, last)
     rows = {
         neural.SA14: run_row(result),
-        "↳ témoin à cible constante ("
+        "↳ constant-target control ("
         + ", ".join(f"{fund} {weight:.1%}" for fund, weight in weights)
         + ")": run_row(fixed),
         HELD: run_row(runner.run(neural.references()[neural.HELD], neural.TRADABLE, start, last)),
@@ -1136,9 +1131,9 @@ def sa14_section(
 
     sensitivities: dict[str, dict[str, object]] = {}
     for label, arguments in (
-        ("graine 42, coûts x1 (le test préinscrit)", ["--seed", "42"]),
-        ("graine 43, coûts x1", ["--seed", "43"]),
-        ("graine 44, coûts x1", ["--seed", "44"]),
+        ("seed 42, costs x1 (the preregistered test)", ["--seed", "42"]),
+        ("seed 43, costs x1", ["--seed", "43"]),
+        ("seed 44, costs x1", ["--seed", "44"]),
         (RECALIBRATED, ["--seed", "42", "--cost-multiplier", "2"]),
     ):
         target = Path("runs/sa14_sensitivities")
@@ -1205,68 +1200,66 @@ def sa14_section(
     return [
         "## 7. SA14",
         "",
-        f"Période de test prolongée, {start} → {last}, modèle figé `{artifact.model_id[:12]}`.",
+        f"Extended test period, {start} → {last}, frozen model `{artifact.model_id[:12]}`.",
         "",
-        "### Contre une allocation constante",
+        "### Against a constant allocation",
         "",
-        table(frames["sa14_constant_allocation"], RUN_COLUMNS, "Livre"),
+        table(frames["sa14_constant_allocation"], RUN_COLUMNS, "Book"),
         "",
-        "Témoin à cible constante égale aux poids moyens de SA14 sur ces dates, avec la "
-        "même bande de 3 points et les mêmes coûts : c'est le témoin exécutable que le "
-        "produit « 65 % fois le rendement du fonds » ne remplaçait pas. Son exposition "
-        "réalisée n'est pas exactement celle de SA14 (colonne « Expo. moy. ») : la "
-        "comparaison décrit deux règles exécutables et n'isole pas la valeur du timing à "
-        "exposition identique. Choisi après coup, il est descriptif.",
+        "Control at a constant target equal to the average weights of SA14 over these "
+        "dates, with the same 3-point band and the same costs: it is the executable "
+        'control that the product "65% times the fund\'s return" did not replace. Its '
+        'realised exposure is not exactly SA14\'s ("Avg. expo." column): the comparison '
+        "describes two executable rules and does not isolate the value of the timing at "
+        "identical exposure. Chosen after the fact, it is descriptive.",
         "",
-        f"Sur ces dates, hors la première séance, le poids total détenu par SA14 va de "
-        f"{float(exposure.min()):.1%} à {float(exposure.max()):.1%} (écart-type "
-        f"{float(exposure.std()):.1%}), et la part du fonds S&P 500 dans ce qui est "
-        f"investi va de {float(share.min()):.1%} à {float(share.max()):.1%} (moyenne "
-        f"{float(share.mean()):.1%}).",
+        f"Over these dates, apart from the first session, the total weight held by SA14 "
+        f"ranges from {float(exposure.min()):.1%} to {float(exposure.max()):.1%} (standard "
+        f"deviation {float(exposure.std()):.1%}), and the share of the S&P 500 fund in what "
+        f"is invested ranges from {float(share.min()):.1%} to {float(share.max()):.1%} "
+        f"(average {float(share.mean()):.1%}).",
         "",
-        "### Sensibilités annoncées par l'hypothèse (période de test d'origine, "
+        "### Sensitivities announced by the hypothesis (original test period, "
         f"{neural.TEST_PERIOD[0]} → {neural.TEST_PERIOD[1]})",
         "",
         table(
             frames["sa14_sensitivities"],
             [
-                ("model", "Modèle", "`{}`"),
-                ("epoch", "Époque retenue", "{:.0f}"),
+                ("model", "Model", "`{}`"),
+                ("epoch", "Epoch retained", "{:.0f}"),
                 ("quality", "Score", "{:.1%}"),
                 ("net_return", "Net", "{:+.2%}"),
                 ("sharpe", "Sharpe", "{:+.2f}"),
-                ("held_sharpe", "Sharpe du fonds détenu", "{:+.2f}"),
-                ("max_drawdown", "Perte max.", "{:.2%}"),
-                ("average_exposure", "Expo. moy.", "{:.1%}"),
-                ("costs_eur", "Coûts EUR", "{:,.0f}"),
+                ("held_sharpe", "Sharpe of the fund held", "{:+.2f}"),
+                ("max_drawdown", "Max. drawdown", "{:.2%}"),
+                ("average_exposure", "Avg. expo.", "{:.1%}"),
+                ("costs_eur", "Costs EUR", "{:,.0f}"),
             ],
-            "Variante",
+            "Variant",
         ),
         "",
-        "Les graines 43 et 44 et les coûts doublés sont rapportés à côté de la graine 42 "
-        "et ne la remplacent pas : une graine n'est jamais choisie sur son résultat de "
-        "test. Toutes les lignes portent sur la même période d'origine. Deux lignes à "
-        "coûts doublés répondent à deux questions différentes. « Modèle figé » rejoue le "
-        "**même artefact** que le test préinscrit - même normalisation, mêmes poids, même "
-        "époque - en doublant seulement les coûts du moteur : ce que devient le modèle "
-        "initial s'il coûte deux fois plus cher à exécuter. « Recalibrée » refait la "
-        "calibration de `scripts/SA14_run_neural_strategy.py` sous ces coûts : sa validation "
-        "peut retenir une autre époque, et c'est alors un autre modèle - ce que produit "
-        "la procédure de calibration sous un autre coût. "
+        "Seeds 43 and 44 and the doubled costs are reported beside seed 42 and do not "
+        "replace it: a seed is never chosen on its test result. All the rows cover the same "
+        "original period. Two rows at doubled costs answer two different questions. "
+        '"Frozen model" replays the **same artifact** as the preregistered test - same '
+        "normalisation, same weights, same epoch - doubling only the costs of the engine: "
+        "what the initial model becomes if it costs twice as much to execute. "
+        '"Recalibrated" redoes the calibration of `scripts/SA14_run_neural_strategy.py` '
+        "under these costs: its validation may retain another epoch, and it is then another "
+        "model - what the calibration procedure produces under another cost. "
         + (
-            "Dans chaque variante le Sharpe reste sous celui du fonds détenu et le score sous 50 %."
+            "In each variant the Sharpe stays below the fund held's and the score below 50%."
             if below
-            else "Les variantes ne sont pas toutes sous le fonds détenu et sous 50 % : voir "
-            "le tableau."
+            else "The variants are not all below the fund held and below 50%: see the table."
         ),
         "",
-        "### Entrées du réseau",
+        "### Inputs of the network",
         "",
-        f"Les {len(names)} caractéristiques lues par le réseau à chacune des "
-        f"{len(features)} décisions sont exportées dans `sa14_inputs.csv` (dossier des "
-        f"diagnostics), avec leur statut : {usable} décisions ont un vecteur complet. "
-        "Elles sont reconstruites par le `NeuralFeatureBuilder` du modèle sur un lecteur "
-        "figé à l'instant de chaque décision.",
+        f"The {len(names)} features read by the network at each of the "
+        f"{len(features)} decisions are exported to `sa14_inputs.csv` (folder of the "
+        f"diagnostics), with their status: {usable} decisions have a complete vector. "
+        "They are rebuilt by the model's `NeuralFeatureBuilder` on a reader frozen at the "
+        "instant of each decision.",
         "",
     ]
 

@@ -1,49 +1,49 @@
-# SA13 - Signatures Neurons — résultats et analyse
+# SA13 - Signatures Neurons — results and analysis
 
-Période de test 2023-01-02 → 2026-10-09 · capital 100 000 EUR · commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · 252 séances par an.
+Test period 2023-01-02 → 2026-10-09 · capital 100,000 EUR · commission 5 bp (minimum 1 EUR), half spread 3 bp, slippage 2 bp · quantities set at the decision, execution at the next open · cash earns nothing · 252 sessions a year.
 
-Source : commit `2b7d147d63e5` (CLEAN), magasin `750c23dfffc3`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
+Source: commit `2b7d147d63e5` (CLEAN), store `750c23dfffc3`, data up to 2026-10-09. Retrospective evaluation: the history of ETF_WORLD had already been looked at in earlier exercises; it is not an untouched sample.
 
-Étude dédiée (`scripts/SA13_run_signature_study.py`) : un modèle par variante et par mois (46 mois, 8 variantes), calibré sur ce qui était connu au soir de la dernière séance du mois précédent - 1 008 origines d'apprentissage et 126 de validation candidates, purgées aux deux frontières - puis gelé pour le mois ; un modèle est supposé disponible 12 heures après sa date limite d'information. La période commence au premier mois que le magasin permet de calibrer (date limite 2022-12-30) et le portefeuille est continu d'un mois à l'autre. Toutes les stratégies comparables sont rejouées sur cette période : leurs chiffres ne se comparent pas à ceux des rapports mesurés depuis 2021. L'hypothèse `sa13_signatures_neurons`, ses huit contrôles (C0 à C7, sans code de catalogue) et ses statuts ont été écrits avant le premier ajustement. Un seul fil de calcul.
+Dedicated study (`scripts/SA13_run_signature_study.py`): one model per variant and per month (46 months, 8 variants), calibrated on what was known on the evening of the last session of the previous month - 1,008 candidate training origins and 126 validation ones, purged at both boundaries - then frozen for the month; a model is assumed available 12 hours after its information cutoff. The period starts at the first month the store allows to be calibrated (cutoff 2022-12-30) and the portfolio is continuous from one month to the next. All the comparable strategies are replayed over this period: their figures are not comparable with those of the reports measured since 2021. The hypothesis `sa13_signatures_neurons`, its eight controls (C0 to C7, without a catalogue code) and its statuses were written before the first fit. A single thread.
 
-## 1. Indicateurs de résultat globaux
+## 1. Global result indicators
 
-| Indicateur | Stratégie | Fonds détenu (buy & hold ETF_WORLD) |
+| Indicator | Strategy | Fund held (buy & hold ETF_WORLD) |
 |---|---:|---:|
-| Période mesurée | 2023-01-02 → 2026-10-09 (964 séances) | idem |
-| Rang au classement commun (QUALITY_V1) | 12 | n/a |
-| Score de qualité QUALITY_V1 (0-100 %) | 0.0% | n/a |
-| - bloc marché (IR et alpha contre le fonds détenu) | 0.00 | n/a |
-| - bloc significativité (Sharpe déflaté) | 0.01 | n/a |
-| - bloc risque (drawdown relatif) | 0.64 | n/a |
-| - bloc robustesse (sous-périodes ; stress approché des coûts) | 0.00 | n/a |
-| - bloc implémentation (poids des coûts) | 0.00 | n/a |
-| Rendement net total | -3.53% | +86.73% |
-| Rendement brut total (mêmes ordres, sans coûts) | -1.95% | +86.83% |
-| Rendement net annualisé | -0.95% | +18.03% |
-| Volatilité annualisée | 6.79% | 12.69% |
-| Ratio de Sharpe net (taux sans risque 0) | -0.10 | +1.35 |
-| Ratio de Sortino net (taux sans risque 0) | -0.13 | +1.94 |
-| Perte maximale (max drawdown) | -18.56% | -21.57% |
-| Alpha annualisé contre le fonds détenu | -6.89% | n/a |
-| Bêta contre le fonds détenu | 0.36 | n/a |
-| Ratio d'information contre le fonds détenu | -1.87 | n/a |
-| Alpha annualisé contre SA1 (MA20) | -2.22% | +11.85% |
-| Bêta contre SA1 (MA20) | 0.28 | 0.98 |
-| Exposition moyenne (part investie) | 23.5% | 99.4% |
-| Ordres exécutés | 60 | 1 |
-| Coûts payés (EUR) | 1,579 | 99 |
-| Rotation annuelle (multiple de l'actif moyen) | 4.24 | 0.19 |
-| Rendement net, deux premiers tiers | -10.54% | +45.35% |
-| Rendement net, dernier tiers | +7.84% | +28.47% |
-| Rendement net, second run réel à coûts doublés | -5.11% | n/a |
-| Sharpe net, second run réel à coûts doublés | -0.17 | n/a |
+| Period measured | 2023-01-02 → 2026-10-09 (964 sessions) | same |
+| Rank in the common ranking (QUALITY_V1) | 12 | n/a |
+| QUALITY_V1 quality score (0-100%) | 0.0% | n/a |
+| - market block (IR and alpha against the fund held) | 0.00 | n/a |
+| - significance block (deflated Sharpe) | 0.01 | n/a |
+| - risk block (relative drawdown) | 0.64 | n/a |
+| - robustness block (sub-periods; approximate cost stress) | 0.00 | n/a |
+| - implementation block (weight of costs) | 0.00 | n/a |
+| Total net return | -3.53% | +86.73% |
+| Total gross return (same orders, no costs) | -1.95% | +86.83% |
+| Annualised net return | -0.95% | +18.03% |
+| Annualised volatility | 6.79% | 12.69% |
+| Net Sharpe ratio (risk-free rate 0) | -0.10 | +1.35 |
+| Net Sortino ratio (risk-free rate 0) | -0.13 | +1.94 |
+| Maximum drawdown | -18.56% | -21.57% |
+| Annualised alpha against the fund held | -6.89% | n/a |
+| Beta against the fund held | 0.36 | n/a |
+| Information ratio against the fund held | -1.87 | n/a |
+| Annualised alpha against SA1 (MA20) | -2.22% | +11.85% |
+| Beta against SA1 (MA20) | 0.28 | 0.98 |
+| Average exposure (share invested) | 23.5% | 99.4% |
+| Orders filled | 60 | 1 |
+| Costs paid (EUR) | 1,579 | 99 |
+| Annual turnover (multiple of average assets) | 4.24 | 0.19 |
+| Net return, first two thirds | -10.54% | +45.35% |
+| Net return, last third | +7.84% | +28.47% |
+| Net return, second actual run at doubled costs | -5.11% | n/a |
+| Net Sharpe, second actual run at doubled costs | -0.17 | n/a |
 
-Le score QUALITY_V1 est une **moyenne géométrique pondérée** de cinq blocs bornés entre 0 et 1 (marché 30 %, significativité 25 %, risque 15 %, robustesse 20 %, implémentation 10 %) : un seul bloc à zéro donne un score nul. Un score nul n'est donc ni une probabilité de gain nulle, ni une égalité économique entre deux stratégies ; le bloc implémentation, par exemple, tombe à zéro dès que les coûts atteignent 30 % du gain brut. Le bloc robustesse contient un **stress approché** des coûts, `net - (brut - net)` sur les mêmes ordres ; les deux dernières lignes du tableau viennent d'un **second run réel** à coûts doublés, où les quantités et la trajectoire changent, et n'entrent pas dans le score. Le score est déflaté par les essais de cette étude seulement, pas par la recherche antérieure : le classement est exploratoire, et un écart de quelques points entre deux scores n'est pas un test de supériorité. Les alphas sont des estimations ponctuelles sans intervalle, avec un taux sans risque nul ; l'alpha contre SA1 compare à une règle active, ce n'est pas un alpha de marché. Le fonds détenu est l'étalon du score et n'est pas noté. « n/a » : la mesure n'existe pas ; elle n'est jamais remplacée par zéro.
+The QUALITY_V1 score is a **weighted geometric mean** of five blocks bounded between 0 and 1 (market 30%, significance 25%, risk 15%, robustness 20%, implementation 10%): a single block at zero gives a zero score. A zero score is therefore neither a zero probability of gain nor an economic tie between two strategies; the implementation block, for example, falls to zero as soon as costs reach 30% of the gross gain. The robustness block contains an **approximate stress** of the costs, `net - (gross - net)` on the same orders; the last two rows of the table come from a **second actual run** at doubled costs, in which the quantities and the path change, and they do not enter the score. The score is deflated by the trials of this study only, not by earlier research: the ranking is exploratory, and a gap of a few points between two scores is not a test of superiority. The alphas are point estimates without an interval, with a zero risk-free rate; the alpha against SA1 compares with an active rule and is not a market alpha. The fund held is the yardstick of the score and is not scored. "n/a": the measure does not exist; it is never replaced by zero.
 
-### Classement de tous les livres de l'étude, sur la même période
+### Ranking of every book of the study, over the same period
 
-| Livre | Rang | Score | Net | Net, coûts x2 | Sharpe | Perte max. | Alpha/an | Exposition | Coûts (EUR) |
+| Book | Rank | Score | Net | Net, costs x2 | Sharpe | Max. drawdown | Alpha/yr | Exposure | Costs (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 50/50 rebalanced | 1 | 74.1% | +92.04% | +91.52% | +1.36 | -22.46% | +0.26% | 100% | 475 |
 | SA10 - ensemble | 2 | 47.5% | +29.77% | +28.44% | +1.21 | -11.74% | -0.45% | 44% | 1,235 |
@@ -67,205 +67,205 @@ Le score QUALITY_V1 est une **moyenne géométrique pondérée** de cinq blocs b
 | SA4 - pullback | 12 | 0.0% | +4.03% | +0.63% | +0.54 | -3.42% | +0.12% | 4% | 3,376 |
 | buy & hold World | n/a | n/a | +86.73% | +86.63% | +1.35 | -21.57% | n/a | 99% | 99 |
 
-Tous ces livres sont exécutés par le même moteur, sur la même période, avec les mêmes coûts. Les contrôles (noms commençant par D ou C) et les deux références ne sont pas des candidats. Ces chiffres ne se comparent pas à ceux d'une autre étude, mesurés depuis une autre date ; un rang n'est pas une probabilité de succès.
+All these books are run by the same engine, over the same period, with the same costs. The controls (names starting with D or C) and the two references are not candidates. These figures are not comparable with those of another study, measured from another date; a rank is not a probability of success.
 
-## 2. Analyse
+## 2. Analysis
 
-### Faits mesurés
+### Measured facts
 
-| Période | Du | Au | Valorisations | Rendements | Stratégie | ETF_WORLD (clôture) | Fonds détenu (net) | Écart relatif | Poids de clôture moyen | Poids de clôture min. | Poids de clôture max. |
+| Stretch | From | To | Valuations | Returns | Strategy | ETF_WORLD (close) | Fund held (net) | Relative gap | Average close weight | Min. close weight | Max. close weight |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Plus forte baisse (sommet → creux) | 2024-07-16 | 2025-04-09 | 189 | 188 | -18.56% | -11.77% | -11.72% | -7.75% | 32% | 0% | 100% |
-| Plus forte hausse (creux → sommet ultérieur, durée libre) | 2025-04-09 | 2026-06-15 | 300 | 299 | +14.13% | +45.06% | +44.82% | -21.20% | 34% | 0% | 100% |
-| Pires 63 rendements consécutifs | 2025-01-10 | 2025-04-09 | 64 | 63 | -14.26% | -18.17% | -18.09% | +4.68% | 58% | 0% | 100% |
-| Meilleurs 63 rendements consécutifs | 2025-08-01 | 2025-10-29 | 64 | 63 | +8.86% | +9.57% | +9.53% | -0.61% | 95% | 77% | 100% |
-| Plus fort retard relatif sur le fonds détenu | 2023-03-13 | 2026-10-06 | 911 | 910 | -4.04% | +87.82% | +87.27% | -48.76% | 24% | 0% | 100% |
-| Plus forte avance relative sur le fonds détenu | 2025-01-31 | 2025-04-09 | 49 | 48 | -14.26% | -21.23% | -21.14% | +8.74% | 76% | 0% | 100% |
-| Plus forte baisse du fonds détenu | 2025-02-19 | 2025-04-09 | 36 | 35 | -15.65% | -21.66% | -21.57% | +7.54% | 72% | 36% | 100% |
-| Plus forte hausse du fonds détenu | 2023-01-03 | 2026-10-06 | 960 | 959 | -3.53% | +88.71% | +88.15% | -48.73% | 24% | 0% | 100% |
+| Deepest fall (peak → trough) | 2024-07-16 | 2025-04-09 | 189 | 188 | -18.56% | -11.77% | -11.72% | -7.75% | 32% | 0% | 100% |
+| Largest rise (trough → later peak, any length) | 2025-04-09 | 2026-06-15 | 300 | 299 | +14.13% | +45.06% | +44.82% | -21.20% | 34% | 0% | 100% |
+| Worst 63 consecutive returns | 2025-01-10 | 2025-04-09 | 64 | 63 | -14.26% | -18.17% | -18.09% | +4.68% | 58% | 0% | 100% |
+| Best 63 consecutive returns | 2025-08-01 | 2025-10-29 | 64 | 63 | +8.86% | +9.57% | +9.53% | -0.61% | 95% | 77% | 100% |
+| Largest relative lag behind the fund held | 2023-03-13 | 2026-10-06 | 911 | 910 | -4.04% | +87.82% | +87.27% | -48.76% | 24% | 0% | 100% |
+| Largest relative lead over the fund held | 2025-01-31 | 2025-04-09 | 49 | 48 | -14.26% | -21.23% | -21.14% | +8.74% | 76% | 0% | 100% |
+| Deepest fall of the fund held | 2025-02-19 | 2025-04-09 | 36 | 35 | -15.65% | -21.66% | -21.57% | +7.54% | 72% | 36% | 100% |
+| Largest rise of the fund held | 2023-01-03 | 2026-10-06 | 960 | 959 | -3.53% | +88.71% | +88.15% | -48.73% | 24% | 0% | 100% |
 
-Chaque ligne va de la valeur de la séance « Du » à celle de la séance « Au » : N valorisations, donc N - 1 rendements. « Plus forte hausse » est la plus grande hausse d'un creux à un sommet ultérieur, de durée libre : ce n'est ni une position ni un trade. Les deux périodes relatives sont choisies sur le rapport de la stratégie au fonds détenu, dont l'« écart relatif » `(1 + stratégie) / (1 + fonds) - 1` est la variation. Le « poids de clôture » est la part de l'actif net détenue en fonds à la valorisation du soir, le reste étant du cash non rémunéré : il a pu dériver avec les cours, et le multiplier par le rendement du fonds ne reconstitue pas le résultat. Une décision prise le soir de t (signal et poids cible de la ligne t) est exécutée à l'ouverture de t + 1 et n'apparaît dans le poids détenu qu'à la ligne t + 1.
+Each row runs from the value of the "From" session to that of the "To" session: N valuations, hence N - 1 returns. "Largest rise" is the largest rise from a trough to a later peak, of any length: it is neither a position nor a trade. The two relative stretches are selected on the ratio of the strategy to the fund held, whose change is the "relative gap" `(1 + strategy) / (1 + fund) - 1`. The "close weight" is the share of the net assets held in funds at the evening valuation, the rest being cash that earns nothing: it may have drifted with prices, and multiplying it by the fund's return does not rebuild the result. A decision taken on the evening of t (signal and target weight of row t) is executed at the open of t + 1 and appears in the weight held only at row t + 1.
 
-### Baisses sous un sommet et retour à ce sommet
+### Falls below a peak and the return to it
 
-| Rang | Sommet | Creux | Profondeur | Retour au sommet | Jours calendaires |
+| Rank | Peak | Trough | Depth | Back at the peak | Calendar days |
 |---:|---|---|---:|---|---:|
-| 1 | 2024-07-16 | 2025-04-09 | -18.56% | non récupéré au 2026-10-09 | 815 (en cours) |
+| 1 | 2024-07-16 | 2025-04-09 | -18.56% | not recovered at 2026-10-09 | 815 (ongoing) |
 | 2 | 2023-10-12 | 2023-10-27 | -5.58% | 2023-11-22 | 41 |
 | 3 | 2023-02-03 | 2023-10-05 | -2.10% | 2023-10-10 | 249 |
 
-Drawdown au 2026-10-09 : **-7.26%** sous le plus haut de la période.
-Plus longue période sous un sommet : **815 jours calendaires**, du 2024-07-16 au 2026-10-09 (en cours, creux à -18.56%).
+Drawdown at 2026-10-09: **-7.26%** below the high of the period.
+Longest stretch below a peak: **815 calendar days**, from 2024-07-16 to 2026-10-09 (ongoing, trough at -18.56%).
 
-### Par année et par mois
+### By year and by month
 
-| Année | Stratégie | Fonds détenu | 50/50 rebalancé | Séances |
+| Year | Strategy | Fund held | 50/50 rebalanced | Sessions |
 |---|---:|---:|---:|---:|
 | 2023 | +2.07% | +17.32% | +18.50% | 255 |
 | 2024 | -3.20% | +26.95% | +30.26% | 256 |
 | 2025 | -3.34% | +6.59% | +5.02% | 255 |
-| 2026 (partielle, au 2026-10-09) | +1.02% | +17.62% | +18.47% | 198 |
+| 2026 (partial, to 2026-10-09) | +1.02% | +17.62% | +18.47% | 198 |
 
-Mois : **9 positifs, 9 négatifs, 28 sans variation** sur 46 (mois incomplets : 2026-10 s'arrête au 2026-10-09). Pire mois : **2025-03** (-6.47%, fonds détenu -7.90%). Meilleur mois : **2023-11** (+5.03%, fonds détenu +5.64%).
+Months: **9 positive, 9 negative, 28 unchanged** out of 46 (incomplete months: 2026-10 stops at 2026-10-09). Worst month: **2025-03** (-6.47%, fund held -7.90%). Best month: **2023-11** (+5.03%, fund held +5.64%).
 
-Activité : une position est détenue à la clôture de **269 valorisations sur 964** ; le poids total détenu y va de 29.0% à 99.9% (moyenne sur toutes les valorisations : 23.5%).
+Activity: a position is held at the close of **269 valuations out of 964**; the total weight held there ranges from 29.0% to 99.9% (average over all valuations: 23.5%).
 
-### Couverture, prévisions et composition (étude SA13)
+### Coverage, forecasts and composition (SA13 study)
 
-- **Couverture.** 46 mois sur 46 ont un modèle calibré ; 964 décisions sur 964 ont un modèle autorisé et des features utilisables (100.00%). Motifs des décisions inutilisables : aucun. Les mois sans modèle et les séances sans signal restent dans la performance, en cash.
-- **Calibrations.** 1004 exemples d'apprentissage et 124 de validation en moyenne par mois ; époque retenue moyenne 206 ; 22 modèle(s) sur 46 retenu(s) à la dernière époque autorisée, c'est-à-dire avec une perte de validation encore en baisse à l'arrêt. Ce plafond était gelé avant le premier ajustement.
-- **Erreur de prévision, toutes prévisions valides.** 962 paires ; MSE 8.7648e-05, contre 8.5767e-05 pour la prévision nulle et 8.5353e-05 pour la moyenne d'apprentissage gelée avec chaque modèle ; R² hors apprentissage -0.0269 ; corrélation prévision/réalisation -0.035.
-- **Signe.** Juste 52.4%, contre 57.1% pour « toujours en hausse » ; justesse équilibrée 49.1% ; 705 prévisions positives.
-- **Prévisions suivies d'une position portée.** 269 paires ; MSE 1.9108e-04 ; signe juste 55.4% contre 55.4% pour « toujours en hausse ».
-- **Épisodes de position.** 8 épisodes, dont 8 terminés ; 5 gagnants ; net moyen -0.35%.
+- **Coverage.** 46 months out of 46 have a calibrated model; 964 decisions out of 964 have an authorised model and usable features (100.00%). Reasons for the unusable decisions: none. The months without a model and the sessions without a signal stay in the performance, in cash.
+- **Calibrations.** 1004 training examples and 124 validation ones on average per month; average epoch retained 206; 22 model(s) out of 46 retained at the last allowed epoch, that is with a validation loss still falling when they stopped. This ceiling was frozen before the first fit.
+- **Forecast error, all valid forecasts.** 962 pairs; MSE 8.7648e-05, against 8.5767e-05 for the zero forecast and 8.5353e-05 for the training mean frozen with each model; out-of-sample R² -0.0269; forecast/realisation correlation -0.035.
+- **Sign.** Right 52.4%, against 57.1% for "always up"; balanced accuracy 49.1%; 705 positive forecasts.
+- **Forecasts followed by a position carried.** 269 pairs; MSE 1.9108e-04; right sign 55.4% against 55.4% for "always up".
+- **Position episodes.** 8 episodes, of which 8 finished; 5 winners; mean net -0.35%.
 
-### De quoi une prévision de SA13 est faite (contributions moyennes, en points de base)
+### What a forecast of SA13 is made of (average contributions, in basis points)
 
-| Décisions | Nombre | Prévision | Référence | Déplacements | Prix-volume | Prix-temps | Volume-temps | Ordre 3 |
+| Decisions | Number | Forecast | Reference | Displacements | Price-volume | Price-time | Volume-time | Order 3 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Toutes les décisions utilisables | 964 | +6.09 | -4.77 | +3.64 | -0.18 | +2.18 | -0.91 | +6.12 |
-| Décisions qui ont ouvert une position | 8 | +23.28 | -3.60 | +0.33 | +0.91 | +0.49 | -0.68 | +25.83 |
-| Décisions qui ont fermé une position | 8 | -2.73 | -4.51 | +3.38 | +0.14 | +2.70 | -0.44 | -4.00 |
+| Every usable decision | 964 | +6.09 | -4.77 | +3.64 | -0.18 | +2.18 | -0.91 | +6.12 |
+| Decisions that opened a position | 8 | +23.28 | -3.60 | +0.33 | +0.91 | +0.49 | -0.68 | +25.83 |
+| Decisions that closed a position | 8 | -2.73 | -4.51 | +3.38 | +0.14 | +2.70 | -0.44 | -4.00 |
 
-Chaque prévision est exactement sa référence plus ses contributions. Une contribution à la prévision n'est pas une contribution au résultat : le poids économique d'un groupe se teste par la variante réentraînée sans lui (C2 pour l'ordre 3, C3 pour le volume). Le point `z = 0` est une référence statistique des features, pas un chemin de marché réalisable.
+Each forecast is exactly its reference plus its contributions. A contribution to the forecast is not a contribution to the result: the economic weight of a group is tested by the variant retrained without it (C2 for order 3, C3 for the volume). The point `z = 0` is a statistical reference of the features, not a market path that could happen.
 
-### Écarts d'erreur quadratique (premier moins second, négatif = premier meilleur)
+### Squared-error gaps (first minus second, negative = first better)
 
-| Comparaison | Paires | Écart moyen | Intervalle 95 % |
+| Comparison | Pairs | Mean gap | 95% interval |
 |---|---:|---:|---|
-| SA13 - zero forecast | 962 | +1.881e-06 | [-4.360e-07 ; +5.886e-06] |
-| SA13 - training mean | 962 | +2.294e-06 | [+1.800e-07 ; +5.913e-06] |
-| SA13 - C1 (the neurons, against Ridge on the same log-signature) | 962 | +1.485e-06 | [+1.272e-07 ; +3.536e-06] |
-| SA13 - C2 (order 3, against order 2) | 962 | +1.733e-06 | [-2.477e-07 ; +4.587e-06] |
-| SA13 - C3 (the volume, against none) | 962 | +6.859e-07 | [-2.890e-07 ; +2.265e-06] |
-| SA13 - C4 (the signature, against classical indicators) | 962 | -4.139e-07 | [-2.572e-06 ; +1.373e-06] |
-| SA13 - C5 (the compression, against the raw trajectory) | 962 | -1.271e-06 | [-6.224e-06 ; +7.281e-06] |
-| C6 - SA13 (a second process, against the fund alone) | 962 | +3.805e-06 | [+1.334e-06 ; +6.012e-06] |
-| C6 - C7 (the neurons on two processes, against Ridge) | 962 | +5.323e-06 | [+2.863e-06 ; +7.651e-06] |
+| SA13 - zero forecast | 962 | +1.881e-06 | [-4.360e-07; +5.886e-06] |
+| SA13 - training mean | 962 | +2.294e-06 | [+1.800e-07; +5.913e-06] |
+| SA13 - C1 (the neurons, against Ridge on the same log-signature) | 962 | +1.485e-06 | [+1.272e-07; +3.536e-06] |
+| SA13 - C2 (order 3, against order 2) | 962 | +1.733e-06 | [-2.477e-07; +4.587e-06] |
+| SA13 - C3 (the volume, against none) | 962 | +6.859e-07 | [-2.890e-07; +2.265e-06] |
+| SA13 - C4 (the signature, against classical indicators) | 962 | -4.139e-07 | [-2.572e-06; +1.373e-06] |
+| SA13 - C5 (the compression, against the raw trajectory) | 962 | -1.271e-06 | [-6.224e-06; +7.281e-06] |
+| C6 - SA13 (a second process, against the fund alone) | 962 | +3.805e-06 | [+1.334e-06; +6.012e-06] |
+| C6 - C7 (the neurons on two processes, against Ridge) | 962 | +5.323e-06 | [+2.863e-06; +7.651e-06] |
 
-Bootstrap par blocs mobiles de 60 origines, 5000 tirages, graine 20261010. Les fenêtres se recouvrent fortement : mille lignes ne sont pas mille expériences indépendantes.
+Moving-block bootstrap of 60 origins, 5000 draws, seed 20261010. The windows overlap heavily: a thousand rows are not a thousand independent experiments.
 
-### SA13 contre ses contrôles et les références
+### SA13 against its controls and the references
 
-| Coûts | Contrôle | Sharpe SA13 | Sharpe contrôle | Écart | Intervalle 95 % | Perte max. SA13 | Perte max. contrôle |
+| Costs | Control | Sharpe SA13 | Sharpe control | Gap | 95% interval | Max. drawdown SA13 | Max. drawdown control |
 |---|---|---:|---:|---:|---|---:|---:|
-| x1 | C0 - same risk no filter | -0.104 | +1.249 | -1.353 | [-1.999 ; -0.627] | -18.56% | -15.70% |
-| x1 | C1 - Ridge logsig3 | -0.104 | +0.568 | n/a | [n/a ; n/a] | -18.56% | -10.72% |
-| x1 | C2 - NAM logsig2 | -0.104 | -0.285 | n/a | [n/a ; n/a] | -18.56% | -9.02% |
-| x1 | C3 - NAM no volume | -0.104 | -0.088 | -0.016 | [-0.525 ; +0.464] | -18.56% | -15.68% |
-| x1 | C4 - NAM classical | -0.104 | +0.480 | -0.584 | [-1.532 ; +0.480] | -18.56% | -22.98% |
-| x1 | C5 - Ridge raw trajectory | -0.104 | -0.017 | -0.088 | [-1.331 ; +1.155] | -18.56% | -10.56% |
-| x1 | C6 - NAM context SP500 | -0.104 | -0.088 | -0.017 | [-0.524 ; +0.611] | -18.56% | -15.06% |
-| x1 | C7 - Ridge context SP500 | -0.104 | +0.776 | -0.881 | [-2.338 ; +0.208] | -18.56% | -13.95% |
-| x1 | SA6 - vol control | -0.104 | +1.249 | -1.353 | [-1.999 ; -0.627] | -18.56% | -15.70% |
-| x1 | SA11 - GARCH vol control | -0.104 | +1.269 | -1.374 | [-2.042 ; -0.645] | -18.56% | -16.52% |
-| x1 | SA12 - ARIMA GARCH | -0.104 | -0.164 | n/a | [n/a ; n/a] | -18.56% | -6.99% |
-| x1 | buy & hold World | -0.104 | +1.352 | -1.456 | [-2.118 ; -0.788] | -18.56% | -21.57% |
-| x1 | 50/50 rebalanced | -0.104 | +1.365 | -1.469 | [-2.173 ; -0.769] | -18.56% | -22.46% |
-| x2 | C0 - same risk no filter | -0.168 | +1.233 | -1.401 | [-2.052 ; -0.678] | -18.98% | -15.77% |
-| x2 | C1 - Ridge logsig3 | -0.168 | +0.528 | n/a | [n/a ; n/a] | -18.98% | -10.88% |
-| x2 | C2 - NAM logsig2 | -0.168 | -0.298 | n/a | [n/a ; n/a] | -18.98% | -9.06% |
-| x2 | C3 - NAM no volume | -0.168 | -0.147 | -0.021 | [-0.517 ; +0.456] | -18.98% | -15.78% |
-| x2 | C4 - NAM classical | -0.168 | +0.438 | -0.606 | [-1.556 ; +0.463] | -18.98% | -23.49% |
-| x2 | C5 - Ridge raw trajectory | -0.168 | -1.163 | +0.996 | [-0.376 ; +2.349] | -18.98% | -26.74% |
-| x2 | C6 - NAM context SP500 | -0.168 | -0.202 | +0.034 | [-0.469 ; +0.665] | -18.98% | -15.64% |
-| x2 | C7 - Ridge context SP500 | -0.168 | +0.725 | -0.892 | [-2.313 ; +0.183] | -18.98% | -13.99% |
-| x2 | SA6 - vol control | -0.168 | +1.233 | -1.401 | [-2.052 ; -0.678] | -18.98% | -15.77% |
-| x2 | SA11 - GARCH vol control | -0.168 | +1.237 | -1.405 | [-2.082 ; -0.672] | -18.98% | -16.59% |
-| x2 | SA12 - ARIMA GARCH | -0.168 | -0.567 | n/a | [n/a ; n/a] | -18.98% | -9.46% |
-| x2 | buy & hold World | -0.168 | +1.350 | -1.518 | [-2.185 ; -0.849] | -18.98% | -21.58% |
-| x2 | 50/50 rebalanced | -0.168 | +1.359 | -1.527 | [-2.238 ; -0.825] | -18.98% | -22.47% |
+| x1 | C0 - same risk no filter | -0.104 | +1.249 | -1.353 | [-1.999; -0.627] | -18.56% | -15.70% |
+| x1 | C1 - Ridge logsig3 | -0.104 | +0.568 | n/a | [n/a; n/a] | -18.56% | -10.72% |
+| x1 | C2 - NAM logsig2 | -0.104 | -0.285 | n/a | [n/a; n/a] | -18.56% | -9.02% |
+| x1 | C3 - NAM no volume | -0.104 | -0.088 | -0.016 | [-0.525; +0.464] | -18.56% | -15.68% |
+| x1 | C4 - NAM classical | -0.104 | +0.480 | -0.584 | [-1.532; +0.480] | -18.56% | -22.98% |
+| x1 | C5 - Ridge raw trajectory | -0.104 | -0.017 | -0.088 | [-1.331; +1.155] | -18.56% | -10.56% |
+| x1 | C6 - NAM context SP500 | -0.104 | -0.088 | -0.017 | [-0.524; +0.611] | -18.56% | -15.06% |
+| x1 | C7 - Ridge context SP500 | -0.104 | +0.776 | -0.881 | [-2.338; +0.208] | -18.56% | -13.95% |
+| x1 | SA6 - vol control | -0.104 | +1.249 | -1.353 | [-1.999; -0.627] | -18.56% | -15.70% |
+| x1 | SA11 - GARCH vol control | -0.104 | +1.269 | -1.374 | [-2.042; -0.645] | -18.56% | -16.52% |
+| x1 | SA12 - ARIMA GARCH | -0.104 | -0.164 | n/a | [n/a; n/a] | -18.56% | -6.99% |
+| x1 | buy & hold World | -0.104 | +1.352 | -1.456 | [-2.118; -0.788] | -18.56% | -21.57% |
+| x1 | 50/50 rebalanced | -0.104 | +1.365 | -1.469 | [-2.173; -0.769] | -18.56% | -22.46% |
+| x2 | C0 - same risk no filter | -0.168 | +1.233 | -1.401 | [-2.052; -0.678] | -18.98% | -15.77% |
+| x2 | C1 - Ridge logsig3 | -0.168 | +0.528 | n/a | [n/a; n/a] | -18.98% | -10.88% |
+| x2 | C2 - NAM logsig2 | -0.168 | -0.298 | n/a | [n/a; n/a] | -18.98% | -9.06% |
+| x2 | C3 - NAM no volume | -0.168 | -0.147 | -0.021 | [-0.517; +0.456] | -18.98% | -15.78% |
+| x2 | C4 - NAM classical | -0.168 | +0.438 | -0.606 | [-1.556; +0.463] | -18.98% | -23.49% |
+| x2 | C5 - Ridge raw trajectory | -0.168 | -1.163 | +0.996 | [-0.376; +2.349] | -18.98% | -26.74% |
+| x2 | C6 - NAM context SP500 | -0.168 | -0.202 | +0.034 | [-0.469; +0.665] | -18.98% | -15.64% |
+| x2 | C7 - Ridge context SP500 | -0.168 | +0.725 | -0.892 | [-2.313; +0.183] | -18.98% | -13.99% |
+| x2 | SA6 - vol control | -0.168 | +1.233 | -1.401 | [-2.052; -0.678] | -18.98% | -15.77% |
+| x2 | SA11 - GARCH vol control | -0.168 | +1.237 | -1.405 | [-2.082; -0.672] | -18.98% | -16.59% |
+| x2 | SA12 - ARIMA GARCH | -0.168 | -0.567 | n/a | [n/a; n/a] | -18.98% | -9.46% |
+| x2 | buy & hold World | -0.168 | +1.350 | -1.518 | [-2.185; -0.849] | -18.98% | -21.58% |
+| x2 | 50/50 rebalanced | -0.168 | +1.359 | -1.527 | [-2.238; -0.825] | -18.98% | -22.47% |
 
-C0 : mêmes modèles, même disponibilité, même dimensionnement, filtre de direction toujours actif. C1 : Ridge sur les 13 mêmes coefficients. C2 : réseau additif à l'ordre 2. C3 : réseau additif sans volume. C4 : réseau additif sur neuf indicateurs classiques. C5 : Ridge sur la trajectoire brute. C6 et C7 : réseau additif et Ridge sur World + S&P 500. Ce sont des contrôles de recherche, sans code de catalogue, et aucun n'est candidat. Bootstrap apparié par blocs de 60 séances, 5000 tirages, graine 20261010.
+C0: same models, same availability, same sizing, direction gate always on. C1: Ridge on the same 13 coefficients. C2: additive network at order 2. C3: additive network without volume. C4: additive network on nine classic indicators. C5: Ridge on the raw path. C6 and C7: additive network and Ridge on World + S&P 500. These are research controls, without a catalogue code, and none is a candidate. Paired bootstrap by blocks of 60 sessions, 5000 draws, seed 20261010.
 
-Écart principal, SA13 moins C0, aux trois longueurs de bloc annoncées :
+Main gap, SA13 minus C0, at the three block lengths announced:
 
-| Coûts | Bloc | Écart de Sharpe | Intervalle 95 % |
+| Costs | Block | Sharpe gap | 95% interval |
 |---|---:|---:|---|
-| x1 | 20 | -1.353 | [-2.028 ; -0.543] |
-| x1 | 60 | -1.353 | [-1.999 ; -0.627] |
-| x1 | 120 | -1.353 | [-1.987 ; -0.673] |
-| x2 | 20 | -1.401 | [-2.074 ; -0.602] |
-| x2 | 60 | -1.401 | [-2.052 ; -0.678] |
-| x2 | 120 | -1.401 | [-2.034 ; -0.714] |
+| x1 | 20 | -1.353 | [-2.028; -0.543] |
+| x1 | 60 | -1.353 | [-1.999; -0.627] |
+| x1 | 120 | -1.353 | [-1.987; -0.673] |
+| x2 | 20 | -1.401 | [-2.074; -0.602] |
+| x2 | 60 | -1.401 | [-2.052; -0.678] |
+| x2 | 120 | -1.401 | [-2.034; -0.714] |
 
-### Statut de l'hypothèse préinscrite `sa13_signatures_neurons` : **INSUFFICIENT_EVIDENCE**
+### Status of the preregistered hypothesis `sa13_signatures_neurons`: **INSUFFICIENT_EVIDENCE**
 
 - 8 completed position episodes, under 30
 
-Ce statut répond à une seule question, écrite avant le premier ajustement : le filtre de direction appris sur la log-signature améliore-t-il le même dimensionnement de risque sans lui (C0) ? Les intervalles sont conditionnels au chemin déjà produit ; ils ne portent ni l'incertitude des réestimations ni la sélection des idées. Conclusions séparées, sur les écarts d'erreur quadratique :
+This status answers a single question, written before the first fit: does the direction gate learned on the log-signature improve the same risk sizing without it (C0)? The intervals are conditional on the path already produced; they carry neither the uncertainty of the re-estimations nor the selection of the ideas. Separate conclusions, on the squared-error gaps:
 
-- Apport des neurones (SA13 contre Ridge sur les mêmes log-signatures) : erreur quadratique non plus faible : non soutenu sur ce chemin.
-- Apport de l'ordre 3 (contre l'ordre 2) : erreur quadratique non plus faible : non soutenu sur ce chemin.
-- Apport du volume (contre le canal de volume à zéro) : erreur quadratique non plus faible : non soutenu sur ce chemin.
-- Apport des signatures (contre neuf indicateurs classiques) : erreur quadratique plus faible, intervalle contenant zéro : non établi.
-- Apport de la compression (contre la trajectoire brute en Ridge) : erreur quadratique plus faible, intervalle contenant zéro : non établi.
-- Apport d'un second processus (World + S&P 500 contre World seul) : erreur quadratique non plus faible : non soutenu sur ce chemin.
+- Contribution of the neurons (SA13 against Ridge on the same log-signatures): squared error not lower: not supported on this path.
+- Contribution of order 3 (against order 2): squared error not lower: not supported on this path.
+- Contribution of the volume (against the volume channel at zero): squared error not lower: not supported on this path.
+- Contribution of the signatures (against nine classic indicators): lower squared error, interval containing zero: not established.
+- Contribution of the compression (against the raw path in Ridge): lower squared error, interval containing zero: not established.
+- Contribution of a second process (World + S&P 500 against World alone): squared error not lower: not supported on this path.
 
-### En résumé
+### In short
 
-Détenir ETF_WORLD seulement quand un petit réseau additif (4 unités tanh par coefficient, 157 paramètres), réestimé chaque mois, prévoit plus de 20 pb pour le rendement de l'ouverture de t + 1 à l'ouverture de t + 2, à partir des 13 coefficients de la log-signature d'ordre 3 des 60 dernières séances du fonds (prix, activité, temps) ; la position est gardée tant que la prévision reste strictement positive, au poids de SA6, min(1, 12 % / max(σ20, σ60, 5 %)). Sur les 964 séances de test le livre prend 8 positions, est investi à 23,5 % en moyenne et perd 3,53 % net, quand le même dimensionnement sans filtre (C0, identique ici à SA6 puisque la couverture est de 100 %) gagne 62,09 %. Le statut préinscrit est INSUFFICIENT_EVIDENCE parce qu'il n'y a que 8 épisodes terminés pour 30 requis ; l'écart de Sharpe mesuré contre C0 est de -1,35, avec un intervalle entièrement négatif. Les prévisions ont une erreur quadratique plus élevée que la moyenne d'apprentissage et que la régression Ridge sur les mêmes coefficients. Cela ne dit rien des signatures de chemin en général.
+Hold ETF_WORLD only when a small additive network (4 tanh units per coefficient, 157 parameters), re-estimated every month, forecasts more than 20 bp for the return from the open of t + 1 to the open of t + 2, from the 13 coefficients of the order-3 log-signature of the last 60 sessions of the fund (price, activity, time); the position is kept as long as the forecast stays strictly positive, at the weight of SA6, min(1, 12% / max(σ20, σ60, 5%)). Over the 964 test sessions the book takes 8 positions, is invested at 23.5% on average and loses 3.53% net, when the same sizing without the gate (C0, identical here to SA6 since the coverage is 100%) gains 62.09%. The preregistered status is INSUFFICIENT_EVIDENCE because there are only 8 finished episodes for 30 required; the Sharpe gap measured against C0 is -1.35, with an interval entirely negative. The forecasts have a higher squared error than the training mean and than the Ridge regression on the same coefficients. This says nothing about path signatures in general.
 
-### Points forts
+### Strengths
 
-- **Fait.** La chaîne fonctionne et se vérifie : 46 mois sur 46 ont un modèle calibré ; 964 décisions sur 964 ont un modèle autorisé et des features utilisables ; les prévisions exportées depuis les features de la calibration sont exactement celles que le signal du run a calculées ; chaque prévision est sa référence plus ses 13 contributions.
-- **Fait.** Pendant la baisse du fonds du 2025-02-19 au 2025-04-09 (-21,57 %), le livre perd -15,65 % : le poids détenu passe de 100 % à 36 %. **Lecture.** Cette réduction vient de la règle de taille de SA6, pas de la prévision, qui est restée positive pendant toute la baisse.
-- **Fait.** Sur ses 63 meilleurs rendements consécutifs (2025-08-01 au 2025-10-29) le livre fait +8,86 % contre +9,57 % pour le fonds, avec un poids de clôture moyen de 95 %.
-- **Fait.** L'erreur quadratique de SA13 est un peu plus basse que celle du réseau sur indicateurs classiques (écart de -4,1e-07) et que celle de la Ridge sur trajectoire brute (-1,3e-06) ; les deux intervalles contiennent zéro.
-- **Fait.** Les fonctions apprises changent peu de signe d'un mois à l'autre : à z = ±1 et ±2, la contribution d'un coefficient a le signe de sa moyenne dans 84 à 86 % des mois en moyenne, et dans 67 % des mois pour l'aire prix-volume à z = 2. C'est une mesure de stabilité, pas de justesse.
+- **Fact.** The chain works and checks itself: 46 months out of 46 have a calibrated model; 964 decisions out of 964 have an authorised model and usable features; the forecasts exported from the features of the calibration are exactly those the signal of the run computed; each forecast is its reference plus its 13 contributions.
+- **Fact.** During the fall of the fund from 2025-02-19 to 2025-04-09 (-21.57%), the book loses -15.65%: the weight held goes from 100% to 36%. **Reading.** This reduction comes from the sizing rule of SA6, not from the forecast, which stayed positive throughout the fall.
+- **Fact.** Over its 63 best consecutive returns (2025-08-01 to 2025-10-29) the book makes +8.86% against +9.57% for the fund, with an average close weight of 95%.
+- **Fact.** The squared error of SA13 is slightly lower than that of the network on classic indicators (gap of -4.1e-07) and than that of the Ridge on the raw path (-1.3e-06); both intervals contain zero.
+- **Fact.** The learned functions rarely change sign from one month to the next: at z = ±1 and ±2, the contribution of a coefficient has the sign of its mean in 84 to 86% of the months on average, and in 67% of the months for the price-volume area at z = 2. It is a measure of stability, not of accuracy.
 
-### Points faibles
+### Weaknesses
 
-- **Fait.** -3,53 % net sur la période, contre +62,09 % pour C0 et SA6 et +86,73 % pour le fonds ; Sharpe -0,10 ; -5,11 % dans le second run à coûts doublés. Brut de coûts le livre perd déjà 1,95 % : la perte ne vient pas d'abord des coûts (1 579 EUR).
-- **Fait.** Perte maximale de -18,56 %, plus profonde que celle de C0 (-15,70 %), et non récupérée au 2026-10-09, 815 jours après le sommet du 2024-07-16.
-- **Fait.** Les séances investies sont moins bonnes que les séances en cash : le fonds gagne en moyenne +3,0 pb par séance sur les 269 valorisations où le livre est investi (+6,6 % composé), contre +8,3 pb sur les 694 autres (+75,0 % composé).
-- **Fait.** Les prévisions sont moins bonnes que deux prévisions naïves : erreur quadratique moyenne de 8,7648e-05, contre 8,5767e-05 pour la prévision nulle et 8,5353e-05 pour la moyenne d'apprentissage gelée avec chaque modèle (écart de +2,3e-06, intervalle à 95 % [+1,8e-07 ; +5,9e-06], au-dessus de zéro) ; R² hors apprentissage -0,027 ; corrélation prévision/réalisation -0,035 ; signe juste 52,4 % contre 57,1 % pour « toujours en hausse ».
-- **Fait.** Le réseau fait moins bien que la Ridge sur les mêmes 13 coefficients : écart d'erreur quadratique de +1,5e-06, intervalle [+1,3e-07 ; +3,5e-06] ; le livre de la Ridge (C1) fait +11,25 % net.
-- **Fait.** 22 modèles sur 46 sont retenus à la dernière époque autorisée (300) : leur perte de validation baissait encore à l'arrêt.
-- **Fait.** Seulement 8 entrées en 964 séances : 88 soirs ont une prévision au-dessus de 20 pb, mais 80 d'entre eux tombent quand le livre est déjà investi, et 438 soirs en cash ont une prévision entre 0 et 20 pb.
+- **Fact.** -3.53% net over the period, against +62.09% for C0 and SA6 and +86.73% for the fund; Sharpe -0.10; -5.11% in the second run at doubled costs. Gross of costs the book already loses 1.95%: the loss does not come first from the costs (1,579 EUR).
+- **Fact.** Maximum drawdown of -18.56%, deeper than C0's (-15.70%), and not recovered at 2026-10-09, 815 days after the peak of 2024-07-16.
+- **Fact.** The invested sessions are worse than the sessions in cash: the fund gains on average +3.0 bp per session over the 269 valuations at which the book is invested (+6.6% compounded), against +8.3 bp over the 694 others (+75.0% compounded).
+- **Fact.** The forecasts are worse than two naive forecasts: mean squared error of 8.7648e-05, against 8.5767e-05 for the zero forecast and 8.5353e-05 for the training mean frozen with each model (gap of +2.3e-06, 95% interval [+1.8e-07; +5.9e-06], above zero); out-of-sample R² -0.027; forecast/realisation correlation -0.035; right sign 52.4% against 57.1% for "always up".
+- **Fact.** The network does worse than the Ridge on the same 13 coefficients: squared-error gap of +1.5e-06, interval [+1.3e-07; +3.5e-06]; the book of the Ridge (C1) makes +11.25% net.
+- **Fact.** 22 models out of 46 are retained at the last allowed epoch (300): their validation loss was still falling when they stopped.
+- **Fact.** Only 8 entries in 964 sessions: 88 evenings have a forecast above 20 bp, but 80 of them fall when the book is already invested, and 438 evenings in cash have a forecast between 0 and 20 bp.
 
-### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
+### What happened over the stretch in which the strategy lost most
 
-**Fait.** La plus forte baisse va du sommet du 2024-07-16 (104 024,9 EUR) au creux du 2025-04-09 (84 714,7 EUR) : -18,56 %, contre -11,77 % pour le fonds. Elle contient deux épisodes longs. Le premier : le soir du 2024-07-01 la prévision vaut +20,1 pb (dont +23,5 pb pour le groupe d'ordre 3) et la cible 100 % ; l'achat est exécuté à l'ouverture du 2024-07-02 (518,15). Le 2024-08-02 le fonds clôture à 496,61 après 517,22 la veille ; la prévision monte à +47,1 pb, puis +58,1 pb le 5 août, et reste positive : la position est gardée et seul le dimensionnement la réduit, de 100 % à 58 % le 8 août. La prévision devient négative le soir du 2024-08-20 (-1,0 pb) et la vente est exécutée à l'ouverture du 2024-08-21 (515,76) : -3,15 % sur le livre pour cet épisode, quand le fonds perd 0,53 % de clôture à clôture. Le second : le soir du 2025-01-31 la prévision vaut +22,6 pb (ordre 3 : +29,3 pb) et la cible 97 % ; l'achat est exécuté à l'ouverture du 2025-02-03 (584,79). Du 2025-02-19 au 2025-04-09 le fonds perd 21,57 % ; la prévision reste positive aux 36 décisions de cette baisse (entre +3,5 et +75,5 pb, +33,4 pb en moyenne), portée par le groupe des déplacements (+20,5 pb en moyenne) et par l'aire prix-temps (+11,4 pb), tandis que le groupe d'ordre 3 devient négatif. Le poids détenu descend de 100 % à 36 % par le seul effet de la volatilité. La prévision ne devient négative que le soir du 2025-05-19 (-9,1 pb) et la vente est exécutée à l'ouverture du 2025-05-20 (548,69) : -9,46 % sur le livre pour cet épisode de 73 valorisations. **Lecture.** Dans ces deux baisses le modèle prévoit d'autant plus de hausse que le fonds a déjà baissé : la contribution des déplacements se comporte comme un pari de retour à la moyenne, qui n'a pas été payé à l'horizon d'une séance. Ce n'est pas démontré au-delà de ces deux épisodes.
+**Fact.** The deepest fall runs from the peak of 2024-07-16 (104,024.9 EUR) to the trough of 2025-04-09 (84,714.7 EUR): -18.56%, against -11.77% for the fund. It contains two long episodes. The first: on the evening of 2024-07-01 the forecast is +20.1 bp (of which +23.5 bp for the order-3 group) and the target 100%; the purchase is executed at the open of 2024-07-02 (518.15). On 2024-08-02 the fund closes at 496.61 after 517.22 the day before; the forecast rises to +47.1 bp, then +58.1 bp on 5 August, and stays positive: the position is kept and only the sizing reduces it, from 100% to 58% on 8 August. The forecast turns negative on the evening of 2024-08-20 (-1.0 bp) and the sale is executed at the open of 2024-08-21 (515.76): -3.15% on the book for this episode, when the fund loses 0.53% close to close. The second: on the evening of 2025-01-31 the forecast is +22.6 bp (order 3: +29.3 bp) and the target 97%; the purchase is executed at the open of 2025-02-03 (584.79). From 2025-02-19 to 2025-04-09 the fund loses 21.57%; the forecast stays positive at the 36 decisions of this fall (between +3.5 and +75.5 bp, +33.4 bp on average), carried by the displacement group (+20.5 bp on average) and by the price-time area (+11.4 bp), while the order-3 group turns negative. The weight held falls from 100% to 36% through the effect of the volatility alone. The forecast turns negative only on the evening of 2025-05-19 (-9.1 bp) and the sale is executed at the open of 2025-05-20 (548.69): -9.46% on the book for this episode of 73 valuations. **Reading.** In these two falls the model forecasts all the more rise as the fund has already fallen: the contribution of the displacements behaves like a bet on mean reversion, which did not pay at the one-session horizon. It is not demonstrated beyond these two episodes.
 
-### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
+### What happened over the stretch in which the strategy gained most
 
-**Fait.** La plus forte hausse d'un creux à un sommet ultérieur va du 2025-04-09 au 2026-06-15 : +14,13 % contre +45,06 % pour le fonds, avec un poids de clôture moyen de 34 %. Elle tient d'abord à la fin de l'épisode précédent - le livre, encore investi à 36 % au creux, n'est vendu que le 2025-05-20 - puis à l'épisode le plus long : le soir du 2025-07-17 la prévision vaut +26,3 pb (ordre 3 : +33,3 pb) et la cible 94 % ; l'achat est exécuté à l'ouverture du 2025-07-18 (560,77) ; la prévision reste positive pendant 93 valorisations, passe à -1,1 pb le soir du 2025-11-25, et la vente est exécutée à l'ouverture du 2025-11-26 (603,70) : +6,75 % sur le livre, quand le fonds gagne 8,24 % de clôture à clôture. Le livre est ensuite en cash du 2025-11-26 au 2026-06-09, pendant que le fonds gagne 8,57 %. **Lecture.** Quand le livre gagne, il gagne à peu près ce que le fonds gagne sur les mêmes séances, moins les coûts : rien ici ne montre un choix de séances meilleur que la détention.
+**Fact.** The largest rise from a trough to a later peak runs from 2025-04-09 to 2026-06-15: +14.13% against +45.06% for the fund, with an average close weight of 34%. It rests first on the end of the previous episode - the book, still invested at 36% at the trough, is sold only on 2025-05-20 - then on the longest episode: on the evening of 2025-07-17 the forecast is +26.3 bp (order 3: +33.3 bp) and the target 94%; the purchase is executed at the open of 2025-07-18 (560.77); the forecast stays positive for 93 valuations, goes to -1.1 bp on the evening of 2025-11-25, and the sale is executed at the open of 2025-11-26 (603.70): +6.75% on the book, when the fund gains 8.24% close to close. The book is then in cash from 2025-11-26 to 2026-06-09, while the fund gains 8.57%. **Reading.** When the book gains, it gains about what the fund gains over the same sessions, less the costs: nothing here shows a choice of sessions better than holding.
 
-### Situations de marché les plus risquées pour cette stratégie
+### The market situations most risky for this strategy
 
-- **Observé.** Baisse prolongée du fonds (août 2024, février à avril 2025) : la prévision monte avec la baisse et le filtre ne vend pas ; seule la règle de volatilité réduit le poids.
-- **Observé.** Hausse régulière et calme (du 2023-11-24 au 2024-07-02, fonds +20,18 % ; du 2025-11-26 au 2026-06-09, +8,57 %) : la prévision reste positive mais sous 20 pb et le livre reste en cash.
-- **Observé.** Sortie après la baisse, retour tardif : vendu à l'ouverture du 2025-05-20 (548,69), le livre ne revient qu'à celle du 2025-07-18 (560,77).
-- **Plausible.** Coefficients d'ordre 3 hors du domaine d'apprentissage : aux décisions de test, 1,5 % et 2,3 % des valeurs normalisées de deux coefficients d'ordre 3 dépassent +5 et sont écrêtées, alors que les entrées reposent surtout sur ce groupe (+25,8 pb pour une prévision moyenne de +23,3 pb aux 8 décisions d'entrée).
-- **Plausible.** Un modèle changé chaque mois peut déplacer la prévision au changement de mois sans que le marché ait bougé : la référence passe de -3,95 pb à -0,89 pb entre le soir du 2025-01-31 et celui du 2025-02-03. L'effet sur les décisions n'est pas mesuré.
+- **Observed.** Prolonged fall of the fund (August 2024, February to April 2025): the forecast rises with the fall and the gate does not sell; only the volatility rule reduces the weight.
+- **Observed.** Steady and calm rise (from 2023-11-24 to 2024-07-02, fund +20.18%; from 2025-11-26 to 2026-06-09, +8.57%): the forecast stays positive but below 20 bp and the book stays in cash.
+- **Observed.** Exit after the fall, late return: sold at the open of 2025-05-20 (548.69), the book comes back only at that of 2025-07-18 (560.77).
+- **Plausible.** Order-3 coefficients outside the training domain: at the test decisions, 1.5% and 2.3% of the normalised values of two order-3 coefficients exceed +5 and are clipped, while the entries rest mostly on this group (+25.8 bp for an average forecast of +23.3 bp at the 8 entry decisions).
+- **Plausible.** A model changed every month can move the forecast at the change of month without the market having moved: the reference goes from -3.95 bp to -0.89 bp between the evening of 2025-01-31 and that of 2025-02-03. The effect on the decisions is not measured.
 
-### Mesures complémentaires (voir study.md)
+### Complementary measures (see study.md)
 
-- **Fait.** SA13 contre C0 : écart de Sharpe de -1,353, intervalle bootstrap à 95 % [-1,999 ; -0,627] par blocs de 60 séances, [-2,028 ; -0,543] par blocs de 20 et [-1,987 ; -0,673] par blocs de 120. À coûts doublés : -1,401, intervalle [-2,052 ; -0,678].
-- **Fait.** Les livres des contrôles, nets : C7 (Ridge, deux processus) +17,87 % ; C4 (réseau, indicateurs classiques) +14,05 % ; C1 (Ridge) +11,25 % ; C5 (Ridge, trajectoire brute) -1,19 %, et -25,72 % à coûts doublés avec 75 rotations de l'actif par an ; C6 (réseau, deux processus) -2,49 % ; C3 (sans volume) -3,47 % ; C2 (ordre 2) -3,75 %. Aucun n'approche C0.
-- **Fait.** Quatre écarts d'erreur quadratique ont un intervalle qui exclut zéro : SA13 moins la moyenne d'apprentissage (+2,3e-06), SA13 moins Ridge (+1,5e-06), deux processus moins un seul (+3,8e-06), réseau moins Ridge sur deux processus (+5,3e-06). Dans les quatre cas le modèle le plus riche a l'erreur la plus élevée.
-- **Fait.** Ordre 3 contre ordre 2 (+1,7e-06) et avec volume contre sans (+6,9e-07) : SA13 n'a pas l'erreur la plus basse, et les deux intervalles contiennent zéro.
-- **Fait.** Trois comparaisons de Sharpe (contre C1, C2 et SA12) sont refusées par le bootstrap : ces livres restent si longtemps en cash que certains rééchantillonnages n'ont aucune variation. Elles sont notées n/a, jamais zéro.
-- **Lecture.** Sur ce chemin le filtre appris a retiré de l'exposition pendant les hausses et l'a gardée pendant les deux baisses : l'inverse de ce que l'hypothèse attendait.
+- **Fact.** SA13 against C0: Sharpe gap of -1.353, 95% bootstrap interval [-1.999; -0.627] with blocks of 60 sessions, [-2.028; -0.543] with blocks of 20 and [-1.987; -0.673] with blocks of 120. At doubled costs: -1.401, interval [-2.052; -0.678].
+- **Fact.** The books of the controls, net: C7 (Ridge, two processes) +17.87%; C4 (network, classic indicators) +14.05%; C1 (Ridge) +11.25%; C5 (Ridge, raw path) -1.19%, and -25.72% at doubled costs with a turnover of 75 times the assets a year; C6 (network, two processes) -2.49%; C3 (without volume) -3.47%; C2 (order 2) -3.75%. None comes close to C0.
+- **Fact.** Four squared-error gaps have an interval that excludes zero: SA13 minus the training mean (+2.3e-06), SA13 minus Ridge (+1.5e-06), two processes minus one (+3.8e-06), network minus Ridge on two processes (+5.3e-06). In all four cases the richer model has the higher error.
+- **Fact.** Order 3 against order 2 (+1.7e-06) and with volume against without (+6.9e-07): SA13 does not have the lowest error, and both intervals contain zero.
+- **Fact.** Three Sharpe comparisons (against C1, C2 and SA12) are refused by the bootstrap: these books stay so long in cash that some resamplings have no variation. They are marked n/a, never zero.
+- **Reading.** On this path the learned gate removed exposure during the rises and kept it during the two falls: the opposite of what the hypothesis expected.
 
-### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+### What these results do not establish, and what remains to be measured
 
-- Le statut INSUFFICIENT_EVIDENCE est celui des critères écrits avant le premier ajustement : 8 épisodes terminés pour 30 requis. Le seuil n'a pas été modifié après lecture. L'écart mesuré contre C0 est négatif, avec un intervalle sous zéro aux trois longueurs de bloc ; ces intervalles sont conditionnels au chemin produit et ne portent ni l'incertitude des réestimations ni la sélection des idées.
-- Le plafond de 300 époques, le pas d'apprentissage et le seuil d'entrée de 20 pb étaient gelés. Les modifier après lecture - par exemple parce que 22 modèles sur 46 s'arrêtent au plafond - serait une nouvelle variante, à préinscrire.
-- Les contrôles Ridge (C1, C7) font mieux que SA13 ici. En adopter un serait une nouvelle hypothèse : aucun ne remplace le résultat de SA13.
-- Le délai de 12 heures entre la date limite d'un modèle et sa disponibilité est une hypothèse du run historique.
-- Les fonctions de composante et leur domaine observé sont exportés (`component_functions.csv`, `feature_domain.csv`) mais ne sont pas tracés ici.
-- Une contribution à la prévision n'est pas une contribution au résultat : le poids économique d'un groupe ne se lit que sur la variante réentraînée sans lui (C2 pour l'ordre 3, C3 pour le volume).
-- La vérification prospective commence à la première séance XPAR où les artefacts existent réellement, configuration figée ; elle n'existe pas encore.
+- The INSUFFICIENT_EVIDENCE status is that of the criteria written before the first fit: 8 finished episodes for 30 required. The threshold was not changed after reading. The gap measured against C0 is negative, with an interval below zero at the three block lengths; these intervals are conditional on the path produced and carry neither the uncertainty of the re-estimations nor the selection of the ideas.
+- The ceiling of 300 epochs, the learning rate and the entry threshold of 20 bp were frozen. Changing them after reading - for example because 22 models out of 46 stop at the ceiling - would be a new variant, to be preregistered.
+- The Ridge controls (C1, C7) do better than SA13 here. Adopting one would be a new hypothesis: none replaces the result of SA13.
+- The delay of 12 hours between the cutoff of a model and its availability is an assumption of the historical run.
+- The component functions and their observed domain are exported (`component_functions.csv`, `feature_domain.csv`) but are not plotted here.
+- A contribution to the forecast is not a contribution to the result: the economic weight of a group is read only on the variant retrained without it (C2 for order 3, C3 for volume).
+- The prospective check starts at the first XPAR session at which the artifacts actually exist, configuration frozen; it does not exist yet.
 
-## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
+## 3. History: underlying, indicators used and value of the strategy
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
+One row per session. The indicators are those the strategy read at its evening decision (23:00 Paris), recomputed by its own signals on the store as the run read it. The target weight of row t is decided that evening and executed at the open of t + 1; the weight held of row t is the portfolio's at the valuation of t. An empty cell is an indicator with no value that day. The orders, the execution prices and the costs of each session are not in this table: they are in `fills.csv`, beside this file.
 
-Colonnes propres à SA13 : le mois du modèle utilisé, dont l'information s'arrête au soir de la dernière séance du mois précédent ; la prévision en points de base et sa décomposition exacte - référence, déplacements de prix et d'activité, aires prix-volume, prix-temps et volume-temps, groupe d'ordre 3 - dont la somme est la prévision ; le filtre, lu sur le poids détenu ce soir-là ; le poids avant la bande de 3 points ; les deux volatilités réalisées de la règle de taille. Une contribution à la prévision n'est pas une contribution au résultat. L'identifiant complet de chaque modèle est dans `sa13_history.csv` de l'étude.
+Columns of SA13 only: the month of the model used, whose information stops on the evening of the last session of the previous month; the forecast in basis points and its exact breakdown - reference, displacements of price and of activity, price-volume, price-time and volume-time areas, order-3 group - whose sum is the forecast; the gate, read on the weight held that evening; the weight before the 3-point band; the two realised volatilities of the sizing rule. A contribution to the forecast is not a contribution to the result. The full identifier of each model is in the study's `sa13_history.csv`.
 
-| Séance | Clôture ETF_WORLD | Ouverture ETF_WORLD | Modèle du mois (AAAAMM) | Prévision (pb) | Référence (pb) | Déplacements (pb) | Prix-volume (pb) | Prix-temps (pb) | Volume-temps (pb) | Ordre 3 (pb) | Filtre (1 = ouvert) | Poids avant bande | `volatility_20r[ETF_WORLD]` | `volatility_60r[ETF_WORLD]` | Poids cible ETF_WORLD | Poids détenu ETF_WORLD | Valeur nette (EUR) |
+| Session | Close ETF_WORLD | Open ETF_WORLD | Model of the month (YYYYMM) | Forecast (bp) | Reference (bp) | Displacements (bp) | Price-volume (bp) | Price-time (bp) | Volume-time (bp) | Order 3 (bp) | Gate (1 = open) | Weight before the band | `volatility_20r[ETF_WORLD]` | `volatility_60r[ETF_WORLD]` | Target weight ETF_WORLD | Held weight ETF_WORLD | Net value (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 2023-01-02 | 383.75 | 385.28 | 202301 | -2.63 | -5.07 | +7.53 | -3.56 | +2.05 | +0.12 | -3.71 | 0 | 0.0% | 0.2010 | 0.1507 | 0.0% | 0.0% | 100,000.00 |
 | 2023-01-03 | 380.01 | 381.83 | 202301 | -5.52 | -5.07 | +7.42 | -4.80 | +3.15 | -0.00 | -6.21 | 0 | 0.0% | 0.2014 | 0.1517 | 0.0% | 0.0% | 100,000.00 |
