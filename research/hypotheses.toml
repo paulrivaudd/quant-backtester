@@ -98,7 +98,7 @@ prediction = "Contrat complet research/SA15_GPT-6.1/round5/hypothesis.json avant
 refutation = "NOT_SUPPORTED si le gagnant ne dépasse pas Nasdaq sur contrôle ou continu. Avantage positif mais coûts, risque25%, fréquence4dates/an ou stabilité non vérifiés : UNCERTAIN. Même un succès rétrospectif ne valide pas le futur. Aucun51edesign, aucun remplacement après lecture finale."
 [[hypothesis]]
 hypothesis_id = "sa16_it1_trend_breadth_gold"
-status = "PREREGISTERED"
+status = "NOT_SUPPORTED"
 written_on = 2026-10-31
 statement = "Holding the Nasdaq fund (SXRV) at the share of positive 1/3/6/12-month returns of the Nasdaq-100 read at the New York close, offering the rest to gold (4GLD) at the share of its own positive euro returns, then to the money market, decided weekly with a 10-point band and keeping the book when an input is unreadable, beats both Nasdaq bought and held and SA15's last archived selection (R4 trial 71), net of costs."
 universe = "ETF_NASDAQ, ETF_GOLD, ETF_MONETARY_EUR; NDX as a signal only. Store runs/sa16_store, window 2018-08-01 to 2026-10-30, SA15 conventions (research/SA16/protocol.md). Written after both references were run on this window and before any SA16 run: retrospective, the whole history has been looked at."
@@ -107,7 +107,7 @@ refutation = "Net CAGR or net Sharpe at or below either reference on the window 
 
 [[hypothesis]]
 hypothesis_id = "sa16_it2_growth_gold_risk_budget"
-status = "PREREGISTERED"
+status = "UNCERTAIN"
 written_on = 2026-10-31
 statement = "Holding US technology (QDVE, the core of SA15) and gold (4GLD) permanently, at inverse-volatility weights scaled by a risk budget of 75% for growth and 25% for gold, volatility on 126 span-scaled euro log returns, rebalanced weekly through a 5-point band, beats both Nasdaq bought and held and SA15's last archived selection, net of costs, without forecasting any direction."
 universe = "ETF_US_TECH and ETF_GOLD; store runs/sa16_store, window 2018-08-01 to 2026-10-30, SA15 conventions (research/SA16/protocol.md). Written after it1 was read and before any it2 run. Technology is a retrospective choice inherited from SA15; the C2 control measures what it is worth."
@@ -116,7 +116,7 @@ refutation = "Net CAGR or net Sharpe at or below either reference (NOT_SUPPORTED
 
 [[hypothesis]]
 hypothesis_id = "sa16_it3_relative_momentum_tilt"
-status = "PREREGISTERED"
+status = "NOT_SUPPORTED"
 written_on = 2026-10-31
 statement = "Tilting it2's risk budget of US technology from 0.75 to 0.85 when its 126-session euro return is strictly above gold's, and to 0.65 otherwise, both funds staying held, improves on it2 and still beats both references, net of costs."
 universe = "ETF_US_TECH and ETF_GOLD; store runs/sa16_store, window 2018-08-01 to 2026-10-30, SA15 conventions. Written after it2 was read and before any it3 run: retrospective."

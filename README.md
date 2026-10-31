@@ -126,7 +126,7 @@ src/quant_backtester/
 tests/           mirrors the package layout
 scripts/         command-line entry points (see docs/ARCHITECTURE.md §13)
 docs/            architecture, data layer, formulas, corporate actions, glossary (French)
-results/         one folder per strategy (SA1 ... SA15) and summary/, which compares them
+results/         one folder per strategy (SA1 ... SA16) and summary/, which compares them
 runs/            what the study scripts export, run after run; not committed
 market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
 ```
@@ -985,6 +985,35 @@ retains failures, conditional block effects, physical/logical replay counts and
 the archived audit-serialization attempt. A new reproduction uses a new output
 directory; existing evidence is never silently replaced. All periods remain
 retrospective.
+
+### SA16: technology and gold under a budget of risk
+
+SA16 ([study](results/SA16/study.md), [protocol](research/SA16/protocol.md))
+was run against two fixed references: Nasdaq-100 bought and held, and SA15's
+last archived selection (R4 trial 71; R5 stopped at M34 without a selection).
+Three of the ten allowed candidates were used, failures kept:
+
+- it1, a stepwise trend rule on the Nasdaq read at the New York close, was not supported;
+- it2, the retained configuration, holds US technology and gold together at
+  inverse-volatility weights scaled by a 75/25 risk budget, rebalanced weekly
+  through a 5-point band;
+- it3, the same budget tilted by 6-month relative momentum, was not supported.
+
+On 2018-08-01 to 2026-10-30, net of costs, it2 returns 22.40% a year against
+19.09% and 20.97%, with a Sharpe ratio of 1.321 against 0.942 and 1.064 and a
+maximum drawdown of -22.3% against -31.3% and -25.7%. The ordering holds at
+doubled costs, for 7 of 7 declared neighbours and for 7 of 7 restarts from
+cash. Its Sharpe edge has a paired-bootstrap interval above zero; its return
+edge does not, and it comes from the technology fund chosen by SA15 after the
+fact. Technology held alone returns more (24.14%) with a -31.4% drawdown. The
+volatility it sizes with is `SpanScaledVolatilitySignal`, which tolerates a
+session the provider did not serve. The class is `SA16RiskBudget`, catalogued
+`SA16 - growth gold budget`; the frozen configuration is
+[`results/SA16/selected.json`](results/SA16/selected.json). The store is
+`runs/sa16_store` (`scripts/SA16_download_data.py`), and the study is run by
+`scripts/SA16_run_study.py` (phases `reproduce`, `references`, `candidate`,
+`robustness`, `finalise`) and `scripts/SA16_report.py`. Every period had been
+looked at before: the result is retrospective.
 
 ## What a strategy may not do
 

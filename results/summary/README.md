@@ -271,6 +271,18 @@ analyse :
 `SA10` reste exécutée sans fonds de style ni fonds monétaire, comme dans tous
 ses runs précédents : sa version complète est un autre run, à décider.
 
+## SA16 : une étude à part, sur une autre fenêtre
+
+[SA16/study.md](../SA16/study.md) vient de sa propre étude
+(`scripts/SA16_run_study.py`, magasin `runs/sa16_store`, fenêtre
+2018-08-01 → 2026-10-30, conventions de SA15 : Sharpe sur 252 séances à taux
+nul). Ses chiffres ne se lisent pas dans le classement ci-dessus. La
+configuration retenue (technologie et or au budget de risque 75/25) fait
+22,40 % par an, Sharpe 1,321, perte maximale −22,3 %, contre 19,09 % / 0,942 /
+−31,3 % pour le Nasdaq conservé et 20,97 % / 1,064 / −25,7 % pour SA15 essai
+71 ; avantage de Sharpe établi par bootstrap, avantage de rendement non
+établi et dépendant du choix de la technologie.
+
 ## Diagnostics complémentaires
 
 [diagnostics.md](diagnostics.md) mesure ce que les analyses

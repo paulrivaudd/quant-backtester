@@ -80,7 +80,7 @@ Trois règles supplémentaires sont vérifiées par les mêmes tests :
 | `execution/` | Ce que le marché fait d'un ordre | `model` (`ExecutionModel`, `Sizing`), `costs` (`CostModel`), `rounding` (lots), `orders`, `fills` (`Fill`, `ExecutionReject`) |
 | `backtest/` | Le temps | `config` (`BacktestConfig`), `engine`, `timetable`, `schedule`, `context` (`StrategyContext`), `market`, `records` (`BacktestRecord`), `result` (`BacktestResult`), `runner` (`StrategyRunner`, `StrategyResult`) |
 | `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (score 0-100 % contre le marché, règles versionnées `QUALITY_V1`), `volatility_forecast` (qualité ex post d'une prévision de variance : QLIKE), `return_forecast` (prévision de rendement à deux séances : moyenne, signe, perte jointe) |
-| `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1` à `SA14`), un module par stratégie à la racine (`SA1_world_ma20_benchmark` … `SA14_neural_allocation`), `adaptive/` (les règles qu'elles partagent) |
+| `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1` à `SA16`), un module par stratégie à la racine (`SA1_world_ma20_benchmark` … `SA16_risk_budget`), `adaptive/` (les règles qu'elles partagent) |
 | `ml/` | Les modèles ajustés (hors couches, voir ci-dessous) | `config` (`NeuralStrategyConfig`), `features` (`NeuralFeatureBuilder`, `FeatureScaler`), `network` (`NeuralAllocator`), `artifacts` (`NeuralArtifact`), `dataset` (`ForwardOpenReturnBuilder`, purge), `training` (`calibrate_neural_strategy`), `signatures/` (`SignatureVariant`, `SignatureArtifact`, `SignatureModelSchedule`, `calibrate_month`) |
 | `research/` | La discipline de recherche | `references` (les livres auxquels une étude se mesure) |
 
@@ -243,7 +243,11 @@ Signaux disponibles : `ReturnSignal`, `MomentumSignal`, `MeanReversionSignal`,
 et `EwmaVolatilitySignal` (modèles, `signals/models/garch.py`),
 `ArimaGarchForecastSignal` (`signals/models/arima_garch.py`),
 `SignatureReturnSignal` (`signals/ml/signature_return.py`, features de
-`signals/signatures/`).
+`signals/signatures/`), `SpanScaledVolatilitySignal`
+(`signals/risk/span_volatility.py` : volatilité sur les `N + 1` dernières
+clôtures disponibles, chaque rendement divisé par la racine des séances qu'il
+couvre, contrat `AVAILABLE_OBSERVATIONS` déclaré, un trou de plus de
+`max_span_sessions` séances refusé).
 
 ## 7. Stratégie et contexte de décision
 
@@ -582,6 +586,7 @@ s'en servait. Chaque étude compte ses propres essais et les imprime.
 | `scripts/SA13_run_signature_study.py` | l'étude `SA13` : calibrations mensuelles, contrôles C0 à C7, contributions, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`, extras `ml stats signatures`) | non |
 | `scripts/SA12_run_arima_garch_study.py` | l'étude `SA12` : contrôles D0/D1/D2, prévisions à deux pas, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`) | non |
 | `scripts/SA11_run_garch_study.py` | l'étude `SA11` sur la période commune : classement, témoins `SA6`/EWMA, QLIKE, bootstrap, coûts ×2, historiques par stratégie | non |
+| `scripts/SA16_download_data.py`, `scripts/SA16_run_study.py`, `scripts/SA16_report.py` | l'étude `SA16` : magasin isolé `runs/sa16_store` (réseau), puis reproduction de SA15, références, candidats et témoins, voisins et redémarrages, gel, figures (`results/SA16/study.md`) | oui pour le magasin, non ensuite |
 | `scripts/write_strategy_reports.py` | le dossier `results/` : un sous-dossier par stratégie (`analysis.md`, tableaux, figures) et `summary/` qui compare les livres, depuis les exports d'une étude rangés dans `runs/` ; `--only SA12` écrit le dossier d'une étude dédiée, avec le classement de ses livres et la section que l'étude a écrite (`report_extra_<code>.md`) | non |
 
 **Référence d'API.** Chaque module, classe et fonction publique a une docstring

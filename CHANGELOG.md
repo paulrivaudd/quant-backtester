@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### SA16: technology and gold under a budget of risk (2026-10-31)
+- **SA16 is catalogued** (`SA16 - growth gold budget`, `SA16RiskBudget`): US
+  technology and gold held together at inverse-volatility weights scaled by a
+  75/25 risk budget, rebalanced weekly through a 5-point band. On 2018-08-01
+  to 2026-10-30 it beats Nasdaq held and SA15 R4 trial 71 net of costs (CAGR
+  22.40%, Sharpe 1.321, drawdown -22.3%), at doubled costs, for 7/7
+  neighbours and 7/7 restarts; its return edge is not significant and depends
+  on the technology fund. Study: `results/SA16/study.md`.
+- **New signal** `SpanScaledVolatilitySignal`: volatility over available
+  closes, each return scaled by the sessions it spans, so a session the
+  provider did not serve no longer blinds a 126-return window.
+- **Two candidates not supported and kept**: a stepwise Nasdaq trend rule read
+  at the New York close (it1) and a relative-momentum tilt of the budget (it3).
+- **Isolated store** `runs/sa16_store` (`scripts/SA16_download_data.py`) with
+  signal-only New York series (`^NDX`, GLD, HYG, IEF) and VIX3M; it
+  reproduces SA15's archived runs to the cent.
+
 ### SA7 and SA8 run, on Xetra funds (2026-10-11)
 - **SA7 and SA8 have results**, in the common study, on the funds registered
   for them: +60.2% net for SA7 (rank 5 of 11, score 49.8%), +10.5% for SA8.
