@@ -6,7 +6,8 @@ Run under WSL/POSIX from the repository root, on the store built by
     uv run python scripts/SA16_run_study.py reproduce
     uv run python scripts/SA16_run_study.py references
     uv run python scripts/SA16_run_study.py candidate research/SA16/candidates/it01.json
-    uv run python scripts/SA16_run_study.py robustness research/SA16/candidates/it07.json
+    uv run python scripts/SA16_run_study.py robustness research/SA16/candidates/it02.json
+    uv run python scripts/SA16_run_study.py finalise research/SA16/candidates/it02.json
 
 Every book is run under the conventions of SA15, so that the comparison is
 made on the same terms: Paris reference calendar, euro book of 100 000 EUR,
@@ -774,10 +775,51 @@ def robustness(path: Path, store: Path, output: Path) -> None:
     print("\n".join(lines), flush=True)
 
 
+def finalise(path: Path, store: Path, output: Path) -> None:
+    """Freeze the retained candidate, rerun it with the final code and check it is unchanged.
+
+    The candidate was first run by the code of its own commit; the final code
+    may have gained parameters that are off by default. The rerun must give
+    the same curve to the cent, or the freeze is refused.
+    """
+    spec = read_candidate(path)
+    book = candidate_books(spec)[0]
+    folder = output / "final"
+    curves = {}
+    for multiplier in (1.0, 2.0):
+        run_folder = folder / f"x{multiplier:g}" / book.name
+        run_book(book, WINDOWS["full"], run_folder, multiplier=multiplier, store=store)
+        original = load_curve(output / f"it{spec['number']:02d}" / f"x{multiplier:g}" / book.name)
+        rerun = load_curve(run_folder)
+        gap = float((rerun / original - 1.0).abs().max())
+        if len(rerun) != len(original) or gap > 1e-12:
+            raise ValueError(
+                f"the final code does not reproduce {book.name} x{multiplier:g}: {gap}"
+            )
+        curves[f"x{multiplier:g}"] = {"sessions": len(rerun), "largest_relative_gap": gap}
+    selected = {
+        "candidate": spec,
+        "candidate_file": str(path.as_posix()),
+        "class": spec["class"],
+        "schedule": spec["schedule"],
+        "parameters": spec["parameters"],
+        "fingerprint": book.strategy.fingerprint(),
+        "window": WINDOWS["full"],
+        "rule": "research/SA16/protocol.md section 6: highest net Sharpe x1 among the "
+        "candidates meeting criteria 1 to 3",
+        "reproduced_with_final_code": curves,
+        "trials_in_register": len(pd.read_csv(output / "register.csv")),
+    }
+    write_json(output / "selected.json", selected)
+    print(json.dumps(selected, indent=2, default=str), flush=True)
+
+
 def main(arguments: Sequence[str] | None = None) -> None:
     """Run one phase of the study."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("phase", choices=("reproduce", "references", "candidate", "robustness"))
+    parser.add_argument(
+        "phase", choices=("reproduce", "references", "candidate", "robustness", "finalise")
+    )
     parser.add_argument("spec", nargs="?", type=Path)
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--output", type=Path, default=OUTPUT)
@@ -793,8 +835,10 @@ def main(arguments: Sequence[str] | None = None) -> None:
             parser.error(f"{options.phase} needs the path of a candidate JSON")
         if options.phase == "candidate":
             candidate(options.spec, options.store, options.output)
-        else:
+        elif options.phase == "robustness":
             robustness(options.spec, options.store, options.output)
+        else:
+            finalise(options.spec, options.store, options.output)
 
 
 if __name__ == "__main__":

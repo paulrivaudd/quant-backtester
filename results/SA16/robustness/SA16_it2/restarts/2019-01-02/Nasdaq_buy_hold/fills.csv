@@ -1,0 +1,2 @@
+session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
+2019-01-03,2019-01-03 09:01:00+01:00,ETF_NASDAQ,BUY,321.0,304.79998779296875,304.95238778686524,97889.71647958375,48.94485823979188,29.352238824462887,19.568159216308594,97.86525628056336
