@@ -1,124 +1,124 @@
-# 50/50 rebalanced — résultats et analyse
+# 50/50 rebalanced — results and analysis
 
-Période commune 2021-04-01 → 2026-10-09 · capital 100 000 EUR · commission 5 pb (minimum 1 EUR), demi-spread 3 pb, slippage 2 pb · quantités fixées à la décision, exécution à l'ouverture suivante · cash non rémunéré · 252 séances par an.
+Common period 2021-04-01 → 2026-10-09 · capital 100,000 EUR · commission 5 bp (minimum 1 EUR), half spread 3 bp, slippage 2 bp · quantities set at the decision, execution at the next open · cash earns nothing · 252 sessions a year.
 
-Source : commit `91a2f3776759` (CLEAN), magasin `b5facce52a6f`, données à jour au 2026-10-09. Évaluation rétrospective : l'historique d'ETF_WORLD a déjà été regardé dans les exercices précédents, ce n'est pas un échantillon vierge.
+Source: commit `91a2f3776759` (CLEAN), store `b5facce52a6f`, data up to 2026-10-09. Retrospective evaluation: the history of ETF_WORLD had already been looked at in earlier exercises; it is not an untouched sample.
 
-## 1. Indicateurs de résultat globaux
+## 1. Global result indicators
 
-| Indicateur | Stratégie | Fonds détenu (buy & hold ETF_WORLD) |
+| Indicator | Strategy | Fund held (buy & hold ETF_WORLD) |
 |---|---:|---:|
-| Période mesurée | 2021-04-01 → 2026-10-09 (1416 séances) | idem |
-| Rang au classement commun (QUALITY_V1) | 1 | n/a |
-| Score de qualité QUALITY_V1 (0-100 %) | 77.9% | n/a |
-| - bloc marché (IR et alpha contre le fonds détenu) | 0.78 | n/a |
-| - bloc significativité (Sharpe déflaté) | 0.87 | n/a |
-| - bloc risque (drawdown relatif) | 0.46 | n/a |
-| - bloc robustesse (sous-périodes ; stress approché des coûts) | 0.91 | n/a |
-| - bloc implémentation (poids des coûts) | 0.98 | n/a |
-| Rendement net total | +103.35% | +94.79% |
-| Rendement brut total (mêmes ordres, sans coûts) | +104.08% | +94.89% |
-| Rendement net annualisé | +13.71% | +12.83% |
-| Volatilité annualisée | 14.20% | 13.79% |
-| Ratio de Sharpe net (taux sans risque 0) | +0.96 | +0.93 |
-| Perte maximale (max drawdown) | -22.47% | -21.64% |
-| Alpha annualisé contre le fonds détenu | +0.51% | n/a |
-| Bêta contre le fonds détenu | 1.02 | n/a |
-| Ratio d'information contre le fonds détenu | +0.55 | n/a |
-| Alpha annualisé contre SA1 (MA20) | +9.85% | +9.12% |
-| Bêta contre SA1 (MA20) | 1.03 | 1.00 |
-| Exposition moyenne (part investie) | 99.8% | 99.9% |
-| Ordres exécutés | 617 | 1 |
-| Coûts payés (EUR) | 736 | 100 |
-| Rotation annuelle (multiple de l'actif moyen) | 0.18 | 0.13 |
-| Rendement net, deux premiers tiers | +65.27% | +57.42% |
-| Rendement net, dernier tiers | +23.04% | +23.74% |
-| Rendement net, second run réel à coûts doublés | +102.72% | n/a |
-| Sharpe net, second run réel à coûts doublés | +0.96 | n/a |
+| Period measured | 2021-04-01 → 2026-10-09 (1416 sessions) | same |
+| Rank in the common ranking (QUALITY_V1) | 1 | n/a |
+| QUALITY_V1 quality score (0-100%) | 77.9% | n/a |
+| - market block (IR and alpha against the fund held) | 0.78 | n/a |
+| - significance block (deflated Sharpe) | 0.87 | n/a |
+| - risk block (relative drawdown) | 0.46 | n/a |
+| - robustness block (sub-periods; approximate cost stress) | 0.91 | n/a |
+| - implementation block (weight of costs) | 0.98 | n/a |
+| Total net return | +103.35% | +94.79% |
+| Total gross return (same orders, no costs) | +104.08% | +94.89% |
+| Annualised net return | +13.71% | +12.83% |
+| Annualised volatility | 14.20% | 13.79% |
+| Net Sharpe ratio (risk-free rate 0) | +0.96 | +0.93 |
+| Maximum drawdown | -22.47% | -21.64% |
+| Annualised alpha against the fund held | +0.51% | n/a |
+| Beta against the fund held | 1.02 | n/a |
+| Information ratio against the fund held | +0.55 | n/a |
+| Annualised alpha against SA1 (MA20) | +9.85% | +9.12% |
+| Beta against SA1 (MA20) | 1.03 | 1.00 |
+| Average exposure (share invested) | 99.8% | 99.9% |
+| Orders filled | 617 | 1 |
+| Costs paid (EUR) | 736 | 100 |
+| Annual turnover (multiple of average assets) | 0.18 | 0.13 |
+| Net return, first two thirds | +65.27% | +57.42% |
+| Net return, last third | +23.04% | +23.74% |
+| Net return, second actual run at doubled costs | +102.72% | n/a |
+| Net Sharpe, second actual run at doubled costs | +0.96 | n/a |
 
-Le score QUALITY_V1 est une **moyenne géométrique pondérée** de cinq blocs bornés entre 0 et 1 (marché 30 %, significativité 25 %, risque 15 %, robustesse 20 %, implémentation 10 %) : un seul bloc à zéro donne un score nul. Un score nul n'est donc ni une probabilité de gain nulle, ni une égalité économique entre deux stratégies ; le bloc implémentation, par exemple, tombe à zéro dès que les coûts atteignent 30 % du gain brut. Le bloc robustesse contient un **stress approché** des coûts, `net - (brut - net)` sur les mêmes ordres ; les deux dernières lignes du tableau viennent d'un **second run réel** à coûts doublés, où les quantités et la trajectoire changent, et n'entrent pas dans le score. Le score est déflaté par les essais de cette étude seulement, pas par la recherche antérieure : le classement est exploratoire, et un écart de quelques points entre deux scores n'est pas un test de supériorité. Les alphas sont des estimations ponctuelles sans intervalle, avec un taux sans risque nul ; l'alpha contre SA1 compare à une règle active, ce n'est pas un alpha de marché. Le fonds détenu est l'étalon du score et n'est pas noté. « n/a » : la mesure n'existe pas ; elle n'est jamais remplacée par zéro.
+The QUALITY_V1 score is a **weighted geometric mean** of five blocks bounded between 0 and 1 (market 30%, significance 25%, risk 15%, robustness 20%, implementation 10%): a single block at zero gives a zero score. A zero score is therefore neither a zero probability of gain nor an economic tie between two strategies; the implementation block, for example, falls to zero as soon as costs reach 30% of the gross gain. The robustness block contains an **approximate stress** of the costs, `net - (gross - net)` on the same orders; the last two rows of the table come from a **second actual run** at doubled costs, in which the quantities and the path change, and they do not enter the score. The score is deflated by the trials of this study only, not by earlier research: the ranking is exploratory, and a gap of a few points between two scores is not a test of superiority. The alphas are point estimates without an interval, with a zero risk-free rate; the alpha against SA1 compares with an active rule and is not a market alpha. The fund held is the yardstick of the score and is not scored. "n/a": the measure does not exist; it is never replaced by zero.
 
-## 2. Analyse
+## 2. Analysis
 
-### Faits mesurés
+### Measured facts
 
-| Période | Du | Au | Valorisations | Rendements | Stratégie | ETF_WORLD (clôture) | Fonds détenu (net) | Écart relatif | Poids de clôture moyen | Poids de clôture min. | Poids de clôture max. |
+| Stretch | From | To | Valuations | Returns | Strategy | ETF_WORLD (close) | Fund held (net) | Relative gap | Average close weight | Min. close weight | Max. close weight |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Plus forte baisse (sommet → creux) | 2025-02-19 | 2025-04-09 | 36 | 35 | -22.47% | -21.66% | -21.64% | -1.06% | 100% | 100% | 100% |
-| Plus forte hausse (creux → sommet ultérieur, durée libre) | 2021-05-19 | 2026-10-06 | 1381 | 1380 | +109.15% | +100.27% | +100.17% | +4.48% | 100% | 100% | 100% |
-| Pires 63 rendements consécutifs | 2025-01-10 | 2025-04-09 | 64 | 63 | -19.33% | -18.17% | -18.16% | -1.44% | 100% | 100% | 100% |
-| Meilleurs 63 rendements consécutifs | 2025-04-09 | 2025-07-10 | 64 | 63 | +19.30% | +19.34% | +19.33% | -0.03% | 100% | 100% | 100% |
-| Plus fort retard relatif sur le fonds détenu | 2024-12-24 | 2026-02-27 | 300 | 299 | +4.63% | +7.69% | +7.68% | -2.84% | 100% | 100% | 100% |
-| Plus forte avance relative sur le fonds détenu | 2021-06-16 | 2024-12-24 | 908 | 907 | +61.18% | +52.24% | +52.19% | +5.91% | 100% | 100% | 100% |
-| Plus forte baisse du fonds détenu | 2025-02-19 | 2025-04-09 | 36 | 35 | -22.47% | -21.66% | -21.64% | -1.06% | 100% | 100% | 100% |
-| Plus forte hausse du fonds détenu | 2021-05-19 | 2026-10-06 | 1381 | 1380 | +109.15% | +100.27% | +100.17% | +4.48% | 100% | 100% | 100% |
+| Deepest fall (peak → trough) | 2025-02-19 | 2025-04-09 | 36 | 35 | -22.47% | -21.66% | -21.64% | -1.06% | 100% | 100% | 100% |
+| Largest rise (trough → later peak, any length) | 2021-05-19 | 2026-10-06 | 1381 | 1380 | +109.15% | +100.27% | +100.17% | +4.48% | 100% | 100% | 100% |
+| Worst 63 consecutive returns | 2025-01-10 | 2025-04-09 | 64 | 63 | -19.33% | -18.17% | -18.16% | -1.44% | 100% | 100% | 100% |
+| Best 63 consecutive returns | 2025-04-09 | 2025-07-10 | 64 | 63 | +19.30% | +19.34% | +19.33% | -0.03% | 100% | 100% | 100% |
+| Largest relative lag behind the fund held | 2024-12-24 | 2026-02-27 | 300 | 299 | +4.63% | +7.69% | +7.68% | -2.84% | 100% | 100% | 100% |
+| Largest relative lead over the fund held | 2021-06-16 | 2024-12-24 | 908 | 907 | +61.18% | +52.24% | +52.19% | +5.91% | 100% | 100% | 100% |
+| Deepest fall of the fund held | 2025-02-19 | 2025-04-09 | 36 | 35 | -22.47% | -21.66% | -21.64% | -1.06% | 100% | 100% | 100% |
+| Largest rise of the fund held | 2021-05-19 | 2026-10-06 | 1381 | 1380 | +109.15% | +100.27% | +100.17% | +4.48% | 100% | 100% | 100% |
 
-Chaque ligne va de la valeur de la séance « Du » à celle de la séance « Au » : N valorisations, donc N - 1 rendements. « Plus forte hausse » est la plus grande hausse d'un creux à un sommet ultérieur, de durée libre : ce n'est ni une position ni un trade. Les deux périodes relatives sont choisies sur le rapport de la stratégie au fonds détenu, dont l'« écart relatif » `(1 + stratégie) / (1 + fonds) - 1` est la variation. Le « poids de clôture » est la part de l'actif net détenue en fonds à la valorisation du soir, le reste étant du cash non rémunéré : il a pu dériver avec les cours, et le multiplier par le rendement du fonds ne reconstitue pas le résultat. Une décision prise le soir de t (signal et poids cible de la ligne t) est exécutée à l'ouverture de t + 1 et n'apparaît dans le poids détenu qu'à la ligne t + 1.
+Each row runs from the value of the "From" session to that of the "To" session: N valuations, hence N - 1 returns. "Largest rise" is the largest rise from a trough to a later peak, of any length: it is neither a position nor a trade. The two relative stretches are selected on the ratio of the strategy to the fund held, whose change is the "relative gap" `(1 + strategy) / (1 + fund) - 1`. The "close weight" is the share of the net assets held in funds at the evening valuation, the rest being cash that earns nothing: it may have drifted with prices, and multiplying it by the fund's return does not rebuild the result. A decision taken on the evening of t (signal and target weight of row t) is executed at the open of t + 1 and appears in the weight held only at row t + 1.
 
-### Baisses sous un sommet et retour à ce sommet
+### Falls below a peak and the return to it
 
-| Rang | Sommet | Creux | Profondeur | Retour au sommet | Jours calendaires |
+| Rank | Peak | Trough | Depth | Back at the peak | Calendar days |
 |---:|---|---|---:|---|---:|
 | 1 | 2025-02-19 | 2025-04-09 | -22.47% | 2025-10-09 | 232 |
 | 2 | 2022-01-04 | 2022-06-16 | -16.97% | 2023-09-05 | 609 |
 | 3 | 2024-07-16 | 2024-08-05 | -8.23% | 2024-10-02 | 78 |
 
-Drawdown au 2026-10-09 : **-0.05%** sous le plus haut de la période.
-Plus longue période sous un sommet : **609 jours calendaires**, du 2022-01-04 au 2023-09-05 (récupérée, creux à -16.97%).
+Drawdown at 2026-10-09: **-0.05%** below the high of the period.
+Longest stretch below a peak: **609 calendar days**, from 2022-01-04 to 2023-09-05 (recovered, trough at -16.97%).
 
-### Par année et par mois
+### By year and by month
 
-| Année | Stratégie | Fonds détenu | Séances |
+| Year | Strategy | Fund held | Sessions |
 |---|---:|---:|---:|
-| 2021 (partielle, depuis le 2021-04-01) | +20.74% | +18.40% | 195 |
+| 2021 (partial, from 2021-04-01) | +20.74% | +18.40% | 195 |
 | 2022 | -14.00% | -13.73% | 257 |
 | 2023 | +20.88% | +19.61% | 255 |
 | 2024 | +30.19% | +27.07% | 256 |
 | 2025 | +5.02% | +6.61% | 255 |
-| 2026 (partielle, au 2026-10-09) | +18.49% | +17.68% | 198 |
+| 2026 (partial, to 2026-10-09) | +18.49% | +17.68% | 198 |
 
-Mois : **41 positifs, 26 négatifs, 0 sans variation** sur 67 (mois incomplets : 2026-10 s'arrête au 2026-10-09). Pire mois : **2025-03** (-8.52%, fonds détenu -7.93%). Meilleur mois : **2022-07** (+10.65%, fonds détenu +10.11%).
+Months: **41 positive, 26 negative, 0 unchanged** out of 67 (incomplete months: 2026-10 stops at 2026-10-09). Worst month: **2025-03** (-8.52%, fund held -7.93%). Best month: **2022-07** (+10.65%, fund held +10.11%).
 
-Activité : une position est détenue à la clôture de **1415 valorisations sur 1416** ; le poids total détenu y va de 99.6% à 100.0% (moyenne sur toutes les valorisations : 99.8%).
+Activity: a position is held at the close of **1415 valuations out of 1416**; the total weight held there ranges from 99.6% to 100.0% (average over all valuations: 99.8%).
 
-### En résumé
+### In short
 
-La seconde référence : ETF_WORLD et ETF_SP500_PEA à poids égaux, redemandés à chaque décision. Elle n'est pas une stratégie du catalogue et n'est pas comptée comme un essai, mais elle est notée, et elle est première du classement commun (77,9 %). C'est le contrôle indispensable de SA2 et de SA5, qui détiennent les deux mêmes fonds.
+The second reference: ETF_WORLD and ETF_SP500_PEA at equal weights, asked for again at each decision. It is not a strategy of the catalogue and is not counted as a trial, but it is scored, and it is first in the common ranking (77.9%). It is the indispensable control of SA2 and SA5, which hold the same two funds.
 
-### Points forts
+### Strengths
 
-- **Fait.** +103,35 % net, Sharpe de 0,96, alpha de +0,51 % par an contre le fonds monde (sans intervalle) pour un bêta de 1,02.
-- **Fait.** 617 ordres mais de très petite taille : 736 EUR de coûts, rotation de 0,18 fois l'actif par an ; +102,7 % dans le second run à coûts doublés.
-- **Fait.** Au-dessus du fonds monde en 2021 (partielle), 2023, 2024 et 2026 (partielle) ; en dessous en 2022 et en 2025.
+- **Fact.** +103.35% net, Sharpe of 0.96, alpha of +0.51% a year against the world fund (without an interval) for a beta of 1.02.
+- **Fact.** 617 orders but of very small size: 736 EUR of costs, turnover of 0.18 times the assets a year; +102.7% in the second run at doubled costs.
+- **Fact.** Above the world fund in 2021 (partial), 2023, 2024 and 2026 (partial); below in 2022 and in 2025.
 
-### Points faibles
+### Weaknesses
 
-- **Fait.** Aucune réduction du risque : perte maximale de -22,47 %, un peu plus profonde que celle du fonds monde, et volatilité de 14,2 %.
-- **Fait.** Derrière le fonds monde en 2025 (+5,0 % contre +6,6 %) ; son plus fort retard relatif va du 2024-12-24 au 2026-02-27 (écart relatif de -2,8 %).
-- **Lecture.** Son avance vient de la moitié placée sur le S&P 500 pendant une période favorable aux actions américaines : c'est un choix de panier fait avant l'étude, pas un signal, et rien ne dit qu'il se répétera.
+- **Fact.** No reduction of risk: maximum drawdown of -22.47%, slightly deeper than the world fund's, and volatility of 14.2%.
+- **Fact.** Behind the world fund in 2025 (+5.0% against +6.6%); its largest relative lag runs from 2024-12-24 to 2026-02-27 (relative gap of -2.8%).
+- **Reading.** Its lead comes from the half placed on the S&P 500 during a period favourable to US equities: it is a choice of basket made before the study, not a signal, and nothing says it will repeat.
 
-### Ce qui s'est passé pendant la période où la stratégie a le plus perdu
+### What happened over the stretch in which the strategy lost most
 
-**Fait.** Du 2025-02-19 au 2025-04-09 le panier perd -22,47 % contre -21,64 % pour le fonds monde, le fonds S&P 500 perdant -23,3 % en clôture. Sommet retrouvé le 2025-10-09, 232 jours après.
+**Fact.** From 2025-02-19 to 2025-04-09 the basket loses -22.47% against -21.64% for the world fund, the S&P 500 fund losing -23.3% at the close. Peak back on 2025-10-09, 232 days later.
 
-### Ce qui s'est passé pendant la période où la stratégie a le plus gagné
+### What happened over the stretch in which the strategy gained most
 
-**Fait.** Sa plus forte avance relative sur le fonds monde va du 2021-06-16 au 2024-12-24 : +61,2 % contre +52,2 %, écart relatif de +5,9 %. Les 63 meilleurs rendements consécutifs (2025-04-09 au 2025-07-10) font +19,30 %, comme le fonds monde.
+**Fact.** Its largest relative lead over the world fund runs from 2021-06-16 to 2024-12-24: +61.2% against +52.2%, relative gap of +5.9%. The 63 best consecutive returns (2025-04-09 to 2025-07-10) make +19.30%, like the world fund.
 
-### Situations de marché les plus risquées pour cette stratégie
+### The market situations most risky for this strategy
 
-- **Observé.** Toute baisse du marché actions, subie en entier.
-- **Plausible.** Sous-performance durable des actions américaines ou baisse du dollar : la moitié du panier y est exposée.
+- **Observed.** Any fall of the equity market, taken in full.
+- **Plausible.** Lasting underperformance of US equities or a fall of the dollar: half of the basket is exposed to it.
 
-### Ce que ces résultats n'établissent pas, et ce qui reste à mesurer
+### What these results do not establish, and what remains to be measured
 
-- Premier du classement sans être une stratégie : cela dit surtout qu'aucune règle du catalogue ne bat un panier passif des mêmes fonds sur cette période.
+- First in the ranking without being a strategy: it mostly says that no rule of the catalogue beats a passive basket of the same funds over this period.
 
-## 3. Historique : sous-jacent, indicateurs utilisés et valeur de la stratégie
+## 3. History: underlying, indicators used and value of the strategy
 
-Une ligne par séance. Les indicateurs sont ceux que la stratégie a lus à sa décision du soir (23:00 Paris), recalculés par ses propres signaux sur le magasin tel que le run l'a lu. Le poids cible de la ligne t est décidé ce soir-là et exécuté à l'ouverture de t + 1 ; le poids détenu de la ligne t est celui du portefeuille à la valorisation de t. Une case vide est un indicateur sans valeur ce jour-là. Les ordres, les prix d'exécution et les coûts de chaque séance ne sont pas dans ce tableau : ils sont dans `fills.csv`, à côté de ce fichier.
+One row per session. The indicators are those the strategy read at its evening decision (23:00 Paris), recomputed by its own signals on the store as the run read it. The target weight of row t is decided that evening and executed at the open of t + 1; the weight held of row t is the portfolio's at the valuation of t. An empty cell is an indicator with no value that day. The orders, the execution prices and the costs of each session are not in this table: they are in `fills.csv`, beside this file.
 
-| Séance | Clôture ETF_WORLD | Clôture ETF_SP500_PEA | Poids cible ETF_SP500_PEA | Poids cible ETF_WORLD | Poids détenu ETF_SP500_PEA | Poids détenu ETF_WORLD | Valeur nette (EUR) |
+| Session | Close ETF_WORLD | Close ETF_SP500_PEA | Target weight ETF_SP500_PEA | Target weight ETF_WORLD | Held weight ETF_SP500_PEA | Held weight ETF_WORLD | Net value (EUR) |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | 2021-04-01 | 363.45 | 16.26 | 50.0% | 50.0% | 0.0% | 0.0% | 100,000.00 |
 | 2021-04-06 | 366.90 | 16.46 | 50.0% | 50.0% | 50.3% | 49.6% | 99,885.33 |
