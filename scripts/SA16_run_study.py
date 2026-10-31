@@ -628,9 +628,14 @@ def candidate(path: Path, store: Path, output: Path) -> None:
             rows.append({"name": name, "costs": multiplier, **values})
     parents = [spec["parent"]] if isinstance(spec["parent"], str) else spec["parent"]
     for parent in parents:
-        parent_folder = output / parent / "x1" / parent.split("/")[-1]
-        if parent.startswith("it") and (parent_folder / "equity.csv").exists():
-            compared[parent.split("/")[-1]] = parent_folder
+        # "itNN/<book>" names a book of an earlier iteration, run at x1 costs
+        iteration, _, name = parent.partition("/")
+        parent_folder = output / iteration / "x1" / name
+        if iteration.startswith("it") and (parent_folder / "equity.csv").exists():
+            compared[name] = parent_folder
+            for multiplier in (1.0, 2.0):
+                saved = output / iteration / f"x{multiplier:g}" / name / "metrics.json"
+                rows.append({"name": name, "costs": multiplier, **json.loads(saved.read_text())})
     compared |= {name: reference_folders[name] for name in ("Nasdaq_buy_hold", "SA15_R4_trial71")}
     comparison = compare_books(compared, spec["id"])
     report = {
