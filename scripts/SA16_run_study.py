@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import math
 import sys
@@ -51,6 +52,10 @@ from SA15_run_gpt61_round4 import MonthlyFromStart  # noqa: E402
 from quant_backtester.analytics.config import AnalyticsConfig  # noqa: E402
 from quant_backtester.analytics.curves import Book  # noqa: E402
 from quant_backtester.analytics.performance import PerformanceStats  # noqa: E402
+from quant_backtester.analytics.quality import (  # noqa: E402
+    deflated_sharpe_probability,
+    session_sharpe,
+)
 from quant_backtester.analytics.uncertainty import (  # noqa: E402
     PairedStatistic,
     paired_block_bootstrap,
@@ -459,19 +464,198 @@ def reproduce(store: Path, output: Path) -> None:
     write_json(output / "reproduction" / "reproduction.json", report)
 
 
+def build_strategy(class_path: str, parameters: Mapping[str, Any]) -> Strategy:
+    """Instantiate a strategy class from its dotted path and JSON parameters."""
+    module_name, _, class_name = class_path.rpartition(".")
+    module = importlib.import_module(module_name)
+    cls = getattr(module, class_name)
+    arguments = {
+        key: tuple(value) if isinstance(value, list) else value for key, value in parameters.items()
+    }
+    strategy = cls(**arguments)
+    if not isinstance(strategy, Strategy):
+        raise TypeError(f"{class_path} is not a Strategy")
+    return strategy
+
+
+def read_candidate(path: Path) -> dict[str, Any]:
+    """Read a candidate JSON and check it is complete and numbered within budget."""
+    spec = json.loads(path.read_text(encoding="utf-8"))
+    required = {"id", "number", "parent", "class", "schedule", "parameters", "controls"}
+    if set(spec) - {"note"} != required:
+        raise ValueError(f"a candidate holds exactly {sorted(required)} (and an optional note)")
+    number = spec["number"]
+    if isinstance(number, bool) or not isinstance(number, int) or not 1 <= number <= 10:
+        raise ValueError("a candidate number is an integer from 1 to 10: the budget is ten")
+    if spec["schedule"] not in SCHEDULES:
+        raise ValueError(f"unknown schedule {spec['schedule']!r}")
+    return spec
+
+
+def candidate_books(spec: Mapping[str, Any]) -> list[BookSpec]:
+    """Return the candidate and its ablation controls, each a complete book."""
+    schedule = SCHEDULES[spec["schedule"]]()
+    books = [
+        BookSpec(
+            spec["id"], build_strategy(spec["class"], spec["parameters"]), schedule, "candidate"
+        )
+    ]
+    for name, changes in spec["controls"].items():
+        parameters = {**spec["parameters"], **changes}
+        books.append(BookSpec(name, build_strategy(spec["class"], parameters), schedule, "control"))
+    return books
+
+
+def register_trial(output: Path, values: Mapping[str, Any], name: str, number: int) -> None:
+    """Append one trial of the study to its register, once per run signature."""
+    path = output / "register.csv"
+    frame = pd.read_csv(path) if path.exists() else pd.DataFrame()
+    if len(frame) and (frame["signature"] == values["signature"]).any():
+        return
+    curve = load_curve(output / values["folder"])
+    row = {
+        "trial": name,
+        "candidate_number": number,
+        "role": values["role"],
+        "signature": values["signature"],
+        "folder": values["folder"],
+        "session_sharpe": session_sharpe(curve, ANALYTICS),
+        "cagr": values["cagr"],
+        "sharpe": values["sharpe"],
+        "max_drawdown": values["max_drawdown"],
+    }
+    pd.concat([frame, pd.DataFrame([row])], ignore_index=True).to_csv(path, index=False)
+
+
+def deflated(output: Path, folder: Path) -> dict[str, Any]:
+    """Deflate a curve's Sharpe ratio by every trial registered so far."""
+    register = pd.read_csv(output / "register.csv")
+    spread = float(register["session_sharpe"].std(ddof=1)) if len(register) > 1 else 0.0
+    probability = deflated_sharpe_probability(
+        load_curve(folder), ANALYTICS, trials=len(register), trial_sharpe_std=spread
+    )
+    return {"trials": len(register), "trial_sharpe_std": spread, "probability": probability}
+
+
+def percent(value: float | None, digits: int = 2) -> str:
+    """Format a fraction as a percentage, or a dash."""
+    return "—" if value is None else f"{100 * value:.{digits}f} %"
+
+
+def summary_markdown(spec: Mapping[str, Any], report: Mapping[str, Any]) -> str:
+    """Write the generated part of an iteration sheet: tables only, no reading."""
+    lines = [
+        f"# {spec['id']} — tableaux générés",
+        "",
+        f"Fenêtre {report['comparison']['start']} → {report['comparison']['end']} "
+        f"({report['comparison']['sessions']} séances). Généré par "
+        "`scripts/SA16_run_study.py candidate` ; aucune lecture ici.",
+        "",
+        "| Livre | Coûts | CAGR net | Sharpe net | Vol. | Perte max. | Coûts EUR | "
+        "Jours d'interv./an | Ordres/interv. (moy./max) | Expo. moy. |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for row in report["books"]:
+        lines.append(
+            f"| {row['name']} | x{row['costs']:g} | {percent(row['cagr'])} | "
+            f"{row['sharpe']:.3f} | {percent(row['volatility'])} | "
+            f"{percent(row['max_drawdown'])} | {row['costs_eur']:,.0f} | "
+            f"{row['intervention_days_per_year']:.1f} | "
+            f"{row['orders_per_intervention_mean']:.1f} / {row['orders_per_intervention_max']} | "
+            f"{percent(row['average_exposure'], 0)} |"
+        )
+    years = report["comparison"]["years"]
+    books = list(years)
+    lines += ["", "| Année | " + " | ".join(books) + " |", "| --- |" + " ---: |" * len(books)]
+    for year in years[books[0]]:
+        lines.append(f"| {year} | " + " | ".join(percent(years[b][year], 1) for b in books) + " |")
+    lines += ["", "| Épisode | " + " | ".join(books) + " |", "| --- |" + " ---: |" * len(books)]
+    for episode, values in report["comparison"]["episodes"].items():
+        cells = ["—" if values[b] is None else percent(values[b]["net_return"], 1) for b in books]
+        lines.append(f"| {episode} | " + " | ".join(cells) + " |")
+    lines += [
+        "",
+        f"Bootstrap apparié (blocs {BOOTSTRAP['block']}, {BOOTSTRAP['draws']} tirages, "
+        f"graine {BOOTSTRAP['seed']}, {BOOTSTRAP['level']:.0%}) de {spec['id']} moins :",
+        "",
+        "| Contre | ΔSharpe [IC] | Δrendement moyen annualisé [IC] |",
+        "| --- | --- | --- |",
+    ]
+    for name, tests in report["comparison"]["paired_bootstrap"].items():
+        sharpe, mean = tests["SHARPE"], tests["MEAN_RETURN"]
+        lines.append(
+            f"| {name} | {sharpe['estimate']:+.3f} [{sharpe['low']:+.3f} ; {sharpe['high']:+.3f}] "
+            f"| {percent(mean['estimate'])} [{percent(mean['low'])} ; {percent(mean['high'])}] |"
+        )
+    dsr = report["deflated_sharpe"]
+    lines += [
+        "",
+        f"Sharpe déflaté du candidat : {dsr['probability']:.3f} "
+        f"({dsr['trials']} essais au registre, écart-type des Sharpe par séance "
+        f"{dsr['trial_sharpe_std']:.4f}).",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def candidate(path: Path, store: Path, output: Path) -> None:
+    """Run a candidate and its controls, x1 and x2, and compare them with the references."""
+    spec = read_candidate(path)
+    folder = output / f"it{spec['number']:02d}"
+    reference_folders = references(store, output)
+    books = candidate_books(spec)
+    rows, compared = [], {}
+    for book in books:
+        for multiplier in (1.0, 2.0):
+            run_folder = folder / f"x{multiplier:g}" / book.name
+            values = run_book(book, WINDOWS["full"], run_folder, multiplier=multiplier, store=store)
+            values["folder"] = str(run_folder.relative_to(output))
+            register_trial(output, values, book.name, spec["number"])
+            rows.append({"name": book.name, "costs": multiplier, **values})
+            if multiplier == 1.0:
+                compared[book.name] = run_folder
+    for name in ("Nasdaq_buy_hold", "SA15_R4_trial71"):
+        for multiplier in (1.0, 2.0):
+            values = json.loads(
+                (output / "references" / f"x{multiplier:g}" / name / "metrics.json").read_text()
+            )
+            rows.append({"name": name, "costs": multiplier, **values})
+    parents = [spec["parent"]] if isinstance(spec["parent"], str) else spec["parent"]
+    for parent in parents:
+        parent_folder = output / parent / "x1" / parent.split("/")[-1]
+        if parent.startswith("it") and (parent_folder / "equity.csv").exists():
+            compared[parent.split("/")[-1]] = parent_folder
+    compared |= {name: reference_folders[name] for name in ("Nasdaq_buy_hold", "SA15_R4_trial71")}
+    comparison = compare_books(compared, spec["id"])
+    report = {
+        "candidate": spec,
+        "books": rows,
+        "comparison": comparison,
+        "deflated_sharpe": deflated(output, compared[spec["id"]]),
+    }
+    write_json(folder / "report.json", report)
+    (folder / "tables.md").write_text(summary_markdown(spec, report), encoding="utf-8")
+    print((folder / "tables.md").read_text(encoding="utf-8"), flush=True)
+
+
 def main(arguments: Sequence[str] | None = None) -> None:
     """Run one phase of the study."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("phase", choices=("reproduce", "references"))
+    parser.add_argument("phase", choices=("reproduce", "references", "candidate"))
+    parser.add_argument("spec", nargs="?", type=Path)
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--output", type=Path, default=OUTPUT)
     options = parser.parse_args(arguments)
     if options.phase == "reproduce":
         reproduce(options.store, options.output)
-    else:
+    elif options.phase == "references":
         folders = references(options.store, options.output)
         summary = compare_books(folders, "SA15_R4_trial71")
         write_json(options.output / "references" / "comparison.json", summary)
+    else:
+        if options.spec is None:
+            parser.error("candidate needs the path of its JSON")
+        candidate(options.spec, options.store, options.output)
 
 
 if __name__ == "__main__":

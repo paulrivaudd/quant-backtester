@@ -1,0 +1,23 @@
+{
+  "id": "SA16_it1",
+  "number": 1,
+  "parent": "SA15_R4_trial71",
+  "class": "quant_backtester.strategies.SA16_regime_allocation.SA16RegimeAllocation",
+  "schedule": "weekly",
+  "parameters": {
+    "equity_id": "ETF_NASDAQ",
+    "gauge_id": "NDX",
+    "trend_lookbacks": [21, 63, 126, 252],
+    "hedge_id": "ETF_GOLD",
+    "hedge_lookbacks": [21, 63, 126, 252],
+    "monetary_id": "ETF_MONETARY_EUR",
+    "monetary_lookback": 21,
+    "rebalance_band": 0.10,
+    "max_age_sessions": 1,
+    "strategy_id": "SA16_it1"
+  },
+  "controls": {
+    "SA16_it1_C1_no_hedge": {"hedge_id": null, "strategy_id": "SA16_it1_C1_no_hedge"}
+  },
+  "note": "Written before the first run of SA16_it1; see research/SA16/it01.md."
+}
