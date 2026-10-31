@@ -39,20 +39,26 @@ market_data/.lock
 *.parquet
 *.csv
 
-# results/: a study commits its reports and their summary tables; the raw
-# exports of its runs (curves, orders, per-candidate folders, caches,
-# manifests) belong in an archive attached to a GitHub Release, cited by its
-# SHA-256 in the study. Files already tracked stay tracked: these rules only
-# keep new raw exports out.
+# results/: a study commits its reports (every .md), its summary tables, its
+# figures and what it froze (selections, their SHA-256, the frozen drivers and
+# inputs); a catalogued strategy also keeps its session history and fills,
+# which its analysis.md cites. The raw exports of the runs (curves, orders,
+# per-candidate folders, caches, manifests) are in an archive attached to a
+# GitHub Release, cited by its SHA-256 in results/ARCHIVE.md.
 results/**
 !results/**/
-!results/**/study.md
-!results/**/analysis.md
+!results/**/*.md
 !results/**/metrics.csv
 !results/**/yearly.csv
 !results/**/*.png
 !results/**/selected.json
 !results/**/verdict.json
+!results/**/*.sha256
+!results/**/*_frozen.json
+!results/**/frozen_inputs.json
+!results/SA15_GPT-6.1_mechanism_pilot/manifest.json
+!results/SA*/history.csv
+!results/SA*/fills.csv
 !results/summary/**
 
 # OS / editor

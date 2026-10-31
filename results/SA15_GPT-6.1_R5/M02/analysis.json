@@ -1,9 +1,0 @@
-{
-  "id": "M02",
-  "completed_sha256": "8984215a9068ee1ed20affc3163613012efc67c2d8a07c17b05b629fae20da34",
-  "decision": "Conserver la confirmation de reprise : elle ameliore croissance, risque et couts par rapport a M01.",
-  "findings": [
-    "M02 CAGR20.575%,DD23.147%,24dates vsM01 20.425%,DD23.773%,26dates;525.89EUR de frais economises. GainCAGR+0.150point x1 et+0.232point x2. Le cap ajoute14dates a la version sansrisque, mais protege4.823pointsDD pour cout0.345pointCAGR. Les reprises restent sous-exposees72.13%, moyenneactive-3.225bp/j."
-  ],
-  "next_defect": "Le dimensionnement de risque continue de bouger meme dans une tendance haussiere confirmee et coute14dates ; tester une exception de risque en regime confirme."
-}

@@ -1,6 +1,0 @@
-{
-  "type": "MonthlyFromStart",
-  "parameters": {
-    "initial_decision": true
-  }
-}

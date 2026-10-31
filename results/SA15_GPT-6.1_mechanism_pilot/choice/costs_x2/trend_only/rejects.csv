@@ -1,3 +1,0 @@
-session_date,instrument_id,reason,side,requested_quantity
-2022-10-03,ETF_MONETARY_EUR,INSUFFICIENT_CASH,BUY,1.0
-2023-04-03,ETF_NASDAQ,INSUFFICIENT_CASH,BUY,3.0

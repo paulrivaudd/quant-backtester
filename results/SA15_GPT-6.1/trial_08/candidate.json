@@ -1,8 +1,0 @@
-{
-  "number": 8,
-  "reason": "Le filtre126 (essai7) perd encore. Le meilleur score reste l'hebdomadaire initial ; combiner cette fréquence avec le coeur50% de l'essai5, qui améliorait fortement la participation actions en sélection.",
-  "schedule": "weekly",
-  "parameters": {
-    "core_fraction": 0.5
-  }
-}

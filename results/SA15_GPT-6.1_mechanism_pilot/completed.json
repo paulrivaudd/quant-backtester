@@ -1,7 +1,0 @@
-{
-  "real_backtest_count": 30,
-  "candidate_count": 1,
-  "control_count": 4,
-  "manifest_sha256": "23e7600fccc89eaa75add01a923604e41737ad55e6af363baf3c3256957e8a05",
-  "metrics_sha256": "3e09817caaa4e0dd263ea5b62e478f481197429c0001c67d99ebda122d165333"
-}

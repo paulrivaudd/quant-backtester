@@ -1,8 +1,0 @@
-{
-  "number": 4,
-  "reason": "Le top2 (essai3) détériore développement et validation. Revenir top3 mensuel et tester des poids égaux : l'inverse volatilité peut surpondérer les actifs défensifs au détriment des tendances actions.",
-  "schedule": "monthly",
-  "parameters": {
-    "volatility_power": 0
-  }
-}

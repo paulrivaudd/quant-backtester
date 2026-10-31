@@ -1,2 +1,0 @@
-session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
-2019-06-04,2019-06-04 09:01:00+02:00,ETF_WORLD,BUY,372.0,266.3891906738281,266.522385269165,99146.32732012938,49.57316366006469,29.729033679199215,19.819355786132814,99.12155312539672

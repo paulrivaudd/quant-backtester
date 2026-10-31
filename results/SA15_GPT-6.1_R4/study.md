@@ -328,7 +328,7 @@ NON_CONSECUTIVE_HISTORY indique une fenêtre historique incomplète, pas une vol
 | full | 399.69 % | 389.07 % | 348.00 % | 41.07 pp | -25.77 % | 13737 |
 | final | 19.09 % | 17.64 % | 34.32 % | -16.68 pp | -25.73 % | 2607 |
 
-[50 replays aux frais doubles](reported_costs_x2.csv). Les 50 politiques sont rejouées, pas réestimées ; la comparaison x2 face au Nasdaq
+[50 replays aux frais doubles](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1_R4/reported_costs_x2.csv). Les 50 politiques sont rejouées, pas réestimées ; la comparaison x2 face au Nasdaq
 x1 est volontairement conservatrice.
 
 | Départ cash | SA15 net | Nasdaq net | Écart | DD SA15 | Dates/an |
@@ -340,7 +340,7 @@ x1 est volontairement conservatrice.
 
 Les quatre dates sont de vrais redémarrages depuis cash jusqu'à fin 2024. Le gagnant et les cinq
 références sont simulés sur les mêmes dates : aucun simple rebasage de courbe.
-[Tous les redémarrages](robustness/starts.csv).
+[Tous les redémarrages](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1_R4/robustness/starts.csv).
 
 Bootstrap du rendement actif moyen annuel final :
 **-6.54 %**, intervalle 95 %
@@ -412,10 +412,20 @@ Régénérer seulement ce rapport, sans backtest :
 
     uv run python scripts/SA15_report_gpt61_round4.py --output results/SA15_GPT-6.1_R4
 
-[50 essais](reported_iterations.csv) · [Pareto](pareto.csv) · [Sélection gelée](selected.json) ·
-[Verdict](verdict.json) · [Diagnostic DSR](selection_diagnostics.json) ·
+[50 essais](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1_R4/reported_iterations.csv) · [Pareto](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1_R4/pareto.csv) · [Sélection gelée](selected.json) ·
+[Verdict](verdict.json) · [Diagnostic DSR](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1_R4/selection_diagnostics.json) ·
 [Vérifications](validation.md).
 
 Ce rendu ne modifie ni candidat, ni sélection, ni ordre, ni archive financière.
 reporting_manifest.json date les exports et identifie le source de présentation séparément du
 source financier gelé.
+
+## Archived exports (2026-10-31)
+
+The raw exports of this study are no longer tracked by the repository;
+they are in the results archive `quant-backtester-results-7a2205d.tar.gz`
+(SHA-256 `475440c48634efec917ea1e0a11397cc2ac2b917e631d09f672346a60e8a0583`),
+attached to the Release [`results-archive-2026-10-31`](https://github.com/paulrivaudd/quant-backtester/releases/tag/results-archive-2026-10-31).
+The links above to those files point to their copy at commit `7a2205d`.
+[ARCHIVE.md](../ARCHIVE.md) lists what the repository keeps and how to
+restore the rest.

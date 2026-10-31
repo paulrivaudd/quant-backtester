@@ -1,8 +1,0 @@
-{
-  "trials_declared": 85,
-  "dispersion_curves_inherited": 80,
-  "session_sharpe_std": 0.01776811286289506,
-  "dispersion_source_sha256": "da17cfe8dcf5c979502412b5d064809edc38c1ef0dd5e31631e904f4f71f3d07",
-  "complete_policy_2023_2024_dsr": 0.9462043576500164,
-  "interpretation": "approximate absolute Sharpe diagnostic; not a probability of beating Nasdaq"
-}

@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### The raw exports of results/ move to a Release (2026-10-31)
+- **`results/` tracks 279 files, 28 MB, instead of 15,454 files, 330 MB.**
+  - Kept: the reports, the summary tables, the figures, what each study froze
+    (`selected.json`, `verdict.json`, the `*.sha256` files, the frozen drivers
+    and inputs), and the history and fills of SA1 to SA14.
+  - Moved: the other 15,175 files, all raw exports of SA15 and SA16. They are
+    in `quant-backtester-results-7a2205d.tar.gz` (SHA-256 `475440c4…0583`),
+    attached to the Release `results-archive-2026-10-31`. The archive holds
+    `results/` at commit `7a2205d`, which also keeps them in the history.
+- `results/ARCHIVE.md` says what is kept, how to restore the rest, and which
+  scripts need it. The R4 report script, for one, computes its deflated Sharpe
+  ratio on fewer curves when the earlier series are missing.
+- The series 1, R4 and SA16 reports end with a pointer to the archive. The
+  series 1 and R4 links to archived files now point to `7a2205d`.
+- The R2 and R3 reports are left as they were, because their digest is
+  recorded. No figure changes.
+
 ### Decision-time sizing values a line without a close at its last price (2026-10-31)
 - **Fixed**: with `Sizing.AT_DECISION`, a line held at the decision whose close
   was MISSING (a session the provider did not serve) was valued at zero when

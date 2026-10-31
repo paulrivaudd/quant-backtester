@@ -1,2 +1,0 @@
-session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
-2023-01-03,2023-01-03 09:01:00+01:00,ETF_SP500_PEA,BUY,5580.0,17.80500030517578,17.813902805328368,99401.5776537323,49.70078882686615,29.805570510864253,19.870380340576173,99.37673967830658

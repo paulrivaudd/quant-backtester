@@ -1,3 +1,0 @@
-session_date,instrument_id,reason,side,requested_quantity
-2019-07-01,ETF_NASDAQ,INSUFFICIENT_CASH,BUY,7.0
-2023-04-03,ETF_NASDAQ,INSUFFICIENT_CASH,BUY,2.0

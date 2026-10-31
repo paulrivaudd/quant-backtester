@@ -185,8 +185,8 @@ Bootstrap apparie de l'exces de rendement moyen annualise contre World :
 intervalle du CAGR ni une correction des essais multiples.
 
 Les frais doubles des configurations figurent dans
-[le tableau des frais doubles](robustness/costs_x2.csv), et les vrais redemarrages
-du gagnant dans [les departs glissants](robustness/starts.csv).
+[le tableau des frais doubles](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1/robustness/costs_x2.csv), et les vrais redemarrages
+du gagnant dans [les departs glissants](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1/robustness/starts.csv).
 Les variantes proches de ponderation, frequence et horizons sont les essais
 publies ci-dessus ; aucune recherche de grille cachee n'a ete realisee.
 
@@ -202,7 +202,7 @@ publies ci-dessus ; aucune recherche de grille cachee n'a ete realisee.
 
 Cette periode inclut le developpement, la selection et le controle final. Elle decrit le gagnant retrospectif et ne constitue pas une validation supplementaire.
 
-[Courbes completes](comparison/full/comparison.png) · [Tableau complet](comparison/full/summary.csv).
+[Courbes completes](comparison/full/comparison.png) · [Tableau complet](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1/comparison/full/summary.csv).
 
 ## Limites et verdict pratique
 
@@ -232,9 +232,9 @@ le protocole local avait ete ecrit avant. Le code est un travail non commite :
 la provenance le declare DIRTY, avec le commit de depart et les empreintes
 des donnees/configurations. Aucun resultat anterieur n'a ete remplace.
 Le source exact et les metadonnees sont archives avant le gel dans
-[source.zip](source/source.zip), avec [manifest des empreintes](source/manifest.json).
+[source.zip](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1/source/source.zip), avec [manifest des empreintes](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1/source/manifest.json).
 Cette archive financiere originale est conservee ; le correctif ulterieur de rendu
-est archive separement dans [postprocessing](postprocessing/). Il ne change aucune
+est archive separement dans [postprocessing](https://github.com/paulrivaudd/quant-backtester/tree/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1/postprocessing). Il ne change aucune
 decision, transaction, selection ni metrique financiere sauvegardee.
 
 ## Sources et reproduction
@@ -263,8 +263,18 @@ uv run python scripts/SA15_report_gpt61.py --output "$OUT"
 ```
 
 [Courbes finales](comparison/final/comparison.png) ·
-[Tableau final](comparison/final/summary.csv) ·
-[Tous les essais](iterations.csv) · [Selection gelee](selected.json).
+[Tableau final](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1/comparison/final/summary.csv) ·
+[Tous les essais](https://github.com/paulrivaudd/quant-backtester/blob/7a2205d6690ea5aa759710de9fe35a032d22b972/results/SA15_GPT-6.1/iterations.csv) · [Selection gelee](selected.json).
 
 
 [Vérifications du code et des artefacts](validation.md).
+
+## Archived exports (2026-10-31)
+
+The raw exports of this study are no longer tracked by the repository;
+they are in the results archive `quant-backtester-results-7a2205d.tar.gz`
+(SHA-256 `475440c48634efec917ea1e0a11397cc2ac2b917e631d09f672346a60e8a0583`),
+attached to the Release [`results-archive-2026-10-31`](https://github.com/paulrivaudd/quant-backtester/releases/tag/results-archive-2026-10-31).
+The links above to those files point to their copy at commit `7a2205d`.
+[ARCHIVE.md](../ARCHIVE.md) lists what the repository keeps and how to
+restore the rest.

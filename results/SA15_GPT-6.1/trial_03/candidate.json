@@ -1,8 +1,0 @@
-{
-  "number": 3,
-  "reason": "Essai2 réduit les frais mais reste derrière World en validation. Tester une sélection top2 au lieu de top3 pour moins diluer les leaders, en conservant fréquence mensuelle et contrôle18%.",
-  "schedule": "monthly",
-  "parameters": {
-    "top_k": 2
-  }
-}

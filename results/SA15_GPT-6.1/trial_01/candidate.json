@@ -1,6 +1,0 @@
-{
-  "number": 1,
-  "reason": "Point de départ inspiré du momentum multi-horizon : top3, filtre200 séances, poids inverse volatilité et plafond de risque18%.",
-  "schedule": "weekly",
-  "parameters": {}
-}

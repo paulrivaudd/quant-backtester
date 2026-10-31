@@ -260,8 +260,9 @@ src/quant_backtester/
     demo.py      an invented market for a first, offline backtest
 tests/           mirrors the package layout
 scripts/         command-line entry points (see docs/ARCHITECTURE.md §13)
-docs/            architecture, data layer, formulas, corporate actions, glossary (French)
-results/         one folder per strategy (SA1 ... SA16) and summary/, which compares them
+docs/            architecture, data layer, formulas, corporate actions, glossary
+results/         one folder per strategy (SA1 ... SA16) and summary/, which compares them;
+                 the raw exports of SA15 and SA16 are in a Release (results/ARCHIVE.md)
 runs/            what the study scripts export, run after run; not committed
 market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
 ```

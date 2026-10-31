@@ -1,8 +1,0 @@
-{
-  "number": 5,
-  "reason": "Poids égaux (essai4) ne corrigent pas la sous-performance en sélection. Ajouter un coeur S&P500 de50%, toujours filtré par momentum/tendance, avec50% pour la rotation top3 inversevol ; conserver mensuel et risque18%.",
-  "schedule": "monthly",
-  "parameters": {
-    "core_fraction": 0.5
-  }
-}

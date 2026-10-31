@@ -1,9 +1,0 @@
-{
-  "id": "M03",
-  "completed_sha256": "1a19995619e2c5e4078ac1f7f9eea5a5ce1d4f799f86df41bc7878f42dde47e5",
-  "decision": "Conserver provisoirement le risque conditionnel : croissance et nombre d'ordres ameliores sans perte de protection observee.",
-  "findings": [
-    "M03 CAGR21.482%,DD23.147%,20dates vsM02 20.575%,DD23.147%,24dates. Gain+0.907pointCAGR x1 et+0.901 x2; exposition en reprise80.73% contre72.13%. Le bloc de risque est desormais positif contre sa propre ablation (+0.563pointCAGR,4.823pointsDD evites). Le filtre de tendance coute encore0.903pointCAGR mais evite6.209pointsDD. L'ecart au Nasdaq reste-2.393pointsCAGR."
-  ],
-  "next_defect": "La traine de volatilite longue freine les reprises; comparer a une reactivite du seul estimateur plutot qu'un contournement conditionnel."
-}

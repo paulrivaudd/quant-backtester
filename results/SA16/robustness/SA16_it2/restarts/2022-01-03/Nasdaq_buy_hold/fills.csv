@@ -1,2 +1,0 @@
-session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
-2022-01-04,2022-01-04 09:01:00+01:00,ETF_NASDAQ,BUY,120.0,827.0,827.4135,99289.62,49.64481,29.772,19.848000000000003,99.26481
