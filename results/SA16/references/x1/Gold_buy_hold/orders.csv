@@ -1,0 +1,2 @@
+session_date,submitted_at,decided_on,instrument_id,side,quantity,filled_quantity,status
+2018-08-02,2018-08-02 09:01:00+02:00,2018-08-01,ETF_GOLD,BUY,2976.0,2965.0,PARTIALLY_FILLED

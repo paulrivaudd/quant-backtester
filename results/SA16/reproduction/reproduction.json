@@ -1,0 +1,30 @@
+{
+  "SA15_R4_trial71": {
+    "rerun": {
+      "net_return": 3.9969343664372907,
+      "sharpe": 1.1931444544805636
+    },
+    "archived_net_return": 3.99693436643729,
+    "sessions_compared": 1886,
+    "sessions_only_rerun": 0,
+    "sessions_only_archive": 0,
+    "largest_relative_gap": 0.0,
+    "first_session_gap_above_1e6": null,
+    "final_value_rerun": 499693.436643729,
+    "final_value_archive": 499693.436643729
+  },
+  "Nasdaq_buy_hold": {
+    "rerun": {
+      "net_return": 3.4800296762689484,
+      "sharpe": 1.0813878325227084
+    },
+    "archived_net_return": 3.4800296762689484,
+    "sessions_compared": 1886,
+    "sessions_only_rerun": 0,
+    "sessions_only_archive": 0,
+    "largest_relative_gap": 0.0,
+    "first_session_gap_above_1e6": null,
+    "final_value_rerun": 448002.9676268948,
+    "final_value_archive": 448002.9676268948
+  }
+}

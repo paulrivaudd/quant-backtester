@@ -1,0 +1,2 @@
+session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
+2018-08-02,2018-08-02 09:01:00+02:00,ETF_US_TECH,BUY,13262.0,7.525000095367432,7.532525095462798,99896.34781602763,99.89634781602763,59.87793075885772,39.91862050590515,199.6928990807905

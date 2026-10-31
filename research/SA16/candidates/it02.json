@@ -1,0 +1,33 @@
+{
+  "id": "SA16_it2",
+  "number": 2,
+  "parent": "it01/SA16_it1",
+  "class": "quant_backtester.strategies.SA16_risk_budget.SA16RiskBudget",
+  "schedule": "weekly",
+  "parameters": {
+    "growth_id": "ETF_US_TECH",
+    "hedge_id": "ETF_GOLD",
+    "growth_risk_budget": 0.75,
+    "volatility_returns": 126,
+    "max_span_sessions": 3,
+    "volatility_floor": 0.05,
+    "rebalance_band": 0.05,
+    "max_age_sessions": 1,
+    "strategy_id": "SA16_it2"
+  },
+  "controls": {
+    "SA16_it2_C1_constant_two_thirds": {
+      "class": "quant_backtester.research.references.FixedWeights",
+      "parameters": {
+        "weights": [["ETF_US_TECH", 0.6667], ["ETF_GOLD", 0.3333]],
+        "rebalance_band": 0.05,
+        "strategy_id": "SA16_it2_C1_constant_two_thirds"
+      }
+    },
+    "SA16_it2_C2_nasdaq_growth": {
+      "growth_id": "ETF_NASDAQ",
+      "strategy_id": "SA16_it2_C2_nasdaq_growth"
+    }
+  },
+  "note": "Written before the first run of SA16_it2; see research/SA16/it02.md."
+}

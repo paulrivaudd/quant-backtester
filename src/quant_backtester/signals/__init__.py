@@ -43,6 +43,7 @@ from quant_backtester.signals.price.trend import (
     MovingAverageTrendSignal,
 )
 from quant_backtester.signals.risk.drawdown import CurrentDrawdownSignal
+from quant_backtester.signals.risk.span_volatility import SpanScaledVolatilitySignal
 from quant_backtester.signals.risk.volatility import RealizedVolatilitySignal
 from quant_backtester.signals.snapshot import SignalSnapshot
 from quant_backtester.signals.types import (
@@ -78,6 +79,7 @@ __all__ = [
     "SignalResult",
     "SignalSnapshot",
     "SignalStatus",
+    "SpanScaledVolatilitySignal",
     "SignalUnit",
     "VixReliefSignal",
     "WindowMode",

@@ -1,0 +1,712 @@
+{
+  "candidate": {
+    "id": "SA16_it1",
+    "number": 1,
+    "parent": "SA15_R4_trial71",
+    "class": "quant_backtester.strategies.SA16_regime_allocation.SA16RegimeAllocation",
+    "schedule": "weekly",
+    "parameters": {
+      "equity_id": "ETF_NASDAQ",
+      "gauge_id": "NDX",
+      "trend_lookbacks": [
+        21,
+        63,
+        126,
+        252
+      ],
+      "hedge_id": "ETF_GOLD",
+      "hedge_lookbacks": [
+        21,
+        63,
+        126,
+        252
+      ],
+      "monetary_id": "ETF_MONETARY_EUR",
+      "monetary_lookback": 21,
+      "rebalance_band": 0.1,
+      "max_age_sessions": 1,
+      "strategy_id": "SA16_it1"
+    },
+    "controls": {
+      "SA16_it1_C1_no_hedge": {
+        "hedge_id": null,
+        "strategy_id": "SA16_it1_C1_no_hedge"
+      }
+    },
+    "note": "Written before the first run of SA16_it1; see research/SA16/it01.md."
+  },
+  "books": [
+    {
+      "name": "SA16_it1",
+      "costs": 1.0,
+      "start": "2018-08-01",
+      "end": "2026-10-30",
+      "net_return": 2.290537359868698,
+      "cagr": 0.15538395131444815,
+      "volatility": 0.1548282667814378,
+      "sharpe": 0.995810309530818,
+      "max_drawdown": -0.24506464285705898,
+      "gross_return": 2.44078121006012,
+      "costs_eur": 15024.385019143025,
+      "traded_value_eur": 15021872.896847544,
+      "turnover_per_year": 9.15083233986607,
+      "average_exposure": 0.9257863624816141,
+      "average_cash": 0.07421363751838594,
+      "orders": 314,
+      "fills": 314,
+      "rejects": 69,
+      "intervention_days": 141,
+      "intervention_days_per_year": 17.09835657370518,
+      "orders_per_intervention_mean": 2.226950354609929,
+      "orders_per_intervention_max": 3,
+      "decisions": 431,
+      "decisions_with_unreadable_inputs": 23,
+      "run_id": "5a3b8625d2e93b114938b438577f63caf408716d4d9bed6295943062e525b7e7",
+      "data_state": "677397e6fb7709780bbeaecb355a1961a0a759f9ce67d64022ef42ce4aa77de9",
+      "signature": "317db217f7dc45a4e8c6c5ac6c5d6a0f84cdde3a8c2d12b9241a5e982c995311",
+      "role": "candidate",
+      "folder": "it01/x1/SA16_it1"
+    },
+    {
+      "name": "SA16_it1",
+      "costs": 2.0,
+      "start": "2018-08-01",
+      "end": "2026-10-30",
+      "net_return": 2.05613085822483,
+      "cagr": 0.145076091727129,
+      "volatility": 0.15486704641876556,
+      "sharpe": 0.9386346860369695,
+      "max_drawdown": -0.2454873485483805,
+      "gross_return": 2.3432808153152465,
+      "costs_eur": 28714.995709042476,
+      "traded_value_eur": 14353857.405092677,
+      "turnover_per_year": 9.111743824445862,
+      "average_exposure": 0.9257085599222233,
+      "average_cash": 0.07429144007777666,
+      "orders": 315,
+      "fills": 315,
+      "rejects": 70,
+      "intervention_days": 141,
+      "intervention_days_per_year": 17.09835657370518,
+      "orders_per_intervention_mean": 2.234042553191489,
+      "orders_per_intervention_max": 3,
+      "decisions": 431,
+      "decisions_with_unreadable_inputs": 23,
+      "run_id": "5b6d6a7c5cdd507ee0e986c7675180674a7f1de2e3aad4bfcd3011e623fa6eab",
+      "data_state": "677397e6fb7709780bbeaecb355a1961a0a759f9ce67d64022ef42ce4aa77de9",
+      "signature": "c2a88ee44cef361ee620a66029b97a6e9559563997efb3782896d71f6d3d2fba",
+      "role": "candidate",
+      "folder": "it01/x2/SA16_it1"
+    },
+    {
+      "name": "SA16_it1_C1_no_hedge",
+      "costs": 1.0,
+      "start": "2018-08-01",
+      "end": "2026-10-30",
+      "net_return": 1.6377820750541718,
+      "cagr": 0.12481606788917321,
+      "volatility": 0.14688804817386633,
+      "sharpe": 0.8617572848441198,
+      "max_drawdown": -0.24843911311160183,
+      "gross_return": 1.7405313925170898,
+      "costs_eur": 10274.931746292381,
+      "traded_value_eur": 10274674.251260757,
+      "turnover_per_year": 7.578685036004793,
+      "average_exposure": 0.87288699590705,
+      "average_cash": 0.12711300409295,
+      "orders": 210,
+      "fills": 210,
+      "rejects": 45,
+      "intervention_days": 133,
+      "intervention_days_per_year": 16.128237051792826,
+      "orders_per_intervention_mean": 1.5789473684210527,
+      "orders_per_intervention_max": 2,
+      "decisions": 431,
+      "decisions_with_unreadable_inputs": 0,
+      "run_id": "523ebe1b3e9b553235e949317fe02d871a8add753cbc37e61d8f47da380a8b5f",
+      "data_state": "677397e6fb7709780bbeaecb355a1961a0a759f9ce67d64022ef42ce4aa77de9",
+      "signature": "07edf6b4dd7febaf471101cd29216cc1cebe27995c4df19e68d1a76d0c263f87",
+      "role": "control",
+      "folder": "it01/x1/SA16_it1_C1_no_hedge"
+    },
+    {
+      "name": "SA16_it1_C1_no_hedge",
+      "costs": 2.0,
+      "start": "2018-08-01",
+      "end": "2026-10-30",
+      "net_return": 1.4826765448823518,
+      "cagr": 0.11658031560956039,
+      "volatility": 0.14702955452118752,
+      "sharpe": 0.811871877103558,
+      "max_drawdown": -0.2500148713524992,
+      "gross_return": 1.6808985826110838,
+      "costs_eur": 19822.203772873854,
+      "traded_value_eur": 9910861.662372451,
+      "turnover_per_year": 7.545032826430686,
+      "average_exposure": 0.8729100995443553,
+      "average_cash": 0.12708990045564472,
+      "orders": 210,
+      "fills": 210,
+      "rejects": 42,
+      "intervention_days": 133,
+      "intervention_days_per_year": 16.128237051792826,
+      "orders_per_intervention_mean": 1.5789473684210527,
+      "orders_per_intervention_max": 2,
+      "decisions": 431,
+      "decisions_with_unreadable_inputs": 0,
+      "run_id": "ef9ae8287c8d8c347359dd191e855cddcf2f33611169cd9816b8e15d31fd8ebd",
+      "data_state": "677397e6fb7709780bbeaecb355a1961a0a759f9ce67d64022ef42ce4aa77de9",
+      "signature": "09d7318eadfb1734edbefc14239306b1182e42ca0fbebc0c1670c9c6a344d614",
+      "role": "control",
+      "folder": "it01/x2/SA16_it1_C1_no_hedge"
+    },
+    {
+      "name": "Nasdaq_buy_hold",
+      "costs": 1.0,
+      "start": "2018-08-01",
+      "end": "2026-10-30",
+      "net_return": 3.2225870355247928,
+      "cagr": 0.19086012295196886,
+      "volatility": 0.20488790473330712,
+      "sharpe": 0.941793453072917,
+      "max_drawdown": -0.3129805937333824,
+      "gross_return": 3.223584052734375,
+      "costs_eur": 99.70172095825194,
+      "traded_value_eur": 99726.6401586914,
+      "turnover_per_year": 0.05362340953067375,
+      "average_exposure": 0.9983417300126037,
+      "average_cash": 0.0016582699873962659,
+      "orders": 1,
+      "fills": 1,
+      "rejects": 0,
+      "intervention_days": 1,
+      "intervention_days_per_year": 0.12126494023904381,
+      "orders_per_intervention_mean": 1.0,
+      "orders_per_intervention_max": 1,
+      "decisions": 2113,
+      "decisions_with_unreadable_inputs": 0,
+      "run_id": "80abd08cb0e812900aec7e04810925eddde54226ba7730614f43c92ce9927a8a",
+      "data_state": "677397e6fb7709780bbeaecb355a1961a0a759f9ce67d64022ef42ce4aa77de9",
+      "signature": "3ea00befda82b87ec25edb4408e6d36d06e5ce62f708c2c1d6111d3bf33cc523",
+      "role": "reference"
+    },
+    {
+      "name": "Nasdaq_buy_hold",
+      "costs": 2.0,
+      "start": "2018-08-01",
+      "end": "2026-10-30",
+      "net_return": 3.221589519931201,
+      "cagr": 0.1908260050611943,
+      "volatility": 0.2049963577601798,
+      "sharpe": 0.9412664505048145,
+      "max_drawdown": -0.313110491847743,
+      "gross_return": 3.223584052734375,
+      "costs_eur": 199.4532803173828,
+      "traded_value_eur": 99776.4785595703,
+      "turnover_per_year": 0.053673937169956824,
+      "average_exposure": 0.9988702128378477,
+      "average_cash": 0.0011297871621522848,
+      "orders": 1,
+      "fills": 1,
+      "rejects": 0,
+      "intervention_days": 1,
+      "intervention_days_per_year": 0.12126494023904381,
+      "orders_per_intervention_mean": 1.0,
+      "orders_per_intervention_max": 1,
+      "decisions": 2113,
+      "decisions_with_unreadable_inputs": 0,
+      "run_id": "2cbdd761d514f0180bef8649e3eeee7d8555c81b04a652c0ec91628ff4422724",
+      "data_state": "677397e6fb7709780bbeaecb355a1961a0a759f9ce67d64022ef42ce4aa77de9",
+      "signature": "f0f879c7622df40c80e4803a7631ff8d41bd9fdf044954a6d6a839af656b1004",
+      "role": "reference"
+    },
+    {
+      "name": "SA15_R4_trial71",
+      "costs": 1.0,
+      "start": "2018-08-01",
+      "end": "2026-10-30",
+      "net_return": 3.805888749580153,
+      "cagr": 0.20969322566778636,
+      "volatility": 0.19390891102864793,
+      "sharpe": 1.0635026449122051,
+      "max_drawdown": -0.25679107719481353,
+      "gross_return": 3.8785339748954772,
+      "costs_eur": 7264.522531532693,
+      "traded_value_eur": 7262649.971473048,
+      "turnover_per_year": 3.369880226035461,
+      "average_exposure": 0.9927977307348038,
+      "average_cash": 0.007202269265196182,
+      "orders": 70,
+      "fills": 70,
+      "rejects": 19,
+      "intervention_days": 31,
+      "intervention_days_per_year": 3.7592131474103585,
+      "orders_per_intervention_mean": 2.2580645161290325,
+      "orders_per_intervention_max": 3,
+      "decisions": 100,
+      "decisions_with_unreadable_inputs": 6,
+      "run_id": "3634ce050cac81bdb0f7c16714a48cfc149520e008581143ae3a1023a9e039bb",
+      "data_state": "677397e6fb7709780bbeaecb355a1961a0a759f9ce67d64022ef42ce4aa77de9",
+      "signature": "a65550edbfbce6a5eb003e94e569cd8c316073e867f17811dcccc629d80d3b38",
+      "role": "reference"
+    },
+    {
+      "name": "SA15_R4_trial71",
+      "costs": 2.0,
+      "start": "2018-08-01",
+      "end": "2026-10-30",
+      "net_return": 3.6983581310625997,
+      "cagr": 0.20637826993832253,
+      "volatility": 0.19398185334741747,
+      "sharpe": 1.0492524522052558,
+      "max_drawdown": -0.2576701032731876,
+      "gross_return": 3.8415789022541045,
+      "costs_eur": 14322.077119151025,
+      "traded_value_eur": 7158944.415109919,
+      "turnover_per_year": 3.358609293409196,
+      "average_exposure": 0.9928740580759237,
+      "average_cash": 0.00712594192407634,
+      "orders": 70,
+      "fills": 70,
+      "rejects": 19,
+      "intervention_days": 31,
+      "intervention_days_per_year": 3.7592131474103585,
+      "orders_per_intervention_mean": 2.2580645161290325,
+      "orders_per_intervention_max": 3,
+      "decisions": 100,
+      "decisions_with_unreadable_inputs": 6,
+      "run_id": "7794cb278996093479ce8796c8af552e3c15d02acbbf779880a48cb7ed5b1fca",
+      "data_state": "677397e6fb7709780bbeaecb355a1961a0a759f9ce67d64022ef42ce4aa77de9",
+      "signature": "daa53c776190151fd1c8865f27cc7d7642ed336475b5c213b435d25a43f735c0",
+      "role": "reference"
+    }
+  ],
+  "comparison": {
+    "sessions": 2113,
+    "start": "2018-08-01",
+    "end": "2026-10-30",
+    "full": {
+      "SA16_it1": {
+        "start": "2018-08-01",
+        "end": "2026-10-30",
+        "net_return": 2.290537359868698,
+        "cagr": 0.15538395131444815,
+        "volatility": 0.15482826678143777,
+        "sharpe": 0.9958103095308188,
+        "max_drawdown": -0.2450646428570591
+      },
+      "SA16_it1_C1_no_hedge": {
+        "start": "2018-08-01",
+        "end": "2026-10-30",
+        "net_return": 1.6377820750541718,
+        "cagr": 0.12481606788917321,
+        "volatility": 0.14688804817386633,
+        "sharpe": 0.8617572848441201,
+        "max_drawdown": -0.24843911311160194
+      },
+      "Nasdaq_buy_hold": {
+        "start": "2018-08-01",
+        "end": "2026-10-30",
+        "net_return": 3.2225870355247928,
+        "cagr": 0.19086012295196886,
+        "volatility": 0.20488790473330712,
+        "sharpe": 0.941793453072917,
+        "max_drawdown": -0.3129805937333824
+      },
+      "SA15_R4_trial71": {
+        "start": "2018-08-01",
+        "end": "2026-10-30",
+        "net_return": 3.805888749580153,
+        "cagr": 0.20969322566778636,
+        "volatility": 0.19390891102864796,
+        "sharpe": 1.063502644912207,
+        "max_drawdown": -0.25679107719481364
+      }
+    },
+    "years": {
+      "SA16_it1": {
+        "2018": 0.0,
+        "2019": 0.25320449076758456,
+        "2020": 0.19161088506257395,
+        "2021": 0.35339801562860007,
+        "2022": -0.2008823025110098,
+        "2023": 0.3438752741570241,
+        "2024": 0.3331747226769384,
+        "2025": 0.06446843613845021,
+        "2026": 0.06830513346840483
+      },
+      "SA16_it1_C1_no_hedge": {
+        "2018": -0.06280291236237245,
+        "2019": 0.21113885027668133,
+        "2020": 0.09045192972607397,
+        "2021": 0.34228760198419783,
+        "2022": -0.1720874731153571,
+        "2023": 0.3020418244735297,
+        "2024": 0.3026834036856265,
+        "2025": 0.04554764176354742,
+        "2026": 0.08135886982800966
+      },
+      "Nasdaq_buy_hold": {
+        "2018": -0.11158899963145741,
+        "2019": 0.42791005496588497,
+        "2020": 0.34417303372113794,
+        "2021": 0.39285502164088637,
+        "2022": -0.300239148959931,
+        "2023": 0.5111978164316144,
+        "2024": 0.3351771886480055,
+        "2025": 0.06973698606068868,
+        "2026": 0.17710678569431337
+      },
+      "SA15_R4_trial71": {
+        "2018": -0.07671563075383481,
+        "2019": 0.4660434752914553,
+        "2020": 0.21705063645739564,
+        "2021": 0.48760304349787575,
+        "2022": -0.17218481374825723,
+        "2023": 0.4190819824046452,
+        "2024": 0.4878859657251686,
+        "2025": 0.1359291328979506,
+        "2026": -0.012279849393170728
+      }
+    },
+    "episodes": {
+      "2018Q4_selloff": {
+        "SA16_it1": {
+          "start": "2018-09-28",
+          "end": "2018-12-31",
+          "net_return": 0.0,
+          "cagr": 0.0,
+          "volatility": 0.0,
+          "sharpe": null,
+          "max_drawdown": 0.0
+        },
+        "SA16_it1_C1_no_hedge": {
+          "start": "2018-09-28",
+          "end": "2018-12-31",
+          "net_return": -0.08515191282950485,
+          "cagr": -0.29235387415106406,
+          "volatility": 0.11911668557344189,
+          "sharpe": -2.8809338068616643,
+          "max_drawdown": -0.09929864152661894
+        },
+        "Nasdaq_buy_hold": {
+          "start": "2018-09-28",
+          "end": "2018-12-31",
+          "net_return": -0.15895255711917855,
+          "cagr": -0.48963646709727615,
+          "volatility": 0.24401663809351806,
+          "sharpe": -2.6690675956583463,
+          "max_drawdown": -0.18712450311641038
+        },
+        "SA15_R4_trial71": {
+          "start": "2018-09-28",
+          "end": "2018-12-31",
+          "net_return": -0.12772026935807246,
+          "cagr": -0.411955991855093,
+          "volatility": 0.2123505389516287,
+          "sharpe": -2.4262900458044903,
+          "max_drawdown": -0.15783284608676107
+        }
+      },
+      "2020_covid_crash": {
+        "SA16_it1": {
+          "start": "2020-02-18",
+          "end": "2020-03-31",
+          "net_return": -0.20151031287689947,
+          "cagr": null,
+          "volatility": 0.3739552174869287,
+          "sharpe": null,
+          "max_drawdown": -0.2450646428570591
+        },
+        "SA16_it1_C1_no_hedge": {
+          "start": "2020-02-18",
+          "end": "2020-03-31",
+          "net_return": -0.22595782748250381,
+          "cagr": null,
+          "volatility": 0.3305113833052028,
+          "sharpe": null,
+          "max_drawdown": -0.24843911311160194
+        },
+        "Nasdaq_buy_hold": {
+          "start": "2020-02-18",
+          "end": "2020-03-31",
+          "net_return": -0.18010487510999018,
+          "cagr": null,
+          "volatility": 0.5045380931540517,
+          "sharpe": null,
+          "max_drawdown": -0.2833894263660345
+        },
+        "SA15_R4_trial71": {
+          "start": "2020-02-18",
+          "end": "2020-03-31",
+          "net_return": -0.16322605830215964,
+          "cagr": null,
+          "volatility": 0.438586614439287,
+          "sharpe": null,
+          "max_drawdown": -0.24844483838883946
+        }
+      },
+      "2020_rebound": {
+        "SA16_it1": {
+          "start": "2020-03-31",
+          "end": "2020-08-31",
+          "net_return": 0.334004169834615,
+          "cagr": 0.9896748410156118,
+          "volatility": 0.22281733907447882,
+          "sharpe": 3.1897454292323153,
+          "max_drawdown": -0.08003765578068689
+        },
+        "SA16_it1_C1_no_hedge": {
+          "start": "2020-03-31",
+          "end": "2020-08-31",
+          "net_return": 0.2604032984576725,
+          "cagr": 0.7375682436745952,
+          "volatility": 0.21156135340974416,
+          "sharpe": 2.70874144207675,
+          "max_drawdown": -0.07979301125950411
+        },
+        "Nasdaq_buy_hold": {
+          "start": "2020-03-31",
+          "end": "2020-08-31",
+          "net_return": 0.39105093719414397,
+          "cagr": 1.1988538212233548,
+          "volatility": 0.259576320286714,
+          "sharpe": 3.1564154843707093,
+          "max_drawdown": -0.0799671043394734
+        },
+        "SA15_R4_trial71": {
+          "start": "2020-03-31",
+          "end": "2020-08-31",
+          "net_return": 0.21025992412820305,
+          "cagr": 0.5770754439225276,
+          "volatility": 0.16649895754924093,
+          "sharpe": 2.80975460536228,
+          "max_drawdown": -0.04565053310923417
+        }
+      },
+      "2022_bear": {
+        "SA16_it1": {
+          "start": "2021-12-31",
+          "end": "2022-12-30",
+          "net_return": -0.2008823025110098,
+          "cagr": -0.2014974494733628,
+          "volatility": 0.1128217720806653,
+          "sharpe": -1.891709270875079,
+          "max_drawdown": -0.2061844727456732
+        },
+        "SA16_it1_C1_no_hedge": {
+          "start": "2021-12-31",
+          "end": "2022-12-30",
+          "net_return": -0.1720874731153571,
+          "cagr": -0.17262421333247158,
+          "volatility": 0.07732016565815306,
+          "sharpe": -2.355330807744009,
+          "max_drawdown": -0.1725960888331346
+        },
+        "Nasdaq_buy_hold": {
+          "start": "2021-12-31",
+          "end": "2022-12-30",
+          "net_return": -0.300239148959931,
+          "cagr": -0.30109654314656353,
+          "volatility": 0.25122387988510975,
+          "sharpe": -1.2669453917560463,
+          "max_drawdown": -0.3044832396947311
+        },
+        "SA15_R4_trial71": {
+          "start": "2021-12-31",
+          "end": "2022-12-30",
+          "net_return": -0.17218481374825723,
+          "cagr": -0.17272182489664056,
+          "volatility": 0.20608899251721452,
+          "sharpe": -0.7956792191529165,
+          "max_drawdown": -0.19272452793865968
+        }
+      },
+      "2025_tariff_crash": {
+        "SA16_it1": {
+          "start": "2025-02-18",
+          "end": "2025-04-30",
+          "net_return": -0.12295922117719782,
+          "cagr": null,
+          "volatility": 0.20776303853121628,
+          "sharpe": null,
+          "max_drawdown": -0.18200682995906214
+        },
+        "SA16_it1_C1_no_hedge": {
+          "start": "2025-02-18",
+          "end": "2025-04-30",
+          "net_return": -0.1481230203216306,
+          "cagr": null,
+          "volatility": 0.14305537783887617,
+          "sharpe": null,
+          "max_drawdown": -0.1685675608628583
+        },
+        "Nasdaq_buy_hold": {
+          "start": "2025-02-18",
+          "end": "2025-04-30",
+          "net_return": -0.19210169380962605,
+          "cagr": null,
+          "volatility": 0.35326775903303687,
+          "sharpe": null,
+          "max_drawdown": -0.2667211689666813
+        },
+        "SA15_R4_trial71": {
+          "start": "2025-02-18",
+          "end": "2025-04-30",
+          "net_return": -0.16382748687987414,
+          "cagr": null,
+          "volatility": 0.3267294584658909,
+          "sharpe": null,
+          "max_drawdown": -0.2418715605747227
+        }
+      },
+      "2025_rebound": {
+        "SA16_it1": {
+          "start": "2025-04-30",
+          "end": "2025-09-30",
+          "net_return": 0.1359840785789883,
+          "cagr": 0.35577512742861983,
+          "volatility": 0.1305841032172314,
+          "sharpe": 2.3444136219758978,
+          "max_drawdown": -0.035926963847735194
+        },
+        "SA16_it1_C1_no_hedge": {
+          "start": "2025-04-30",
+          "end": "2025-09-30",
+          "net_return": 0.15443945215320132,
+          "cagr": 0.40895089595639034,
+          "volatility": 0.13332174872055,
+          "sharpe": 2.5813156725118103,
+          "max_drawdown": -0.03588590867229102
+        },
+        "Nasdaq_buy_hold": {
+          "start": "2025-04-30",
+          "end": "2025-09-30",
+          "net_return": 0.22918508211200406,
+          "cagr": 0.6365877382093756,
+          "volatility": 0.1656409250374291,
+          "sharpe": 2.9911082011324153,
+          "max_drawdown": -0.03644394296360498
+        },
+        "SA15_R4_trial71": {
+          "start": "2025-04-30",
+          "end": "2025-09-30",
+          "net_return": 0.1623873845961863,
+          "cagr": 0.4322183294965529,
+          "volatility": 0.13590394015557625,
+          "sharpe": 2.652746094887288,
+          "max_drawdown": -0.04344743377822924
+        }
+      }
+    },
+    "paired_bootstrap": {
+      "SA16_it1_C1_no_hedge": {
+        "SHARPE": {
+          "statistic": "SHARPE",
+          "estimate": 0.13405302468669877,
+          "low": -0.04042090318925249,
+          "high": 0.3321410491769626,
+          "level": 0.9,
+          "sessions": 2112,
+          "block": 20,
+          "draws": 2000,
+          "seed": 1616,
+          "analytics": {
+            "sessions_per_year": 252,
+            "risk_free_rate": 0.0,
+            "minimum_sessions": 60
+          }
+        },
+        "MEAN_RETURN": {
+          "statistic": "MEAN_RETURN",
+          "estimate": 0.027597738697380345,
+          "low": 0.0023614914613832396,
+          "high": 0.059010937363737505,
+          "level": 0.9,
+          "sessions": 2112,
+          "block": 20,
+          "draws": 2000,
+          "seed": 1616,
+          "analytics": {
+            "sessions_per_year": 252,
+            "risk_free_rate": 0.0,
+            "minimum_sessions": 60
+          }
+        }
+      },
+      "Nasdaq_buy_hold": {
+        "SHARPE": {
+          "statistic": "SHARPE",
+          "estimate": 0.054016856457901885,
+          "low": -0.212666701080986,
+          "high": 0.37217169529725097,
+          "level": 0.9,
+          "sessions": 2112,
+          "block": 20,
+          "draws": 2000,
+          "seed": 1616,
+          "analytics": {
+            "sessions_per_year": 252,
+            "risk_free_rate": 0.0,
+            "minimum_sessions": 60
+          }
+        },
+        "MEAN_RETURN": {
+          "statistic": "MEAN_RETURN",
+          "estimate": -0.03878250302391245,
+          "low": -0.09276826825923677,
+          "high": 0.02095052407903515,
+          "level": 0.9,
+          "sessions": 2112,
+          "block": 20,
+          "draws": 2000,
+          "seed": 1616,
+          "analytics": {
+            "sessions_per_year": 252,
+            "risk_free_rate": 0.0,
+            "minimum_sessions": 60
+          }
+        }
+      },
+      "SA15_R4_trial71": {
+        "SHARPE": {
+          "statistic": "SHARPE",
+          "estimate": -0.06769233538138808,
+          "low": -0.39198417128624174,
+          "high": 0.3308845899998201,
+          "level": 0.9,
+          "sessions": 2112,
+          "block": 20,
+          "draws": 2000,
+          "seed": 1616,
+          "analytics": {
+            "sessions_per_year": 252,
+            "risk_free_rate": 0.0,
+            "minimum_sessions": 60
+          }
+        },
+        "MEAN_RETURN": {
+          "statistic": "MEAN_RETURN",
+          "estimate": -0.05204305548326919,
+          "low": -0.11078679957988102,
+          "high": 0.01567638405749499,
+          "level": 0.9,
+          "sessions": 2112,
+          "block": 20,
+          "draws": 2000,
+          "seed": 1616,
+          "analytics": {
+            "sessions_per_year": 252,
+            "risk_free_rate": 0.0,
+            "minimum_sessions": 60
+          }
+        }
+      }
+    }
+  },
+  "deflated_sharpe": {
+    "trials": 4,
+    "trial_sharpe_std": 0.005128639845730544,
+    "probability": 0.9950165564993073
+  }
+}

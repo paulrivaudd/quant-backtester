@@ -501,8 +501,12 @@ def candidate_books(spec: Mapping[str, Any]) -> list[BookSpec]:
         )
     ]
     for name, changes in spec["controls"].items():
-        parameters = {**spec["parameters"], **changes}
-        books.append(BookSpec(name, build_strategy(spec["class"], parameters), schedule, "control"))
+        if "class" in changes:
+            # a control of another class states its parameters whole
+            strategy = build_strategy(changes["class"], changes["parameters"])
+        else:
+            strategy = build_strategy(spec["class"], {**spec["parameters"], **changes})
+        books.append(BookSpec(name, strategy, schedule, "control"))
     return books
 
 
@@ -610,7 +614,9 @@ def candidate(path: Path, store: Path, output: Path) -> None:
             run_folder = folder / f"x{multiplier:g}" / book.name
             values = run_book(book, WINDOWS["full"], run_folder, multiplier=multiplier, store=store)
             values["folder"] = str(run_folder.relative_to(output))
-            register_trial(output, values, book.name, spec["number"])
+            if multiplier == 1.0:
+                # a policy is one trial; its doubled-cost run is a sensitivity of it
+                register_trial(output, values, book.name, spec["number"])
             rows.append({"name": book.name, "costs": multiplier, **values})
             if multiplier == 1.0:
                 compared[book.name] = run_folder

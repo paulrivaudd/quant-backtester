@@ -1,0 +1,2 @@
+session_date,submitted_at,decided_on,instrument_id,side,quantity,filled_quantity,status
+2018-08-02,2018-08-02 09:01:00+02:00,2018-08-01,ETF_NASDAQ,BUY,288.0,288.0,FILLED

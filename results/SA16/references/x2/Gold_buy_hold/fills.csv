@@ -1,0 +1,2 @@
+session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
+2018-08-02,2018-08-02 09:01:00+02:00,ETF_GOLD,BUY,2962.0,33.6879997253418,33.721687725067135,99883.63904164886,99.88363904164886,59.87031311187744,39.91354207458496,199.66749422811125

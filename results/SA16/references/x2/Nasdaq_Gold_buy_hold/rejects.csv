@@ -1,0 +1,3 @@
+session_date,instrument_id,reason,side,requested_quantity
+2018-08-02,ETF_GOLD,INSUFFICIENT_CASH,BUY,1.0
+2018-08-02,ETF_NASDAQ,INSUFFICIENT_CASH,BUY,1.0

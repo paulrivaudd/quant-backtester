@@ -1,0 +1,11 @@
+{
+  "strategy_id": "buy_and_hold",
+  "class": "quant_backtester.research.references.BuyAndHold",
+  "parameters": {
+    "instruments": [
+      "ETF_US_TECH"
+    ],
+    "strategy_id": "buy_and_hold"
+  },
+  "signals": []
+}
