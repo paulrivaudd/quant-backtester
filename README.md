@@ -27,6 +27,7 @@ No strategy of the common ranking ([ranking.csv](results/summary/ranking.csv)) b
 
 - [Design goals](#design-goals)
 - [Getting started](#getting-started)
+- [My contribution](#my-contribution)
 - [Status](#status)
 - [Layout](#layout)
 - [The data layer](#the-data-layer)
@@ -163,6 +164,18 @@ decision = reader.at(datetime(2026, 9, 17, 23, 0, tzinfo=ZoneInfo("Europe/Paris"
 prices = decision.history("SP500")  # nothing after the decision instant
 state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
 ```
+
+## My contribution
+
+*To be written by the author.*
+
+### What I designed
+
+*Architecture, research protocol, choice of tests.*
+
+### What I implemented myself
+
+### What was done with AI tools, and how I checked it
 
 ## Status
 
