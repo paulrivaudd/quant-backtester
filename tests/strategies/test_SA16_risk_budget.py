@@ -10,7 +10,7 @@ from datetime import date
 import pytest
 
 from quant_backtester.backtest.context import StrategyContext
-from quant_backtester.signals.engine import SignalEngine
+from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.types import SignalStatus
 from quant_backtester.strategies.SA16_risk_budget import BudgetPlan, SA16RiskBudget
 
@@ -131,7 +131,11 @@ def test_real_signals_ignore_future_prices(
                 closes[day] = price if day <= decided else 1_000_000.0
             bars[name] = make_bars(name, xpar, closes)
         context = make_context(make_market(bars), evening(decided))
-        requests = [request.resolved(decided) for request in allocation.required_signals()]
+        requests = [
+            request.resolved(decided)
+            for request in allocation.required_signals()
+            if isinstance(request, SignalRequest)
+        ]
         snapshot = SignalEngine().compute(context, requests, list(UNIVERSE))
         return allocation.plan(make_decision(context, snapshot, universe=UNIVERSE))
 
@@ -176,7 +180,8 @@ def test_an_unreadable_return_keeps_the_book(decision) -> None:
 
 def test_without_a_tilt_no_return_is_requested() -> None:
     allocation = strategy()
-    assert all("endpoint" not in item.signal.signal_id for item in allocation.required_signals())
+    requests = [item for item in allocation.required_signals() if isinstance(item, SignalRequest)]
+    assert all("endpoint" not in item.signal.signal_id for item in requests)
     assert allocation.relative_lookback == 0
 
 

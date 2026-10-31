@@ -23,6 +23,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.axes import Axes
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "results" / "SA16"
@@ -38,7 +39,7 @@ def curve(folder: Path) -> pd.Series:  # type: ignore[type-arg]
     return pd.Series(frame.iloc[:, 1].to_numpy(dtype=float), index=index)
 
 
-def style(axis: plt.Axes) -> None:
+def style(axis: Axes) -> None:
     """Keep grid and spines recessive, text neutral."""
     axis.set_facecolor(SURFACE)
     axis.grid(color=GRID, linewidth=1.0)

@@ -119,7 +119,8 @@ def test_residual_stays_in_cash_unless_the_money_market_return_is_strictly_posit
 
 def test_without_hedge_the_residual_goes_to_the_money_market(decision) -> None:
     allocation = strategy(hedge_id=None)
-    assert all(HEDGE not in (item.names() or ()) for item in allocation.required_signals())
+    requests = [item for item in allocation.required_signals() if isinstance(item, SignalRequest)]
+    assert all(HEDGE not in (item.names() or ()) for item in requests)
     plan = allocation.plan(decision(allocation, returns(allocation, (0.01, 0.01, -0.01, -0.01))))
     assert plan.hedge_score == 0.0
     assert dict(plan.weights) == pytest.approx({EQUITY: 0.5, MONEY: 0.5})
@@ -173,7 +174,8 @@ def test_small_drift_is_held_and_a_complete_exit_is_always_sent(decision) -> Non
 
 def test_definition_is_serialisable_and_requests_are_unique() -> None:
     allocation = SA16RegimeAllocation()
-    requests = allocation.required_signals()
+    requests = [item for item in allocation.required_signals() if isinstance(item, SignalRequest)]
+    assert len(requests) == len(allocation.required_signals())
     assert len({request.signal.signal_id for request in requests}) == len(requests)
     assert allocation.trend_lookbacks == (21, 63, 126, 252)
     json.dumps(allocation.definition())
@@ -223,7 +225,11 @@ def test_real_signals_ignore_future_prices(
                         closes[day] = 0.01 if name == GAUGE else 1_000_000.0
             bars[name] = make_bars(name, calendar, closes)
         context = make_context(make_market(bars), evening(decided))
-        requests = [request.resolved(decided) for request in allocation.required_signals()]
+        requests = [
+            request.resolved(decided)
+            for request in allocation.required_signals()
+            if isinstance(request, SignalRequest)
+        ]
         snapshot = SignalEngine().compute(context, requests, list(UNIVERSE))
         return allocation.plan(make_decision(context, snapshot, universe=UNIVERSE))
 

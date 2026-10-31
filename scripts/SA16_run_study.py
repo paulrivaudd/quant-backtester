@@ -36,6 +36,7 @@ import hashlib
 import importlib
 import json
 import math
+import statistics
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -257,7 +258,7 @@ def run_metrics(result: StrategyResult) -> dict[str, Any]:
     fills, orders = result.fills(), result.orders()
     years = max((result.end - result.start).days / 365.25, 1 / 252)
     traded = math.fsum(float(value) for value in fills["traded_value"]) if len(fills) else 0.0
-    per_session = orders.groupby("session_date").size() if len(orders) else pd.Series(dtype=int)
+    per_session = [int(count) for count in orders.groupby("session_date").size().tolist()]
     weights = result.weights()
     values.update(
         costs_eur=float(result.backtest.total_cost),
@@ -270,8 +271,8 @@ def run_metrics(result: StrategyResult) -> dict[str, Any]:
         rejects=len(result.rejects()),
         intervention_days=len(per_session),
         intervention_days_per_year=len(per_session) / years,
-        orders_per_intervention_mean=float(per_session.mean()) if len(per_session) else 0.0,
-        orders_per_intervention_max=int(per_session.max()) if len(per_session) else 0,
+        orders_per_intervention_mean=statistics.fmean(per_session) if per_session else 0.0,
+        orders_per_intervention_max=max(per_session, default=0),
         decisions=sum(record.decision is not None for record in result.records()),
         decisions_with_unreadable_inputs=sum(
             bool(record.decision.requested.skipped)
@@ -357,24 +358,29 @@ def load_curve(folder: Path, name: str = "equity.csv") -> pd.Series:  # type: ig
 def slice_metrics(curve: pd.Series, start: str, end: str) -> dict[str, Any] | None:  # type: ignore[type-arg]
     """Measure a slice of a continuous book, anchored on the close before it."""
     lower, upper = date.fromisoformat(start), date.fromisoformat(end)
-    before = curve[curve.index < lower]
-    inside = curve[(curve.index >= lower) & (curve.index <= upper)]
-    if len(inside) < 3:
+    days: list[date] = list(curve.index)
+    values = [float(value) for value in curve.tolist()]
+    kept = [index for index, day in enumerate(days) if lower <= day <= upper]
+    if len(kept) < 3:
         return None
-    if len(before):
-        inside = pd.concat([before.iloc[-1:], inside])
-    return curve_metrics(inside)
+    if kept[0] > 0:
+        kept.insert(0, kept[0] - 1)  # the close before the slice anchors its first return
+    return curve_metrics(
+        pd.Series([values[index] for index in kept], index=pd.Index([days[i] for i in kept]))
+    )
 
 
 def yearly_returns(curve: pd.Series) -> dict[str, float]:  # type: ignore[type-arg]
     """Return the calendar-year returns of a continuous book (partial years too)."""
+    days: list[date] = list(curve.index)
+    values = [float(value) for value in curve.tolist()]
     years: dict[str, float] = {}
-    previous = None
-    for year in sorted({day.year for day in curve.index}):
-        inside = curve[[day.year == year for day in curve.index]]
-        anchor = previous if previous is not None else inside.iloc[0]
-        years[str(year)] = float(inside.iloc[-1] / anchor - 1.0)
-        previous = inside.iloc[-1]
+    anchor = values[0]
+    for position, day in enumerate(days):
+        last_of_year = position == len(days) - 1 or days[position + 1].year != day.year
+        if last_of_year:
+            years[str(day.year)] = values[position] / anchor - 1.0
+            anchor = values[position]
     return years
 
 
@@ -535,7 +541,8 @@ def register_trial(output: Path, values: Mapping[str, Any], name: str, number: i
 def deflated(output: Path, folder: Path) -> dict[str, Any]:
     """Deflate a curve's Sharpe ratio by every trial registered so far."""
     register = pd.read_csv(output / "register.csv")
-    spread = float(register["session_sharpe"].std(ddof=1)) if len(register) > 1 else 0.0
+    sharpes = [float(value) for value in register["session_sharpe"].tolist()]
+    spread = statistics.stdev(sharpes) if len(sharpes) > 1 else 0.0
     probability = deflated_sharpe_probability(
         load_curve(folder), ANALYTICS, trials=len(register), trial_sharpe_std=spread
     )
