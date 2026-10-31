@@ -196,6 +196,12 @@ CATALOGUE: tuple[CatalogueEntry, ...] = (
         f"{_STRATEGIES}.SA15_gpt61:SA15GPT61",
         recorded_id="SA15_GPT-6.1",
     ),
+    CatalogueEntry(
+        Family.SA,
+        16,
+        "growth gold budget",
+        f"{_STRATEGIES}.SA16_risk_budget:SA16RiskBudget",
+    ),
 )
 """Every catalogued strategy, by number.
 
@@ -214,6 +220,9 @@ on a schedule of models calibrated before the backtest, and is built with
 when it is loaded, which is what its ``extra`` says. ``SA15`` is the diversified
 momentum and volatility-control strategy of 2026-10-15. Its recorded identifier
 ``SA15_GPT-6.1`` retains the requested spelling through ``recorded_id``.
+``SA16`` is the risk budget of 2026-10-31: US technology and gold held
+together at inverse-volatility weights scaled by a declared budget of risk;
+the configuration its study retained is in ``results/SA16/selected.json``.
 The reference books of studies (``quant_backtester.research.references``)
 are not candidates and carry
 no code. The exercises and the baselines that came before were removed on

@@ -30,8 +30,8 @@ def test_a_code_gives_the_three_spellings_of_a_name() -> None:
         entry("SA99")
 
 
-def test_the_catalogue_runs_from_sa1_to_sa15_and_names_the_one_that_needs_an_extra() -> None:
-    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 16)]
+def test_the_catalogue_runs_from_sa1_to_sa16_and_names_the_one_that_needs_an_extra() -> None:
+    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 17)]
     assert family(Family.SA) == CATALOGUE
     assert [(item.code, item.extra) for item in CATALOGUE if item.extra] == [("SA14", "ml")]
     assert entry("SA13").display_name == "SA13 - Signatures Neurons"
@@ -111,3 +111,13 @@ def test_recorded_id_override_does_not_change_the_display_name() -> None:
     assert item.strategy_id == "SA1-kept.id"
     assert item.display_name == "SA1 - readable label"
     assert item.slug == "sa1-kept.id"
+
+
+def test_sa16_is_the_growth_gold_risk_budget() -> None:
+    from quant_backtester.strategies.SA16_risk_budget import SA16RiskBudget
+
+    item = entry("SA16")
+    assert item.display_name == "SA16 - growth gold budget"
+    assert item.strategy_id == SA16RiskBudget().strategy_id == "SA16_growth_gold_budget"
+    assert item.load() is SA16RiskBudget
+    assert entry_of(SA16RiskBudget) is item

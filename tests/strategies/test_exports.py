@@ -22,6 +22,7 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands() -> None:
         MonetaryCarry,
         RealizedVolControl,
         RelativeResidualTilt,
+        SA16RiskBudget,
         SmoothMovingAverage,
         TrendFilteredPullback,
         VixReliefEntry,
@@ -47,6 +48,7 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands() -> None:
             monetary_id="ETF_LATE",
             core_id="ETF_EU",
         ),
+        SA16RiskBudget(growth_id="ETF_EU", hedge_id="ETF_OTHER"),
         ETFEnsemble(
             enable_factors=False,
             enable_monetary=False,

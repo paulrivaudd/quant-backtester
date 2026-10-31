@@ -129,7 +129,7 @@ class SA16RiskBudget(Strategy):
     max_age_sessions: int = 1
     relative_lookback: int = 0
     momentum_tilt: float = 0.0
-    strategy_id: str = "SA16"
+    strategy_id: str = "SA16_growth_gold_budget"
 
     def __post_init__(self) -> None:
         """Refuse a configuration that is not a budget of two distinct funds."""
