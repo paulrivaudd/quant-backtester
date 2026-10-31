@@ -38,9 +38,22 @@ market_data/.lock
 # friction for a file nobody can read in a diff.
 *.parquet
 *.csv
-# The exception: the tables of results/ are what a report was written from, and
-# are committed beside it.
-!results/**/*.csv
+
+# results/: a study commits its reports and their summary tables; the raw
+# exports of its runs (curves, orders, per-candidate folders, caches,
+# manifests) belong in an archive attached to a GitHub Release, cited by its
+# SHA-256 in the study. Files already tracked stay tracked: these rules only
+# keep new raw exports out.
+results/**
+!results/**/
+!results/**/study.md
+!results/**/analysis.md
+!results/**/metrics.csv
+!results/**/yearly.csv
+!results/**/*.png
+!results/**/selected.json
+!results/**/verdict.json
+!results/summary/**
 
 # OS / editor
 .DS_Store
