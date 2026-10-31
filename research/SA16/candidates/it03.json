@@ -1,0 +1,22 @@
+{
+  "id": "SA16_it3",
+  "number": 3,
+  "parent": "it02/SA16_it2",
+  "class": "quant_backtester.strategies.SA16_risk_budget.SA16RiskBudget",
+  "schedule": "weekly",
+  "parameters": {
+    "growth_id": "ETF_US_TECH",
+    "hedge_id": "ETF_GOLD",
+    "growth_risk_budget": 0.75,
+    "volatility_returns": 126,
+    "max_span_sessions": 3,
+    "volatility_floor": 0.05,
+    "rebalance_band": 0.05,
+    "max_age_sessions": 1,
+    "relative_lookback": 126,
+    "momentum_tilt": 0.10,
+    "strategy_id": "SA16_it3"
+  },
+  "controls": {},
+  "note": "Written before the first run of SA16_it3; the parent it2 is the run without the tilt. See research/SA16/it03.md."
+}

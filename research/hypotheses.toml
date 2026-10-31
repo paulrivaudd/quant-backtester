@@ -113,3 +113,12 @@ statement = "Holding US technology (QDVE, the core of SA15) and gold (4GLD) perm
 universe = "ETF_US_TECH and ETF_GOLD; store runs/sa16_store, window 2018-08-01 to 2026-10-30, SA15 conventions (research/SA16/protocol.md). Written after it1 was read and before any it2 run. Technology is a retrospective choice inherited from SA15; the C2 control measures what it is worth."
 prediction = "Net CAGR at least 21.5% and net Sharpe at least 1.20, both above the two references, maximum drawdown no deeper than 25%, same ordering at doubled costs. The constant two-thirds control (C1) does not do better in Sharpe; the same rule on the Nasdaq (C2) falls short of SA15 in CAGR."
 refutation = "Net CAGR or net Sharpe at or below either reference (NOT_SUPPORTED). C1 doing at least as well shows the risk weighting adds nothing beyond the mix. A paired bootstrap interval that includes zero leaves the comparison uncertain."
+
+[[hypothesis]]
+hypothesis_id = "sa16_it3_relative_momentum_tilt"
+status = "PREREGISTERED"
+written_on = 2026-10-31
+statement = "Tilting it2's risk budget of US technology from 0.75 to 0.85 when its 126-session euro return is strictly above gold's, and to 0.65 otherwise, both funds staying held, improves on it2 and still beats both references, net of costs."
+universe = "ETF_US_TECH and ETF_GOLD; store runs/sa16_store, window 2018-08-01 to 2026-10-30, SA15 conventions. Written after it2 was read and before any it3 run: retrospective."
+prediction = "Net CAGR 0.5 to 1.5 points above it2 with a net Sharpe at least equal, maximum drawdown no deeper than 24%, both references beaten at x1 and x2 costs."
+refutation = "Net CAGR or net Sharpe at or below it2's, or criterion 1 of research/SA16/protocol.md lost against either reference."

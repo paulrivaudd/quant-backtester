@@ -141,3 +141,54 @@ def test_real_signals_ignore_future_prices(
     assert dict(before.weights) == dict(after.weights)
     # the growth fund moves twice as much: with b = 0.75 it holds 0.75/2 / (0.75/2 + 0.25)
     assert before.weights[GROWTH] == pytest.approx(0.6, rel=0.02)
+
+
+def tilted(allocation: SA16RiskBudget, growth: float, hedge: float) -> Written:
+    """Write equal volatilities and the two compared returns."""
+    written = vols(allocation, 0.10, 0.10)
+    signal_id = allocation.momentum().signal_id
+    written[signal_id, GROWTH] = growth
+    written[signal_id, HEDGE] = hedge
+    return written
+
+
+@pytest.mark.parametrize(
+    ("growth", "hedge", "budget"),
+    [(0.10, 0.05, 0.85), (0.05, 0.10, 0.65), (0.05, 0.05, 0.65), (-0.01, -0.20, 0.85)],
+)
+def test_relative_momentum_tilts_the_budget_towards_the_stronger_fund(
+    decision, growth, hedge, budget
+) -> None:
+    allocation = strategy(growth_risk_budget=0.75, relative_lookback=126, momentum_tilt=0.10)
+    plan = allocation.plan(decision(allocation, tilted(allocation, growth, hedge)))
+    assert plan.budget == pytest.approx(budget)
+    # equal volatilities: the weights are the budgets themselves
+    assert dict(plan.weights) == pytest.approx({GROWTH: budget, HEDGE: 1.0 - budget})
+
+
+def test_an_unreadable_return_keeps_the_book(decision) -> None:
+    allocation = strategy(relative_lookback=126, momentum_tilt=0.10)
+    written = tilted(allocation, 0.1, 0.0)
+    written[allocation.momentum().signal_id, HEDGE] = SignalStatus.MISSING_INPUT
+    held = {GROWTH: 0.6, HEDGE: 0.4}
+    assert allocation.decide(decision(allocation, written, held)).hold_positions
+
+
+def test_without_a_tilt_no_return_is_requested() -> None:
+    allocation = strategy()
+    assert all("endpoint" not in item.signal.signal_id for item in allocation.required_signals())
+    assert allocation.relative_lookback == 0
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"relative_lookback": 126},
+        {"momentum_tilt": 0.1},
+        {"relative_lookback": 126, "momentum_tilt": 0.3},
+        {"relative_lookback": 126, "momentum_tilt": 0.1, "growth_risk_budget": 0.95},
+    ],
+)
+def test_an_incomplete_or_excessive_tilt_is_rejected(changes) -> None:
+    with pytest.raises(ValueError):
+        strategy(**changes)
