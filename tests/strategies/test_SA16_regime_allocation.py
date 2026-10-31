@@ -147,6 +147,20 @@ def test_an_unreadable_input_keeps_the_book_and_records_why(decision, name, stat
     assert target.skipped[name] is status
 
 
+def test_a_book_of_several_lines_is_kept_when_the_hedge_is_unreadable(decision) -> None:
+    allocation = strategy()
+    written = returns(allocation, (0.01, 0.01, -0.01, -0.01))
+    written[allocation.momentum(21).signal_id, HEDGE] = SignalStatus.MISSING_INPUT
+    held = {EQUITY: 0.5, HEDGE: 0.4}
+    plan = allocation.plan(decision(allocation, written, held))
+    assert plan.unusable == {HEDGE: SignalStatus.MISSING_INPUT}
+    target = allocation.decide(decision(allocation, written, held))
+    assert target.hold_positions
+    assert dict(target.weights) == pytest.approx(held)
+    # A line kept is not a line skipped: the record holds it, the plan says why.
+    assert HEDGE not in target.skipped
+
+
 def test_small_drift_is_held_and_a_complete_exit_is_always_sent(decision) -> None:
     allocation = strategy(rebalance_band=0.10)
     written = returns(allocation, (0.01,) * 4)

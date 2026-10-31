@@ -213,8 +213,10 @@ class SA16RegimeAllocation(Strategy):
         """Send the target through the band, or keep the book when an input is unreadable."""
         plan = self.plan(ctx)
         if not plan.complete:
+            # The lines kept are what the decision stands among, as in ``settle``.
+            considered = max(plan.readable, len(ctx.portfolio.weights))
             return ctx.hold_positions(
-                among=Selection(names=(), considered=plan.readable, skipped=plan.unusable)
+                among=Selection(names=(), considered=considered, skipped=plan.unusable)
             )
         return settle(
             ctx,
