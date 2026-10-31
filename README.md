@@ -1,5 +1,7 @@
 # quant-backtester
 
+[![checks](https://github.com/paulrivaudd/quant-backtester/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/paulrivaudd/quant-backtester/actions/workflows/ci.yml)
+
 A daily-frequency backtesting framework for systematic strategies, built around
 one priority: results you can trust and reproduce.
 
