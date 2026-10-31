@@ -1727,13 +1727,13 @@ def report_extra(
         f"{_cell(everything['r2_oos_vs_train_mean'], '{:+.4f}')}; forecast/realisation "
         f"correlation {_cell(everything['correlation'], '{:+.3f}')}.",
         f"- **Sign.** Right {_cell(everything['sign_accuracy'], '{:.1%}')}, against "
-        f"{_cell(everything['always_up_accuracy'], '{:.1%}')} for \"always up\"; "
+        f'{_cell(everything["always_up_accuracy"], "{:.1%}")} for "always up"; '
         f"balanced accuracy {_cell(everything['balanced_accuracy'], '{:.1%}')}; "
         f"{_cell(everything['forecast_up'], '{:.0f}')} positive forecasts.",
         f"- **Forecasts followed by a position carried.** {_cell(carried['pairs'], '{:.0f}')} "
         f"pairs; MSE {_cell(carried['mse'], '{:.4e}')}; right sign "
         f"{_cell(carried['sign_accuracy'], '{:.1%}')} against "
-        f"{_cell(carried['always_up_accuracy'], '{:.1%}')} for \"always up\".",
+        f'{_cell(carried["always_up_accuracy"], "{:.1%}")} for "always up".',
         f"- **Position episodes.** {stays.get('stays', 0)} episodes, of which "
         f"{stays.get('completed', 0)} finished; {stays.get('gains', 0)} winners; mean net "
         f"{_cell(stays.get('mean_net_return'), '{:+.2%}')}.",

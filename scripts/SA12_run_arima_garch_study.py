@@ -774,7 +774,8 @@ def report_extra(
         f"{quality['usable']} times ({_cell(quality['usable_share'], '{:.2%}')}). ARIMA means "
         f"accepted: {quality['arima_accepted']}. Variance fits attempted: "
         f"{quality['volatility_fits']}, of which GARCH accepted {quality['garch_accepted']} and "
-        f"EWMA fallback {quality['ewma_fallbacks']} ({_cell(quality['fallback_share'], '{:.2%}')}). "
+        f"EWMA fallback {quality['ewma_fallbacks']} "
+        f"({_cell(quality['fallback_share'], '{:.2%}')}). "
         f"Failures by step: {quality['failures'] or 'none'}.",
         f"- **Pairs that can be evaluated.** {coverage['pairs']} forecasts out of "
         f"{coverage['origins']} have a known target (return from the open of t+1 to the open of "
@@ -784,7 +785,7 @@ def report_extra(
         f"{_cell(means.loc['mean of the window', 'mse'], '{:.4e}')} for the mean of the "
         f"window. Forecast/realisation correlation {_cell(arima['correlation'], '{:+.3f}')}. "
         f"Right sign {_cell(arima['sign_accuracy'], '{:.1%}')}, against "
-        f"{_cell(arima['always_up_accuracy'], '{:.1%}')} for \"always up\"; balanced "
+        f'{_cell(arima["always_up_accuracy"], "{:.1%}")} for "always up"; balanced '
         f"accuracy {_cell(arima['balanced_accuracy'], '{:.1%}')}.",
         f"- **Entry signals.** The forecast exceeds 20 bp at "
         f"{entries['forecast_above_entry']} origins out of {entries['pairs']} "
@@ -820,8 +821,8 @@ def report_extra(
         *[f"- {reason}" for reason in reasons],
         "",
         "This status answers a single question, written before the run: does the direction "
-        "gate improve the same risk sizing without it (D0)? It does not say \"ARIMA-GARCH "
-        "never works\", and the contribution of GARCH is read separately, against D1.",
+        'gate improve the same risk sizing without it (D0)? It does not say "ARIMA-GARCH '
+        'never works", and the contribution of GARCH is read separately, against D1.',
         "",
     ]
     return "\n".join(lines)

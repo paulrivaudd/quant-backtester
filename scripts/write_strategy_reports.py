@@ -315,9 +315,7 @@ def drawdown_markdown(curve: pd.Series, *, episodes: int = 3) -> str:  # type: i
     for rank, episode in enumerate(sorted(found, key=lambda item: item.depth)[:episodes], 1):
         end = last_day if episode.recovery is None else episode.recovery
         back = f"not recovered at {last_day}" if episode.recovery is None else str(episode.recovery)
-        length = f"{(end - episode.peak).days}" + (
-            " (ongoing)" if episode.recovery is None else ""
-        )
+        length = f"{(end - episode.peak).days}" + (" (ongoing)" if episode.recovery is None else "")
         lines.append(
             f"| {rank} | {episode.peak} | {episode.trough} | {episode.depth:.2%} | {back} | "
             f"{length} |"
@@ -559,9 +557,7 @@ def activity_markdown(history: pd.DataFrame) -> str:
     exposure = [float(value) for value in exposure_of(history)]
     invested = [value for value in exposure if value > 0.0]
     if not invested:
-        return (
-            f"Activity: no position held at a close over {len(exposure)} valuations."
-        )
+        return f"Activity: no position held at a close over {len(exposure)} valuations."
     return (
         f"Activity: a position is held at the close of **{len(invested)} valuations "
         f"out of {len(exposure)}**; the total weight held there ranges from {min(invested):.1%} "
@@ -721,7 +717,7 @@ SCORE_NOTE = (
     "the ranking is exploratory, and a gap of a few points between two scores is not a test "
     "of superiority. The alphas are point estimates without an interval, with a zero "
     "risk-free rate; the alpha against SA1 compares with an active rule and is not a market "
-    "alpha. The fund held is the yardstick of the score and is not scored. \"n/a\": the "
+    'alpha. The fund held is the yardstick of the score and is not scored. "n/a": the '
     "measure does not exist; it is never replaced by zero."
 )
 """What the score and the alphas of the first table do and do not say."""
@@ -735,11 +731,11 @@ PEERS_NOTE = (
 """How the table of the peers is to be read."""
 
 READING_NOTE = (
-    "Each row runs from the value of the \"From\" session to that of the \"To\" session: N "
-    "valuations, hence N - 1 returns. \"Largest rise\" is the largest rise from a trough to "
+    'Each row runs from the value of the "From" session to that of the "To" session: N '
+    'valuations, hence N - 1 returns. "Largest rise" is the largest rise from a trough to '
     "a later peak, of any length: it is neither a position nor a trade. The two relative "
     "stretches are selected on the ratio of the strategy to the fund held, whose change is "
-    "the \"relative gap\" `(1 + strategy) / (1 + fund) - 1`. The \"close weight\" is the "
+    'the "relative gap" `(1 + strategy) / (1 + fund) - 1`. The "close weight" is the '
     "share of the net assets held in funds at the evening valuation, the rest being cash "
     "that earns nothing: it may have drifted with prices, and multiplying it by the fund's "
     "return does not rebuild the result. A decision taken on the evening of t (signal and "
@@ -1248,7 +1244,7 @@ def sa14_book(
         provenance,
         control=neural.SPLIT,
         history_note=(
-            "For SA14, the \"proposed weight\" columns are the **output** of the network, not "
+            'For SA14, the "proposed weight" columns are the **output** of the network, not '
             "its inputs: the features it reads (returns, averages, volatilities of the two "
             "funds and of the VIX over 100 sessions) are not in this table."
         ),

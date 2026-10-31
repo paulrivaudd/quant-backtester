@@ -286,9 +286,7 @@ def test_months_are_counted_by_sign_and_an_idle_month_is_not_a_losing_one() -> N
     text = SCRIPT.calendar_markdown(flat, market, yearly, "a", "50/50 rebalanced")
 
     assert "**0 positive, 1 negative, 2 unchanged** out of 3" in text
-    assert (
-        "incomplete months: 2026-01 starts on 2026-01-29; 2026-03 stops at 2026-03-02" in text
-    )
+    assert "incomplete months: 2026-01 starts on 2026-01-29; 2026-03 stops at 2026-03-02" in text
     assert "| Year | Strategy | Fund held | 50/50 rebalanced | Sessions |" in text
     assert "| -10.00% | +20.00% | +25.00% | 6 |" in text
     # The even split is not shown beside itself.
