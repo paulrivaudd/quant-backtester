@@ -5,6 +5,24 @@
 A daily-frequency backtesting framework for systematic strategies, built around
 one priority: results you can trust and reproduce.
 
+## Results at a glance
+
+A daily-frequency, point-in-time backtester: each decision reads only what was published at 23:00 Paris, and look-ahead is refused by construction.
+
+![Net value of every book, base 100](results/summary/overview.png)
+
+| Book, 2021-04-01 to 2026-10-09, net of costs | Annualised return | Volatility | Sharpe | Max drawdown |
+| --- | ---: | ---: | ---: | ---: |
+| 50/50 World / S&P 500, rebalanced (reference) | 13.71% | 14.20% | 0.96 | -22.47% |
+| SA6 - vol control | 9.78% | 10.87% | 0.90 | -15.72% |
+| SA10 - ensemble | 5.16% | 6.00% | 0.86 | -11.76% |
+| SA7 - factor blend | 8.90% | 10.80% | 0.83 | -16.36% |
+| SA3 - smooth MA | 8.62% | 11.01% | 0.79 | -21.64% |
+
+No strategy of the common ranking ([ranking.csv](results/summary/ranking.csv)) beats the rebalanced 50/50 net of costs over 2021-2026. Every session of that period had already been examined, so these results are retrospective, not out of sample. SA15 and SA16 are separate studies, on other windows and references ([SA16](results/SA16/study.md)).
+
+[Getting started](#getting-started) · [Architecture](docs/ARCHITECTURE.md) · [Research protocol](research/PROTOCOL.md)
+
 ## Contents
 
 - [Status](#status)
