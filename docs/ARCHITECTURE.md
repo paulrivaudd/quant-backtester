@@ -127,7 +127,11 @@ déclarés dans `backtest/timetable.py` et enregistrés avec le résultat :
 - **Exécution, ouverture de la séance suivante.** Les ordres sont dimensionnés
   et remplis au prix de l'enchère d'ouverture (`Sizing.AT_AUCTION`, par
   défaut). `Sizing.AT_DECISION` fige les quantités à la clôture de la décision,
-  comme un ordre passé la veille.
+  comme un ordre passé la veille, sur le livre valorisé à ces clôtures. Une
+  ligne détenue dont la clôture manque à la décision (séance non servie par le
+  fournisseur) y est valorisée à son dernier prix connu, comme à l'exécution ;
+  son propre ordre est refusé (`NO_DECISION_PRICE`). Sans aucun prix connu, le
+  livre ne peut pas être dimensionné (`UnvaluablePosition`).
 - **Valorisation, après la clôture.** Le livre est marqué aux prix de clôture
   connus à cet instant, puis vient la décision suivante.
 

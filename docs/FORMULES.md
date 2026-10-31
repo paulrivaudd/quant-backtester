@@ -99,6 +99,18 @@ coût de slippage q · P · s
 Spread et slippage sont **déjà dans `P_f`**. Le rapport les montre à part, mais il
 ne faut pas les retirer une seconde fois.
 
+Avec `Sizing.AT_DECISION`, la quantité visée d'une ligne `i` de poids `w_i` est
+fixée sur le livre tel que la décision le valorisait :
+
+```
+V_d = C + Σ q_j · P_j^d       P_j^d = clôture de j connue à la décision,
+                              ou son dernier prix connu si elle manque
+q_i* = w_i · V_d / P_i^d      (ordre refusé, NO_DECISION_PRICE, si i n'a pas de clôture)
+```
+
+Une ligne détenue sans clôture à la décision n'est jamais valorisée à zéro : cela
+réduisait `V_d` de son poids et faisait vendre les autres lignes d'autant.
+
 Exemple : `P = 100`, `q = 10`, `h = 0,0002`, `s = 0,0001`, `c = 0,0005`, `m = 1`.
 On paie `P_f = 100,03` et `F = max(0,50 ; 1) = 1`, soit un décaissement de
 1 001,30. Les coûts sont de 0,20 de spread, 0,10 de slippage et 1 de commission.

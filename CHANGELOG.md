@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Decision-time sizing values a line without a close at its last price (2026-10-31)
+- **Fixed**: with `Sizing.AT_DECISION`, a line held at the decision whose close
+  was MISSING (a session the provider did not serve) was valued at zero when
+  the book was sized, so every other line was sized on an equity short of that
+  line's weight: A and B held 50/50, asked to stay 50/50 with B's close
+  missing, sold half of A. The line is now valued at its last known price, as
+  the execution already valued a line without an open; its own order is still
+  refused with `NO_DECISION_PRICE`, and a held line never priced raises
+  `UnvaluablePosition`. Tests in `tests/execution/test_model.py`.
+- `Sizing.AT_DECISION` is used by the common ETF study (SA1 to SA13), SA14,
+  SA15 and SA16: the sessions exposed in their published results are counted
+  in the pull request; no published result is rewritten by this change.
+
 ### SA16: technology and gold under a budget of risk (2026-10-31)
 - **SA16 is catalogued** (`SA16 - growth gold budget`, `SA16RiskBudget`): US
   technology and gold held together at inverse-volatility weights scaled by a
