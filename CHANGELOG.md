@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### The results in English (2026-10-31)
+- **Reports regenerated in English.**
+  - The scripts that write them are translated:
+    `write_strategy_reports.py`, `run_review_diagnostics.py`, the SA16
+    tables and figures, and the report sections of SA12 and SA13.
+  - So is `research/commentary.toml`, the written analysis.
+  - From the same exports, the French code first reproduced the committed
+    files byte for byte. The 20 analyses, the diagnostics, the SA16 tables
+    and the SA16 figures were then written again in English.
+  - Every line keeps the same numbers. Tables, CSVs and figures other than
+    SA16's are byte-identical. The diagnostics tables keep their values; only
+    their row labels are translated.
+  - The SA14 report and the diagnostics cite the commit their runs were made
+    at.
+  - The SA12 and SA13 sections were translated in the run exports they are
+    written from; those studies were not run again.
+- **Translated by hand, with every number checked:** `results/summary/README.md`
+  and `results/SA16/study.md`.
+- **SA16 robustness tables:** `SA16_run_study.py` now draws them with
+  `robustness_markdown()`, a pure function of the saved `summary.json`.
+- **Left in French, as written:** the preregistrations and iteration sheets
+  (`research/hypotheses.toml`, `research/SA15_GPT-6.1/`, `research/SA16/`),
+  and the SA15 reports with their frozen scripts. The README says so.
+
 ### The raw exports of results/ move to a Release (2026-10-31)
 - **`results/` tracks 279 files, 28 MB, instead of 15,454 files, 330 MB.**
   - Kept: the reports, the summary tables, the figures, what each study froze

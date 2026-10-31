@@ -244,6 +244,16 @@ figure the run cannot support is reported as nothing rather than invented.
 Seven layers that depend on each other one way, with research, tests, scripts
 and docs around them.
 
+**Language.** The code, the documentation and the reports of SA1 to SA14 and
+of SA16 are in English. Some research records stay in the French they were
+written in:
+- the hypotheses, protocols and iteration sheets written before their runs
+  (`research/hypotheses.toml`, `research/SA15_GPT-6.1/`, `research/SA16/`);
+- the SA15 reports under `results/SA15_GPT-6.1*/`, with the frozen scripts
+  that wrote them. Some of these reports have their digest recorded.
+
+Translating them would rewrite dated or hash-pinned records.
+
 <details>
 <summary>Show the directory tree</summary>
 
