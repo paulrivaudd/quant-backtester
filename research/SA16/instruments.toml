@@ -1,0 +1,106 @@
+# Signal-only series added for SA16, declared on 2026-10-31 before any SA16
+# backtest. None of them is tradable: they are read as information at the
+# 23:00 Paris decision, never held. The registry of the project is unchanged;
+# runs/sa16_store concatenates market_data/metadata/instruments.toml, the two
+# SA15 additions (research/SA15_GPT-6.1/instruments.toml and
+# research/SA15_GPT-6.1/round4/instruments.toml) and this file.
+#
+# Why US-close series: the funds SA15 and SA16 trade are Xetra listings whose
+# Yahoo history misses whole sessions (2025-10-24, 2026-03-06, see
+# market_data/metadata/known_gaps.toml). A strict window of consecutive Xetra
+# closes then refuses a signal for up to sixty sessions. The New York close of
+# the same exposure is published at 16:00 New York, before the 23:00 Paris
+# decision (22:00 Paris, or 21:00 in the weeks when only one side has shifted
+# to summer time), and its calendar is a different one. It also carries the
+# four and a half hours of trading after the Xetra close.
+#
+# Indices rather than US-listed funds for equities: YahooSource refuses a fund
+# with any split in its history, and QQQ split in 2000, XLK in 2025. The S&P 500
+# IT sector index (^SP500-45) was declared first and dropped before any
+# backtest: Yahoo serves one session of it. A price index ignores
+# dividends, about 0.6 % a year for the Nasdaq-100; a trend or a volatility on
+# it is the trend or the volatility of the exposure, not its total return.
+
+[[instrument]]
+id = "NDX"
+name = "Nasdaq-100 index (price return, USD)"
+asset_type = "INDEX"
+data_type = "BAR"
+currency = "USD"
+primary_source = "YAHOO"
+source_symbol = "^NDX"
+calendar_id = "XNYS"
+tradable = false
+first_session = 2014-01-02
+history_basis = "ASSUMED_UNREVISED"
+history_note = "An index close is a final print. Levels as served by Yahoo on 2026-10-31; no earlier fetch to compare with. Price return in USD: no dividends, no currency conversion. Signal only, the index the traded ETF_NASDAQ (SXRV.DE) replicates."
+
+[[instrument]]
+id = "GLD_US"
+name = "SPDR Gold Shares, NYSE Arca (USD)"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "USD"
+primary_source = "YAHOO"
+source_symbol = "GLD"
+calendar_id = "XNYS"
+tradable = false
+first_session = 2014-01-02
+# A grantor trust that pays no income: ACCUMULATING is the framework's
+# no-cash-income rule, as for ETF_GOLD.
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Physically backed gold trust, no split and no distribution since 2004. Yahoo single source, restated provider snapshot of 2026-10-31. Signal only: the New York close of gold, read beside the Xetra-Gold ETC that is traded (ETF_GOLD)."
+
+[[instrument]]
+id = "HYG_US"
+name = "iShares iBoxx USD High Yield Corporate Bond ETF (USD)"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "USD"
+primary_source = "YAHOO"
+source_symbol = "HYG"
+calendar_id = "XNYS"
+tradable = false
+first_session = 2014-01-02
+distribution_policy = "DISTRIBUTING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Monthly distributions, read through the stored dividend table (ADJUSTED basis). Yahoo single source, restated provider snapshot of 2026-10-31. Signal only: credit risk appetite."
+
+[[instrument]]
+id = "IEF_US"
+name = "iShares 7-10 Year Treasury Bond ETF (USD)"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "USD"
+primary_source = "YAHOO"
+source_symbol = "IEF"
+calendar_id = "XNYS"
+tradable = false
+first_session = 2014-01-02
+distribution_policy = "DISTRIBUTING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "Monthly distributions, read through the stored dividend table (ADJUSTED basis). Yahoo single source, restated provider snapshot of 2026-10-31. Signal only: the duration leg against which credit is measured."
+
+# FRED's VXVCLS is the official Cboe close of the 3-month VIX (VIX3M, VXV
+# before 2017). Cboe disseminates the index live and its close is final at the
+# 16:15 New York options close, the convention of VIX above. FRED's own copy
+# of a day appears the next morning (vintage of 2026-10-30 08:37 CDT carries
+# 2026-10-29): that is the archive's delay, not the information's, so the
+# release time is Cboe's. Read only beside VIX, for the term structure.
+[[instrument]]
+id = "VIX3M"
+name = "CBOE S&P 500 3-Month Volatility Index"
+asset_type = "VOLATILITY"
+data_type = "LEVEL"
+currency = "NA"
+primary_source = "FRED"
+source_symbol = "VXVCLS"
+tradable = false
+first_session = 2014-01-02
+history_basis = "ASSUMED_UNREVISED"
+history_note = "The official Cboe close, final once published. FRED's latest vintage of 2026-10-31; FRED posts a day the next morning, Cboe at its 16:15 New York close."
+
+  [instrument.publication_rule]
+  publication_time = "16:15:00"
+  timezone = "America/New_York"
