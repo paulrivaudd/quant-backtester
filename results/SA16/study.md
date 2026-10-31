@@ -309,3 +309,15 @@ existant. Retélécharger ne garantit pas le même magasin (empreinte de l'étud
 | `robustness/SA16_it2/` | voisins et redémarrages |
 | `final/` | rerun de la configuration retenue avec le code final |
 | `comparison.png`, `weights.png` | figures (`scripts/SA16_report.py`) |
+
+## Archived exports (2026-10-31)
+
+Of the files in the table above, the repository keeps `study.md`,
+`selected.json`, the `tables.md` files and the figures. The others
+(`register.csv`, the `report.json` files, the books under `x1/` and `x2/`,
+`references/`, `reproduction/`, `final/` and the rest of `robustness/`)
+are no longer tracked; they are in the results archive `quant-backtester-results-7a2205d.tar.gz`
+(SHA-256 `475440c48634efec917ea1e0a11397cc2ac2b917e631d09f672346a60e8a0583`),
+attached to the Release [`results-archive-2026-10-31`](https://github.com/paulrivaudd/quant-backtester/releases/tag/results-archive-2026-10-31).
+Restore it before running `scripts/SA16_report.py` or
+`scripts/SA16_run_study.py reproduce`: [ARCHIVE.md](../ARCHIVE.md) says how.

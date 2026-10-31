@@ -1,9 +1,0 @@
-{
-  "number": 7,
-  "reason": "Retirer totalement la tendance (essai6) aggrave le drawdown. Garder le coeur50% et le filtre mais raccourcir la moyenne de200 à126 séances pour réduire le retard aux reprises.",
-  "schedule": "monthly",
-  "parameters": {
-    "core_fraction": 0.5,
-    "trend_sessions": 126
-  }
-}

@@ -1,9 +1,0 @@
-{
-  "id": "M06",
-  "completed_sha256": "d9a606b82da0b77299c3a8678a01f5a165d8878c74d1dcc40d34678941f634e9",
-  "decision": "Ne pas retenir la protection partielle comme parent principal : gain de reprise insuffisant face au depassement du seuil de risque; M03 reste reference principale.",
-  "findings": [
-    "M06 CAGR21.897%,DD25.844%,21dates vsM03 21.482%,DD23.147%,20dates. Gain0.415pointCAGR mais2.697pointsDD perdus; risque au-dessus25%. Frais524.09EUR plus faibles, avantageCAGR x2+0.502point. La reprise ajoute seulement0.205pointCAGR et deteriorieDD1.700point dans ce contexte partiel; les blocs interagissent. Le repli monetaire apporte seulement0.027pointCAGR et ne diversifie pas vraiment les baisses."
-  ],
-  "next_defect": "Le capital defensive monetaire/cash reste peu productif et les blocs directionnels coutent de la croissance. Tester une defense momentum a univers stable (or predeclare), avec vraie ablation cash et risque explicite, sans grille de poids."
-}

@@ -1,2 +1,0 @@
-session_date,submitted_at,decided_on,instrument_id,side,quantity,filled_quantity,status
-2022-01-04,2022-01-04 09:01:00+01:00,2022-01-03,ETF_NASDAQ,BUY,121.0,120.0,PARTIALLY_FILLED

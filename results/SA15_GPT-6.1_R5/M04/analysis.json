@@ -1,9 +1,0 @@
-{
-  "id": "M04",
-  "completed_sha256": "f0d9bfac807e862a28620cd1935d898635f7d91b5aa41a862eea61b0c98e49cf",
-  "decision": "Ne pas retenir l'estimateur rapide seul : faible gain surM02, davantage d'ordres; M03 offre un meilleur compromis.",
-  "findings": [
-    "M04 gagne0.207pointCAGR surM02 avec memeDD23.147%, mais27dates au lieu24,292.73EUR de frais enplus. Expositionreprise76.34% mais actifreprise-0.099bp/j vsparent. M03 atteint21.482%CAGR avec20dates et memeDD, contre20.782%/27datesM04. Le court estimateur ne corrige pas a lui seul le retard des decisions."
-  ],
-  "next_defect": "Les reprises attendent la fin du mois meme lorsque les signaux se sont retournes entretemps; mesurer une cadence plus rapide a regles identiques."
-}

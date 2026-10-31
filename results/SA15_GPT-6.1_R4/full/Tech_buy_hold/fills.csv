@@ -1,2 +1,0 @@
-session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
-2019-06-04,2019-06-04 09:01:00+02:00,ETF_US_TECH,BUY,12586.0,7.761000156402588,7.764880656480789,97728.7879424672,48.8643939712336,29.30398439054489,19.535989593696595,97.70436795547509

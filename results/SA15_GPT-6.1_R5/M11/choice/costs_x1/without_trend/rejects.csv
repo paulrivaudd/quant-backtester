@@ -1,3 +1,0 @@
-session_date,instrument_id,reason,side,requested_quantity
-2020-04-01,ETF_GOLD,INSUFFICIENT_CASH,BUY,55.0
-2020-10-01,ETF_GOLD,INSUFFICIENT_CASH,BUY,3.0

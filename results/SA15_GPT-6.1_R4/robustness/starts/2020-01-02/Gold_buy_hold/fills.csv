@@ -1,2 +1,0 @@
-session_date,executed_at,instrument_id,side,quantity,market_price,fill_price,traded_value,commission,spread_cost,slippage_cost,total_cost
-2020-01-03,2020-01-03 09:01:00+01:00,ETF_GOLD,BUY,2245.0,44.487998962402344,44.51024296188354,99925.49544942855,49.962747724714276,29.962667301177976,19.975111534118653,99.9005265600109
