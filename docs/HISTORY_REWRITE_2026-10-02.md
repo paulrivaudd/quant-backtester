@@ -1,32 +1,32 @@
-# Réécriture de l'historique du 2026-10-02
+# The history rewrite of 2026-10-02
 
-Le 2026-10-02, les 21 commits du 2026-09-20 qui portaient une ligne
-`Co-Authored-By: Claude` dans leur message ont été réécrits sans cette ligne.
-Un commit contient le hash de son parent : les 89 commits suivants ont donc
-changé de hash eux aussi. 110 commits sur 156 sont concernés, à partir de
-`101f1e5`.
+On 2026-10-02, the 21 commits of 2026-09-20 whose message carried a
+`Co-Authored-By: Claude` line were rewritten without that line. A commit
+contains the hash of its parent, so the 89 commits that followed changed hash
+as well. 110 commits out of 156 are concerned, from `101f1e5` onwards.
 
-## Ce qui a changé, et ce qui n'a pas changé
+## What changed, and what did not
 
-- **Changé** : le hash de ces 110 commits, et la ligne retirée dans 21 messages.
-- **Inchangé**, vérifié commit par commit : l'arbre (le code et les fichiers),
-  l'auteur, les deux dates, et le reste de chaque message.
+- **Changed**: the hash of those 110 commits, and the line removed from 21
+  messages.
+- **Unchanged**, checked commit by commit: the tree (the code and the files),
+  the author, both dates, and the rest of each message.
 
-## Ce qui cite encore un ancien hash
+## What still cites an old hash
 
-- `research/registry.jsonl` n'a pas été modifié : un registre en ajout seul ne
-  se réécrit pas. Ses 19 lignes nomment `5eb5b07`, devenu `61a017c`. Leur
-  `run_id` a été calculé avec l'ancien hash : rejouer ces runs sur le nouveau
-  commit donne un autre `run_id` et les mêmes chiffres.
-- Le tag local `baseline-2026-09-26` désignait `5c5470d`, devenu `29d5043` ; il
-  a été déplacé. Le snapshot `~/quant-snapshots/baseline-2026-09-26/` est
-  inchangé.
-- Les réponses d'audit hors dépôt citent les anciens hashes ; la table
-  ci-dessous les traduit.
+- `research/registry.jsonl` was not modified: an append-only register is not
+  rewritten. Its 19 lines name `5eb5b07`, which became `61a017c`. Their
+  `run_id` was computed with the old hash: replaying those runs on the new
+  commit gives another `run_id` and the same figures.
+- The local tag `baseline-2026-09-26` pointed to `5c5470d`, which became
+  `29d5043`; it was moved. The snapshot `~/quant-snapshots/baseline-2026-09-26/`
+  is unchanged.
+- The audit answers kept outside the repository cite the old hashes; the
+  table below translates them.
 
-## Table de correspondance
+## Mapping table
 
-| Ancien hash | Nouveau hash |
+| Old hash | New hash |
 |---|---|
 | `101f1e505a279feac0061ca4a520111364d7caba` | `2dbcf82672878452b6bca9da7c9adc98d74fa03d` |
 | `70c3d13d4d9d9141dc65efb881c54dbda2793fc0` | `b3b1cfb3189ed1417295b7fd7a4d783251d107d7` |

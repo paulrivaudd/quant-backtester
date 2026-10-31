@@ -1,16 +1,37 @@
 # quant-backtester
 
+[![checks](https://github.com/paulrivaudd/quant-backtester/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/paulrivaudd/quant-backtester/actions/workflows/ci.yml)
+
 A daily-frequency backtesting framework for systematic strategies, built around
 one priority: results you can trust and reproduce.
 
+## Results at a glance
+
+A daily-frequency, point-in-time backtester: each decision reads only what was published at 23:00 Paris, and look-ahead is refused by construction.
+
+![Net value of every book, base 100](results/summary/overview.png)
+
+| Book, 2021-04-01 to 2026-10-09, net of costs | Annualised return | Volatility | Sharpe | Max drawdown |
+| --- | ---: | ---: | ---: | ---: |
+| 50/50 World / S&P 500, rebalanced (reference) | 13.71% | 14.20% | 0.96 | -22.47% |
+| SA6 - vol control | 9.78% | 10.87% | 0.90 | -15.72% |
+| SA10 - ensemble | 5.16% | 6.00% | 0.86 | -11.76% |
+| SA7 - factor blend | 8.90% | 10.80% | 0.83 | -16.36% |
+| SA3 - smooth MA | 8.62% | 11.01% | 0.79 | -21.64% |
+
+No strategy of the common ranking ([ranking.csv](results/summary/ranking.csv)) beats the rebalanced 50/50 net of costs over 2021-2026. Every session of that period had already been examined, so these results are retrospective, not out of sample. SA15 and SA16 are separate studies, on other windows and references ([SA16](results/SA16/study.md)).
+
+[Getting started](#getting-started) · [Architecture](docs/ARCHITECTURE.md) · [Research protocol](research/PROTOCOL.md)
+
 ## Contents
 
-- [Status](#status)
 - [Design goals](#design-goals)
+- [Getting started](#getting-started)
+- [My contribution](#my-contribution)
+- [Status](#status)
 - [Layout](#layout)
 - [The data layer](#the-data-layer)
 - [The signals layer](#the-signals-layer)
-- [Getting started](#getting-started)
 - [A run, end to end](#a-run-end-to-end)
 - [What a run records](#what-a-run-records)
 - [Writing a strategy](#writing-a-strategy)
@@ -19,6 +40,159 @@ one priority: results you can trust and reproduce.
 - [What a strategy may not do](#what-a-strategy-may-not-do)
 
 The longer sections are folded: click a line starting with a triangle to open it.
+
+## Design goals
+
+- **No look-ahead bias** — every value is keyed by the time it became available,
+  field by field: on a session `t` the open is knowable at the opening auction
+  and the close only at the closing one.
+- **Look-ahead made unrepresentable** — nothing above the data layer holds a
+  reader it can ask about an arbitrary date. What is handed out is a
+  `PointInTimeReader` fixed at one instant, whose methods take no `as_of`
+  argument at all. A strategy does not even get that: it receives a decision
+  context whose every part answers for the same instant, and no attribute of
+  it leads back to a reader.
+- **Explicit calendars** — real holidays, half days and DST, with a declared
+  coverage period and an error outside it rather than an invented session. A
+  signal computed after the US close trades at the following European open, and
+  that gap is modelled rather than assumed away.
+- **Nothing restated is stored** — no `adj_close`. Raw prices plus a corporate
+  action table, adjusted at read time with the actions known at the decision
+  instant.
+- **Reproducible research** — `clean/` is a pure function of the raw archive and
+  the committed configuration, and can be deleted and rebuilt identically. A
+  provider changing its mind is logged and ignored until someone reviews the
+  exact correction in a diff.
+- **A window of N sessions really is N sessions** — the reader drops a session
+  it cannot serve rather than returning a `NaN`, so twenty observations may span
+  twenty-six sessions. A signal declares which of the two it wants, and the
+  layer refuses the window rather than computing on the wrong one.
+- **Explicit transaction costs** — commission, spread and slippage are named,
+  configurable terms; gross and net results reported side by side.
+- **A book that could have existed** — an instrument is bought only if the
+  registry says it can be bought, in the currency the book is kept in, in the
+  units the venue deals in, with money the book holds, and never short. Each of
+  those is refused loudly rather than reported as a return: a backtest whose
+  orders could not have been placed is not a pessimistic backtest, it is a
+  different strategy.
+- **Target and actual are two things** — what a strategy asked for, what the
+  portfolio allowed, what was filled and what is held are four records, not
+  one number overwritten three times. A report that only kept the last would
+  describe a strategy that never met a missing price, a lot size or a limit.
+
+## Getting started
+
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.12, on a POSIX system -
+Linux, macOS or WSL. The market data store is locked with `flock`, which has
+the shared mode a reading run needs and which native Windows does not
+provide; importing the store there fails with a message saying so.
+
+```bash
+uv sync                          # create the environment from uv.lock
+uv sync --extra ml               # the same, with PyTorch (CPU) for SA14
+uv sync --extra stats            # the same, with arch and statsmodels for SA11 and SA12
+uv sync --extra ml --extra stats --extra signatures   # everything, SA13 (log-signatures) included
+git config core.hooksPath .githooks   # once per clone: the commit-message hook
+uv run pytest                    # offline suite
+uv run pytest -m network         # the live provider checks, opt in
+uv run ruff check . && uv run ruff format --check .
+uv run pyright
+```
+
+A first backtest needs no download. `scripts/demo.py` writes two invented
+funds, drawn from a fixed seed, to a temporary store, and runs `SA1` - a fund
+held above its 20-session average - and a buy-and-hold of the same fund over
+them with the project's own reader, engine, execution model and report
+(`quant_backtester.demo`). The prices are not market data; the machinery is the
+real one:
+
+```bash
+uv run python scripts/demo.py                      # both reports, a few seconds
+uv run python scripts/demo.py --figures demo_output  # and the equity and drawdown figures
+```
+
+```python
+from pathlib import Path
+
+from quant_backtester.demo import demo_runner
+from quant_backtester.strategies import WorldMA20Benchmark
+
+runner = demo_runner(Path("demo_store"), seed=20240101)  # a new, empty directory
+result = runner.run(
+    WorldMA20Benchmark(instrument_id="FUND_A"),  # SA1
+    ("FUND_A", "FUND_B"),
+    "2025-01-02",
+    "2025-12-31",
+)
+print(result.report().render())
+```
+
+For real data, fetch the committed instruments into the local store, then read
+it at a decision instant:
+
+```bash
+uv run python scripts/update_market_data.py              # extend every series
+uv run python scripts/update_market_data.py --rebuild    # replay raw/ into clean/
+uv run python scripts/update_market_data.py --archive --only ETF_WORLD
+uv run python scripts/update_market_data.py --coverage   # what the store is missing
+```
+
+```python
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from quant_backtester.data.calendars import CalendarRegistry
+from quant_backtester.data.instruments import InstrumentRegistry
+from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.data.repository import MarketDataRepository
+from quant_backtester.data.universes import UniverseRegistry
+
+root = Path("market_data")
+instruments = InstrumentRegistry.from_toml(root / "metadata" / "instruments.toml")
+calendars = CalendarRegistry.from_directory(root / "metadata" / "calendars")
+reader = MarketDataReader(
+    repository=MarketDataRepository(root),
+    instruments=instruments,
+    calendars=calendars,
+    reference_calendar_id="XPAR",
+)
+universes = UniverseRegistry.from_toml(root / "metadata" / "universes.toml", instruments)
+
+# 23:00 in Paris: the US and European closes of the day are knowable.
+decision = reader.at(datetime(2026, 9, 17, 23, 0, tzinfo=ZoneInfo("Europe/Paris")))
+prices = decision.history("SP500")  # nothing after the decision instant
+state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
+```
+
+## My contribution
+
+The first ten strategies of the catalogue, SA1 to SA10, are my work. Each one
+has its report under `results/`, measured on the common period 2021-04-01 to
+2026-10-09, net of costs:
+
+| Code | Rule | Report |
+| --- | --- | --- |
+| SA1 | Hold the world fund while its close is above its 20-session average: the benchmark rule. | [SA1](results/SA1/analysis.md) |
+| SA2 | Lean progressively towards the fund with the stronger momentum. | [SA2](results/SA2/analysis.md) |
+| SA3 | Enter a trend progressively, as the fast average pulls away from the slow one. | [SA3](results/SA3/analysis.md) |
+| SA4 | Buy an unusual fall moderately, while the long trend is still up. | [SA4](results/SA4/analysis.md) |
+| SA5 | Overweight the fund that lately lagged what the other one explains of it. | [SA5](results/SA5/analysis.md) |
+| SA6 | Hold less of a fund when its realised volatility rises. | [SA6](results/SA6/analysis.md) |
+| SA7 | Spread the capital over three style funds, half equally and half by inverse volatility. | [SA7](results/SA7/analysis.md) |
+| SA8 | Place the cash in a money-market fund when its carry pays for the round trip. | [SA8](results/SA8/analysis.md) |
+| SA9 | Take a small position once a volatility panic eases and the fund starts to rise. | [SA9](results/SA9/analysis.md) |
+| SA10 | Several rules, fixed capital budgets, one risk control and one rebalancing band. | [SA10](results/SA10/analysis.md) |
+
+The rest of this section is still to be written.
+
+### What I designed
+
+*Architecture, research protocol, choice of tests.*
+
+### What I implemented myself
+
+### What was done with AI tools, and how I checked it
 
 ## Status
 
@@ -64,45 +238,6 @@ holds sends no order at all.
 the split of what execution took, and the caveats a run has to be read with.
 None of it reaches back into the market data — it reads a finished run, and a
 figure the run cannot support is reported as nothing rather than invented.
-
-## Design goals
-
-- **No look-ahead bias** — every value is keyed by the time it became available,
-  field by field: on a session `t` the open is knowable at the opening auction
-  and the close only at the closing one.
-- **Look-ahead made unrepresentable** — nothing above the data layer holds a
-  reader it can ask about an arbitrary date. What is handed out is a
-  `PointInTimeReader` fixed at one instant, whose methods take no `as_of`
-  argument at all. A strategy does not even get that: it receives a decision
-  context whose every part answers for the same instant, and no attribute of
-  it leads back to a reader.
-- **Explicit calendars** — real holidays, half days and DST, with a declared
-  coverage period and an error outside it rather than an invented session. A
-  signal computed after the US close trades at the following European open, and
-  that gap is modelled rather than assumed away.
-- **Nothing restated is stored** — no `adj_close`. Raw prices plus a corporate
-  action table, adjusted at read time with the actions known at the decision
-  instant.
-- **Reproducible research** — `clean/` is a pure function of the raw archive and
-  the committed configuration, and can be deleted and rebuilt identically. A
-  provider changing its mind is logged and ignored until someone reviews the
-  exact correction in a diff.
-- **A window of N sessions really is N sessions** — the reader drops a session
-  it cannot serve rather than returning a `NaN`, so twenty observations may span
-  twenty-six sessions. A signal declares which of the two it wants, and the
-  layer refuses the window rather than computing on the wrong one.
-- **Explicit transaction costs** — commission, spread and slippage are named,
-  configurable terms; gross and net results reported side by side.
-- **A book that could have existed** — an instrument is bought only if the
-  registry says it can be bought, in the currency the book is kept in, in the
-  units the venue deals in, with money the book holds, and never short. Each of
-  those is refused loudly rather than reported as a return: a backtest whose
-  orders could not have been placed is not a pessimistic backtest, it is a
-  different strategy.
-- **Target and actual are two things** — what a strategy asked for, what the
-  portfolio allowed, what was filled and what is held are four records, not
-  one number overwritten three times. A report that only kept the last would
-  describe a strategy that never met a missing price, a lot size or a limit.
 
 ## Layout
 
@@ -338,91 +473,6 @@ snapshot.result("momentum_60d").ok()  # the rows a strategy may use
 ```
 
 </details>
-
-## Getting started
-
-Requires [uv](https://docs.astral.sh/uv/) and Python 3.12, on a POSIX system -
-Linux, macOS or WSL. The market data store is locked with `flock`, which has
-the shared mode a reading run needs and which native Windows does not
-provide; importing the store there fails with a message saying so.
-
-```bash
-uv sync                          # create the environment from uv.lock
-uv sync --extra ml               # the same, with PyTorch (CPU) for SA14
-uv sync --extra stats            # the same, with arch and statsmodels for SA11 and SA12
-uv sync --extra ml --extra stats --extra signatures   # everything, SA13 (log-signatures) included
-git config core.hooksPath .githooks   # once per clone: the commit-message hook
-uv run pytest                    # offline suite
-uv run pytest -m network         # the live provider checks, opt in
-uv run ruff check . && uv run ruff format --check .
-uv run pyright
-```
-
-A first backtest needs no download. `scripts/demo.py` writes two invented
-funds, drawn from a fixed seed, to a temporary store, and runs `SA1` - a fund
-held above its 20-session average - and a buy-and-hold of the same fund over
-them with the project's own reader, engine, execution model and report
-(`quant_backtester.demo`). The prices are not market data; the machinery is the
-real one:
-
-```bash
-uv run python scripts/demo.py                      # both reports, a few seconds
-uv run python scripts/demo.py --figures demo_output  # and the equity and drawdown figures
-```
-
-```python
-from pathlib import Path
-
-from quant_backtester.demo import demo_runner
-from quant_backtester.strategies import WorldMA20Benchmark
-
-runner = demo_runner(Path("demo_store"), seed=20240101)  # a new, empty directory
-result = runner.run(
-    WorldMA20Benchmark(instrument_id="FUND_A"),  # SA1
-    ("FUND_A", "FUND_B"),
-    "2025-01-02",
-    "2025-12-31",
-)
-print(result.report().render())
-```
-
-For real data, fetch the committed instruments into the local store, then read
-it at a decision instant:
-
-```bash
-uv run python scripts/update_market_data.py              # extend every series
-uv run python scripts/update_market_data.py --rebuild    # replay raw/ into clean/
-uv run python scripts/update_market_data.py --archive --only ETF_WORLD
-uv run python scripts/update_market_data.py --coverage   # what the store is missing
-```
-
-```python
-from datetime import datetime
-from pathlib import Path
-from zoneinfo import ZoneInfo
-
-from quant_backtester.data.calendars import CalendarRegistry
-from quant_backtester.data.instruments import InstrumentRegistry
-from quant_backtester.data.reader import MarketDataReader
-from quant_backtester.data.repository import MarketDataRepository
-from quant_backtester.data.universes import UniverseRegistry
-
-root = Path("market_data")
-instruments = InstrumentRegistry.from_toml(root / "metadata" / "instruments.toml")
-calendars = CalendarRegistry.from_directory(root / "metadata" / "calendars")
-reader = MarketDataReader(
-    repository=MarketDataRepository(root),
-    instruments=instruments,
-    calendars=calendars,
-    reference_calendar_id="XPAR",
-)
-universes = UniverseRegistry.from_toml(root / "metadata" / "universes.toml", instruments)
-
-# 23:00 in Paris: the US and European closes of the day are knowable.
-decision = reader.at(datetime(2026, 9, 17, 23, 0, tzinfo=ZoneInfo("Europe/Paris")))
-prices = decision.history("SP500")  # nothing after the decision instant
-state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
-```
 
 ## A run, end to end
 
@@ -830,7 +880,7 @@ that does not move, a constant active return - is a dash with its reason,
 never a zero. `result.report()` shows the same figures gross and net side by
 side, `result.compare(book=Book.GROSS)` the gross ones alone, and
 `result.report(benchmark=...)` measures the same run against another yardstick
-without touching the report it keeps. The formulas are in `docs/FORMULES.md`.
+without touching the report it keeps. The formulas are in `docs/FORMULAS.md`.
 
 `result.plot()` draws the run against its benchmark. It returns a figure and
 never calls `show`, so a notebook displays it, a script saves it and a test
@@ -873,6 +923,13 @@ the rules down before any experiment they govern:
 - neighbourhoods rather than points, rolling start dates, twice the costs, and
   an executable baseline over the same sessions before any variant is kept.
 
+### SA15: five series of ETF studies
+
+SA15 ran five retrospective series against S&P 500, then Nasdaq-100, buy and
+hold; the last selection archived is trial 71 of the fourth series.
+
+<details>
+<summary>Read the five series</summary>
 
 SA15_GPT-6.1 adds a bounded, retrospective multi-asset ETF momentum study:
 [protocol](research/SA15_GPT-6.1/protocol.md),
@@ -899,7 +956,7 @@ Use `scripts/SA15_run_gpt61_round2.py` for numbered candidates 11–20,
 The Nasdaq and the initial 50/50 S&P 500/Nasdaq buy-and-hold controls are
 reported alongside S&P 500. All of this history has already been examined.
 
-### SA15: third series against Nasdaq buy and hold
+#### SA15: third series against Nasdaq buy and hold
 
 The third study keeps the first two series intact and treats 100% Nasdaq
 buy and hold as its main return benchmark. Ten new designs, numbered 21–30,
@@ -917,7 +974,7 @@ saved results. The [R3 report](results/SA15_GPT-6.1_R3/study.md) includes
 cost stress, actual trading dates and the previous simple controls.
 All periods have already been examined; these are retrospective experiments.
 
-### SA15: fifty variants with risk and trading preferences
+#### SA15: fifty variants with risk and trading preferences
 
 The fourth study runs fifty new designs, numbered 31–80, against Nasdaq buy
 and hold. Its [protocol](research/SA15_GPT-6.1/round4/protocol.md) fixes a
@@ -941,9 +998,9 @@ then `--robustness --workers 3` and the companion diagnostics. The
 frontier. The history has already been examined, so conclusions remain
 retrospective.
 
-### SA15: iterations by quantitative blocks
+#### SA15: iterations by quantitative blocks
 
-New work follows the owner's [mechanism protocol](research/SA15_GPT-6.1/mechanism_protocol.md).
+New work follows the [mechanism protocol](research/SA15_GPT-6.1/mechanism_protocol.md).
 Each iteration states a block's hypothesis before running it, replays matched
 controls with that block disabled, measures benefits and costs, then records the
 specific defect that motivates the next mechanism. Asset weights are outputs of
@@ -959,10 +1016,10 @@ source/data/configuration frozen first. It refuses an existing output folder.
 [block analysis](results/SA15_GPT-6.1_mechanism_pilot/study.md); it does not run or
 select a strategy. The periods are already explored and remain retrospective.
 
-### SA15: fifty iterations with block attribution
+#### SA15: fifty iterations with block attribution
 
-The owner then authorised [fifty new mechanism iterations](research/SA15_GPT-6.1/round5/protocol.md),
-M01–M50. Their parent is the fixed pilot. Every new JSON states one changed
+[Fifty further mechanism iterations](research/SA15_GPT-6.1/round5/protocol.md),
+M01–M50, were then planned; the series stopped after M34. Their parent is the fixed pilot. Every new JSON states one changed
 block, an expected benefit and cost, and a refutation before its run. All active
 blocks are removed in matched controls, with base and doubled costs. An analysis linked by SHA-256 to the
 completed evidence is required before the next iteration.
@@ -975,18 +1032,28 @@ gold ETC and currency-hedged government bonds; only declared signal rules can
 allocate them. No asset-weight grid or ex-post annual weights are fitted.
 
 The executable rule is [`SA15Mechanisms`](src/quant_backtester/strategies/SA15_gpt61_mechanisms.py).
-Its constructor defaults describe the pilot. The frozen R5 rule uses all
-parameters and the cadence saved in [`selected.json`](results/SA15_GPT-6.1_R5/selected.json).
+Its constructor defaults describe the pilot. R5 stopped after M34, before any
+freeze: [`results/SA15_GPT-6.1_R5/`](results/SA15_GPT-6.1_R5/) holds the evidence
+of those 34 iterations, with no `selected.json` and no report.
 
-After all fifty analyses, `--freeze` records the sole candidate; `--final` and
-`--robustness` then run its matched controls, shifted starts and predeclared
-non-selectable horizon sensitivities. The [R5 report](results/SA15_GPT-6.1_R5/study.md)
-retains failures, conditional block effects, physical/logical replay counts and
-the archived audit-serialization attempt. A new reproduction uses a new output
+The planned end of the series - `--freeze` recording the sole candidate after
+all fifty analyses, then `--final` and `--robustness` - was never reached, so
+there is no R5 report; the archived audit-serialization attempt is kept in
+`results/SA15_GPT-6.1_R5_attempt01_audit_timestamp_error/`. A new reproduction uses a new output
 directory; existing evidence is never silently replaced. All periods remain
 retrospective.
 
+</details>
+
 ### SA16: technology and gold under a budget of risk
+
+US technology and gold held together under a 75/25 risk budget; it beats
+Nasdaq-100 held and SA15's archived selection on 2018-08 to 2026-10 net of
+costs, with a Sharpe edge established and a return edge that is not
+([study](results/SA16/study.md)).
+
+<details>
+<summary>Read the summary of the study</summary>
 
 SA16 ([study](results/SA16/study.md), [protocol](research/SA16/protocol.md))
 was run against two fixed references: Nasdaq-100 bought and held, and SA15's
@@ -1014,6 +1081,8 @@ session the provider did not serve. The class is `SA16RiskBudget`, catalogued
 `scripts/SA16_run_study.py` (phases `reproduce`, `references`, `candidate`,
 `robustness`, `finalise`) and `scripts/SA16_report.py`. Every period had been
 looked at before: the result is retrospective.
+
+</details>
 
 ## What a strategy may not do
 

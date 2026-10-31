@@ -428,7 +428,7 @@ def bars_frame(
     Every bar normalizer ends here, and a new source's normalizer should too:
     the adapter only maps its columns, dates and units to the five fields, and
     this function stamps availability, drops what cannot be stored and names
-    why. See ``docs/DONNEES.md``, "Ajouter une source".
+    why. See ``docs/DATA.md``, "Adding a source".
 
     Parameters
     ----------
