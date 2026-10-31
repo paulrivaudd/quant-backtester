@@ -748,7 +748,7 @@ def report_extra(
     coverage: Mapping[str, object],
     status: tuple[str, Sequence[str]],
 ) -> str:
-    """Return the section of the SA12 report that only this study can write, in French."""
+    """Return the section of the SA12 report that only this study can write."""
     outcome, reasons = status
     arima = means.loc["ARIMA mu_h2"]
     against = comparison.set_index(["costs", "control"])
@@ -760,68 +760,68 @@ def report_extra(
                 f"| {costs} | {control} | {_cell(row['sharpe_sa12'], '{:+.3f}')} | "
                 f"{_cell(row['sharpe_control'], '{:+.3f}')} | "
                 f"{_cell(row['sharpe_difference'], '{:+.3f}')} | "
-                f"[{_cell(row.get('interval_low'), '{:+.3f}')} ; "
+                f"[{_cell(row.get('interval_low'), '{:+.3f}')}; "
                 f"{_cell(row.get('interval_high'), '{:+.3f}')}] | "
                 f"{_cell(row['max_drawdown_sa12'], '{:.2%}')} | "
                 f"{_cell(row['max_drawdown_control'], '{:.2%}')} |"
             )
     variance = losses.set_index("comparison")
     lines = [
-        "### Qualité opérationnelle et prévisions (étude SA12)",
+        "### Operational quality and forecasts (SA12 study)",
         "",
-        f"- **Couverture.** {quality['decisions']} décisions ; fenêtre de 757 ouvertures servie "
-        f"{quality['admissible_windows']} fois ; prévision jointe utilisable "
-        f"{quality['usable']} fois ({_cell(quality['usable_share'], '{:.2%}')}). Moyennes ARIMA "
-        f"acceptées : {quality['arima_accepted']}. Ajustements de variance tentés : "
-        f"{quality['volatility_fits']}, dont GARCH accepté {quality['garch_accepted']} et repli "
-        f"EWMA {quality['ewma_fallbacks']} ({_cell(quality['fallback_share'], '{:.2%}')}). "
-        f"Échecs par étape : {quality['failures'] or 'aucun'}.",
-        f"- **Paires évaluables.** {coverage['pairs']} prévisions sur {coverage['origins']} ont "
-        f"une cible connue (rendement de l'ouverture t+1 à l'ouverture t+2) ; exclues : "
-        f"{coverage['exclusions']}.",
-        f"- **Moyenne prévue.** MSE {_cell(arima['mse'], '{:.4e}')} pour ARIMA, "
-        f"{_cell(means.loc['zero', 'mse'], '{:.4e}')} pour la prévision nulle et "
-        f"{_cell(means.loc['mean of the window', 'mse'], '{:.4e}')} pour la moyenne de la "
-        f"fenêtre. Corrélation prévision/réalisation {_cell(arima['correlation'], '{:+.3f}')}. "
-        f"Signe juste {_cell(arima['sign_accuracy'], '{:.1%}')}, contre "
-        f"{_cell(arima['always_up_accuracy'], '{:.1%}')} pour « toujours en hausse » ; justesse "
-        f"équilibrée {_cell(arima['balanced_accuracy'], '{:.1%}')}.",
-        f"- **Signaux d'entrée.** La prévision dépasse 20 pb sur "
-        f"{entries['forecast_above_entry']} origines sur {entries['pairs']} "
-        f"({_cell(entries['share_above_entry'], '{:.2%}')}) et est positive sur "
+        f"- **Coverage.** {quality['decisions']} decisions; window of 757 opens served "
+        f"{quality['admissible_windows']} times; joint forecast usable "
+        f"{quality['usable']} times ({_cell(quality['usable_share'], '{:.2%}')}). ARIMA means "
+        f"accepted: {quality['arima_accepted']}. Variance fits attempted: "
+        f"{quality['volatility_fits']}, of which GARCH accepted {quality['garch_accepted']} and "
+        f"EWMA fallback {quality['ewma_fallbacks']} ({_cell(quality['fallback_share'], '{:.2%}')}). "
+        f"Failures by step: {quality['failures'] or 'none'}.",
+        f"- **Pairs that can be evaluated.** {coverage['pairs']} forecasts out of "
+        f"{coverage['origins']} have a known target (return from the open of t+1 to the open of "
+        f"t+2); excluded: {coverage['exclusions']}.",
+        f"- **Forecast mean.** MSE {_cell(arima['mse'], '{:.4e}')} for ARIMA, "
+        f"{_cell(means.loc['zero', 'mse'], '{:.4e}')} for the zero forecast and "
+        f"{_cell(means.loc['mean of the window', 'mse'], '{:.4e}')} for the mean of the "
+        f"window. Forecast/realisation correlation {_cell(arima['correlation'], '{:+.3f}')}. "
+        f"Right sign {_cell(arima['sign_accuracy'], '{:.1%}')}, against "
+        f"{_cell(arima['always_up_accuracy'], '{:.1%}')} for \"always up\"; balanced "
+        f"accuracy {_cell(arima['balanced_accuracy'], '{:.1%}')}.",
+        f"- **Entry signals.** The forecast exceeds 20 bp at "
+        f"{entries['forecast_above_entry']} origins out of {entries['pairs']} "
+        f"({_cell(entries['share_above_entry'], '{:.2%}')}) and is positive at "
         f"{entries['forecast_positive']} ({_cell(entries['share_positive'], '{:.1%}')}). "
-        f"Rendement réalisé moyen après un signal d'entrée : "
-        f"{_cell(entries['mean_realised_after_entry_signal'], '{:+.3%}')}, contre "
-        f"{_cell(entries['mean_realised_all'], '{:+.3%}')} sur toutes les origines.",
-        f"- **Épisodes de position.** {stays.get('stays', 0)} épisodes, dont "
-        f"{stays.get('completed', 0)} terminés ; {stays.get('gains', 0)} gagnants ; net moyen "
+        f"Average realised return after an entry signal: "
+        f"{_cell(entries['mean_realised_after_entry_signal'], '{:+.3%}')}, against "
+        f"{_cell(entries['mean_realised_all'], '{:+.3%}')} over all origins.",
+        f"- **Position episodes.** {stays.get('stays', 0)} episodes, of which "
+        f"{stays.get('completed', 0)} finished; {stays.get('gains', 0)} winners; mean net "
         f"{_cell(stays.get('mean_net_return'), '{:+.2%}')}.",
         "",
-        "### SA12 contre ses contrôles",
+        "### SA12 against its controls",
         "",
-        "| Coûts | Contrôle | Sharpe SA12 | Sharpe contrôle | Écart | Intervalle 95 % | "
-        "Perte max. SA12 | Perte max. contrôle |",
+        "| Costs | Control | Sharpe SA12 | Sharpe control | Gap | 95% interval | "
+        "Max. drawdown SA12 | Max. drawdown control |",
         "|---|---|---:|---:|---:|---|---:|---:|",
         *rows,
         "",
-        "D0 : même ARIMA, même variance, filtre de direction toujours actif. D1 : même ARIMA, "
-        "variance EWMA. D2 : moyenne constante et GARCH. Ce sont des contrôles de recherche, "
-        "sans code de catalogue, et aucun n'est candidat. Bootstrap apparié par blocs de "
-        f"{BOOTSTRAP_BLOCK} séances, {BOOTSTRAP_DRAWS} tirages, graine {BOOTSTRAP_SEED}.",
+        "D0: same ARIMA, same variance, direction gate always on. D1: same ARIMA, EWMA "
+        "variance. D2: constant mean and GARCH. These are research controls, without a "
+        "catalogue code, and none is a candidate. Paired bootstrap by blocks of "
+        f"{BOOTSTRAP_BLOCK} sessions, {BOOTSTRAP_DRAWS} draws, seed {BOOTSTRAP_SEED}.",
         "",
-        "Écart de perte jointe `log(v) + e²/v` SA12 moins D1 (même moyenne, donc une "
-        f"comparaison de variances) : "
+        "Gap of joint loss `log(v) + e²/v` SA12 minus D1 (same mean, hence a comparison of "
+        f"variances): "
         f"{_cell(variance.loc['SA12 - D1 (variance, same mean)', 'estimate'], '{:+.4f}')}, "
-        f"intervalle [{_cell(variance.loc['SA12 - D1 (variance, same mean)', 'low'], '{:+.4f}')} "
+        f"interval [{_cell(variance.loc['SA12 - D1 (variance, same mean)', 'low'], '{:+.4f}')}"
         f"; {_cell(variance.loc['SA12 - D1 (variance, same mean)', 'high'], '{:+.4f}')}].",
         "",
-        f"### Statut de l'hypothèse préinscrite `sa12_arima_garch` : **{outcome}**",
+        f"### Status of the preregistered hypothesis `sa12_arima_garch`: **{outcome}**",
         "",
         *[f"- {reason}" for reason in reasons],
         "",
-        "Ce statut répond à une seule question, écrite avant le run : le filtre de direction "
-        "améliore-t-il le même dimensionnement de risque sans lui (D0) ? Il ne dit pas "
-        "« ARIMA-GARCH ne fonctionne jamais », et l'apport de GARCH se lit à part, contre D1.",
+        "This status answers a single question, written before the run: does the direction "
+        "gate improve the same risk sizing without it (D0)? It does not say \"ARIMA-GARCH "
+        "never works\", and the contribution of GARCH is read separately, against D1.",
         "",
     ]
     return "\n".join(lines)

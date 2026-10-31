@@ -1615,31 +1615,31 @@ def study_markdown(
     return "\n".join(lines)
 
 
-SECONDARY_FRENCH = {
-    "neurons": "Apport des neurones (SA13 contre Ridge sur les mêmes log-signatures)",
-    "order_3": "Apport de l'ordre 3 (contre l'ordre 2)",
-    "volume": "Apport du volume (contre le canal de volume à zéro)",
-    "signature_vs_classical": "Apport des signatures (contre neuf indicateurs classiques)",
-    "compression_vs_raw": "Apport de la compression (contre la trajectoire brute en Ridge)",
-    "second_process": "Apport d'un second processus (World + S&P 500 contre World seul)",
+SECONDARY_LABELS = {
+    "neurons": "Contribution of the neurons (SA13 against Ridge on the same log-signatures)",
+    "order_3": "Contribution of order 3 (against order 2)",
+    "volume": "Contribution of the volume (against the volume channel at zero)",
+    "signature_vs_classical": "Contribution of the signatures (against nine classic indicators)",
+    "compression_vs_raw": "Contribution of the compression (against the raw path in Ridge)",
+    "second_process": "Contribution of a second process (World + S&P 500 against World alone)",
 }
 """The secondary questions as the report names them."""
 
-CONCLUSION_FRENCH = {
-    "LOWER_MSE_INTERVAL_EXCLUDES_ZERO": "erreur quadratique plus faible, intervalle sous zéro",
+CONCLUSION_WORDING = {
+    "LOWER_MSE_INTERVAL_EXCLUDES_ZERO": "lower squared error, interval below zero",
     "LOWER_MSE_NOT_TOLD_FROM_ZERO": (
-        "erreur quadratique plus faible, intervalle contenant zéro : non établi"
+        "lower squared error, interval containing zero: not established"
     ),
-    "NOT_LOWER": "erreur quadratique non plus faible : non soutenu sur ce chemin",
-    "NOT_MEASURED": "non mesuré (trop peu d'origines communes)",
+    "NOT_LOWER": "squared error not lower: not supported on this path",
+    "NOT_MEASURED": "not measured (too few common origins)",
 }
 """The conclusions on a difference of squared error as the report words them."""
 
 
-DECISION_SETS_FRENCH = {
-    "every usable decision": "Toutes les décisions utilisables",
-    "decisions that opened a position": "Décisions qui ont ouvert une position",
-    "decisions that closed a position": "Décisions qui ont fermé une position",
+DECISION_SET_LABELS = {
+    "every usable decision": "Every usable decision",
+    "decisions that opened a position": "Decisions that opened a position",
+    "decisions that closed a position": "Decisions that closed a position",
 }
 """The sets of decisions of the table of contributions as the report names them."""
 
@@ -1656,7 +1656,7 @@ def report_extra(
     status: tuple[str, Sequence[str]],
     secondary: Mapping[str, str],
 ) -> str:
-    """Return the section of the SA13 report that only this study can write, in French."""
+    """Return the section of the SA13 report that only this study can write."""
     outcome, reasons = status
     own = coverage.loc[SA13]
     fitted = calibrations.loc[CORE_VARIANT]
@@ -1674,25 +1674,25 @@ def report_extra(
                 f"| {costs} | {control} | {_cell(row['sharpe_sa13'], '{:+.3f}')} | "
                 f"{_cell(row['sharpe_control'], '{:+.3f}')} | "
                 f"{_cell(row['sharpe_difference'], '{:+.3f}')} | "
-                f"[{_cell(row.get('interval_low'), '{:+.3f}')} ; "
+                f"[{_cell(row.get('interval_low'), '{:+.3f}')}; "
                 f"{_cell(row.get('interval_high'), '{:+.3f}')}] | "
                 f"{_cell(row['max_drawdown_sa13'], '{:.2%}')} | "
                 f"{_cell(row['max_drawdown_control'], '{:.2%}')} |"
             )
     blocks = [
         f"| {row['costs']} | {row['block']} | {_cell(row.get('sharpe_difference'), '{:+.3f}')} | "
-        f"[{_cell(row.get('interval_low'), '{:+.3f}')} ; "
+        f"[{_cell(row.get('interval_low'), '{:+.3f}')}; "
         f"{_cell(row.get('interval_high'), '{:+.3f}')}] |"
         for _, row in sensitivity.iterrows()
     ]
     gaps = [
         f"| {row['comparison']} | {_cell(row.get('pairs'), '{:.0f}')} | "
-        f"{_cell(row.get('estimate'), '{:+.3e}')} | [{_cell(row.get('low'), '{:+.3e}')} ; "
+        f"{_cell(row.get('estimate'), '{:+.3e}')} | [{_cell(row.get('low'), '{:+.3e}')}; "
         f"{_cell(row.get('high'), '{:+.3e}')}] |"
         for _, row in differences.iterrows()
     ]
     parts = [
-        f"| {DECISION_SETS_FRENCH.get(str(label), str(label))} | "
+        f"| {DECISION_SET_LABELS.get(str(label), str(label))} | "
         f"{_cell(row.get('decisions'), '{:.0f}')} | "
         f"{_cell(row.get('forecast_bp'), '{:+.2f}')} | "
         f"{_cell(row.get('reference_bp'), '{:+.2f}')} | "
@@ -1704,96 +1704,96 @@ def report_extra(
         for label, row in contributions.iterrows()
     ]
     lines = [
-        "### Couverture, prévisions et composition (étude SA13)",
+        "### Coverage, forecasts and composition (SA13 study)",
         "",
-        f"- **Couverture.** {own['months_with_model']} mois sur {own['months']} ont un modèle "
-        f"calibré ; {own['usable_decisions']} décisions sur {own['decisions']} ont un modèle "
-        f"autorisé et des features utilisables ({_cell(own['usable_share'], '{:.2%}')}). "
-        f"Motifs des décisions inutilisables : {own['unusable_reasons'] or 'aucun'}. Les mois "
-        "sans modèle et les séances sans signal restent dans la performance, en cash.",
-        f"- **Calibrations.** {_cell(fitted['mean_training_examples'], '{:.0f}')} exemples "
-        f"d'apprentissage et {_cell(fitted['mean_validation_examples'], '{:.0f}')} de validation "
-        f"en moyenne par mois ; époque retenue moyenne "
-        f"{_cell(fitted['mean_selected_epoch'], '{:.0f}')} ; "
-        f"{_cell(fitted['at_epoch_cap'], '{:.0f}')} modèle(s) sur {fitted['months_with_model']} "
-        "retenu(s) à la dernière époque autorisée, c'est-à-dire avec une perte de validation "
-        "encore en baisse à l'arrêt. Ce plafond était gelé avant le premier ajustement.",
-        "- **Erreur de prévision, toutes prévisions valides.** "
-        f"{_cell(everything['pairs'], '{:.0f}')} paires ; MSE "
-        f"{_cell(everything['mse'], '{:.4e}')}, contre "
-        f"{_cell(everything['mse_zero'], '{:.4e}')} pour la prévision nulle et "
-        f"{_cell(everything['mse_train_mean'], '{:.4e}')} pour la moyenne d'apprentissage gelée "
-        f"avec chaque modèle ; R² hors apprentissage "
-        f"{_cell(everything['r2_oos_vs_train_mean'], '{:+.4f}')} ; corrélation "
-        f"prévision/réalisation {_cell(everything['correlation'], '{:+.3f}')}.",
-        f"- **Signe.** Juste {_cell(everything['sign_accuracy'], '{:.1%}')}, contre "
-        f"{_cell(everything['always_up_accuracy'], '{:.1%}')} pour « toujours en hausse » ; "
-        f"justesse équilibrée {_cell(everything['balanced_accuracy'], '{:.1%}')} ; "
-        f"{_cell(everything['forecast_up'], '{:.0f}')} prévisions positives.",
-        f"- **Prévisions suivies d'une position portée.** {_cell(carried['pairs'], '{:.0f}')} "
-        f"paires ; MSE {_cell(carried['mse'], '{:.4e}')} ; signe juste "
-        f"{_cell(carried['sign_accuracy'], '{:.1%}')} contre "
-        f"{_cell(carried['always_up_accuracy'], '{:.1%}')} pour « toujours en hausse ».",
-        f"- **Épisodes de position.** {stays.get('stays', 0)} épisodes, dont "
-        f"{stays.get('completed', 0)} terminés ; {stays.get('gains', 0)} gagnants ; net moyen "
+        f"- **Coverage.** {own['months_with_model']} months out of {own['months']} have a "
+        f"calibrated model; {own['usable_decisions']} decisions out of {own['decisions']} have an "
+        f"authorised model and usable features ({_cell(own['usable_share'], '{:.2%}')}). "
+        f"Reasons for the unusable decisions: {own['unusable_reasons'] or 'none'}. The months "
+        "without a model and the sessions without a signal stay in the performance, in cash.",
+        f"- **Calibrations.** {_cell(fitted['mean_training_examples'], '{:.0f}')} training "
+        f"examples and {_cell(fitted['mean_validation_examples'], '{:.0f}')} validation ones on "
+        f"average per month; average epoch retained "
+        f"{_cell(fitted['mean_selected_epoch'], '{:.0f}')}; "
+        f"{_cell(fitted['at_epoch_cap'], '{:.0f}')} model(s) out of {fitted['months_with_model']} "
+        "retained at the last allowed epoch, that is with a validation loss still falling when "
+        "they stopped. This ceiling was frozen before the first fit.",
+        "- **Forecast error, all valid forecasts.** "
+        f"{_cell(everything['pairs'], '{:.0f}')} pairs; MSE "
+        f"{_cell(everything['mse'], '{:.4e}')}, against "
+        f"{_cell(everything['mse_zero'], '{:.4e}')} for the zero forecast and "
+        f"{_cell(everything['mse_train_mean'], '{:.4e}')} for the training mean frozen with "
+        f"each model; out-of-sample R² "
+        f"{_cell(everything['r2_oos_vs_train_mean'], '{:+.4f}')}; forecast/realisation "
+        f"correlation {_cell(everything['correlation'], '{:+.3f}')}.",
+        f"- **Sign.** Right {_cell(everything['sign_accuracy'], '{:.1%}')}, against "
+        f"{_cell(everything['always_up_accuracy'], '{:.1%}')} for \"always up\"; "
+        f"balanced accuracy {_cell(everything['balanced_accuracy'], '{:.1%}')}; "
+        f"{_cell(everything['forecast_up'], '{:.0f}')} positive forecasts.",
+        f"- **Forecasts followed by a position carried.** {_cell(carried['pairs'], '{:.0f}')} "
+        f"pairs; MSE {_cell(carried['mse'], '{:.4e}')}; right sign "
+        f"{_cell(carried['sign_accuracy'], '{:.1%}')} against "
+        f"{_cell(carried['always_up_accuracy'], '{:.1%}')} for \"always up\".",
+        f"- **Position episodes.** {stays.get('stays', 0)} episodes, of which "
+        f"{stays.get('completed', 0)} finished; {stays.get('gains', 0)} winners; mean net "
         f"{_cell(stays.get('mean_net_return'), '{:+.2%}')}.",
         "",
-        "### De quoi une prévision de SA13 est faite (contributions moyennes, en points de base)",
+        "### What a forecast of SA13 is made of (average contributions, in basis points)",
         "",
-        "| Décisions | Nombre | Prévision | Référence | Déplacements | Prix-volume | "
-        "Prix-temps | Volume-temps | Ordre 3 |",
+        "| Decisions | Number | Forecast | Reference | Displacements | Price-volume | "
+        "Price-time | Volume-time | Order 3 |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
         *parts,
         "",
-        "Chaque prévision est exactement sa référence plus ses contributions. Une "
-        "contribution à la prévision n'est pas une contribution au résultat : le poids "
-        "économique d'un groupe se teste par la variante réentraînée sans lui (C2 pour "
-        "l'ordre 3, C3 pour le volume). Le point `z = 0` est une référence statistique des "
-        "features, pas un chemin de marché réalisable.",
+        "Each forecast is exactly its reference plus its contributions. A contribution to "
+        "the forecast is not a contribution to the result: the economic weight of a group is "
+        "tested by the variant retrained without it (C2 for order 3, C3 for the volume). The "
+        "point `z = 0` is a statistical reference of the features, not a market path that "
+        "could happen.",
         "",
-        "### Écarts d'erreur quadratique (premier moins second, négatif = premier meilleur)",
+        "### Squared-error gaps (first minus second, negative = first better)",
         "",
-        "| Comparaison | Paires | Écart moyen | Intervalle 95 % |",
+        "| Comparison | Pairs | Mean gap | 95% interval |",
         "|---|---:|---:|---|",
         *gaps,
         "",
-        f"Bootstrap par blocs mobiles de {BOOTSTRAP_BLOCK} origines, {BOOTSTRAP_DRAWS} tirages, "
-        f"graine {BOOTSTRAP_SEED}. Les fenêtres se recouvrent fortement : mille lignes ne sont "
-        "pas mille expériences indépendantes.",
+        f"Moving-block bootstrap of {BOOTSTRAP_BLOCK} origins, {BOOTSTRAP_DRAWS} draws, "
+        f"seed {BOOTSTRAP_SEED}. The windows overlap heavily: a thousand rows are not a "
+        "thousand independent experiments.",
         "",
-        "### SA13 contre ses contrôles et les références",
+        "### SA13 against its controls and the references",
         "",
-        "| Coûts | Contrôle | Sharpe SA13 | Sharpe contrôle | Écart | Intervalle 95 % | "
-        "Perte max. SA13 | Perte max. contrôle |",
+        "| Costs | Control | Sharpe SA13 | Sharpe control | Gap | 95% interval | "
+        "Max. drawdown SA13 | Max. drawdown control |",
         "|---|---|---:|---:|---:|---|---:|---:|",
         *rows,
         "",
-        "C0 : mêmes modèles, même disponibilité, même dimensionnement, filtre de direction "
-        "toujours actif. C1 : Ridge sur les 13 mêmes coefficients. C2 : réseau additif à "
-        "l'ordre 2. C3 : réseau additif sans volume. C4 : réseau additif sur neuf indicateurs "
-        "classiques. C5 : Ridge sur la trajectoire brute. C6 et C7 : réseau additif et Ridge "
-        "sur World + S&P 500. Ce sont des contrôles de recherche, sans code de catalogue, et "
-        f"aucun n'est candidat. Bootstrap apparié par blocs de {BOOTSTRAP_BLOCK} séances, "
-        f"{BOOTSTRAP_DRAWS} tirages, graine {BOOTSTRAP_SEED}.",
+        "C0: same models, same availability, same sizing, direction gate always on. C1: "
+        "Ridge on the same 13 coefficients. C2: additive network at order 2. C3: additive "
+        "network without volume. C4: additive network on nine classic indicators. C5: Ridge on "
+        "the raw path. C6 and C7: additive network and Ridge on World + S&P 500. These are "
+        "research controls, without a catalogue code, and none is a candidate. Paired "
+        f"bootstrap by blocks of {BOOTSTRAP_BLOCK} sessions, {BOOTSTRAP_DRAWS} draws, seed "
+        f"{BOOTSTRAP_SEED}.",
         "",
-        "Écart principal, SA13 moins C0, aux trois longueurs de bloc annoncées :",
+        "Main gap, SA13 minus C0, at the three block lengths announced:",
         "",
-        "| Coûts | Bloc | Écart de Sharpe | Intervalle 95 % |",
+        "| Costs | Block | Sharpe gap | 95% interval |",
         "|---|---:|---:|---|",
         *blocks,
         "",
-        f"### Statut de l'hypothèse préinscrite `sa13_signatures_neurons` : **{outcome}**",
+        f"### Status of the preregistered hypothesis `sa13_signatures_neurons`: **{outcome}**",
         "",
         *[f"- {reason}" for reason in reasons],
         "",
-        "Ce statut répond à une seule question, écrite avant le premier ajustement : le "
-        "filtre de direction appris sur la log-signature améliore-t-il le même "
-        "dimensionnement de risque sans lui (C0) ? Les intervalles sont conditionnels au "
-        "chemin déjà produit ; ils ne portent ni l'incertitude des réestimations ni la "
-        "sélection des idées. Conclusions séparées, sur les écarts d'erreur quadratique :",
+        "This status answers a single question, written before the first fit: does the "
+        "direction gate learned on the log-signature improve the same risk sizing without it "
+        "(C0)? The intervals are conditional on the path already produced; they carry neither "
+        "the uncertainty of the re-estimations nor the selection of the ideas. Separate "
+        "conclusions, on the squared-error gaps:",
         "",
         *[
-            f"- {SECONDARY_FRENCH[question]} : {CONCLUSION_FRENCH[answer]}."
+            f"- {SECONDARY_LABELS[question]}: {CONCLUSION_WORDING[answer]}."
             for question, answer in secondary.items()
         ],
         "",
