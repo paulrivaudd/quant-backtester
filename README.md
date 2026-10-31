@@ -167,7 +167,24 @@ state = decision.values(["SP500", "VIX"])  # value, age in sessions, and why
 
 ## My contribution
 
-*To be written by the author.*
+The first ten strategies of the catalogue, SA1 to SA10, are my work. Each one
+has its report under `results/`, measured on the common period 2021-04-01 to
+2026-10-09, net of costs:
+
+| Code | Rule | Report |
+| --- | --- | --- |
+| SA1 | Hold the world fund while its close is above its 20-session average: the benchmark rule. | [SA1](results/SA1/analysis.md) |
+| SA2 | Lean progressively towards the fund with the stronger momentum. | [SA2](results/SA2/analysis.md) |
+| SA3 | Enter a trend progressively, as the fast average pulls away from the slow one. | [SA3](results/SA3/analysis.md) |
+| SA4 | Buy an unusual fall moderately, while the long trend is still up. | [SA4](results/SA4/analysis.md) |
+| SA5 | Overweight the fund that lately lagged what the other one explains of it. | [SA5](results/SA5/analysis.md) |
+| SA6 | Hold less of a fund when its realised volatility rises. | [SA6](results/SA6/analysis.md) |
+| SA7 | Spread the capital over three style funds, half equally and half by inverse volatility. | [SA7](results/SA7/analysis.md) |
+| SA8 | Place the cash in a money-market fund when its carry pays for the round trip. | [SA8](results/SA8/analysis.md) |
+| SA9 | Take a small position once a volatility panic eases and the fund starts to rise. | [SA9](results/SA9/analysis.md) |
+| SA10 | Several rules, fixed capital budgets, one risk control and one rebalancing band. | [SA10](results/SA10/analysis.md) |
+
+The rest of this section is still to be written.
 
 ### What I designed
 
