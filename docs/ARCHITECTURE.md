@@ -123,7 +123,11 @@ declared in `backtest/timetable.py` and recorded with the result:
 - **Execution, the next session's open.** Orders are sized and filled at the
   opening auction price (`Sizing.AT_AUCTION`, the default). `Sizing.AT_DECISION`
   freezes the quantities at the decision close, like an order placed the day
-  before.
+  before, on the book valued at those closes. A held line whose close is
+  missing at the decision (a session the provider did not serve) is valued
+  there at its last known price, as at execution; its own order is refused
+  (`NO_DECISION_PRICE`). With no known price at all, the book cannot be sized
+  (`UnvaluablePosition`).
 - **Valuation, after the close.** The book is marked at the closing prices
   known at that instant, then comes the next decision.
 

@@ -1,5 +1,59 @@
 # SA15_GPT-6.1 — etude retrospective du 15 octobre 2026
 
+## Erratum, 2026-10-31: decision-time sizing valued a held line without a close at zero
+
+With `Sizing.AT_DECISION`, which this study uses, a line held at the decision
+whose close was missing was valued at zero when the book was sized, so every
+other line was sized on an equity short of that line's weight. The fix (pull
+request #2) values it at its last known price. In this study one decision is
+exposed: the evening of 2025-10-24, when ETF_EMERGING and ETF_GOLD had no
+close, executed at the open of 2025-10-27. The `equal_weight` control has a
+second one, executed on 2026-03-09. Development and validation contain none:
+the ten selection scores and the frozen choice of trial 8 are unchanged.
+
+The rerun is a new trial in the sense of `research/PROTOCOL.md`: it replaces
+neither the frozen selection nor the figures below this erratum, which are
+those of the original run and are left as they were. It was made on
+2026-10-31 on a store downloaded again with the same frozen end (2026-10-09),
+whose fingerprint differs (`cdb10486…` against `316789fb…`) but on which the
+code before the fix reproduces every table of this folder byte for byte. The
+differences below therefore come from the fix alone, and all of them start on
+2025-10-27.
+
+| Book, control period 2025-01-02 to 2026-10-09 | Net return, archived | Net return, fixed | Sharpe, archived | Sharpe, fixed | Costs EUR, archived | Costs EUR, fixed |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| SA15_GPT-6.1 (trial 8) | 23.53% | 23.58% | 1.240 | 1.242 | 1979 | 1965 |
+| SA15_GPT-6.1, costs x2 | 21.18% | 21.25% | 1.129 | 1.133 | 3915 | 3883 |
+| equal_weight | 32.90% | 33.30% | 1.497 | 1.512 | 564 | 479 |
+| World_buy_hold, SP500_buy_hold, SA1_MA20 | unchanged | unchanged | unchanged | unchanged | unchanged | unchanged |
+
+- Maximum drawdown of SA15_GPT-6.1 unchanged (-10.08%); its gap to World held
+  goes from -1.01 to -0.96 point; the block bootstrap of the annualised active
+  return goes from -0.99% [-17.16%; +13.66%] to -0.97% [-17.17%; +13.73%].
+- Full history 2019-06-03 to 2026-10-09 (`robustness/full.csv`): SA15_GPT-6.1
+  from +158.35% to +158.47% (Sharpe 1.278 to 1.279), equal_weight from
+  +141.45% to +142.40% (Sharpe 1.152 to 1.156); the other books unchanged.
+- Restarts from cash and doubled costs on development and validation:
+  unchanged.
+- **The verdict does not change**: NOT_SUPPORTED, the selection still trails
+  World held on the control period, and equal_weight still leads it.
+
+Reproduction, in a new folder (`--full-only` writes `full/`; after it
+`SA15_report_gpt61.py` stops on `KeyError: 'alpha_vs_world'`, with or without
+the fix):
+
+```bash
+uv run python scripts/SA15_download_data.py
+OUT=runs/sa15_r1_rerun
+for N in 01 02 03 04 05 06 07 08 09 10; do
+  uv run python scripts/SA15_run_gpt61_study.py --candidate research/SA15_GPT-6.1/candidates/trial_$N.json --output "$OUT"
+done
+uv run python scripts/SA15_run_gpt61_study.py --final --output "$OUT"
+uv run python scripts/SA15_robustness_gpt61.py --output "$OUT" --workers 3
+uv run python scripts/SA15_robustness_gpt61.py --output "$OUT" --workers 3 --full-only
+```
+
+
 Statut de l'hypothese : **NOT_SUPPORTED**. Configuration retenue : **essai 8**,
 choisie uniquement sur developpement 2019-06-03/2022-12-30 et selection
 2023-01-02/2024-12-31 parmi **10 configurations**. Le controle

@@ -896,6 +896,56 @@ def test_a_line_without_a_decision_close_is_refused_not_sized_on_the_open() -> N
     assert done.fills == ()
 
 
+def test_a_held_line_without_a_decision_close_is_valued_at_its_last_known_price() -> None:
+    """A and B 50/50 on 100 000, the same target, B's decision close MISSING.
+
+    Valued at zero, B would halve the book the decision sized on: A, asked to
+    stay at half of it, would be sold down to a quarter.
+    """
+    done = trade(
+        AT_DECISION,
+        book(0.0, A=500.0, B=500.0),
+        {"A": 0.5, "B": 0.5},
+        {"A": 100.0, "B": 100.0},
+        last_known={"A": 100.0, "B": 100.0},
+        decision_closes={"A": 100.0},
+    )
+
+    assert [order for order in done.orders if order.instrument_id == "A"] == []
+    assert done.state.quantity("A") == pytest.approx(500.0)
+    assert reasons(done) == {"B": ExecutionRejectReason.NO_DECISION_PRICE}
+    assert done.state.cash == pytest.approx(0.0)
+
+
+def test_the_decision_equity_counts_a_line_without_a_close_at_its_last_price() -> None:
+    """10 000 cash, A and B 45 000 each: A asked at 55 % buys 100, not sells 147.5."""
+    done = trade(
+        AT_DECISION,
+        book(10_000.0, A=450.0, B=450.0),
+        {"A": 0.55, "B": 0.45},
+        {"A": 100.0, "B": 100.0},
+        last_known={"A": 100.0, "B": 100.0},
+        decision_closes={"A": 100.0},
+    )
+
+    (order,) = [order for order in done.orders if order.instrument_id == "A"]
+    assert order.side is Side.BUY
+    assert order.quantity == pytest.approx(100.0)
+    assert done.state.quantity("A") == pytest.approx(550.0)
+
+
+def test_a_held_line_never_priced_at_the_decision_cannot_be_valued() -> None:
+    with pytest.raises(UnvaluablePosition, match="B"):
+        trade(
+            AT_DECISION,
+            book(0.0, A=500.0, B=500.0),
+            {"A": 0.5, "B": 0.5},
+            {"A": 100.0, "B": 100.0},
+            last_known={"A": 100.0},
+            decision_closes={"A": 100.0},
+        )
+
+
 def test_the_sizing_is_named_where_the_run_records_it() -> None:
     assert FREE.definition()["fill_model"] == "OPEN_AUCTION_NOTIONAL"
     assert AT_DECISION.definition()["fill_model"] == "DECISION_CLOSE_QUANTITIES"

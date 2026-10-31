@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Decision-time sizing values a line without a close at its last price (2026-10-31)
+- **Fixed**: with `Sizing.AT_DECISION`, a line held at the decision whose close
+  was MISSING (a session the provider did not serve) was valued at zero when
+  the book was sized, so every other line was sized on an equity short of that
+  line's weight: A and B held 50/50, asked to stay 50/50 with B's close
+  missing, sold half of A. The line is now valued at its last known price, as
+  the execution already valued a line without an open; its own order is still
+  refused with `NO_DECISION_PRICE`, and a held line never priced raises
+  `UnvaluablePosition`. Tests in `tests/execution/test_model.py`.
+- `Sizing.AT_DECISION` is used by the common ETF study (SA1 to SA13), SA14,
+  SA15 and SA16: the sessions exposed in their published results are counted
+  in the pull request; no published result is rewritten by this change.
+- **SA15 series 1**, the only study with a touched session (the execution of
+  2025-10-27), carries an erratum at the top of
+  `results/SA15_GPT-6.1/study.md`: a rerun with the fix moves the selection
+  from 23.53% to 23.58% net on the control period and the `equal_weight`
+  control from 32.90% to 33.30%; the selection, the verdict and the archived
+  figures are unchanged.
+
 ### The documentation in English (2026-10-31)
 - **Every file of `docs/` is in English**, with English names:
   `DONNEES.md` is `DATA.md`, `FORMULES.md` is `FORMULAS.md`, `GLOSSAIRE.md`

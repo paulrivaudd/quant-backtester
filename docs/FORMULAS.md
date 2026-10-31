@@ -99,6 +99,18 @@ slippage cost    q · P · s
 Spread and slippage are **already in `P_f`**. The report shows them
 separately, but they must not be taken off a second time.
 
+With `Sizing.AT_DECISION`, the target quantity of a line `i` of weight `w_i`
+is set on the book as the decision valued it:
+
+```
+V_d = C + Σ q_j · P_j^d       P_j^d = the close of j known at the decision,
+                              or its last known price if it is missing
+q_i* = w_i · V_d / P_i^d      (order refused, NO_DECISION_PRICE, if i has no close)
+```
+
+A held line without a close at the decision is never valued at zero: that
+reduced `V_d` by its weight and made the other lines sell as much.
+
 Example: `P = 100`, `q = 10`, `h = 0.0002`, `s = 0.0001`, `c = 0.0005`,
 `m = 1`. One pays `P_f = 100.03` and `F = max(0.50; 1) = 1`, a disbursement of
 1,001.30. The costs are 0.20 of spread, 0.10 of slippage and 1 of commission.

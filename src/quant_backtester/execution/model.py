@@ -320,7 +320,11 @@ class ExecutionModel:
             The closes knowable at the decision, for every instrument held or
             targeted that had one. Required with ``Sizing.AT_DECISION``, which
             fixes each quantity on them and on the book valued at them; the
-            order is still filled at the open, and cut to the cash there is.
+            order is still filled at the open, and cut to the cash there is. A
+            held line without a close there is valued at its ``last_known``
+            price, as ``_equity`` values one without an open: its own order is
+            refused (``NO_DECISION_PRICE``), the others are sized on the whole
+            book.
 
         Returns
         -------
@@ -389,6 +393,7 @@ class ExecutionModel:
             keep=frozenset(keep),
             cash_shares=cash_shares or {},
             decision_closes=decision_closes,
+            last_known=last_known,
             equity=equity,
             at=at,
             session=session,
@@ -523,18 +528,47 @@ class ExecutionModel:
         keep: frozenset[str] = frozenset(),
         cash_shares: Mapping[str, float] | None = None,
         decision_closes: Mapping[str, float] | None = None,
+        last_known: Mapping[str, float] | None = None,
     ) -> tuple[list[_Line], list[_Line], list[ExecutionReject]]:
-        """Return the sales, the purchases and the rejects the target calls for."""
+        """Return the sales, the purchases and the rejects the target calls for.
+
+        Notes
+        -----
+        With ``Sizing.AT_DECISION`` the equity every line is sized on is the
+        book as the decision valued it: each held line at its decision close,
+        and a held line whose close was not knowable then - a session its
+        provider did not serve - at its ``last_known`` price, exactly as
+        ``_equity`` values a line whose open did not print. Valuing it at zero
+        sold the other lines down by its weight. A held line with neither
+        price raises ``UnvaluablePosition``: the book cannot be sized.
+
+        Raises
+        ------
+        ValueError
+            If quantities are fixed at the decision without its closes.
+        UnvaluablePosition
+            If, at the decision, a held line has neither a close nor a last
+            known price.
+        """
         shares = cash_shares or {}
         at_decision = self.sizing is Sizing.AT_DECISION
         if at_decision and decision_closes is None:
             raise ValueError("quantities fixed at the decision need the decision's closes")
         closes = decision_closes or {}
         if at_decision:
-            # The book as the decision valued it: held lines at their closes.
-            equity = state.cash + math.fsum(
-                holding.quantity * closes.get(name, 0.0) for name, holding in state.holdings.items()
-            )
+            # The book as the decision valued it: held lines at their closes,
+            # a line whose close was not knowable at its last known price.
+            carried = last_known or {}
+            values = []
+            for name, holding in state.holdings.items():
+                close = closes.get(name, carried.get(name))
+                if close is None:
+                    raise UnvaluablePosition(
+                        f"{name} is held, had no close at the decision and has never had a "
+                        f"knowable price; the book cannot be sized at {at.isoformat()}"
+                    )
+                values.append(holding.quantity * close)
+            equity = state.cash + math.fsum(values)
         sells: list[_Line] = []
         buys: list[_Line] = []
         rejects: list[ExecutionReject] = []
