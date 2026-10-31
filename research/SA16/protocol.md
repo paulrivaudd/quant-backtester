@@ -105,3 +105,18 @@ mesurés par `result.orders()` (moyenne et maximum par jour d'intervention,
 jours d'intervention par an). Aucune limite sur le nombre de jours
 d'intervention n'est imposée par le cahier des charges ; il est publié et
 pèse dans la lecture.
+
+## 6. Choix du candidat retenu (ajouté le 2026-10-31, après it3, avant toute sensibilité)
+
+Cette règle manquait ; elle est écrite après la lecture d'it1 à it3 et avant
+tout run de voisinage ou de redémarrage. Parmi les candidats qui tiennent les
+critères 1 à 3 (calculés pour chacun), est retenu celui dont le Sharpe net à
+coûts ×1 est le plus élevé ; les critères 4 à 6 (redémarrages, voisins,
+bootstrap) sont ensuite calculés pour lui. Si leur lecture conduit à une
+modification, elle est un nouveau candidat, compté, et le choix est refait
+avec la même règle. Les voisins et redémarrages ne sont jamais candidats.
+
+Voisins déclarés pour un candidat de la famille `SA16RiskBudget`, un
+paramètre à la fois : budget de la croissance ±0,05 ; fenêtre de volatilité
+63 et 189 rendements (126 ± 50 %) ; bande 0,03 et 0,08 ; cadence mensuelle au
+lieu d'hebdomadaire. Sept voisins, chacun à coûts ×1.
