@@ -880,7 +880,7 @@ that does not move, a constant active return - is a dash with its reason,
 never a zero. `result.report()` shows the same figures gross and net side by
 side, `result.compare(book=Book.GROSS)` the gross ones alone, and
 `result.report(benchmark=...)` measures the same run against another yardstick
-without touching the report it keeps. The formulas are in `docs/FORMULES.md`.
+without touching the report it keeps. The formulas are in `docs/FORMULAS.md`.
 
 `result.plot()` draws the run against its benchmark. It returns a figure and
 never calls `show`, so a notebook displays it, a script saves it and a test

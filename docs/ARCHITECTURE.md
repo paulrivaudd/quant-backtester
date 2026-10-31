@@ -1,257 +1,253 @@
 # Architecture
 
-État au 2026-09-27. Ce document décrit comment le projet est découpé, comment
-une séance de backtest se déroule et quels mécanismes garantissent qu'un
-résultat est juste et reproductible. Les règles de développement sont dans
-[CLAUDE.md](../CLAUDE.md).
+State on 2026-09-27. This document describes how the project is divided, how
+a backtest session unfolds and which mechanisms ensure that a result is right
+and reproducible. The development rules are in [CLAUDE.md](../CLAUDE.md).
 
-| Document | Pour |
+| Document | For |
 |---|---|
-| [GUIDE_NOUVELLE_STRATEGIE.md](GUIDE_NOUVELLE_STRATEGIE.md) | lancer un premier run hors ligne, écrire un signal et une stratégie, les juger |
-| [DONNEES.md](DONNEES.md) | la couche `data` en détail ; ajouter un instrument ou une source |
-| [FORMULES.md](FORMULES.md) | chaque formule du code : signaux, coûts, portefeuille, métriques |
-| [OPERATIONS_SUR_TITRES.md](OPERATIONS_SUR_TITRES.md) | splits, dividendes, scissions : ce qui est géré et ce qui ne l'est pas |
-| [GLOSSAIRE.md](GLOSSAIRE.md) | les termes de finance, en français et en anglais |
-| [AMELIORATIONS.md](AMELIORATIONS.md) | ce qui reste à faire |
+| [NEW_STRATEGY_GUIDE.md](NEW_STRATEGY_GUIDE.md) | running a first offline run, writing a signal and a strategy, judging them |
+| [DATA.md](DATA.md) | the `data` layer in detail; adding an instrument or a source |
+| [FORMULAS.md](FORMULAS.md) | every formula of the code: signals, costs, portfolio, metrics |
+| [CORPORATE_ACTIONS.md](CORPORATE_ACTIONS.md) | splits, dividends, spin-offs: what is handled and what is not |
+| [GLOSSARY.md](GLOSSARY.md) | the finance terms, with the names the code uses |
+| [IMPROVEMENTS.md](IMPROVEMENTS.md) | what remains to be done |
 
-## 1. Ce que le projet cherche à garantir
+## 1. What the project seeks to guarantee
 
-Le framework backteste des stratégies quotidiennes, et il vise d'abord la
-**confiance** dans un chiffre, pas la vitesse. Tous les choix ci-dessous
-servent trois propriétés :
+The framework backtests daily strategies, and it aims first at **trust** in a
+figure, not at speed. Every choice below serves three properties:
 
-1. **Aucune information du futur.** Une décision ne lit que ce qui était
-   publié à son instant. Ce qu'une donnée décrit (sa date) et le moment où
-   elle devient disponible sont deux choses distinctes.
-2. **Rien d'implicite.** Les calendriers, les coûts, les prix d'exécution, les
-   fenêtres et les paramètres sont déclarés et enregistrés avec le résultat.
-3. **Reproductible au bit près.** Le même code, la même configuration commitée
-   et le même store donnent les mêmes nombres. Un `run_id` le prouve.
+1. **No information from the future.** A decision reads only what was
+   published at its instant. What a data point describes (its date) and the
+   moment it becomes available are two distinct things.
+2. **Nothing implicit.** Calendars, costs, execution prices, windows and
+   parameters are declared and recorded with the result.
+3. **Reproducible to the bit.** The same code, the same committed
+   configuration and the same store give the same numbers. A `run_id` proves
+   it.
 
-## 2. Les couches et la règle de dépendance
+## 2. The layers and the dependency rule
 
 ```
 src/quant_backtester/
-    data/        store Parquet local, fournisseurs, calendriers, lecture point-in-time
+    data/        local Parquet store, providers, calendars, point-in-time reading
       │
-    signals/     marché à un instant  ->  un nombre par instrument (+ un statut)
+    signals/     the market at an instant  ->  one number per instrument (+ a status)
       │
-    portfolio/   cible demandée  ->  cible admissible (poids, limites), état du livre
+    portfolio/   requested target  ->  admissible target (weights, limits), state of the book
       │
-    execution/   cible admissible  ->  quantités sur les lots, ordres, fills, rejets, coûts
+    execution/   admissible target  ->  quantities on lots, orders, fills, rejects, costs
       │
-    backtest/    la boucle qui fait avancer le temps, le contexte de décision, le runner
+    backtest/    the loop that advances time, the decision context, the runner
       │
-    analytics/   performance brute/nette, benchmark, attribution, incertitude
+    analytics/   gross/net performance, benchmark, attribution, uncertainty
       │
-    strategies/  des règles composées à partir des couches ci-dessus
+    strategies/  rules composed from the layers above
       │
-    research/    hypothèses, registre des expériences, archives de runs, paper trading
+    research/    hypotheses, register of experiments, run archives, paper trading
 ```
 
-Les dépendances vont **dans un seul sens** : un module peut importer une couche
-placée au-dessus de la sienne dans ce schéma, jamais une couche placée
-en dessous. Si une couche a besoin d'une information qui vient d'en dessous, on
-la lui passe en argument. `tests/test_package_structure.py` vérifie cette règle
-sur chaque module.
+Dependencies go **one way only**: a module may import a layer placed above its
+own in this diagram, never a layer placed below. If a layer needs information
+that comes from below, it is passed in as an argument.
+`tests/test_package_structure.py` checks this rule on every module.
 
-**Une exception, et une seule : `backtest/runner.py`.** C'est une façade de
-composition. Elle construit le moteur, exécute une stratégie et rend son
-rapport. Elle importe donc `strategies.base` (le contrat d'une stratégie) et
-`analytics` (le rapport, les courbes, les graphiques). Le test la déclare dans
-`COMPOSITION_FACADES`, et aucun autre module ne peut faire de même. Le reste de
-`backtest/`, en particulier `engine.py` et `context.py`, respecte la règle. Les
-stratégies importent `backtest/context.py`, placé au-dessus d'elles : c'est un
-import autorisé.
+**One exception, and only one: `backtest/runner.py`.** It is a composition
+façade. It builds the engine, runs a strategy and returns its report. It
+therefore imports `strategies.base` (the contract of a strategy) and
+`analytics` (the report, the curves, the charts). The test declares it in
+`COMPOSITION_FACADES`, and no other module may do the same. The rest of
+`backtest/`, in particular `engine.py` and `context.py`, follows the rule.
+Strategies import `backtest/context.py`, placed above them: that is an allowed
+import.
 
-Trois règles supplémentaires sont vérifiées par les mêmes tests :
+Three more rules are checked by the same tests:
 
-- `strategies/` et `analytics/` n'importent jamais `quant_backtester.data`.
-  Une stratégie ne peut donc pas ouvrir un reader et lire au-delà de son
-  instant.
-- Aucune couche n'importe `research/`.
-- Seul `data/` fait des entrées-sorties réseau.
+- `strategies/` and `analytics/` never import `quant_backtester.data`. A
+  strategy therefore cannot open a reader and read beyond its instant.
+- No layer imports `research/`.
+- Only `data/` performs network I/O.
 
-| Paquet | Rôle | Modules clés |
+| Package | Role | Key modules |
 |---|---|---|
-| `data/` | Ingestion, contrôle, stockage et lecture des séries de marché | `sources/`, `schemas`, `normalizer`, `validator`, `crosscheck`, `revisions`, `bar_corrections`, `corporate_actions`, `known_gaps`, `conflict_reviews`, `repository`, `updater`, `reader`, `calendars`, `instruments`, `universes` |
-| `signals/` | Transformations réutilisables d'un historique en un nombre | `base` (`Signal`, `SignalResult`), `windows`, `types`, `engine`, `snapshot`, `price/`, `risk/`, `level/`, `cross_sectional/` |
-| `portfolio/` | Ce qu'un livre a le droit de détenir, et ce qu'il détient | `targets` (`TargetAllocation`), `allocation` (`PortfolioModel`, `ConstrainedTarget`), `constraints`, `limits` (`PortfolioLimits`), `holdings`, `state` (`PortfolioState`), `view` |
-| `execution/` | Ce que le marché fait d'un ordre | `model` (`ExecutionModel`, `Sizing`), `costs` (`CostModel`), `rounding` (lots), `orders`, `fills` (`Fill`, `ExecutionReject`) |
-| `backtest/` | Le temps | `config` (`BacktestConfig`), `engine`, `timetable`, `schedule`, `context` (`StrategyContext`), `market`, `records` (`BacktestRecord`), `result` (`BacktestResult`), `runner` (`StrategyRunner`, `StrategyResult`) |
-| `analytics/` | Ce qu'un run a produit | `config` (`AnalyticsConfig`), `curves` (dont `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats` : alpha, bêta, tracking error, ratio d'information), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (score 0-100 % contre le marché, règles versionnées `QUALITY_V1`), `volatility_forecast` (qualité ex post d'une prévision de variance : QLIKE), `return_forecast` (prévision de rendement à deux séances : moyenne, signe, perte jointe) |
-| `strategies/` | Les règles | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1` à `SA16`), un module par stratégie à la racine (`SA1_world_ma20_benchmark` … `SA16_risk_budget`), `adaptive/` (les règles qu'elles partagent) |
-| `ml/` | Les modèles ajustés (hors couches, voir ci-dessous) | `config` (`NeuralStrategyConfig`), `features` (`NeuralFeatureBuilder`, `FeatureScaler`), `network` (`NeuralAllocator`), `artifacts` (`NeuralArtifact`), `dataset` (`ForwardOpenReturnBuilder`, purge), `training` (`calibrate_neural_strategy`), `signatures/` (`SignatureVariant`, `SignatureArtifact`, `SignatureModelSchedule`, `calibrate_month`) |
-| `research/` | La discipline de recherche | `references` (les livres auxquels une étude se mesure) |
+| `data/` | Ingestion, checking, storage and reading of market series | `sources/`, `schemas`, `normalizer`, `validator`, `crosscheck`, `revisions`, `bar_corrections`, `corporate_actions`, `known_gaps`, `conflict_reviews`, `repository`, `updater`, `reader`, `calendars`, `instruments`, `universes` |
+| `signals/` | Reusable transformations of a history into a number | `base` (`Signal`, `SignalResult`), `windows`, `types`, `engine`, `snapshot`, `price/`, `risk/`, `level/`, `cross_sectional/` |
+| `portfolio/` | What a book is allowed to hold, and what it holds | `targets` (`TargetAllocation`), `allocation` (`PortfolioModel`, `ConstrainedTarget`), `constraints`, `limits` (`PortfolioLimits`), `holdings`, `state` (`PortfolioState`), `view` |
+| `execution/` | What the market does with an order | `model` (`ExecutionModel`, `Sizing`), `costs` (`CostModel`), `rounding` (lots), `orders`, `fills` (`Fill`, `ExecutionReject`) |
+| `backtest/` | Time | `config` (`BacktestConfig`), `engine`, `timetable`, `schedule`, `context` (`StrategyContext`), `market`, `records` (`BacktestRecord`), `result` (`BacktestResult`), `runner` (`StrategyRunner`, `StrategyResult`) |
+| `analytics/` | What a run produced | `config` (`AnalyticsConfig`), `curves` (including `aligned_equity_curves`), `performance`, `relative` (`RelativePerformanceStats`: alpha, beta, tracking error, information ratio), `report`, `comparison`, `attribution`, `contribution`, `uncertainty`, `plots`, `quality` (a 0-100% score against the market, versioned rules `QUALITY_V1`), `volatility_forecast` (ex post quality of a variance forecast: QLIKE), `return_forecast` (two-session return forecast: mean, sign, joint loss) |
+| `strategies/` | The rules | `base` (`Strategy`), `functional` (`@strategy`), `catalogue` (codes `SA1` to `SA16`), one module per strategy at the root (`SA1_world_ma20_benchmark` … `SA16_risk_budget`), `adaptive/` (the rules they share) |
+| `ml/` | The fitted models (outside the layers, see below) | `config` (`NeuralStrategyConfig`), `features` (`NeuralFeatureBuilder`, `FeatureScaler`), `network` (`NeuralAllocator`), `artifacts` (`NeuralArtifact`), `dataset` (`ForwardOpenReturnBuilder`, purge), `training` (`calibrate_neural_strategy`), `signatures/` (`SignatureVariant`, `SignatureArtifact`, `SignatureModelSchedule`, `calibrate_month`) |
+| `research/` | The research discipline | `references` (the books a study measures itself against) |
 
-`provenance.py` (état git du code qui a produit un résultat) et `numbers.py`
-(gardes sur les paramètres numériques) sont transverses.
+`provenance.py` (the git state of the code that produced a result) and
+`numbers.py` (guards on numeric parameters) cut across the layers.
 
-`ml/` n'est pas une couche. `config`, `features`, `network` et `artifacts` ne
-lisent rien au-dessus de `signals/` : ce sont eux qu'importent le signal
-(`signals/ml/`) et la stratégie (`strategies/SA14_neural_allocation.py`) d'un modèle. `dataset` et
-`training` tournent hors ligne, **avant** tout backtest : ils composent le
-lecteur, le runner et la stratégie, comme `backtest/runner.py`, et aucune
-couche ne les importe. PyTorch est une dépendance optionnelle
-(`uv sync --extra ml`) que seuls ces trois dossiers importent ; les tests de
-`tests/test_package_structure.py` vérifient les trois règles. `ml/signatures/`
-suit le même partage : `config`, `models` et `artifacts` n'importent que NumPy
-et `signals/` - c'est ce que lisent `signals/ml/signature_return.py` et la
-stratégie `SA13` - et seul `training` importe PyTorch et le lecteur.
+`ml/` is not a layer. `config`, `features`, `network` and `artifacts` read
+nothing above `signals/`: they are what a model's signal (`signals/ml/`) and
+strategy (`strategies/SA14_neural_allocation.py`) import. `dataset` and
+`training` run offline, **before** any backtest: they compose the reader, the
+runner and the strategy, like `backtest/runner.py`, and no layer imports them.
+PyTorch is an optional dependency (`uv sync --extra ml`) that only these three
+folders import; the tests of `tests/test_package_structure.py` check the three
+rules. `ml/signatures/` follows the same split: `config`, `models` and
+`artifacts` import only NumPy and `signals/` - that is what
+`signals/ml/signature_return.py` and the `SA13` strategy read - and only
+`training` imports PyTorch and the reader.
 
-## 3. Une séance, trois instants
+## 3. One session, three instants
 
-Un backtest quotidien parle souvent du « prix du jour », qui n'existe pas. Chaque
-séance du calendrier de référence (XPAR, Euronext Paris) a trois instants,
-déclarés dans `backtest/timetable.py` et enregistrés avec le résultat :
+A daily backtest often speaks of "the day's price", which does not exist. Each
+session of the reference calendar (XPAR, Euronext Paris) has three instants,
+declared in `backtest/timetable.py` and recorded with the result:
 
 ```
- séance J-1                               séance J
+ session D-1                              session D
  ─────────────────────────────┬───────────────────────────────────────────────────
                         23:00 │ 09:01             17:30       23:00         23:00
-                   DÉCISION   │ EXÉCUTION         clôture     VALORISATION  DÉCISION
-                   (lit tout  │ (ordres de J-1    Paris       (livre marqué (signaux de J,
-                    ce qui est│  remplis au prix              aux clôtures  cible pour J+1)
-                    publié)   │  d'ouverture)                  connues)
+                   DECISION   │ EXECUTION         Paris       VALUATION     DECISION
+                   (reads all │ (orders of D-1    close       (book marked  (signals of D,
+                    that is   │  filled at the                at the known  target for D+1)
+                    published)│  opening price)               closes)
 ```
 
-- **Décision, 23:00 Paris.** Assez tard pour que la clôture de New York du même
-  jour soit publiée : une séance américaine et une séance européenne sont
-  ainsi comparables. Les signaux sont calculés et la stratégie fixe une cible.
-- **Contrôle des opérations sur titres, avant l'ouverture.** Si une position
-  détenue passe ex-date sur une opération (split, dividende…) depuis la
-  séance précédente, le run s'arrête avec `UnsupportedCorporateAction`. Il
-  s'arrête même si la stratégie allait vendre à cette ouverture, parce que la
-  vente aurait lieu après l'événement. Voir
-  [OPERATIONS_SUR_TITRES.md](OPERATIONS_SUR_TITRES.md).
-- **Exécution, ouverture de la séance suivante.** Les ordres sont dimensionnés
-  et remplis au prix de l'enchère d'ouverture (`Sizing.AT_AUCTION`, par
-  défaut). `Sizing.AT_DECISION` fige les quantités à la clôture de la décision,
-  comme un ordre passé la veille.
-- **Valorisation, après la clôture.** Le livre est marqué aux prix de clôture
-  connus à cet instant, puis vient la décision suivante.
+- **Decision, 23:00 Paris.** Late enough for the same day's New York close to
+  be published: a US session and a European session are thus comparable. The
+  signals are computed and the strategy sets a target.
+- **Corporate action check, before the open.** If a held position goes
+  ex-date on an action (split, dividend…) since the previous session, the run
+  stops with `UnsupportedCorporateAction`. It stops even if the strategy was
+  about to sell at that open, because the sale would take place after the
+  event. See [CORPORATE_ACTIONS.md](CORPORATE_ACTIONS.md).
+- **Execution, the next session's open.** Orders are sized and filled at the
+  opening auction price (`Sizing.AT_AUCTION`, the default). `Sizing.AT_DECISION`
+  freezes the quantities at the decision close, like an order placed the day
+  before.
+- **Valuation, after the close.** The book is marked at the closing prices
+  known at that instant, then comes the next decision.
 
-L'ordre des instants est vérifié : une décision prise avant la valorisation de
-son propre livre recevrait un portefeuille venu de son futur. Le décalage entre
-une clôture américaine et l'ouverture européenne suivante est modélisé
-explicitement. Il n'est jamais approximé par « la barre suivante ».
+The order of the instants is checked: a decision taken before the valuation of
+its own book would receive a portfolio from its future. The gap between a US
+close and the next European open is modelled explicitly. It is never
+approximated as "the next bar".
 
-## 4. Le déroulé d'un run
+## 4. How a run unfolds
 
 ```
 StrategyRunner.run(strategy, universe, start, end, schedule=...)
  │
- ├─ strategy.validate()                    configuration complète et sérialisable
- ├─ calendrier de référence -> séances     (jamais freq="B")
+ ├─ strategy.validate()                    complete and serialisable configuration
+ ├─ reference calendar -> sessions         (never freq="B")
  │
- └─ BacktestEngine, pour chaque séance :
-      0. contrôle     position détenue qui passe ex-date -> UnsupportedCorporateAction
-      1. exécution    ordres en attente -> fills au prix d'ouverture, coûts, rejets
-      2. valorisation livre marqué aux clôtures disponibles
-      3. si la séance est dans le schedule :
-           reader.at(23:00)              -> PointInTimeReader figé à cet instant
-           SignalEngine.compute(...)     -> SignalSnapshot (un résultat par signal)
-           StrategyContext(...)          -> signaux, marché, livre, univers du jour
+ └─ BacktestEngine, for each session:
+      0. check        held position going ex-date -> UnsupportedCorporateAction
+      1. execution    pending orders -> fills at the opening price, costs, rejects
+      2. valuation    book marked at the available closes
+      3. if the session is in the schedule:
+           reader.at(23:00)              -> PointInTimeReader frozen at that instant
+           SignalEngine.compute(...)     -> SignalSnapshot (one result per signal)
+           StrategyContext(...)          -> signals, market, book, the day's universe
            strategy.decide(ctx)          -> TargetAllocation
-           portfolio: limites, lots      -> ordres pour la séance suivante
-      4. BacktestRecord de la séance     (tout ce qui s'est passé, conservé)
+           portfolio: limits, lots       -> orders for the next session
+      4. BacktestRecord of the session   (everything that happened, kept)
  │
- └─ StrategyResult : records, report() brut/net, compare() au benchmark,
-                     run_id, empreinte de la stratégie, état du code
+ └─ StrategyResult: records, gross/net report(), compare() to the benchmark,
+                    run_id, the strategy's fingerprint, state of the code
 ```
 
-Seul `backtest/engine.py` fait avancer le temps. Les signaux et la stratégie
-reçoivent un instant et l'historique disponible à cet instant, rien d'autre.
+Only `backtest/engine.py` advances time. The signals and the strategy receive
+an instant and the history available at that instant, nothing else.
 
-## 5. La couche `data`
+## 5. The `data` layer
 
-Le détail est dans [DONNEES.md](DONNEES.md).
+The detail is in [DATA.md](DATA.md).
 
 ### Ingestion
 
 ```
-fournisseur (Yahoo, Euronext, FRED, ALFRED, BCE)
-   │  sources/<fournisseur>.py      seul endroit qui connaît les colonnes du fournisseur
+provider (Yahoo, Euronext, FRED, ALFRED, ECB)
+   │  sources/<provider>.py         the only place that knows the provider's columns
    ▼
-raw/          téléchargements immuables, jamais réécrits
-   │  normalizer.py                 schéma canonique, horodatage de disponibilité (UTC)
-   │  validator.py                  règles par classe d'actifs
-   │  crosscheck.py                 plusieurs sources -> une série contrôlée, champ par champ
+raw/          immutable downloads, never rewritten
+   │  normalizer.py                 canonical schema, availability timestamp (UTC)
+   │  validator.py                  rules by asset class
+   │  crosscheck.py                 several sources -> one checked series, field by field
    ▼
-clean/checked_bars/                 ce que les stratégies lisent
+clean/checked_bars/                 what strategies read
 ```
 
-`scripts/update_market_data.py` pilote l'ingestion. Une promotion écrit les
-barres, les verdicts de contrôle, le journal des révisions et celui des
-téléchargements appliqués **en une seule transaction** : les fichiers sont
-préparés sous `.pending/`, un manifeste SHA-256 est écrit, puis tout est
-publié ensemble. Un verrou (`market_data/.lock`) est partagé pour les runs et
-exclusif pour les écritures ; un écrivain concurrent reçoit `StoreBusy`.
+`scripts/update_market_data.py` drives the ingestion. A promotion writes the
+bars, the check verdicts, the journal of revisions and that of the applied
+downloads **in a single transaction**: the files are prepared under
+`.pending/`, a SHA-256 manifest is written, then everything is published
+together. A lock (`market_data/.lock`) is shared for runs and exclusive for
+writes; a concurrent writer receives `StoreBusy`.
 
-### Métadonnées commitées
+### Committed metadata
 
-`market_data/metadata/` est de la configuration versionnée, pas de la donnée :
+`market_data/metadata/` is versioned configuration, not data:
 
-| Fichier | Contenu |
+| File | Content |
 |---|---|
-| `instruments.toml` | chaque série : type, calendrier, publication, négociabilité, `history_basis` et `history_note` obligatoires |
-| `calendars/` | séances, heures réelles d'ouverture et de clôture, demi-séances |
-| `universes.toml` | membres datés (un nom sorti garde sa date de sortie) |
-| `crosscheck.toml` | tolérances entre sources |
-| `known_gaps.toml` | trous connus et expliqués |
-| `conflict_reviews.toml` | conflits entre sources revus et tranchés (statut `REVIEWED`) |
-| `bar_corrections.toml` | barres cassées supprimées (jamais réparées), avec la raison |
-| `accepted_revisions.toml`, `corporate_actions.toml` | révisions et événements revus |
+| `instruments.toml` | each series: type, calendar, publication, tradability, mandatory `history_basis` and `history_note` |
+| `calendars/` | sessions, actual opening and closing times, half-days |
+| `universes.toml` | dated members (a name that left keeps its exit date) |
+| `crosscheck.toml` | tolerances between sources |
+| `known_gaps.toml` | known and explained holes |
+| `conflict_reviews.toml` | conflicts between sources reviewed and settled (status `REVIEWED`) |
+| `bar_corrections.toml` | broken bars deleted (never repaired), with the reason |
+| `accepted_revisions.toml`, `corporate_actions.toml` | reviewed revisions and events |
 
-### Lecture point-in-time
+### Point-in-time reading
 
-`MarketDataReader.at(instant)` renvoie un `PointInTimeReader` figé. Ses méthodes
-ne prennent **aucun** argument de date : il n'existe pas d'expression qui lise
-au-delà. Chaque lecture porte un statut : `OK`, `STALE` (dernière valeur trop
-ancienne), `NOT_LISTED` (l'instrument n'existait pas) ou `MISSING` (trou, ou
-séance contestée par deux sources). Un trou n'est jamais comblé par un
-report de prix. L'âge d'une valeur se compte en séances du calendrier de
-référence.
+`MarketDataReader.at(instant)` returns a frozen `PointInTimeReader`. Its
+methods take **no** date argument: there is no expression that reads beyond
+it. Each reading carries a status: `OK`, `STALE` (last value too old),
+`NOT_LISTED` (the instrument did not exist) or `MISSING` (a hole, or a session
+contested by two sources). A hole is never filled by carrying a price forward.
+The age of a value is counted in sessions of the reference calendar.
 
-## 6. La couche `signals`
+## 6. The `signals` layer
 
-Un **signal** transforme le marché à un instant en un nombre par instrument.
-Il ne décide rien : « le momentum de ce fonds est +8,1 % » est un signal,
-« acheter les deux meilleurs » est une stratégie.
+A **signal** turns the market at an instant into one number per instrument.
+It decides nothing: "this fund's momentum is +8.1%" is a signal, "buy the best
+two" is a strategy.
 
-- Un signal est un **dataclass gelé**. `definition()` liste tous les paramètres
-  qui changent le nombre, et `fingerprint()` en est le hachage.
-- Une fenêtre déclare son contrat (`WindowSpec`) : `CONSECUTIVE_SESSIONS`
-  (N séances tenues par la place, sans trou) ou `AVAILABLE_OBSERVATIONS`
-  (N observations publiées, pour un indicateur). `signals/windows.py` est le
-  seul endroit qui charge une fenêtre, et il refuse celle qui ne correspond
-  pas au contrat. `tail(N)` n'est pas une fenêtre.
-- La base de prix est explicite : `RAW` (cotation) ou `ADJUSTED` (ajustée des
-  opérations connues à l'instant de décision).
-- Chaque résultat porte un statut par instrument : `OK`, `NOT_LISTED`,
+- A signal is a **frozen dataclass**. `definition()` lists every parameter
+  that changes the number, and `fingerprint()` is its hash.
+- A window declares its contract (`WindowSpec`): `CONSECUTIVE_SESSIONS`
+  (N sessions held by the venue, with no hole) or `AVAILABLE_OBSERVATIONS`
+  (N published observations, for an indicator). `signals/windows.py` is the
+  only place that loads a window, and it refuses one that does not match the
+  contract. `tail(N)` is not a window.
+- The price basis is explicit: `RAW` (quotation) or `ADJUSTED` (adjusted for
+  the actions known at the decision instant).
+- Each result carries a status per instrument: `OK`, `NOT_LISTED`,
   `MISSING_INPUT`, `STALE_INPUT`, `INSUFFICIENT_HISTORY`,
-  `NON_CONSECUTIVE_HISTORY`, `INSUFFICIENT_CROSS_SECTION` ou `INVALID_INPUT`.
-  Un nombre n'existe que si le statut est `OK`, et `SignalResult` le vérifie.
-- `SignalEngine` calcule les signaux déclarés et produit un `SignalSnapshot`.
-  Un `SignalRequest` calcule un signal sur un univers à lui, par exemple le VIX
-  lu comme jauge sans être détenu.
+  `NON_CONSECUTIVE_HISTORY`, `INSUFFICIENT_CROSS_SECTION` or `INVALID_INPUT`.
+  A number exists only if the status is `OK`, and `SignalResult` checks it.
+- `SignalEngine` computes the declared signals and produces a
+  `SignalSnapshot`. A `SignalRequest` computes a signal on a universe of its
+  own, for instance the VIX read as a gauge without being held.
 
-Signaux disponibles : `ReturnSignal`, `MomentumSignal`, `MeanReversionSignal`,
-`MovingAverageTrendSignal`, `MovingAverageCrossSignal` (prix), `RealizedVolatilitySignal`,
-`CurrentDrawdownSignal` (risque), `LevelChangeSignal`, `LevelZScoreSignal`
-(séries publiées), `CrossSectionalRank` (classement), `GarchVolatilitySignal`
-et `EwmaVolatilitySignal` (modèles, `signals/models/garch.py`),
+Available signals: `ReturnSignal`, `MomentumSignal`, `MeanReversionSignal`,
+`MovingAverageTrendSignal`, `MovingAverageCrossSignal` (price),
+`RealizedVolatilitySignal`, `CurrentDrawdownSignal` (risk),
+`LevelChangeSignal`, `LevelZScoreSignal` (published series),
+`CrossSectionalRank` (ranking), `GarchVolatilitySignal` and
+`EwmaVolatilitySignal` (models, `signals/models/garch.py`),
 `ArimaGarchForecastSignal` (`signals/models/arima_garch.py`),
-`SignatureReturnSignal` (`signals/ml/signature_return.py`, features de
+`SignatureReturnSignal` (`signals/ml/signature_return.py`, features of
 `signals/signatures/`), `SpanScaledVolatilitySignal`
-(`signals/risk/span_volatility.py` : volatilité sur les `N + 1` dernières
-clôtures disponibles, chaque rendement divisé par la racine des séances qu'il
-couvre, contrat `AVAILABLE_OBSERVATIONS` déclaré, un trou de plus de
-`max_span_sessions` séances refusé).
+(`signals/risk/span_volatility.py`: volatility over the last `N + 1` available
+closes, each return divided by the square root of the sessions it spans, an
+`AVAILABLE_OBSERVATIONS` contract declared, a hole of more than
+`max_span_sessions` sessions refused).
 
-## 7. Stratégie et contexte de décision
+## 7. Strategy and decision context
 
-Une stratégie (`strategies/base.py`) déclare ses signaux et prend une décision :
+A strategy (`strategies/base.py`) declares its signals and takes a decision:
 
 ```python
 class Strategy(ABC):
@@ -259,361 +255,366 @@ class Strategy(ABC):
     def decide(self, ctx: StrategyContext) -> TargetAllocation: ...
 ```
 
-Ses paramètres sont les champs d'un dataclass gelé. Ils entrent dans
-`definition()` et `fingerprint()`, donc dans l'identité du run. Le moteur
-vérifie que la définition n'a pas changé pendant le run (`StrategyMutated`).
+Its parameters are the fields of a frozen dataclass. They enter
+`definition()` and `fingerprint()`, hence the identity of the run. The engine
+checks that the definition did not change during the run (`StrategyMutated`).
 
-`StrategyContext` (dans `backtest/`, car c'est le moteur qui le construit)
-contient tout ce qu'une décision peut voir, figé à un instant :
+`StrategyContext` (in `backtest/`, because the engine builds it) contains
+everything a decision can see, frozen at one instant:
 
-| Attribut / méthode | Rôle |
+| Attribute / method | Role |
 |---|---|
-| `ctx.signal_value`, `signal_status`, `signal_value_or_none`, `signal` | lire le snapshot |
-| `ctx.top`, `bottom`, `where` | sélectionner des noms (`Selection`, qui garde la raison des exclus) |
-| `ctx.market.value`, `values`, `history` | lire une série brute, avec statut et âge |
-| `ctx.portfolio` | le livre : poids, quantités, coût moyen, cash investi |
-| `ctx.universe` | les noms que l'univers autorise ce jour-là |
-| `ctx.weights`, `equal_weight`, `cash`, `hold_positions`, `keep_and_buy` | exprimer la cible |
+| `ctx.signal_value`, `signal_status`, `signal_value_or_none`, `signal` | read the snapshot |
+| `ctx.top`, `bottom`, `where` | select names (`Selection`, which keeps the reason for those excluded) |
+| `ctx.market.value`, `values`, `history` | read a raw series, with status and age |
+| `ctx.portfolio` | the book: weights, quantities, average cost, cash invested |
+| `ctx.universe` | the names the universe allows that day |
+| `ctx.weights`, `equal_weight`, `cash`, `hold_positions`, `keep_and_buy` | express the target |
 
-Les constructeurs de cible refusent un livre que personne ne pourrait
-détenir : un poids négatif, une somme supérieure à 1, un nom hors de
-l'univers ou un instrument non négociable.
+The target constructors refuse a book that nobody could hold: a negative
+weight, a sum above 1, a name outside the universe or a non-tradable
+instrument.
 
-Pièges du contexte : `signal_value` lève `UnusableSignal` si le statut n'est
-pas `OK`, alors que `signal_value_or_none` renvoie `None`. `keep_and_buy`
-répartit une fraction du **cash restant** entre des lignes nouvelles : ce n'est
-pas un poids du portefeuille, et il refuse une ligne déjà détenue.
-`hold_positions` n'envoie aucun ordre, sauf si une limite coupe le livre.
-`@strategy` enregistre le nom qualifié de la fonction, pas son code : seul l'état
-git trace une modification de son corps.
+Pitfalls of the context: `signal_value` raises `UnusableSignal` if the status
+is not `OK`, whereas `signal_value_or_none` returns `None`. `keep_and_buy`
+splits a fraction of the **remaining cash** between new lines: it is not a
+portfolio weight, and it refuses a line already held. `hold_positions` sends
+no order, unless a limit cuts the book. `@strategy` records the qualified name
+of the function, not its code: only the git state traces a change to its body.
 
-### Les livres de référence (`research/references.py`)
+### The reference books (`research/references.py`)
 
-Les stratégies conservées ont un code et sont décrites plus bas, au catalogue.
-Les trois classes de ce module ne sont pas des candidates et ne sont pas dans
-le paquet `strategies` : ce sont les références et le témoin auxquels les
-études mesurent une stratégie.
+The strategies that are kept have a code and are described below, in the
+catalogue. The three classes of this module are not candidates and are not in
+the `strategies` package: they are the references and the control that the
+studies measure a strategy against.
 
-| Classe | Règle exacte | Si le signal est inutilisable |
+| Class | Exact rule | If the signal is unusable |
 |---|---|---|
-| `BuyAndHold(instruments)` | achète à parts égales puis garde les quantités ; les poids dérivent. Un nom dont l'achat a échoué est acheté plus tard avec le cash restant, sans revendre les lignes déjà détenues (D5) | pas de signal |
-| `EqualWeightRebalance(instruments)` | poids égaux redemandés à chaque décision, donc vend le gagnant et rachète le perdant | pas de signal |
-| `FixedWeights(weights)` | vise des poids constants et ne traite que lorsque la dérive des cours l'écarte de sa cible de plus que la bande de rééquilibrage ; son exposition réalisée n'est donc pas exactement sa cible. Témoin des diagnostics | pas de signal |
+| `BuyAndHold(instruments)` | buys in equal parts then keeps the quantities; the weights drift. A name whose purchase failed is bought later with the remaining cash, without selling the lines already held (D5) | no signal |
+| `EqualWeightRebalance(instruments)` | equal weights asked again at each decision, so it sells the winner and buys back the loser | no signal |
+| `FixedWeights(weights)` | aims at constant weights and trades only when price drift moves it away from its target by more than the rebalancing band; its realised exposure is therefore not exactly its target. The diagnostics' control | no signal |
 
-Une règle sur un seul fonds enregistre ce qu'elle a lu avec
-`ctx.considering({fonds: statut})`, passé en `among` à `cash`, `weights` ou
-`hold_positions` : un jour en cash sur un signal valide compte un instrument
-considéré, un jour sans signal lisible n'en compte aucun et porte le statut.
-C'est ce qui permet au rapport de ne compter en « sessions with nothing to
-choose from » que les secondes.
+A rule on a single fund records what it read with
+`ctx.considering({fund: status})`, passed as `among` to `cash`, `weights` or
+`hold_positions`: a day in cash on a valid signal counts one instrument
+considered, a day with no readable signal counts none and carries the status.
+That is what lets the report count only the latter as "sessions with nothing
+to choose from".
 
-Les scripts de référence passent `top_n=1` sur l'univers à deux fonds. Avec la
-valeur par défaut `top_n=2`, la rotation détiendrait les deux.
+The reference scripts pass `top_n=1` on the two-fund universe. With the
+default value `top_n=2`, the rotation would hold both.
 
-### Le catalogue (`strategies/catalogue.py`)
+### The catalogue (`strategies/catalogue.py`)
 
-Une stratégie conservée reçoit un **code** (famille + numéro) et un **libellé**
-court. Les trois écritures d'un nom en découlent et ne s'écrivent nulle part à
-la main :
+A strategy that is kept receives a **code** (family + number) and a short
+**label**. The three spellings of a name follow from them and are never
+written by hand:
 
-| Usage | Forme | Exemple |
+| Use | Form | Example |
 |---|---|---|
-| tableau, figure, légende | `display_name` | `SA3 - smooth MA` |
-| `strategy_id` d'un résultat | `strategy_id` | `SA3_smooth_ma` |
-| nom de fichier | `slug` | `sa3_smooth_ma` |
+| table, figure, legend | `display_name` | `SA3 - smooth MA` |
+| `strategy_id` of a result | `strategy_id` | `SA3_smooth_ma` |
+| file name | `slug` | `sa3_smooth_ma` |
 
-Une seule famille, `SA`. L'allocation neuronale était `ML1`, seule de sa
-famille, jusqu'au 2026-10-11 : elle est `SA14`, et le code `ML1` n'est pas
-réattribué. Son module importe PyTorch dès son chargement, ce que son entrée
-déclare (`extra = "ml"`). Un code est attribué une fois, dans
-l'ordre d'adoption, et n'est jamais réutilisé ; le libellé peut être reformulé.
-`SA1` à `SA10` sont les dix règles ETF du 2026-10-03 (numérotées 0 à 9 dans
-leur spécification : `SA1` est le benchmark MA20, `SA10` l'ensemble), `SA11`
-le contrôle de volatilité GARCH, `SA12` l'ARIMA-GARCH et `SA13` les
-signatures neuronales du 2026-10-10 (libellés sans tiret), `SA14` l'allocation
-neuronale. Les trois livres de référence ne sont pas catalogués ; les exemples
-et exercices antérieurs ont été retirés du code le 2026-10-11. `entry("SA3")`, `entry_of(strategy)` et `family(Family.SA)`
-donnent une entrée ; `entry.load()` importe la classe à la demande.
+A single family, `SA`. The neural allocation was `ML1`, alone in its family,
+until 2026-10-11: it is `SA14`, and the code `ML1` is not reassigned. Its
+module imports PyTorch as soon as it is loaded, which its entry declares
+(`extra = "ml"`). A code is assigned once, in the order of adoption, and is
+never reused; the label may be reworded. `SA1` to `SA10` are the ten ETF rules
+of 2026-10-03 (numbered 0 to 9 in their specification: `SA1` is the MA20
+benchmark, `SA10` the ensemble), `SA11` the GARCH volatility control, `SA12`
+the ARIMA-GARCH and `SA13` the neural signatures of 2026-10-10 (labels without
+a dash), `SA14` the neural allocation. The three reference books are not
+catalogued; the earlier examples and exercises were removed from the code on
+2026-10-11. `entry("SA3")`, `entry_of(strategy)` and `family(Family.SA)` give
+an entry; `entry.load()` imports the class on demand.
 
-### SA14, l'allocation neuronale (`strategies/SA14_neural_allocation.py`)
+### SA14, the neural allocation (`strategies/SA14_neural_allocation.py`)
 
-Un petit réseau (encodeur partagé `Linear(100, 8)`, couche cachée de 16,
-softmax sur les fonds achetables et le cash) propose chaque soir des poids. Il
-est entraîné **avant** le backtest (`scripts/SA14_run_neural_strategy.py`), puis
-figé dans un artefact identifié par son contenu (`model_id`). La décision
-plafonne, retire les poids sous 1 %, puis compare au livre réellement détenu :
-`hold_positions` dans la bande de 3 points (cash compris), `weights` sinon,
-`cash` si une entrée manque. Trois garde-fous propres à un modèle ajusté :
-l'entrée est construite par le même `NeuralFeatureBuilder` à l'entraînement et
-en décision ; les rendements futurs ouverture→ouverture ne sont lus que par
-`ForwardOpenReturnBuilder`, sur un lecteur figé à la fin de l'apprentissage ;
-l'artefact porte sa date limite d'information et une décision prise avant est
-refusée (`InformationCutoffError`).
+A small network (a shared encoder `Linear(100, 8)`, a hidden layer of 16, a
+softmax over the buyable funds and cash) proposes weights every evening. It is
+trained **before** the backtest (`scripts/SA14_run_neural_strategy.py`), then
+frozen in an artifact identified by its content (`model_id`). The decision
+caps, removes the weights under 1%, then compares with the book actually held:
+`hold_positions` within the 3-point band (cash included), `weights`
+otherwise, `cash` if an input is missing. Three safeguards specific to a
+fitted model: the input is built by the same `NeuralFeatureBuilder` in
+training and in decision; the future open→open returns are read only by
+`ForwardOpenReturnBuilder`, on a reader frozen at the end of training; the
+artifact carries its information cutoff date and a decision taken before it is
+refused (`InformationCutoffError`).
 
-### SA11, le contrôle de volatilité GARCH (`strategies/SA11_garch_vol_control.py`)
+### SA11, the GARCH volatility control (`strategies/SA11_garch_vol_control.py`)
 
-`GarchVolControl` détient `ETF_WORLD` à hauteur de
-`min(1, 12 % / max(σ, 5 %))`, où `σ = sqrt(252 · h(t+1|t))` est la prévision à
-une séance d'un GARCH(1,1) de moyenne nulle à innovations de Student. Le modèle
-est **réestimé à chaque décision** sur les 756 rendements logarithmiques
-(757 clôtures ajustées, séances consécutives) connus à cet instant ; rien n'est
-conservé d'une décision à l'autre, ni modèle, ni point de départ, ni cache.
-La bande de 3 points, la cible et le plancher sont ceux de `SA6`, son
-comparateur.
+`GarchVolControl` holds `ETF_WORLD` at `min(1, 12% / max(σ, 5%))`, where
+`σ = sqrt(252 · h(t+1|t))` is the one-session forecast of a zero-mean
+GARCH(1,1) with Student innovations. The model is **re-estimated at each
+decision** on the 756 log returns (757 adjusted closes, consecutive sessions)
+known at that instant; nothing is kept from one decision to the next, neither
+model, nor starting point, nor cache. The 3-point band, the target and the
+floor are those of `SA6`, its comparator.
 
-- **Unités.** Les rendements sont multipliés par 100 pour l'optimiseur
-  seulement ; tout ce qui sort de `forecast_garch` est en unités décimales
-  (variance quotidienne, `ω` divisé par 10 000, volatilité de 20 % écrite
-  `0.20`).
-- **Repli.** Un fit non convergé, inadmissible (`α + β ≥ 1`, `ν ≤ 2`…) ou à
-  prévision invalide est remplacé par une EWMA (0,94, amorcée sur 60
-  rendements) de la **même fenêtre valide**. Le signal reste `OK` : la valeur
-  est exploitable, ce qui ne veut pas dire que GARCH a convergé ;
-  `GarchVolatilitySignal.diagnose()` donne la source et le motif. Une fenêtre
-  courte, trouée, périmée ou invalide ne déclenche ni fit ni repli : cash.
-- **Ce que couvre la prévision.** Le rendement clôture → clôture ; l'ordre est
-  exécuté à l'ouverture suivante. C'est un proxy du risque de la position.
-- **Dépendance.** L'estimation est faite par `arch`, dépendance optionnelle
-  (extra `stats`), importée au moment du fit. Le module, la classe et le
-  catalogue s'importent sans elle ; `validate()`, appelé par tout run, lève
+- **Units.** Returns are multiplied by 100 for the optimiser only; everything
+  that comes out of `forecast_garch` is in decimal units (daily variance, `ω`
+  divided by 10,000, a volatility of 20% written `0.20`).
+- **Fallback.** A fit that did not converge, is inadmissible (`α + β ≥ 1`,
+  `ν ≤ 2`…) or gives an invalid forecast is replaced by an EWMA (0.94, seeded
+  on 60 returns) of the **same valid window**. The signal stays `OK`: the
+  value is usable, which does not mean that GARCH converged;
+  `GarchVolatilitySignal.diagnose()` gives the source and the reason. A short,
+  holed, stale or invalid window triggers neither fit nor fallback: cash.
+- **What the forecast covers.** The close → close return; the order is
+  executed at the next open. It is a proxy for the position's risk.
+- **Dependency.** The estimation is done by `arch`, an optional dependency
+  (extra `stats`), imported at fit time. The module, the class and the
+  catalogue import without it; `validate()`, called by every run, raises
   `MissingDependency`.
-- **Témoin.** `EwmaVolControl` applique la même règle à l'EWMA seule, sous un
-  identifiant de recherche (`research_ewma94_vol_control`), sans code de
-  catalogue.
+- **Control.** `EwmaVolControl` applies the same rule to the EWMA alone, under
+  a research identifier (`research_ewma94_vol_control`), without a catalogue
+  code.
 
-`analytics/volatility_forecast.py` juge la prévision **ex post** : appariement
-origine → séance suivante, QLIKE (`log q + r²/q`, plancher de métrique à 1e-12
-compté), erreur quadratique, résidus standardisés. `scripts/SA11_run_garch_study.py`
-tient séparés le classement commun, la qualité de la prévision et le test
-économique de l'hypothèse (bootstrap apparié, second run réel à coûts doublés).
+`analytics/volatility_forecast.py` judges the forecast **ex post**: pairing
+origin → next session, QLIKE (`log q + r²/q`, with a metric floor of 1e-12
+that is counted), squared error, standardised residuals.
+`scripts/SA11_run_garch_study.py` keeps separate the common ranking, the
+quality of the forecast and the economic test of the hypothesis (paired
+bootstrap, a second real run at doubled costs).
 
 ### SA12, ARIMA-GARCH (`strategies/SA12_arima_garch.py`)
 
-`ArimaGarch` détient `ETF_WORLD` tant qu'un ARIMA(1,0,1) prévoit un rendement
-positif pour **la première séance qu'un ordre peut porter**, à un poids
-dimensionné par la variance de ce rendement.
+`ArimaGarch` holds `ETF_WORLD` while an ARIMA(1,0,1) forecasts a positive
+return for **the first session an order can carry**, at a weight sized by the
+variance of that return.
 
-- **Chronologie.** Au soir de `t`, le dernier rendement connu est
-  `r_t = log(O_t / O_{t-1})` sur ouvertures ajustées ; l'ordre est exécuté à
-  `O_{t+1}`, donc le rendement visé est `r_{t+2}`, le **deuxième pas**. Les
-  ouvertures ajustées viennent de `load_adjusted_open_window` : ouverture brute
-  × clôture ajustée / clôture brute, les trois connues à l'instant de décision.
-- **Moyenne.** `mu_2` de l'état filtré (`statsmodels`, espace d'états,
-  initialisation stationnaire, un seul point de départ, réestimé chaque soir).
-- **Risque.** GARCH(1,1) Student sur les 696 innovations ARIMA restantes après
-  retrait des 60 premières : `h_1`, puis `h_2 = ω + (α + β) h_1`, et
-  `v_2 = h_2 + (φ + θ)² h_1`, la variance du *rendement* à deux pas. Repli EWMA
-  sur les mêmes innovations (`h_2 = h_1`). Estimation séquentielle en deux
-  étapes, pas une vraisemblance jointe.
-- **Règle.** Entrée depuis le cash si `mu_2 > 20 pb`, maintien si `mu_2 > 0`,
-  sortie à zéro inclus, lus sur la position **réellement détenue** ;
-  `w = g · min(1, 12 % / max(σ, 5 %))` ; bande de 3 points, une sortie et une
-  entrée depuis le cash étant toujours transmises.
-- **Un signal, un calcul.** `ArimaGarchForecastSignal` porte `mu_2` en valeur
-  et la variance, la volatilité, la source et les diagnostics en colonnes ;
-  `read_joint_forecast` lève si la colonne de volatilité manque. Un échec ARIMA
-  est `INVALID_INPUT` avec `failure_stage="ARIMA"`, jamais une donnée manquante.
-- **Contrôles** (sans code de catalogue) : D0 sans filtre de direction, D1
-  avec variance EWMA, D2 à moyenne constante. `scripts/SA12_run_arima_garch_study.py`
-  les exécute et attribue un statut à l'hypothèse (`INSUFFICIENT_EVIDENCE`,
-  `NOT_SUPPORTED`, `UNCERTAIN`, `SUPPORTED_RETROSPECTIVE`).
+- **Chronology.** On the evening of `t`, the last known return is
+  `r_t = log(O_t / O_{t-1})` on adjusted opens; the order is executed at
+  `O_{t+1}`, so the return targeted is `r_{t+2}`, the **second step**. The
+  adjusted opens come from `load_adjusted_open_window`: raw open × adjusted
+  close / raw close, all three known at the decision instant.
+- **Mean.** `mu_2` of the filtered state (`statsmodels`, state space,
+  stationary initialisation, a single starting point, re-estimated every
+  evening).
+- **Risk.** A Student GARCH(1,1) on the 696 ARIMA innovations left after the
+  first 60 are removed: `h_1`, then `h_2 = ω + (α + β) h_1`, and
+  `v_2 = h_2 + (φ + θ)² h_1`, the variance of the two-step *return*. EWMA
+  fallback on the same innovations (`h_2 = h_1`). A sequential two-stage
+  estimation, not a joint likelihood.
+- **Rule.** Entry from cash if `mu_2 > 20 bp`, holding if `mu_2 > 0`, exit at
+  zero inclusive, read on the position **actually held**;
+  `w = g · min(1, 12% / max(σ, 5%))`; a 3-point band, an exit and an entry
+  from cash always being sent.
+- **One signal, one computation.** `ArimaGarchForecastSignal` carries `mu_2` as
+  its value and the variance, the volatility, the source and the diagnostics
+  as columns; `read_joint_forecast` raises if the volatility column is
+  missing. An ARIMA failure is `INVALID_INPUT` with `failure_stage="ARIMA"`,
+  never a missing data point.
+- **Controls** (without a catalogue code): D0 without the direction filter, D1
+  with an EWMA variance, D2 with a constant mean.
+  `scripts/SA12_run_arima_garch_study.py` runs them and assigns a status to
+  the hypothesis (`INSUFFICIENT_EVIDENCE`, `NOT_SUPPORTED`, `UNCERTAIN`,
+  `SUPPORTED_RETROSPECTIVE`).
 
-`analytics/return_forecast.py` apparie une prévision à l'origine `t` avec le
-rendement de l'ouverture `t+1` à l'ouverture `t+2` et mesure la moyenne (MSE,
-signe avec ses dénominateurs) et la perte jointe `log v + e²/v`.
+`analytics/return_forecast.py` pairs a forecast at origin `t` with the return
+from the open of `t+1` to the open of `t+2` and measures the mean (MSE, sign
+with its denominators) and the joint loss `log v + e²/v`.
 
-### SA13, signatures neuronales (`strategies/SA13_signatures_neurons.py`)
+### SA13, neural signatures (`strategies/SA13_signatures_neurons.py`)
 
-`SignaturesNeurons` détient `ETF_WORLD` tant qu'un modèle additif, lisant la
-log-signature de ses 60 dernières séances, prévoit un rendement simple positif
-de l'ouverture `t+1` à l'ouverture `t+2`.
+`SignaturesNeurons` holds `ETF_WORLD` while an additive model, reading the
+log-signature of its last 60 sessions, forecasts a positive simple return from
+the open of `t+1` to the open of `t+2`.
 
-- **Chemin** (`signals/signatures/path.py`). 61 points `(P, U, T)` : log-rendement
-  cumulé × 100 sur clôtures ajustées, activité notionnelle cumulée (clôture
-  brute × volume brut) rapportée à la médiane des 60 séances précédentes, temps
-  de séance. 120 séances consécutives exigées, âge nul ; un volume absent rend
-  la fenêtre inutilisable, un volume nul observé est conservé et compté.
-- **Log-signature** (`signals/signatures/logsignature.py`). Ordre 3, `esig`
-  avec le backend `roughpy`, base de Hall vérifiée clé par clé (14 coefficients,
-  13 après retrait du seul déplacement constant du temps). `FeatureSpec` nomme
-  la représentation (log-signature, neuf indicateurs classiques, trajectoire
-  brute) et les processus explicatifs, concaténés par blocs et qualifiés
-  (`ETF_WORLD:[1,2]`) ; un bloc manquant rend toute la variante inutilisable.
-- **Modèle** (`ml/signatures/`). Un petit réseau `tanh` de 4 unités par
-  coefficient, centré en zéro, sommé avec un biais (157 paramètres) : la
-  prévision est exactement `référence + Σ contributions`, en rendement décimal.
-  Régression Ridge de contrôle. L'inférence est écrite en NumPy (`models.py`) ;
-  seul l'ajustement (`training.py`) importe PyTorch.
-- **Réestimation mensuelle** (`calibrate_month`). 126 origines de validation se
-  terminant à la dernière séance du mois précédent, 1 008 d'apprentissage avant
-  elles, purge aux deux frontières par les dates de fin de label ; les features
-  de chaque origine sont celles construites à son propre instant ; le scaler et
-  les poids ne voient que l'apprentissage, la validation choisit l'époque. Un
-  mois sans assez d'exemples valides n'a pas de modèle et dit pourquoi.
-- **Artefacts** (`artifacts.py`). `SignatureArtifact` est identifié par son
-  contenu (poids, scaler, noms et ordre des features, définition de la
-  variante, périodes, cutoff, environnement) ; tableaux NumPy sans pickle et
-  manifeste JSON. `SignatureModelSchedule`, immuable, donne à chaque décision
-  le modèle prévu pour son mois et lève `ModelCausalityError` si son cutoff ou
-  sa disponibilité ne précèdent pas la décision.
-- **Règle.** Entrée si la prévision dépasse 20 pb, maintien si elle est
-  strictement positive, sortie à zéro inclus, lus sur la position détenue ;
-  `w = g · min(1, 12 % / max(σ20, σ60, 5 %))` ; bande de 3 points. Le
-  portefeuille est continu d'un mois à l'autre.
-- **Contrôles** (sans code de catalogue) : C0 mêmes modèles sans filtre, C1
-  Ridge, C2 ordre 2, C3 sans volume, C4 indicateurs classiques, C5 trajectoire
-  brute, C6/C7 contexte World + S&P 500. `scripts/SA13_run_signature_study.py`
-  calibre, exécute, exporte les contributions et attribue le statut.
+- **Path** (`signals/signatures/path.py`). 61 points `(P, U, T)`: cumulative log
+  return × 100 on adjusted closes, cumulative notional activity (raw close ×
+  raw volume) relative to the median of the previous 60 sessions, session
+  time. 120 consecutive sessions required, zero age; a missing volume makes the
+  window unusable, an observed zero volume is kept and counted.
+- **Log-signature** (`signals/signatures/logsignature.py`). Order 3, `esig`
+  with the `roughpy` backend, Hall basis checked key by key (14 coefficients,
+  13 after removing the single constant displacement of time). `FeatureSpec`
+  names the representation (log-signature, nine classic indicators, raw
+  trajectory) and the explanatory processes, concatenated by blocks and
+  qualified (`ETF_WORLD:[1,2]`); a missing block makes the whole variant
+  unusable.
+- **Model** (`ml/signatures/`). A small `tanh` network of 4 units per
+  coefficient, centred at zero, summed with a bias (157 parameters): the
+  forecast is exactly `reference + Σ contributions`, as a decimal return. A
+  control Ridge regression. Inference is written in NumPy (`models.py`); only
+  the fitting (`training.py`) imports PyTorch.
+- **Monthly re-estimation** (`calibrate_month`). 126 validation origins ending
+  on the last session of the previous month, 1,008 training ones before them,
+  purged at both boundaries by the label end dates; the features of each
+  origin are those built at its own instant; the scaler and the weights see
+  only the training set, the validation chooses the epoch. A month without
+  enough valid examples has no model and says why.
+- **Artifacts** (`artifacts.py`). `SignatureArtifact` is identified by its
+  content (weights, scaler, names and order of the features, definition of the
+  variant, periods, cutoff, environment); NumPy arrays without pickle and a
+  JSON manifest. `SignatureModelSchedule`, immutable, gives each decision the
+  model planned for its month and raises `ModelCausalityError` if its cutoff or
+  its availability does not precede the decision.
+- **Rule.** Entry if the forecast exceeds 20 bp, holding if it is strictly
+  positive, exit at zero inclusive, read on the position held;
+  `w = g · min(1, 12% / max(σ20, σ60, 5%))`; a 3-point band. The portfolio is
+  continuous from one month to the next.
+- **Controls** (without a catalogue code): C0 the same models without the
+  filter, C1 Ridge, C2 order 2, C3 without volume, C4 classic indicators, C5
+  raw trajectory, C6/C7 World + S&P 500 context.
+  `scripts/SA13_run_signature_study.py` calibrates, runs, exports the
+  contributions and assigns the status.
 
-## 8. Portefeuille et exécution
+## 8. Portfolio and execution
 
-Il faut distinguer quatre objets :
+Four objects must be told apart:
 
-| Objet | Ce qu'il décrit | Produit par |
+| Object | What it describes | Produced by |
 |---|---|---|
-| `TargetAllocation` | ce que la stratégie **demande** (des poids) | `strategy.decide(ctx)` |
-| `ConstrainedTarget` (dans `PortfolioDecision`) | ce que les limites **autorisent** (des poids), avec chaque coupe nommée | `PortfolioModel.decide` |
-| `Order` / `Fill` / `ExecutionReject` | ce qui est **demandé au marché** et ce qui en est **fait** (des quantités) | `ExecutionModel.rebalance` |
-| `PortfolioState` | ce que le livre **détient** (quantités, coût moyen, cash) | les fills appliqués |
+| `TargetAllocation` | what the strategy **asks for** (weights) | `strategy.decide(ctx)` |
+| `ConstrainedTarget` (in `PortfolioDecision`) | what the limits **allow** (weights), with each cut named | `PortfolioModel.decide` |
+| `Order` / `Fill` / `ExecutionReject` | what is **asked of the market** and what **comes of it** (quantities) | `ExecutionModel.rebalance` |
+| `PortfolioState` | what the book **holds** (quantities, average cost, cash) | the fills applied |
 
-- `portfolio/` travaille en **poids**. `PortfolioModel.decide` refuse une cible
-  inadmissible : un instrument inconnu, non négociable, dans une autre devise
-  ou hors de l'univers du jour lève `InadmissibleTarget`. Il n'y a pas de
-  coupe silencieuse. `PortfolioLimits` plafonne ensuite chaque ligne, puis
-  réduit les poids proportionnellement si l'exposition brute dépasse son
-  plafond. Les poids retirés restent en cash et ne sont pas redistribués. Ces
-  plafonds s'appliquent à la cible **avant coûts et arrondis**.
-- `execution/` passe des poids aux **quantités**. Les quantités sont arrondies
-  vers zéro au lot de l'instrument (`rounding`). Les ventes passent avant les
-  achats, et un achat que le cash ne couvre pas est réduit.
-  `ExecutionModel` réunit un `CostModel`, dont la commission (avec son
-  minimum), le demi-spread et le slippage sont des termes séparés et nommés,
-  une valeur minimale d'ordre et un mode de dimensionnement (`Sizing`). Les
-  équations sont dans [FORMULES.md](FORMULES.md).
-- Un ordre non exécuté est un **rejet motivé**. Il ne disparaît pas en
-  silence : il est compté dans le rapport. Une cible exécutée une fois n'est
-  jamais remise en file. Si un achat est rejeté, c'est à la décision suivante
-  de le redemander.
+- `portfolio/` works in **weights**. `PortfolioModel.decide` refuses an
+  inadmissible target: an unknown instrument, a non-tradable one, one in
+  another currency or outside the day's universe raises `InadmissibleTarget`.
+  There is no silent cut. `PortfolioLimits` then caps each line, then reduces
+  the weights proportionally if the gross exposure exceeds its cap. The
+  weights removed stay in cash and are not redistributed. These caps apply to
+  the target **before costs and rounding**.
+- `execution/` goes from weights to **quantities**. Quantities are rounded
+  towards zero to the instrument's lot (`rounding`). Sales go before
+  purchases, and a purchase the cash does not cover is reduced.
+  `ExecutionModel` brings together a `CostModel`, whose commission (with its
+  minimum), half-spread and slippage are separate, named terms, a minimum
+  order value and a sizing mode (`Sizing`). The equations are in
+  [FORMULAS.md](FORMULAS.md).
+- An order not executed is a **reject with a reason**. It does not disappear
+  silently: it is counted in the report. A target executed once is never
+  queued again. If a purchase is rejected, it is up to the next decision to
+  ask for it again.
 
-| `ExecutionRejectReason` | Sens |
+| `ExecutionRejectReason` | Meaning |
 |---|---|
-| `NON_TRADABLE` | instrument déclaré `tradable = false` (dernier garde-fou ; `portfolio` le refuse avant) |
-| `CURRENCY_MISMATCH` | instrument coté dans une autre devise que le livre (même rôle) |
-| `NO_EXECUTION_PRICE` | aucun prix d'ouverture à l'instant d'exécution |
-| `STALE_EXECUTION_PRICE` | le dernier prix d'ouverture date d'une séance antérieure |
-| `NO_DECISION_PRICE` | `Sizing.AT_DECISION` sans clôture à la décision pour fixer la quantité |
-| `BELOW_MINIMUM_TRADE` | ordre inférieur à la valeur minimale déclarée |
-| `INSUFFICIENT_CASH` | achat réduit ou refusé faute de cash, coûts compris |
-| `CASH_SHARE_BUDGET` | achat `keep_and_buy` ramené à sa part de cash, au prix réellement payé |
-| `INVALID_QUANTITY` | position détenue hors de la grille des lots (livre construit hors du moteur) |
-| `OUTSIDE_TRADING_UNIVERSE` | achat d'un nom sorti de l'univers entre la décision et l'ouverture ; une vente n'est jamais refusée pour ce motif |
+| `NON_TRADABLE` | an instrument declared `tradable = false` (last safeguard; `portfolio` refuses it before) |
+| `CURRENCY_MISMATCH` | an instrument quoted in another currency than the book (same role) |
+| `NO_EXECUTION_PRICE` | no opening price at the execution instant |
+| `STALE_EXECUTION_PRICE` | the last opening price dates from an earlier session |
+| `NO_DECISION_PRICE` | `Sizing.AT_DECISION` without a close at the decision to set the quantity |
+| `BELOW_MINIMUM_TRADE` | an order below the declared minimum value |
+| `INSUFFICIENT_CASH` | a purchase reduced or refused for lack of cash, costs included |
+| `CASH_SHARE_BUDGET` | a `keep_and_buy` purchase brought back to its share of cash, at the price actually paid |
+| `INVALID_QUANTITY` | a held position off the lot grid (a book built outside the engine) |
+| `OUTSIDE_TRADING_UNIVERSE` | the purchase of a name that left the universe between the decision and the open; a sale is never refused for this reason |
 
-## 9. Résultat, analytics et identité d'un run
+## 9. Result, analytics and identity of a run
 
-`StrategyResult` conserve tout : `records` (une entrée par séance),
+`StrategyResult` keeps everything: `records` (one entry per session),
 `orders()`, `fills()`, `rejects()`, `holdings()`, `weights()`, `costs()`,
-`equity(book)` et `drawdown(book)`.
+`equity(book)` and `drawdown(book)`.
 
-- `report()` affiche **brut et net côte à côte**, les coûts décomposés, le
-  turnover, le cash moyen, les séances sans prix, les achats coupés, et les
-  hypothèses de fill.
-- `compare()` confronte le run au benchmark déclaré du runner, valorisé
-  pendant le run, sur une période sans trou intérieur. En plus des mesures
-  absolues, il donne l'alpha de régression, le bêta, le rendement actif, la
-  tracking error, le ratio d'information et le R² (`comparison.relative`).
-  `report()` les montre en brut et en net, et `report(benchmark=...)` produit
-  un rapport exploratoire contre une autre référence sans toucher celui qui
-  est conservé. Formules et cas indéfinis : [FORMULES.md](FORMULES.md) §4.
-- `analytics.uncertainty.paired_block_bootstrap` rééchantillonne par blocs la
-  **différence** entre une stratégie et un témoin exécutable, sous la même
-  convention que le rapport.
-- `run_id` hache toute la configuration : la stratégie, l'exécution, le
-  calendrier, l'univers, l'empreinte du store (`data_state`), celle des
-  calendriers et des instruments, l'environnement (Python, `uv.lock`,
-  numpy, pandas, pyarrow, scipy) et l'état du code (commit, arbre propre ou
-  non). Deux runs de même `run_id` ont produit les mêmes nombres.
+- `report()` shows **gross and net side by side**, the costs broken down, the
+  turnover, the average cash, the sessions without a price, the purchases cut,
+  and the fill assumptions.
+- `compare()` sets the run against the runner's declared benchmark, valued
+  during the run, over a period with no inner hole. Besides the absolute
+  measures, it gives the regression alpha, the beta, the active return, the
+  tracking error, the information ratio and the R² (`comparison.relative`).
+  `report()` shows them gross and net, and `report(benchmark=...)` produces an
+  exploratory report against another reference without touching the one that
+  is kept. Formulas and undefined cases: [FORMULAS.md](FORMULAS.md) §4.
+- `analytics.uncertainty.paired_block_bootstrap` resamples by blocks the
+  **difference** between a strategy and an executable control, under the same
+  convention as the report.
+- `run_id` hashes the whole configuration: the strategy, the execution, the
+  calendar, the universe, the store's fingerprint (`data_state`), that of the
+  calendars and instruments, the environment (Python, `uv.lock`, numpy,
+  pandas, pyarrow, scipy) and the state of the code (commit, clean tree or
+  not). Two runs with the same `run_id` produced the same numbers.
 
-## 10. La couche `research`
+## 10. The `research` layer
 
-La couche `research/` porte la discipline de recherche décrite dans
-[research/PROTOCOL.md](../research/PROTOCOL.md) :
+The `research/` layer carries the research discipline described in
+[research/PROTOCOL.md](../research/PROTOCOL.md):
 
-| Élément | Rôle |
+| Element | Role |
 |---|---|
-| `research/hypotheses.toml` | les hypothèses des stratégies étudiées, écrites **avant** leurs runs (`PREREGISTERED`) : ce qu'elles prédisent et ce qui les réfuterait |
-| `research/commentary.toml` | l'analyse rédigée de chaque stratégie, lue par `write_strategy_reports.py` |
-| `quant_backtester.research.references` | `BuyAndHold`, `EqualWeightRebalance`, `FixedWeights` : les livres auxquels une étude mesure une stratégie |
+| `research/hypotheses.toml` | the hypotheses of the strategies studied, written **before** their runs (`PREREGISTERED`): what they predict and what would refute them |
+| `research/commentary.toml` | the written analysis of each strategy, read by `write_strategy_reports.py` |
+| `quant_backtester.research.references` | `BuyAndHold`, `EqualWeightRebalance`, `FixedWeights`: the books a study measures a strategy against |
 
-Le registre des runs, les plans de paper trading, l'archive d'un run et le
-chargeur des hypothèses ont été retirés le 2026-10-11 : plus aucun script ne
-s'en servait. Chaque étude compte ses propres essais et les imprime.
+The register of runs, the paper trading plans, the archive of a run and the
+loader of hypotheses were removed on 2026-10-11: no script used them any more.
+Each study counts its own trials and prints them.
 
-## 11. Mécanismes d'intégrité, en résumé
+## 11. Integrity mechanisms, in summary
 
-| Risque | Garde-fou |
+| Risk | Safeguard |
 |---|---|
-| Lire le futur | reader figé à un instant, pas d'argument de date ; test « le futur ne change rien » par couche |
-| Fenêtre trouée | `WindowSpec` + `windows.py`, statut `NON_CONSECUTIVE_HISTORY` |
-| Donnée contestée | cross-check multi-sources, `CONFLICT` servi comme trou, revue commitée |
-| Store à moitié écrit | transactions avec manifeste, verrou partagé ou exclusif |
-| Résultat non reproductible | `run_id`, `fingerprint`, état git, environnement ; `uv.lock` commité |
-| Stratégie qui triche | pas d'import de `data` (test), contexte sans reader, définition figée |
-| Chiffre flatteur | brut et net, témoin exécutable, bootstrap apparié, registre des variantes |
-| Régression silencieuse | tests hors ligne, warnings = erreurs, CI à chaque push, `ruff` + `pyright` |
+| Reading the future | reader frozen at an instant, no date argument; a "the future changes nothing" test per layer |
+| A window with a hole | `WindowSpec` + `windows.py`, status `NON_CONSECUTIVE_HISTORY` |
+| A contested data point | multi-source cross-check, `CONFLICT` served as a hole, committed review |
+| A half-written store | transactions with a manifest, shared or exclusive lock |
+| A non-reproducible result | `run_id`, `fingerprint`, git state, environment; `uv.lock` committed |
+| A strategy that cheats | no import of `data` (test), a context without a reader, a frozen definition |
+| A flattering figure | gross and net, executable control, paired bootstrap, register of variants |
+| A silent regression | offline tests, warnings = errors, CI on every push, `ruff` + `pyright` |
 
-## 12. Où ajouter quoi
+## 12. Where to add what
 
-| Je veux… | Où | Remarque |
+| I want… | Where | Note |
 |---|---|---|
-| une nouvelle règle d'investissement | `strategies/` (ou un script / notebook avec `@strategy`) | voir le guide |
-| une transformation réutilisable d'un prix | `signals/price/`, `signals/risk/`… | dataclass gelé, `compute_window`, tests avec garde anti look-ahead |
-| un nouveau fournisseur | `data/sources/` + un normaliseur qui finit par `bars_frame` | normaliser toutes ses particularités dans l'adaptateur ; voir [DONNEES.md](DONNEES.md) §11 |
-| un nouvel instrument | `market_data/metadata/instruments.toml` | `history_basis` et `history_note` obligatoires ; voir [DONNEES.md](DONNEES.md) §10 |
-| un nouvel univers | `market_data/metadata/universes.toml` | membres datés |
-| un autre modèle de coûts | `ExecutionModel` / `CostModel` passés au runner | jamais dans la stratégie |
-| une nouvelle métrique | `analytics/` | brut et net, même convention que le rapport |
+| a new investment rule | `strategies/` (or a script / notebook with `@strategy`) | see the guide |
+| a reusable transformation of a price | `signals/price/`, `signals/risk/`… | frozen dataclass, `compute_window`, tests with a look-ahead guard |
+| a new provider | `data/sources/` + a normaliser that ends with `bars_frame` | normalise all of its quirks in the adapter; see [DATA.md](DATA.md) §11 |
+| a new instrument | `market_data/metadata/instruments.toml` | `history_basis` and `history_note` mandatory; see [DATA.md](DATA.md) §10 |
+| a new universe | `market_data/metadata/universes.toml` | dated members |
+| another cost model | `ExecutionModel` / `CostModel` passed to the runner | never in the strategy |
+| a new metric | `analytics/` | gross and net, the same convention as the report |
 
-## 13. Scripts et environnement
+## 13. Scripts and environment
 
-| Script | Rôle | Réseau |
+| Script | Role | Network |
 |---|---|---|
-| `scripts/demo.py` | premier backtest sur un marché synthétique (`quant_backtester.demo`), rapports et figures | non |
-| `scripts/update_market_data.py` | télécharger, contrôler et promouvoir (`--archive`, `--coverage`, `--only`, `--rebuild`) | oui, sauf `--coverage` et `--rebuild` |
-| `scripts/accept_revision.py` | préparer le bloc TOML d'une révision à relire ; ne modifie aucun fichier | non |
-| `scripts/generate_calendars.py` | régénérer les calendriers depuis `exchange_calendars` et les vérifier | non |
-| `scripts/check_calendar_coverage.py` | échouer quand il reste moins de 90 jours de calendrier | non |
-| `scripts/run_etf_strategies_comparison.py` | les règles `SA` sur les mêmes dates et coûts (`--start`, `--end` ; `SA11` omise avec la mention « dependency missing » sans l'extra `stats`) ; `quality_details.csv` | non |
-| `scripts/SA13_run_signature_study.py` | l'étude `SA13` : calibrations mensuelles, contrôles C0 à C7, contributions, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`, extras `ml stats signatures`) | non |
-| `scripts/SA12_run_arima_garch_study.py` | l'étude `SA12` : contrôles D0/D1/D2, prévisions à deux pas, statut de l'hypothèse, coûts ×2 (`OMP_NUM_THREADS=1`) | non |
-| `scripts/SA11_run_garch_study.py` | l'étude `SA11` sur la période commune : classement, témoins `SA6`/EWMA, QLIKE, bootstrap, coûts ×2, historiques par stratégie | non |
-| `scripts/SA16_download_data.py`, `scripts/SA16_run_study.py`, `scripts/SA16_report.py` | l'étude `SA16` : magasin isolé `runs/sa16_store` (réseau), puis reproduction de SA15, références, candidats et témoins, voisins et redémarrages, gel, figures (`results/SA16/study.md`) | oui pour le magasin, non ensuite |
-| `scripts/write_strategy_reports.py` | le dossier `results/` : un sous-dossier par stratégie (`analysis.md`, tableaux, figures) et `summary/` qui compare les livres, depuis les exports d'une étude rangés dans `runs/` ; `--only SA12` écrit le dossier d'une étude dédiée, avec le classement de ses livres et la section que l'étude a écrite (`report_extra_<code>.md`) | non |
+| `scripts/demo.py` | a first backtest on a synthetic market (`quant_backtester.demo`), reports and figures | no |
+| `scripts/update_market_data.py` | download, check and promote (`--archive`, `--coverage`, `--only`, `--rebuild`) | yes, except `--coverage` and `--rebuild` |
+| `scripts/accept_revision.py` | prepare the TOML block of a revision to review; modifies no file | no |
+| `scripts/generate_calendars.py` | regenerate the calendars from `exchange_calendars` and check them | no |
+| `scripts/check_calendar_coverage.py` | fail when fewer than 90 days of calendar remain | no |
+| `scripts/run_etf_strategies_comparison.py` | the `SA` rules on the same dates and costs (`--start`, `--end`; `SA11` left out with the note "dependency missing" without the `stats` extra); `quality_details.csv` | no |
+| `scripts/SA13_run_signature_study.py` | the `SA13` study: monthly calibrations, controls C0 to C7, contributions, status of the hypothesis, costs ×2 (`OMP_NUM_THREADS=1`, extras `ml stats signatures`) | no |
+| `scripts/SA12_run_arima_garch_study.py` | the `SA12` study: controls D0/D1/D2, two-step forecasts, status of the hypothesis, costs ×2 (`OMP_NUM_THREADS=1`) | no |
+| `scripts/SA11_run_garch_study.py` | the `SA11` study over the common period: ranking, `SA6`/EWMA controls, QLIKE, bootstrap, costs ×2, histories by strategy | no |
+| `scripts/SA16_download_data.py`, `scripts/SA16_run_study.py`, `scripts/SA16_report.py` | the `SA16` study: isolated store `runs/sa16_store` (network), then reproduction of SA15, references, candidates and controls, neighbours and restarts, freeze, figures (`results/SA16/study.md`) | yes for the store, no afterwards |
+| `scripts/write_strategy_reports.py` | the `results/` folder: one subfolder per strategy (`analysis.md`, tables, figures) and `summary/` that compares the books, from the exports of a study stored in `runs/`; `--only SA12` writes the folder of a dedicated study, with the ranking of its books and the section the study wrote (`report_extra_<code>.md`) | no |
 
-**Référence d'API.** Chaque module, classe et fonction publique a une docstring
-numpy qui donne les unités, le fuseau et l'instant de disponibilité. On la lit
-avec `pydoc`, sans dépendance supplémentaire et toujours à jour du code :
+**API reference.** Every public module, class and function has a numpy
+docstring that gives the units, the time zone and the availability instant.
+It is read with `pydoc`, with no extra dependency and always up to date with
+the code:
 
 ```bash
-uv run python -m pydoc quant_backtester.backtest.runner   # un module dans le terminal
-uv run python -m pydoc -b                                  # tout le paquet dans le navigateur
+uv run python -m pydoc quant_backtester.backtest.runner   # one module in the terminal
+uv run python -m pydoc -b                                  # the whole package in the browser
 ```
 
-Une référence recopiée à la main, avec des numéros de ligne, serait fausse dès
-le commit suivant.
+A reference copied by hand, with line numbers, would be wrong from the next
+commit on.
 
-Un script ne contient pas de calcul métier. Il charge la configuration, vérifie
-les préconditions, appelle le paquet et écrit dans un dossier neuf.
+A script contains no business computation. It loads the configuration, checks
+the preconditions, calls the package and writes to a new folder.
 
-**Environnement.** Python 3.12 exactement (`requires-python = ">=3.12,<3.13"`),
-et `uv` avec `uv.lock` commité. Les verrous du store et des journaux utilisent
-`fcntl`/`flock`, qui offre le mode partagé dont un run a besoin : **Linux, macOS
-ou WSL, pas Windows natif** (décision D11). L'import du store y échoue avec un
-message qui le dit. `numbers.py` refuse un `bool` là où l'on attend un nombre, car
-en Python `True` est un `int` et passerait sinon pour un taux ou une durée.
+**Environment.** Python 3.12 exactly (`requires-python = ">=3.12,<3.13"`), and
+`uv` with `uv.lock` committed. The locks of the store and of the journals use
+`fcntl`/`flock`, which offers the shared mode a run needs: **Linux, macOS or
+WSL, not native Windows** (decision D11). Importing the store there fails with
+a message that says so. `numbers.py` refuses a `bool` where a number is
+expected, because in Python `True` is an `int` and would otherwise pass for a
+rate or a duration.
 
-**Annualisation.** Les rapports déclarent `AnalyticsConfig(sessions_per_year=255,
-risk_free_rate=0.02)` pour XPAR. `RealizedVolatilitySignal.annualization` n'a pas
-de valeur par défaut : on la déclare, 252 pour XNYS ou 255 pour XPAR.
+**Annualisation.** The reports declare `AnalyticsConfig(sessions_per_year=255,
+risk_free_rate=0.02)` for XPAR. `RealizedVolatilitySignal.annualization` has no
+default value: it is declared, 252 for XNYS or 255 for XPAR.
 
-Les dossiers de la couche `data` sont sous `market_data/` : `metadata/` est
-commité, `raw/`, `clean/` et `validation/` ne le sont pas.
+The folders of the `data` layer are under `market_data/`: `metadata/` is
+committed, `raw/`, `clean/` and `validation/` are not.
