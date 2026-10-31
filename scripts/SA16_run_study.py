@@ -649,10 +649,135 @@ def candidate(path: Path, store: Path, output: Path) -> None:
     print((folder / "tables.md").read_text(encoding="utf-8"), flush=True)
 
 
+def neighbours(spec: Mapping[str, Any]) -> dict[str, tuple[dict[str, Any], str]]:
+    """Return the declared neighbours of a risk-budget candidate (protocol, section 6)."""
+    if not spec["class"].endswith("SA16RiskBudget"):
+        raise ValueError("neighbours are declared for the SA16RiskBudget family only")
+    base = dict(spec["parameters"])
+    budget = base["growth_risk_budget"]
+    changes: dict[str, tuple[dict[str, Any], str]] = {
+        "budget_minus_005": ({"growth_risk_budget": round(budget - 0.05, 10)}, spec["schedule"]),
+        "budget_plus_005": ({"growth_risk_budget": round(budget + 0.05, 10)}, spec["schedule"]),
+        "volatility_63": ({"volatility_returns": 63}, spec["schedule"]),
+        "volatility_189": ({"volatility_returns": 189}, spec["schedule"]),
+        "band_003": ({"rebalance_band": 0.03}, spec["schedule"]),
+        "band_008": ({"rebalance_band": 0.08}, spec["schedule"]),
+        "monthly": ({}, "monthly"),
+    }
+    return {
+        name: ({**base, **change, "strategy_id": f"{spec['id']}_N_{name}"}, schedule)
+        for name, (change, schedule) in changes.items()
+    }
+
+
+def beats(book: Mapping[str, Any], other: Mapping[str, Any]) -> bool:
+    """Return whether a book has a strictly higher net CAGR and net Sharpe."""
+    return book["cagr"] > other["cagr"] and book["sharpe"] > other["sharpe"]
+
+
+def robustness(path: Path, store: Path, output: Path) -> None:
+    """Run the declared neighbours and the restarts from cash of one candidate."""
+    spec = read_candidate(path)
+    folder = output / "robustness" / spec["id"]
+    references(store, output)
+    nasdaq = json.loads((output / "references/x1/Nasdaq_buy_hold/metrics.json").read_text())
+    sa15 = json.loads((output / "references/x1/SA15_R4_trial71/metrics.json").read_text())
+    rows = []
+    for name, (parameters, schedule) in neighbours(spec).items():
+        book = BookSpec(
+            parameters["strategy_id"],
+            build_strategy(spec["class"], parameters),
+            SCHEDULES[schedule](),
+            "neighbour",
+        )
+        run_folder = folder / "neighbours" / name
+        values = run_book(book, WINDOWS["full"], run_folder, store=store)
+        values["folder"] = str(run_folder.relative_to(output))
+        register_trial(output, values, book.name, spec["number"])
+        rows.append(
+            {
+                "neighbour": name,
+                **{key: values[key] for key in ("cagr", "sharpe", "max_drawdown", "costs_eur")},
+                "beats_nasdaq": beats(values, nasdaq),
+                "beats_sa15": beats(values, sa15),
+            }
+        )
+    candidate_book = candidate_books(spec)[0]
+    restarts = []
+    for start in START_DATES:
+        window = (start, WINDOWS["full"][1])
+        books = [candidate_book, *reference_books()[:2]]
+        values = {
+            book.name: run_book(book, window, folder / "restarts" / start / book.name, store=store)
+            for book in books
+        }
+        mine = values[candidate_book.name]
+        restarts.append(
+            {
+                "start": start,
+                **{
+                    f"{name}_{key}": values[name][key]
+                    for name in values
+                    for key in ("cagr", "sharpe", "max_drawdown")
+                },
+                "beats_nasdaq": beats(mine, values["Nasdaq_buy_hold"]),
+                "beats_sa15": beats(mine, values["SA15_R4_trial71"]),
+            }
+        )
+    summary = {
+        "candidate": spec["id"],
+        "neighbours": rows,
+        "neighbours_beating_nasdaq": sum(row["beats_nasdaq"] for row in rows),
+        "neighbours_beating_both": sum(row["beats_nasdaq"] and row["beats_sa15"] for row in rows),
+        "restarts": restarts,
+        "restarts_beating_both": sum(row["beats_nasdaq"] and row["beats_sa15"] for row in restarts),
+        "deflated_sharpe": deflated(output, output / f"it{spec['number']:02d}/x1/{spec['id']}"),
+    }
+    write_json(folder / "summary.json", summary)
+    lines = [
+        f"# Robustesse de {spec['id']} — tableaux générés",
+        "",
+        "| Voisin | CAGR net | Sharpe | Perte max. | Coûts EUR | Bat le Nasdaq | Bat SA15 |",
+        "| --- | ---: | ---: | ---: | ---: | --- | --- |",
+    ]
+    lines += [
+        f"| {row['neighbour']} | {percent(row['cagr'])} | {row['sharpe']:.3f} | "
+        f"{percent(row['max_drawdown'])} | {row['costs_eur']:,.0f} | "
+        f"{'oui' if row['beats_nasdaq'] else 'non'} | {'oui' if row['beats_sa15'] else 'non'} |"
+        for row in rows
+    ]
+    lines += [
+        "",
+        "| Départ | CAGR candidat | Nasdaq | SA15 | Sharpe candidat | Nasdaq | SA15 | "
+        "Perte max. candidat | Bat les deux |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for row in restarts:
+        name = candidate_book.name
+        lines.append(
+            f"| {row['start']} | {percent(row[f'{name}_cagr'])} | "
+            f"{percent(row['Nasdaq_buy_hold_cagr'])} | {percent(row['SA15_R4_trial71_cagr'])} | "
+            f"{row[f'{name}_sharpe']:.3f} | {row['Nasdaq_buy_hold_sharpe']:.3f} | "
+            f"{row['SA15_R4_trial71_sharpe']:.3f} | {percent(row[f'{name}_max_drawdown'])} | "
+            f"{'oui' if row['beats_nasdaq'] and row['beats_sa15'] else 'non'} |"
+        )
+    dsr = summary["deflated_sharpe"]
+    lines += [
+        "",
+        f"Voisins battant le Nasdaq (CAGR et Sharpe) : {summary['neighbours_beating_nasdaq']}/"
+        f"{len(rows)} ; battant les deux références : {summary['neighbours_beating_both']}/"
+        f"{len(rows)}. Redémarrages battant les deux : {summary['restarts_beating_both']}/"
+        f"{len(restarts)}. Sharpe déflaté : {dsr['probability']:.3f} ({dsr['trials']} essais).",
+        "",
+    ]
+    (folder / "tables.md").write_text("\n".join(lines), encoding="utf-8")
+    print("\n".join(lines), flush=True)
+
+
 def main(arguments: Sequence[str] | None = None) -> None:
     """Run one phase of the study."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("phase", choices=("reproduce", "references", "candidate"))
+    parser.add_argument("phase", choices=("reproduce", "references", "candidate", "robustness"))
     parser.add_argument("spec", nargs="?", type=Path)
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--output", type=Path, default=OUTPUT)
@@ -665,8 +790,11 @@ def main(arguments: Sequence[str] | None = None) -> None:
         write_json(options.output / "references" / "comparison.json", summary)
     else:
         if options.spec is None:
-            parser.error("candidate needs the path of its JSON")
-        candidate(options.spec, options.store, options.output)
+            parser.error(f"{options.phase} needs the path of a candidate JSON")
+        if options.phase == "candidate":
+            candidate(options.spec, options.store, options.output)
+        else:
+            robustness(options.spec, options.store, options.output)
 
 
 if __name__ == "__main__":
