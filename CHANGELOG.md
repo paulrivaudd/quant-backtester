@@ -14,6 +14,12 @@
 - `Sizing.AT_DECISION` is used by the common ETF study (SA1 to SA13), SA14,
   SA15 and SA16: the sessions exposed in their published results are counted
   in the pull request; no published result is rewritten by this change.
+- **SA15 series 1**, the only study with a touched session (the execution of
+  2025-10-27), carries an erratum at the top of
+  `results/SA15_GPT-6.1/study.md`: a rerun with the fix moves the selection
+  from 23.53% to 23.58% net on the control period and the `equal_weight`
+  control from 32.90% to 33.30%; the selection, the verdict and the archived
+  figures are unchanged.
 
 ### The documentation in English (2026-10-31)
 - **Every file of `docs/` is in English**, with English names:
