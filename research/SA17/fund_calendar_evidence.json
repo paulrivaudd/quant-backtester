@@ -1,0 +1,210 @@
+{
+  "gate": "2a fund valuation calendar",
+  "rule": {
+    "document": "SSGA SPDR ETFs Europe II plc prospectus, 19 February 2026",
+    "url": "https://www.ssga.com/library-content/products/fund-docs/etfs/emea/2-GENERIC-EN-FP-IRISH-SPDR-II.pdf",
+    "archive": "runs/sa17_admission_20261107/raw/umbrella-prospectus-spdr-ii.pdf",
+    "sha256": "6665411ab82ce255ec7c9a3aaf9475f3db519401b4e05aaae649795dd905ea69",
+    "retrieved_at_utc": "2026-11-07T21:33:20.047061+00:00",
+    "quotes": {
+      "business_day_pdf_page_70": "a day on which markets in the United Kingdom are open and/or such other day or days as the Directors may determine and notify in advance to Shareholders",
+      "dealing_day_pdf_page_71": "unless specified otherwise in the Relevant Supplement for any Fund, every Business Day (excluding, for each Fund, any day on which a market on which securities included in the relevant Index are listed or traded is closed and/or the day preceding any such day provided that a list of such closed market days will be published for each Fund on the Website)",
+      "publication_pdf_page_55": "the Net Asset Value per Share shall be made public after the Valuation Point on the business day following the relevant Dealing Day"
+    },
+    "supplements": "Valuation Point 10.15 p.m. (Irish time) on each Business Day; no supplement redefines Business Day or Dealing Day (technology and consumer discretionary checked).",
+    "caveat": "The 2026 edition of the prospectus; earlier editions were not acquired. The empirical check over 2015-2026 is what supports applying the rule to earlier years."
+  },
+  "calendars": {
+    "XLON": "exchange_calendars 4.13.2",
+    "range": [
+      "2015-01-01",
+      "2026-12-31"
+    ]
+  },
+  "funds": [
+    {
+      "id": "SA17_NAV_ENERGY",
+      "missing_xnys_sessions": 26,
+      "missing_on_uk_holidays": 26,
+      "unexplained_missing": [],
+      "navs_on_non_xnys_days": 74,
+      "navs_on_uk_holidays_when_xnys_closed": [
+        "2017-05-29",
+        "2018-05-28",
+        "2019-05-27",
+        "2020-05-25",
+        "2021-05-31",
+        "2023-05-29",
+        "2024-05-27",
+        "2025-05-26",
+        "2026-05-25"
+      ]
+    },
+    {
+      "id": "SA17_NAV_MATERIALS",
+      "missing_xnys_sessions": 26,
+      "missing_on_uk_holidays": 26,
+      "unexplained_missing": [],
+      "navs_on_non_xnys_days": 74,
+      "navs_on_uk_holidays_when_xnys_closed": [
+        "2017-05-29",
+        "2018-05-28",
+        "2019-05-27",
+        "2020-05-25",
+        "2021-05-31",
+        "2023-05-29",
+        "2024-05-27",
+        "2025-05-26",
+        "2026-05-25"
+      ]
+    },
+    {
+      "id": "SA17_NAV_INDUSTRIALS",
+      "missing_xnys_sessions": 26,
+      "missing_on_uk_holidays": 26,
+      "unexplained_missing": [],
+      "navs_on_non_xnys_days": 74,
+      "navs_on_uk_holidays_when_xnys_closed": [
+        "2017-05-29",
+        "2018-05-28",
+        "2019-05-27",
+        "2020-05-25",
+        "2021-05-31",
+        "2023-05-29",
+        "2024-05-27",
+        "2025-05-26",
+        "2026-05-25"
+      ]
+    },
+    {
+      "id": "SA17_NAV_CONSUMER_DISCRETIONARY",
+      "missing_xnys_sessions": 26,
+      "missing_on_uk_holidays": 26,
+      "unexplained_missing": [],
+      "navs_on_non_xnys_days": 74,
+      "navs_on_uk_holidays_when_xnys_closed": [
+        "2017-05-29",
+        "2018-05-28",
+        "2019-05-27",
+        "2020-05-25",
+        "2021-05-31",
+        "2023-05-29",
+        "2024-05-27",
+        "2025-05-26",
+        "2026-05-25"
+      ]
+    },
+    {
+      "id": "SA17_NAV_CONSUMER_STAPLES",
+      "missing_xnys_sessions": 26,
+      "missing_on_uk_holidays": 26,
+      "unexplained_missing": [],
+      "navs_on_non_xnys_days": 74,
+      "navs_on_uk_holidays_when_xnys_closed": [
+        "2017-05-29",
+        "2018-05-28",
+        "2019-05-27",
+        "2020-05-25",
+        "2021-05-31",
+        "2023-05-29",
+        "2024-05-27",
+        "2025-05-26",
+        "2026-05-25"
+      ]
+    },
+    {
+      "id": "SA17_NAV_HEALTH_CARE",
+      "missing_xnys_sessions": 26,
+      "missing_on_uk_holidays": 26,
+      "unexplained_missing": [],
+      "navs_on_non_xnys_days": 74,
+      "navs_on_uk_holidays_when_xnys_closed": [
+        "2017-05-29",
+        "2018-05-28",
+        "2019-05-27",
+        "2020-05-25",
+        "2021-05-31",
+        "2023-05-29",
+        "2024-05-27",
+        "2025-05-26",
+        "2026-05-25"
+      ]
+    },
+    {
+      "id": "SA17_NAV_FINANCIALS",
+      "missing_xnys_sessions": 26,
+      "missing_on_uk_holidays": 26,
+      "unexplained_missing": [],
+      "navs_on_non_xnys_days": 74,
+      "navs_on_uk_holidays_when_xnys_closed": [
+        "2017-05-29",
+        "2018-05-28",
+        "2019-05-27",
+        "2020-05-25",
+        "2021-05-31",
+        "2023-05-29",
+        "2024-05-27",
+        "2025-05-26",
+        "2026-05-25"
+      ]
+    },
+    {
+      "id": "SA17_NAV_TECHNOLOGY",
+      "missing_xnys_sessions": 26,
+      "missing_on_uk_holidays": 26,
+      "unexplained_missing": [],
+      "navs_on_non_xnys_days": 74,
+      "navs_on_uk_holidays_when_xnys_closed": [
+        "2017-05-29",
+        "2018-05-28",
+        "2019-05-27",
+        "2020-05-25",
+        "2021-05-31",
+        "2023-05-29",
+        "2024-05-27",
+        "2025-05-26",
+        "2026-05-25"
+      ]
+    },
+    {
+      "id": "SA17_NAV_COMMUNICATION",
+      "missing_xnys_sessions": 18,
+      "missing_on_uk_holidays": 18,
+      "unexplained_missing": [],
+      "navs_on_non_xnys_days": 57,
+      "navs_on_uk_holidays_when_xnys_closed": [
+        "2019-05-27",
+        "2020-05-25",
+        "2021-05-31",
+        "2023-05-29",
+        "2024-05-27",
+        "2025-05-26",
+        "2026-05-25"
+      ]
+    },
+    {
+      "id": "SA17_NAV_UTILITIES",
+      "missing_xnys_sessions": 26,
+      "missing_on_uk_holidays": 26,
+      "unexplained_missing": [],
+      "navs_on_non_xnys_days": 74,
+      "navs_on_uk_holidays_when_xnys_closed": [
+        "2017-05-29",
+        "2018-05-28",
+        "2019-05-27",
+        "2020-05-25",
+        "2021-05-31",
+        "2023-05-29",
+        "2024-05-27",
+        "2025-05-26",
+        "2026-05-25"
+      ]
+    }
+  ],
+  "unexplained_total": 0,
+  "grid_candidate": {
+    "definition": "XNYS sessions that are also XLON sessions",
+    "why": "known in advance from two published calendars; every fund holds a NAV on every such date (no unexplained gap); drops NAVs the Directors chose to strike on some UK holidays, which a grid fixed in advance cannot anticipate",
+    "status": "PROPOSED: adopted only by the executable-run amendment"
+  }
+}
