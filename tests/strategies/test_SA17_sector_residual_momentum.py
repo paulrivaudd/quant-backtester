@@ -727,6 +727,10 @@ def test_sa17_holds_no_fixed_cutoff() -> None:
     [
         (date(2026, 8, 31), date(2026, 10, 30)),  # two months back: a frozen window
         (date(2026, 9, 15), date(2026, 9, 30)),  # the decision's own month: partial
+        # The month before, but mid-month: August 31 -> September 15 would be
+        # scored as September's completed return.
+        (date(2026, 9, 15), date(2026, 10, 30)),
+        (date(2026, 9, 29), date(2026, 10, 30)),  # one session short is still short
     ],
 )
 def test_a_completed_months_cutoff_must_end_the_month_before(
@@ -753,6 +757,22 @@ def test_a_cutoff_in_the_month_before_is_read(market, make_context, evening) -> 
     result = momentum.compute(context, ["S_A_NAV"])
     assert result.status("S_A_NAV") is SignalStatus.OK
     assert result.frame.loc["S_A_NAV", "input_end_date"] == date(2026, 9, 30)
+
+
+def test_a_cutoff_after_the_last_session_resolves_to_it(market, make_context, evening) -> None:
+    # Saturday 31 October: the last session on or before it is Friday 30
+    # October, October's last - the same window as the computed cutoff.
+    context = make_context(market, evening(date(2026, 11, 2)))
+    explicit = dataclasses.replace(
+        candidate(**SHORT).momentum(), observation_cutoff=date(2026, 10, 31)
+    )
+    computed = candidate(**SHORT).momentum()
+    result = explicit.compute(context, ["S_A_NAV"])
+    assert result.status("S_A_NAV") is SignalStatus.OK
+    assert result.frame.loc["S_A_NAV", "input_end_date"] == date(2026, 10, 30)
+    assert result.frame.loc["S_A_NAV", "value"] == pytest.approx(
+        computed.compute(context, ["S_A_NAV"]).frame.loc["S_A_NAV", "value"]
+    )
 
 
 def test_an_analysis_of_one_past_window_keeps_the_loaders_contract(
