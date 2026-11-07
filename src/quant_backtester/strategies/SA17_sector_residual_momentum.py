@@ -29,7 +29,8 @@ What is not a score is settled explicitly, as the proposal states it:
   fund (in cash when none is declared or it cannot be held yet).
 
 ``signal_input_ids`` must explicitly name USD LEVEL NAV against a USD SP500TR
-market on identical XNYS observation dates. ``risk_input_ids`` separately name
+market on identical observation dates: the sessions of ``observation_calendar_id``,
+``XNYS`` or a declared subset of it such as ``XNYS_XLON``. ``risk_input_ids`` name
 NAV for EUR risk: USD NAV divided by synchronized USD-per-EUR FX, or explicitly
 validated synchronous EUR NAV. WM16 London EUR reference NAV is not equivalent.
 The shared cutoff is the previous completed calendar month of each decision; no
@@ -214,7 +215,16 @@ class SA17SectorResidualMomentum(Strategy):
         Annualised volatility the equity sleeve is scaled down to, as a
         fraction; ``None`` holds the sectors at the whole book.
     annualization : int
-        Sessions per year the daily covariance is scaled by.
+        Observations per year the daily covariance is scaled by: sessions per
+        year of ``observation_calendar_id``. 252 suits ``XNYS``; on
+        ``XNYS_XLON`` a return across a UK holiday spans two NYSE sessions,
+        so the grid's own count (about 248) has to be declared, or the basket
+        volatility is overstated and the exposure understated.
+    observation_calendar_id : str
+        The calendar whose sessions are the expected observation dates of
+        both signals: month ends for the ranking, daily returns for the risk.
+        ``XNYS``, or a registered subset of it such as ``XNYS_XLON`` (NYSE
+        sessions on which London is open too, the days the funds value).
     strategy_id : str
         Identity of the strategy in its results.
 
@@ -249,6 +259,7 @@ class SA17SectorResidualMomentum(Strategy):
     risk_returns: int = 63
     target_volatility: float | None = 0.15
     annualization: int = 252
+    observation_calendar_id: str = "XNYS"
     strategy_id: str = "SA17_sector_residual_momentum"
 
     def __post_init__(self) -> None:
@@ -304,6 +315,7 @@ class SA17SectorResidualMomentum(Strategy):
         if self.target_volatility is not None:
             require_finite_positive(self.target_volatility, "target_volatility")
         require_positive_int(self.annualization, "annualization")
+        require_identifier(self.observation_calendar_id, "observation_calendar_id")
         self.momentum()  # the window and its score are checked by the signal
         self.risk_signal()
         self.validate()
@@ -333,7 +345,7 @@ class SA17SectorResidualMomentum(Strategy):
             skip_months=self.skip_months,
             price_basis=PriceBasis.ADJUSTED,
             required_currency="USD",
-            observation_calendar_id="XNYS",
+            observation_calendar_id=self.observation_calendar_id,
             completed_months_only=True,
             require_nav=True,
         )
@@ -349,6 +361,7 @@ class SA17SectorResidualMomentum(Strategy):
             risk_returns=self.risk_returns,
             input_currency=self.risk_input_currency,
             usd_per_eur_fx_id=self.usd_per_eur_fx_id,
+            observation_calendar_id=self.observation_calendar_id,
         )
 
     def required_signals(self) -> Sequence[Signal | SignalRequest]:
