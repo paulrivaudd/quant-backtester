@@ -17,6 +17,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
+from types import MappingProxyType
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 MAX_CLOSED_DAYS = 14
@@ -77,7 +78,10 @@ CALENDAR_KEYS = frozenset(
         "early_closes",
     }
 )
-"""Keys a calendar TOML file must carry, and the only ones it may carry."""
+"""Keys a calendar TOML file must carry."""
+
+OPTIONAL_CALENDAR_KEYS = frozenset({"subset_of"})
+"""Keys a calendar TOML file may carry besides the required ones."""
 
 
 def _as_local_time(value: object, key: str, path: Path) -> time:
@@ -139,6 +143,12 @@ class TradingCalendar:
         complete. Every holiday and early close lies inside it, and any date
         outside it raises :class:`CalendarCoverageError` instead of being
         assumed a regular weekday.
+    subset_of : str | None
+        Another calendar every session of this one is a session of, with the
+        same hours: XNYS sessions on which London is also open, for a series
+        observed on US closes but only on UK business days. ``None`` for a
+        venue's own calendar. :class:`CalendarRegistry` checks the claim
+        against the other calendar.
     """
 
     def __init__(
@@ -151,8 +161,14 @@ class TradingCalendar:
         early_closes: Mapping[date, time],
         covered_from: date,
         covered_until: date,
+        subset_of: str | None = None,
     ) -> None:
         self._calendar_id = calendar_id
+        if subset_of is not None and (
+            not isinstance(subset_of, str) or not subset_of or subset_of == calendar_id
+        ):
+            raise ValueError(f"{calendar_id}: subset_of must name another calendar")
+        self._subset_of = subset_of
         try:
             ZoneInfo(timezone)
         except (ZoneInfoNotFoundError, ValueError):
@@ -222,6 +238,9 @@ class TradingCalendar:
             },
             "covered_from": self._covered_from.isoformat(),
             "covered_until": self._covered_until.isoformat(),
+            # Only when set, so the definition of a venue's own calendar - and
+            # every run signature built on it - is what it was before the key.
+            **({"subset_of": self._subset_of} if self._subset_of is not None else {}),
         }
 
     @classmethod
@@ -248,7 +267,7 @@ class TradingCalendar:
         with path.open("rb") as fh:
             raw = tomllib.load(fh)
         # A typo such as `utc_offset` must fail, not be silently ignored.
-        unknown = set(raw) - CALENDAR_KEYS
+        unknown = set(raw) - CALENDAR_KEYS - OPTIONAL_CALENDAR_KEYS
         if unknown:
             raise ValueError(f"{path} has unknown key(s): {', '.join(sorted(unknown))}")
         missing = CALENDAR_KEYS - set(raw)
@@ -269,7 +288,33 @@ class TradingCalendar:
             early_closes=early_closes,
             covered_from=raw["covered_from"],
             covered_until=raw["covered_until"],
+            subset_of=raw.get("subset_of"),
         )
+
+    @property
+    def subset_of(self) -> str | None:
+        """Return the calendar every session of this one belongs to, if declared."""
+        return self._subset_of
+
+    @property
+    def regular_open(self) -> time:
+        """Return the local opening time of a regular session."""
+        return self._regular_open
+
+    @property
+    def regular_close(self) -> time:
+        """Return the local closing time of a regular session."""
+        return self._regular_close
+
+    @property
+    def holidays(self) -> frozenset[date]:
+        """Return the weekdays without a session, within the covered period."""
+        return self._holidays
+
+    @property
+    def early_closes(self) -> Mapping[date, time]:
+        """Return the sessions closing early, with their local close time."""
+        return MappingProxyType(dict(self._early_closes))
 
     @property
     def calendar_id(self) -> str:
@@ -539,7 +584,10 @@ class CalendarRegistry:
     ------
     ValueError
         If two calendars share an id: the second would silently replace the
-        first.
+        first. Or if a calendar declared a subset of another is not one: the
+        other is missing, or has another timezone or other hours, a narrower
+        coverage, a holiday the subset trades through, or another early close
+        on a shared session.
     """
 
     def __init__(self, calendars: Sequence[TradingCalendar]) -> None:
@@ -548,6 +596,9 @@ class CalendarRegistry:
             if calendar.calendar_id in self._calendars:
                 raise ValueError(f"duplicate calendar id {calendar.calendar_id!r}")
             self._calendars[calendar.calendar_id] = calendar
+        for calendar in self._calendars.values():
+            if calendar.subset_of is not None:
+                _check_subset(calendar, self._calendars.get(calendar.subset_of))
 
     @classmethod
     def from_directory(cls, directory: Path) -> CalendarRegistry:
@@ -609,3 +660,37 @@ class CalendarRegistry:
     def __iter__(self) -> Iterator[TradingCalendar]:
         """Iterate over calendars in id order."""
         return iter([self._calendars[key] for key in sorted(self._calendars)])
+
+
+def _check_subset(child: TradingCalendar, parent: TradingCalendar | None) -> None:
+    """Refuse a calendar declared a subset of another that is not one.
+
+    Every session of ``child`` must be a session of ``parent`` with the same
+    open and close: same timezone and regular hours, a covered period inside
+    the parent's, every parent holiday of that period a child holiday, and the
+    parent's early closes on the child's sessions exactly the child's.
+    """
+    name = child.calendar_id
+    if parent is None:
+        raise ValueError(
+            f"{name} is declared a subset of {child.subset_of}, which is not registered"
+        )
+    if (child.timezone, child.regular_open, child.regular_close) != (
+        parent.timezone,
+        parent.regular_open,
+        parent.regular_close,
+    ):
+        raise ValueError(f"{name} does not keep the timezone and hours of {parent.calendar_id}")
+    if child.covered_from < parent.covered_from or child.covered_until > parent.covered_until:
+        raise ValueError(f"{name} covers days {parent.calendar_id} does not")
+    within = {day for day in parent.holidays if child.covered_from <= day <= child.covered_until}
+    traded = [day.isoformat() for day in sorted(within - child.holidays)]
+    if traded:
+        raise ValueError(f"{name} trades on {parent.calendar_id} holidays: {traded[:5]}")
+    expected = {
+        day: close
+        for day, close in parent.early_closes.items()
+        if child.covered_from <= day <= child.covered_until and day not in child.holidays
+    }
+    if dict(child.early_closes) != expected:
+        raise ValueError(f"{name} does not keep the early closes of {parent.calendar_id}")

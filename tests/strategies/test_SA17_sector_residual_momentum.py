@@ -1052,3 +1052,129 @@ def test_every_control_runs_through_the_engine(runner) -> None:
         expected = 5 if name.startswith("equal_sectors") else 3
         assert int((held > 0.0).sum()) == expected, name
         assert_invested_with_only_cash_trims(result, name)
+
+
+# --- The XNYS ∩ XLON observation grid (admission gate 2a) ----------------------
+
+UK_SUMMER_HOLIDAY = date(2026, 8, 31)
+"""A Monday: the last NYSE session of August 2026, and a UK bank holiday."""
+
+
+def london_subset(xnys: TradingCalendar) -> TradingCalendar:
+    """Return the NYSE sessions of the fixture on which London is open too."""
+    holidays = frozenset(xnys.holidays | {UK_SUMMER_HOLIDAY})
+    return TradingCalendar(
+        calendar_id="XNYS_XLON",
+        timezone=xnys.timezone,
+        regular_open=xnys.regular_open,
+        regular_close=xnys.regular_close,
+        holidays=holidays,
+        early_closes={day: at for day, at in xnys.early_closes.items() if day not in holidays},
+        covered_from=xnys.covered_from,
+        covered_until=xnys.covered_until,
+        subset_of="XNYS",
+    )
+
+
+@pytest.fixture
+def grid_context(market, xnys, xpar, evening):
+    """Return a decision context whose registry also holds the London subset of XNYS."""
+
+    def build(day: date) -> SignalContext:
+        return SignalContext(
+            market=market.at(evening(day)),
+            instruments=market.instruments,
+            calendars=CalendarRegistry([xnys, xpar, london_subset(xnys)]),
+        )
+
+    return build
+
+
+def test_a_bars_market_is_read_on_its_declared_london_subset(grid_context) -> None:
+    context = grid_context(date(2026, 10, 2))
+    read = {
+        calendar: load_month_end_window(
+            context,
+            MARKET,
+            months=3,
+            basis=PriceBasis.ADJUSTED,
+            max_age_sessions=0,
+            observation_calendar_id=calendar,
+            observation_cutoff=date(2026, 9, 30),
+        )
+        for calendar in ("XNYS", "XNYS_XLON")
+    }
+    assert read["XNYS"].dates[2] == UK_SUMMER_HOLIDAY
+    # On the grid, August ends on the Friday before the UK holiday.
+    assert read["XNYS_XLON"].status is SignalStatus.OK
+    assert read["XNYS_XLON"].dates == (
+        date(2026, 6, 30),
+        date(2026, 7, 31),
+        date(2026, 8, 28),
+        date(2026, 9, 30),
+    )
+
+
+def test_a_bars_market_on_an_unrelated_calendar_is_still_refused(grid_context) -> None:
+    with pytest.raises(ValueError, match="configuration mistake"):
+        load_month_end_window(
+            grid_context(date(2026, 10, 2)),
+            MARKET,
+            months=3,
+            basis=PriceBasis.ADJUSTED,
+            max_age_sessions=0,
+            observation_calendar_id="XPAR",
+            observation_cutoff=date(2026, 9, 30),
+        )
+
+
+def test_the_strategy_declares_its_grid_to_both_signals(grid_context) -> None:
+    strategy = candidate(**SHORT, observation_calendar_id="XNYS_XLON")
+    assert strategy.momentum().observation_calendar_id == "XNYS_XLON"
+    assert strategy.risk_signal().observation_calendar_id == "XNYS_XLON"
+    assert strategy.momentum().definition() != candidate(**SHORT).momentum().definition()
+    context = grid_context(date(2026, 10, 2))
+    momentum = strategy.momentum().compute(context, ["S_A_NAV"])
+    assert momentum.status("S_A_NAV") is SignalStatus.OK
+    # 25 returns ending 30 September reach back past 31 August.
+    longer = {**SHORT, "risk_returns": 25}
+    on_grid = candidate(**longer, observation_calendar_id="XNYS_XLON").risk_signal()
+    on_nyse = candidate(**longer).risk_signal()
+    grid_risk = on_grid.compute(context, ["S_A_NAV", "S_B_NAV"])
+    nyse_risk = on_nyse.compute(context, ["S_A_NAV", "S_B_NAV"])
+    assert all(grid_risk.status(name) is SignalStatus.OK for name in ("S_A_NAV", "S_B_NAV"))
+    # The risk sample skips the UK holiday rather than reading it, and keeps
+    # its length by reaching one session further back.
+    grid_dates = grid_risk.frame.loc["S_A_NAV", "dates"]
+    nyse_dates = nyse_risk.frame.loc["S_A_NAV", "dates"]
+    assert UK_SUMMER_HOLIDAY in nyse_dates
+    assert UK_SUMMER_HOLIDAY not in grid_dates
+    assert len(grid_dates) == len(nyse_dates)
+    assert grid_dates[0] < nyse_dates[0]
+
+
+def test_an_fx_bars_series_may_be_read_on_its_venues_subset_only(grid_context) -> None:
+    signal = dataclasses.replace(
+        candidate(**SHORT).risk_signal(), observation_calendar_id="XNYS_XLON"
+    )
+    context = grid_context(date(2026, 10, 2))
+
+    def with_fx_bars_on(calendar_id: str) -> SignalContext:
+        changed = [
+            dataclasses.replace(
+                i, data_type=DataType.BAR, calendar_id=calendar_id, publication_rule=None
+            )
+            if i.id == "FX"
+            else i
+            for i in context.instruments
+        ]
+        return dataclasses.replace(context, instruments=InstrumentRegistry(changed))
+
+    signal.compute(with_fx_bars_on("XNYS"), ["S_A_NAV"])  # its venue's subset: no error
+    with pytest.raises(ValueError, match="cannot convert"):
+        signal.compute(with_fx_bars_on("XPAR"), ["S_A_NAV"])
+
+
+def test_an_observation_calendar_must_be_named() -> None:
+    with pytest.raises(ValueError):
+        candidate(observation_calendar_id="")

@@ -9,6 +9,11 @@ Nothing outside this script imports the library.
 Run it when a covered period is extended or the library publishes a correction::
 
     uv run python scripts/generate_calendars.py
+    uv run python scripts/generate_calendars.py --only XNYS_XLON
+
+A calendar can also restrict a venue to the days another one is open too:
+``XNYS_XLON`` holds the NYSE sessions on which London is open, at NYSE hours,
+and declares ``subset_of = "XNYS"`` so the registry can check it is one.
 
 Extend the horizon by about a year at a time, not ten. An exchange announces an
 exceptional closure - a state funeral, a market holiday moved - months ahead,
@@ -25,8 +30,10 @@ session, no close after the regular one.
 
 from __future__ import annotations
 
+import argparse
 import tempfile
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -56,6 +63,12 @@ class Venue:
         Inclusive period written to the file.
     coverage_note : str
         Why the period starts where it does, written above ``covered_from``.
+    library_id : str | None
+        The library's name for the venue whose sessions are read; the
+        ``calendar_id`` itself when ``None``.
+    restricted_to : str | None
+        Another library venue: only the sessions on which it is open too are
+        kept, and the file declares itself a subset of ``library_id``.
     """
 
     calendar_id: str
@@ -64,6 +77,13 @@ class Venue:
     covered_from: date
     covered_until: date
     coverage_note: str
+    library_id: str | None = None
+    restricted_to: str | None = None
+
+    @property
+    def source_id(self) -> str:
+        """Return the library venue whose sessions the calendar keeps."""
+        return self.library_id or self.calendar_id
 
 
 VENUES = (
@@ -101,6 +121,20 @@ VENUES = (
             "# checking those days against an independent source."
         ),
     ),
+    Venue(
+        calendar_id="XNYS_XLON",
+        title="NYSE sessions on which the London Stock Exchange is also open.",
+        timezone="America/New_York",
+        covered_from=date(2015, 1, 1),
+        covered_until=date(2027, 12, 31),
+        coverage_note=(
+            "From 2015, before the first SA17 fund NAV (July 2015). The observation grid\n"
+            "# of NAVs struck on UK business days and read beside US closes: a UK holiday\n"
+            "# is a weekday without a session here although New York trades."
+        ),
+        library_id="XNYS",
+        restricted_to="XLON",
+    ),
 )
 
 
@@ -132,12 +166,20 @@ def library_sessions(venue: Venue) -> list[LibrarySession]:
         If the library uses another timezone than the one expected.
     """
     calendar = xc.get_calendar(
-        venue.calendar_id,
+        venue.source_id,
         start=venue.covered_from.isoformat(),
         end=venue.covered_until.isoformat(),
     )
     if str(calendar.tz) != venue.timezone:
         raise ValueError(f"{venue.calendar_id}: library timezone {calendar.tz} != {venue.timezone}")
+    kept = None
+    if venue.restricted_to is not None:
+        other = xc.get_calendar(
+            venue.restricted_to,
+            start=venue.covered_from.isoformat(),
+            end=venue.covered_until.isoformat(),
+        )
+        kept = {label.date() for label in other.sessions}
     schedule = calendar.schedule
     return [
         LibrarySession(
@@ -146,6 +188,7 @@ def library_sessions(venue: Venue) -> list[LibrarySession]:
             close_utc=schedule.at[label, "close"].to_pydatetime(),
         )
         for label in schedule.index
+        if kept is None or label.date() in kept
     ]
 
 
@@ -198,6 +241,14 @@ def build_toml(venue: Venue, sessions: list[LibrarySession]) -> str:
         "# and checked session by session against it. Do not edit by hand: change the",
         "# script and regenerate, so the change shows up as a reviewed diff.",
         f'calendar_id = "{venue.calendar_id}"',
+        *(
+            [
+                f"# Each session is a {venue.source_id} session, at its hours (checked).",
+                f'subset_of = "{venue.source_id}"',
+            ]
+            if venue.restricted_to is not None
+            else []
+        ),
         f'timezone = "{zone}"',
         f'regular_open = "{regular_open.isoformat()}"',
         f'regular_close = "{regular_close.isoformat()}"',
@@ -261,9 +312,14 @@ def _days(start: date, end: date) -> list[date]:
     return [start + timedelta(days=offset) for offset in range((end - start).days + 1)]
 
 
-def main() -> None:
-    """Generate, check and write every venue's calendar file."""
+def main(only: Sequence[str] | None = None) -> None:
+    """Generate, check and write the calendar files, all of them or those named."""
+    unknown = set(only or ()) - {venue.calendar_id for venue in VENUES}
+    if unknown:
+        raise ValueError(f"unknown calendar(s): {sorted(unknown)}")
     for venue in VENUES:
+        if only and venue.calendar_id not in only:
+            continue
         sessions = library_sessions(venue)
         text = build_toml(venue, sessions)
         with tempfile.TemporaryDirectory() as scratch:
@@ -276,4 +332,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Generate the committed calendar files.")
+    parser.add_argument("--only", nargs="+", metavar="CALENDAR_ID")
+    main(parser.parse_args().only)
