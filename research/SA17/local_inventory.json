@@ -1,0 +1,563 @@
+{
+  "calendars": {
+    "XETR": {
+      "covered_from": "2014-01-01",
+      "covered_until": "2027-12-31"
+    },
+    "XNYS": {
+      "covered_from": "1990-01-01",
+      "covered_until": "2027-12-31"
+    },
+    "XPAR": {
+      "covered_from": "2002-01-01",
+      "covered_until": "2027-12-31"
+    }
+  },
+  "files_sha256": {
+    "clean/applied_fetches.parquet": "0b9e597c1e8a89cecaf47146f6f9fa410b18c1c0b8056d50a5a2e134d6cb262c",
+    "clean/bars/ETF_COMMODITY.parquet": "4d8ee8d9b16143e0d0476c07e880753dc0f4f3a6d65ea0a9c3ef7744a66ff1d1",
+    "clean/bars/ETF_EMERGING.parquet": "8bb96dc5d7f1ae29cd21523fbbc8284a97fa87d74b75a69993482b9bd3b6c32e",
+    "clean/bars/ETF_EURO_GOV.parquet": "e99d2a131da022bdfd0c050ac9083971de12cf6dbf4c0b048c772f2545fb293f",
+    "clean/bars/ETF_GOLD.parquet": "9c9921db339bd36f57432d53045ef2d3d6d932f29cedd570fd10b65d3098dc85",
+    "clean/bars/ETF_MONETARY_EUR.parquet": "5dac3d4ffe62ad623da071d3287e209b002d52abd89f7e825b4dcf11970835e2",
+    "clean/bars/ETF_NASDAQ.parquet": "de011925fdb3be64d473847f1fa5c6324613b34caff551c8472acafdc936a091",
+    "clean/bars/ETF_SP500_PEA.parquet": "abe385a3afedda0a5f96adc37837fa38dab594852985b8eedeeb69522bf2f14c",
+    "clean/bars/ETF_US_TECH.parquet": "8c98db9c0a72a0beb273b74de5f6dae36771c08e654e09c9b4acbae67b5d43f5",
+    "clean/bars/ETF_WORLD.parquet": "a5aad0ba9aa83cc9b7ca6fe2b9d3c8943d970b2e314233d51761efe7367a85b4",
+    "clean/bars/ETF_WORLD_HEALTH.parquet": "0d6fc6d583986490347b87ab9b448b8783a68e6850379543b8631bfc5aa2b312",
+    "clean/bars/ETF_WORLD_UTILITIES.parquet": "d8ca9ba6eb39338ad2d5a501027f708761dba9400bc86de0ead3fb22571a1b73",
+    "clean/bars/GLD_US.parquet": "c8e9155bb9522122c1d999232b1aba26fc377dc34daa7c63dc74c895ea7fb774",
+    "clean/bars/HYG_US.parquet": "823a857d112537c4ff280b34d9a6c7adae79cff27b34ee1c04ff841e65d5af56",
+    "clean/bars/IEF_US.parquet": "6a0e14c77ddfaeb97818f286965c0f297aa8ce57cf3a36238fece22dfdf871f1",
+    "clean/bars/NDX.parquet": "a71917c3661aff984c637af40c2d06531f57eec55f8d179c48d75ff4e0daa893",
+    "clean/bars/SP500.parquet": "37c084fdf14612c41dfa5019623aa3cf40d2d42ba9d2a30cb6fe126e134b26b1",
+    "clean/check_bars/EURONEXT/ETF_SP500_PEA.parquet": "7aa513c7904a465d2763f460e1e077b736604e9a8912611490799611079b2983",
+    "clean/check_bars/EURONEXT/ETF_WORLD.parquet": "4b1f25419caa3d4147ed2e65caa8fa0a3db777d0a0082d312b58201078b341ec",
+    "clean/checked_bars/ETF_COMMODITY.parquet": "f63e04a64f059988f5393c76bbf2c32ac9c2c637764657c8f27676ef769993f7",
+    "clean/checked_bars/ETF_EMERGING.parquet": "d86ed48f9f88d223bef06a84ad05d302afba17af13efd7e0c802ba4600ec8c74",
+    "clean/checked_bars/ETF_EURO_GOV.parquet": "bdf2038fe5fb16e469464034baa57da6c6485424d07c713bfd9115ff3076a93d",
+    "clean/checked_bars/ETF_GOLD.parquet": "1b9a0121b3ac1659ccfdd8b37e04fae82b76c4e53cec0faa702c5eec42930c78",
+    "clean/checked_bars/ETF_MONETARY_EUR.parquet": "cd0ad40a526ca0881373663f18554dd839b140e0980c42434eb1bd849a5fa23f",
+    "clean/checked_bars/ETF_NASDAQ.parquet": "f3bfe3bdf812aecc10fb152eae82146b6eb48591bcc492ab789e2ac3d3693245",
+    "clean/checked_bars/ETF_SP500_PEA.parquet": "74dbe64e57b5b1145bcb7be10abfa995499cc8cef5445d8849a9b4ccf1668928",
+    "clean/checked_bars/ETF_US_TECH.parquet": "283b1d2e33deb6baacc663b3599e8944d8b76fec2c4b1bccca2df53206f5215b",
+    "clean/checked_bars/ETF_WORLD.parquet": "a01c80ae5ae24123e98bb18558a7b8ce555c5af7db66871b6b5e7e82e91b7e90",
+    "clean/checked_bars/ETF_WORLD_HEALTH.parquet": "0fa9826bbaf1e079d93cb8078561dfb99ec10b81d518954b90907f56e8fe4e36",
+    "clean/checked_bars/ETF_WORLD_UTILITIES.parquet": "d7c07299743f1948c884fbfeebcc7aabfc4e6187f24e04cbb6441f09b011a307",
+    "clean/checked_bars/GLD_US.parquet": "b6aec9f3f24366b8a1155b7e083aa1d872073e182dcac197c33f0caed945ce30",
+    "clean/checked_bars/HYG_US.parquet": "5e762b6a140c0639b49ab42b56f352c1eb3937bac5759d6f8c480c931caa75ae",
+    "clean/checked_bars/IEF_US.parquet": "31a0a7267cb66d13d7a7054576168506d5a42e571358424f23cab3fed17fd80f",
+    "clean/checked_bars/NDX.parquet": "229c04b519806c92ce0183fb37dcfc9e75919401fb6fdeac5afa5f5e16ae15c8",
+    "clean/checked_bars/SP500.parquet": "65abe6dfb4aaa5cfd6035cfb59ee5c83068e521ee013a1e3460356e737ef167d",
+    "clean/corporate_actions.parquet": "857a1a29b8fe0a03dc9b39e46921f91ce1a6a85f92562621aaf27156d37f241e",
+    "clean/levels/ECB_EURUSD.parquet": "3428248263d2c2c928181d5600d83d13de821020a39644eee0c23cb092a55ed7",
+    "clean/levels/US10Y.parquet": "b4256e4aa878871247e3d77a590a2021d38945acefa6c32c8cb7c13541c7d058",
+    "clean/levels/VIX.parquet": "2f7e643f63cd0b649006ad823f188f85dec46f3e0602076ec12a28027ae3b2a9",
+    "clean/levels/VIX3M.parquet": "9854e68c37071e3f054b3cb94bfbf974670aea2aaa7bd3495c0033722d4fa8fd",
+    "metadata/accepted_revisions.toml": "8ed14fbb2fcd41058e4d49801bd326081b337b5c54bcbedb20e94357bbf95d61",
+    "metadata/bar_corrections.toml": "c04db29d1da399e9636e9c177948e67becd96f6dfabceb9cfcc8f1291fdbbc61",
+    "metadata/calendars/XETR.toml": "d38cabf16335fd6c30d52a7301a98939911333790f7f1adbab061546ef40d884",
+    "metadata/calendars/XNYS.toml": "65ecb789002a0d3c6a5e074b9a9fdcdb218b86a321cbd178030c37339c69a6df",
+    "metadata/calendars/XPAR.toml": "f9774c5caad808758e793c25f40aa8d7417662d9cd570207aa245c2791d8823b",
+    "metadata/conflict_reviews.toml": "e3773003b0fd312786da6c765fbb6f7a409c2aa1df6c1fbba58b343b5898b17f",
+    "metadata/corporate_actions.toml": "4ec62f052eb56c49ee91258d1b9ba851c0cf3b9adafe5944e2ebf1f69ccbb01b",
+    "metadata/crosscheck.toml": "ce0f165dab641416ad515cb7a0fbf5d10b56010846ca12d56bb168354a76a9db",
+    "metadata/instruments.toml": "d61b44b2cabcf16d6ee5ab75623e0778023acbc1b8e457344b6d0d0a3e78d069",
+    "metadata/known_gaps.toml": "19c5c024466d63bff59ca9634aee64ad2b32d4e74292667ad9321f09129aac73",
+    "metadata/universes.toml": "be9691b8d7ac886bf264801613073893a05a2de8468dd3c602455e422137cb0e"
+  },
+  "instruments": [
+    {
+      "calendar": null,
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": null,
+        "non_session_dates": null,
+        "rows": 3284,
+        "unique_dates": 3284
+      },
+      "currency": "USD",
+      "data_type": "LEVEL",
+      "declared_first_session": "1999-01-04",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ECB_EURUSD",
+      "name": "ECB euro reference exchange rate, USD",
+      "symbol": "EXR.D.USD.EUR.SP00.A",
+      "tradable": false
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [],
+        "non_session_dates": [],
+        "rows": 3255,
+        "unique_dates": 3255
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_COMMODITY",
+      "name": "Xtrackers Bloomberg Commodity Swap UCITS ETF 1C",
+      "symbol": "XDBC.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-06-12",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [
+          "2025-10-24",
+          "2026-03-06"
+        ],
+        "non_session_dates": [],
+        "rows": 3141,
+        "unique_dates": 3141
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2014-06-12",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_EMERGING",
+      "name": "iShares Core MSCI Emerging Markets IMI UCITS ETF USD (Acc), traded EUR",
+      "symbol": "IS3N.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [],
+        "non_session_dates": [],
+        "rows": 3255,
+        "unique_dates": 3255
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_EURO_GOV",
+      "name": "Xtrackers II Global Government Bond UCITS ETF 1C EUR hedged",
+      "symbol": "DBZB.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2018-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [
+          "2025-10-24",
+          "2026-03-06"
+        ],
+        "non_session_dates": [],
+        "rows": 2241,
+        "unique_dates": 2241
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_GOLD",
+      "name": "Xetra-Gold physically backed gold ETC (not a UCITS ETF)",
+      "symbol": "4GLD.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": null,
+        "last_observation": null,
+        "missing_sessions_within_observed_range": null,
+        "non_session_dates": null,
+        "rows": 0,
+        "unique_dates": 0
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_MINVOL_WORLD",
+      "name": "iShares Edge MSCI World Minimum Volatility",
+      "symbol": "IQQ0.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [],
+        "non_session_dates": [],
+        "rows": 3255,
+        "unique_dates": 3255
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_MONETARY_EUR",
+      "name": "Xtrackers II EUR Overnight Rate Swap",
+      "symbol": "XEON.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [],
+        "non_session_dates": [],
+        "rows": 3255,
+        "unique_dates": 3255
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_NASDAQ",
+      "name": "iShares NASDAQ 100 UCITS ETF USD (Acc), traded EUR",
+      "symbol": "SXRV.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": null,
+        "last_observation": null,
+        "missing_sessions_within_observed_range": null,
+        "non_session_dates": null,
+        "rows": 0,
+        "unique_dates": 0
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2014-10-06",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_QUALITY_WORLD",
+      "name": "iShares Edge MSCI World Quality Factor",
+      "symbol": "IS3Q.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XPAR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-03-18",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [
+          "2014-12-24",
+          "2015-05-25",
+          "2015-12-24",
+          "2015-12-31",
+          "2017-09-07"
+        ],
+        "non_session_dates": [],
+        "rows": 3226,
+        "unique_dates": 3226
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2014-03-18",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_SP500_PEA",
+      "name": "BNP Paribas Easy S&P 500 (PEA)",
+      "symbol": "ESE.PA",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2017-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [
+          "2025-10-24",
+          "2026-03-06"
+        ],
+        "non_session_dates": [],
+        "rows": 2493,
+        "unique_dates": 2493
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2017-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_US_TECH",
+      "name": "iShares S&P 500 Information Technology Sector UCITS ETF USD (Acc), EUR listing",
+      "symbol": "QDVE.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": null,
+        "last_observation": null,
+        "missing_sessions_within_observed_range": null,
+        "non_session_dates": null,
+        "rows": 0,
+        "unique_dates": 0
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2014-10-06",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_VALUE_WORLD",
+      "name": "iShares Edge MSCI World Value Factor",
+      "symbol": "IS3S.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XPAR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2018-04-18",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [],
+        "non_session_dates": [],
+        "rows": 2187,
+        "unique_dates": 2187
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2018-04-18",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_WORLD",
+      "name": "Amundi MSCI World (PEA)",
+      "symbol": "CW8.PA",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2017-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [
+          "2025-10-24",
+          "2026-03-06"
+        ],
+        "non_session_dates": [],
+        "rows": 2493,
+        "unique_dates": 2493
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2017-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_WORLD_HEALTH",
+      "name": "Xtrackers MSCI World Health Care UCITS ETF 1C, EUR listing",
+      "symbol": "XDWH.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XETR",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2017-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [
+          "2017-07-03",
+          "2017-07-05",
+          "2017-08-02",
+          "2025-10-24",
+          "2026-03-06"
+        ],
+        "non_session_dates": [],
+        "rows": 2490,
+        "unique_dates": 2490
+      },
+      "currency": "EUR",
+      "data_type": "BAR",
+      "declared_first_session": "2017-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "ETF_WORLD_UTILITIES",
+      "name": "Xtrackers MSCI World Utilities UCITS ETF 1C, EUR listing",
+      "symbol": "XDWU.DE",
+      "tradable": true
+    },
+    {
+      "calendar": "XNYS",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [],
+        "non_session_dates": [],
+        "rows": 3227,
+        "unique_dates": 3227
+      },
+      "currency": "USD",
+      "data_type": "BAR",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "GLD_US",
+      "name": "SPDR Gold Shares, NYSE Arca (USD)",
+      "symbol": "GLD",
+      "tradable": false
+    },
+    {
+      "calendar": "XNYS",
+      "corporate_actions": {
+        "DIVIDEND": 153
+      },
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [],
+        "non_session_dates": [],
+        "rows": 3227,
+        "unique_dates": 3227
+      },
+      "currency": "USD",
+      "data_type": "BAR",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "HYG_US",
+      "name": "iShares iBoxx USD High Yield Corporate Bond ETF (USD)",
+      "symbol": "HYG",
+      "tradable": false
+    },
+    {
+      "calendar": "XNYS",
+      "corporate_actions": {
+        "DIVIDEND": 153
+      },
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [],
+        "non_session_dates": [],
+        "rows": 3227,
+        "unique_dates": 3227
+      },
+      "currency": "USD",
+      "data_type": "BAR",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "IEF_US",
+      "name": "iShares 7-10 Year Treasury Bond ETF (USD)",
+      "symbol": "IEF",
+      "tradable": false
+    },
+    {
+      "calendar": "XNYS",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [],
+        "non_session_dates": [],
+        "rows": 3227,
+        "unique_dates": 3227
+      },
+      "currency": "USD",
+      "data_type": "BAR",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "NDX",
+      "name": "Nasdaq-100 index (price return, USD)",
+      "symbol": "^NDX",
+      "tradable": false
+    },
+    {
+      "calendar": "XNYS",
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-30",
+        "missing_sessions_within_observed_range": [],
+        "non_session_dates": [],
+        "rows": 3227,
+        "unique_dates": 3227
+      },
+      "currency": "USD",
+      "data_type": "BAR",
+      "declared_first_session": "1990-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "SP500",
+      "name": "S&P 500",
+      "symbol": "^GSPC",
+      "tradable": false
+    },
+    {
+      "calendar": null,
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-29",
+        "missing_sessions_within_observed_range": null,
+        "non_session_dates": null,
+        "rows": 3208,
+        "unique_dates": 3208
+      },
+      "currency": "NA",
+      "data_type": "LEVEL",
+      "declared_first_session": "1990-01-02",
+      "history_basis": "RESTATED",
+      "id": "US10Y",
+      "name": "US 10-year Treasury constant maturity rate",
+      "symbol": "DGS10",
+      "tradable": false
+    },
+    {
+      "calendar": null,
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-29",
+        "missing_sessions_within_observed_range": null,
+        "non_session_dates": null,
+        "rows": 3259,
+        "unique_dates": 3259
+      },
+      "currency": "NA",
+      "data_type": "LEVEL",
+      "declared_first_session": "1990-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "VIX",
+      "name": "CBOE Volatility Index",
+      "symbol": "VIXCLS",
+      "tradable": false
+    },
+    {
+      "calendar": null,
+      "corporate_actions": {},
+      "coverage": {
+        "first_observation": "2014-01-02",
+        "last_observation": "2026-10-29",
+        "missing_sessions_within_observed_range": null,
+        "non_session_dates": null,
+        "rows": 3226,
+        "unique_dates": 3226
+      },
+      "currency": "NA",
+      "data_type": "LEVEL",
+      "declared_first_session": "2014-01-02",
+      "history_basis": "ASSUMED_UNREVISED",
+      "id": "VIX3M",
+      "name": "CBOE S&P 500 3-Month Volatility Index",
+      "symbol": "VXVCLS",
+      "tradable": false
+    }
+  ],
+  "purpose": "LOCAL_COVERAGE_ONLY_NOT_RESEARCH_READINESS",
+  "schema_version": 1,
+  "script_sha256": "828a30d537c6de7c765db5a80ed739b001a8d3c8f70119efc8ac943ae511cc7f",
+  "store_digest": "9a5346a834f4a8572655f059643e80633db47b307b83f7e423b6e909a5cefed6"
+}

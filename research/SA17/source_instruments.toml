@@ -1,0 +1,189 @@
+# SA17 acquisition registry, declared 2026-11-02 before ingestion.
+# This is a sourcing pool, NOT the strategy's frozen historical universe.
+# EUR exchange quotations of accumulating UCITS funds; no synthetic USD or
+# total-return-index series is manufactured from them. Real estate is missing.
+# EUR listing dates below are from the issuer's dated listing tables, not the
+# earlier fund inception dates. See sourcing_20261102.md for evidence/limits.
+# All use the project's existing Yahoo adapter and normalizer, including its
+# refusal of split-adjusted histories and normal corporate-action checks.
+
+# ISIN IE00BWBXM492; source consulted 2026-11-02:
+# https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-energy-select-sector-ucits-etf-acc-zpde-gy
+[[instrument]]
+id = "SA17_ETF_ENERGY"
+name = "SPDR S&P US Energy Select Sector UCITS ETF (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ZPDE.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2015-07-08
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BWBXM492. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
+
+# ISIN IE00BWBXM831; source consulted 2026-11-02:
+# https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-materials-select-sector-ucits-etf-acc-zpdm-gy
+[[instrument]]
+id = "SA17_ETF_MATERIALS"
+name = "SPDR S&P US Materials Select Sector UCITS ETF (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ZPDM.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2015-07-08
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BWBXM831. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
+
+# ISIN IE00BWBXM724; source consulted 2026-11-02:
+# https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-industrials-select-sector-ucits-etf-acc-zpdi-gy
+[[instrument]]
+id = "SA17_ETF_INDUSTRIALS"
+name = "SPDR S&P US Industrials Select Sector UCITS ETF (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ZPDI.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2015-07-08
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BWBXM724. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
+
+# ISIN IE00BWBXM278; source consulted 2026-11-02:
+# https://www.ssga.com/no/en_gb/institutional/etfs/state-street-spdr-sp-us-consumer-discretionary-select-sector-ucits-etf-acc-zpdd-gy
+[[instrument]]
+id = "SA17_ETF_CONSUMER_DISCRETIONARY"
+name = "SPDR S&P US Consumer Discretionary Select Sector UCITS ETF (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ZPDD.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2015-07-08
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BWBXM278. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
+
+# ISIN IE00BWBXM385; source consulted 2026-11-02:
+# https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-consumer-staples-select-sector-ucits-etf-acc-zpds-gy
+[[instrument]]
+id = "SA17_ETF_CONSUMER_STAPLES"
+name = "SPDR S&P US Consumer Staples Select Sector UCITS ETF (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ZPDS.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2015-07-08
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BWBXM385. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
+
+# ISIN IE00BWBXM617; source consulted 2026-11-02:
+# https://www.ssga.com/lu/en_gb/institutional/etfs/state-street-spdr-sp-us-health-care-select-sector-ucits-etf-acc-zpdh-gy
+[[instrument]]
+id = "SA17_ETF_HEALTH_CARE"
+name = "SPDR S&P US Health Care Select Sector UCITS ETF (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ZPDH.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2015-07-08
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BWBXM617. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
+
+# ISIN IE00BWBXM500; source consulted 2026-11-02:
+# https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-financials-select-sector-ucits-etf-acc-zpdf-gy
+[[instrument]]
+id = "SA17_ETF_FINANCIALS"
+name = "SPDR S&P US Financials Select Sector UCITS ETF (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ZPDF.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2015-07-08
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BWBXM500. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
+
+# ISIN IE00BWBXM948; source consulted 2026-11-02:
+# https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-technology-select-sector-ucits-etf-acc-zpdt-gy
+[[instrument]]
+id = "SA17_ETF_TECHNOLOGY"
+name = "SPDR S&P US Technology Select Sector UCITS ETF (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ZPDT.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2015-07-08
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BWBXM948. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
+
+# ISIN IE00BFWFPX50; source consulted 2026-11-02:
+# https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-communication-services-select-sector-ucits-etf-acc-zpdk-gy
+[[instrument]]
+id = "SA17_ETF_COMMUNICATION"
+name = "SPDR S&P US Communication Services Select Sector UCITS ETF (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ZPDK.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2018-08-16
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BFWFPX50. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
+
+# ISIN IE00BWBXMB69; source consulted 2026-11-02:
+# https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-utilities-select-sector-ucits-etf-acc-zpdu-gy
+[[instrument]]
+id = "SA17_ETF_UTILITIES"
+name = "SPDR S&P US Utilities Select Sector UCITS ETF (Acc), EUR listing"
+asset_type = "ETF"
+data_type = "BAR"
+currency = "EUR"
+primary_source = "YAHOO"
+source_symbol = "ZPDU.DE"
+calendar_id = "XETR"
+tradable = true
+quantity_step = 1.0
+first_session = 2015-07-08
+distribution_policy = "ACCUMULATING"
+history_basis = "ASSUMED_UNREVISED"
+history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BWBXMB69. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
+
