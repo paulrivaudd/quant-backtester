@@ -83,7 +83,7 @@ def test_exact_html_publication_and_raw_provenance(embedded):
     assert result.provenance.sha256 == hashlib.sha256(payload).hexdigest()
     assert result.provenance.retrieved_at_utc == NOW
     with pytest.raises(FrozenInstanceError):
-        row.value = Decimal("1")
+        row.value = Decimal("1")  # pyright: ignore[reportAttributeAccessIssue] -- test immutability
 
 
 def test_london_summer_time_is_explicit():

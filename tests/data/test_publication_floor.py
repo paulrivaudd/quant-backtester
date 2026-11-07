@@ -49,9 +49,12 @@ def test_unset_floor_preserves_definition_and_set_floor_serializes():
         "lag_sessions": 0,
         "calendar_id": None,
     }
+    assert instrument.publication_rule is not None
     rule = replace(instrument.publication_rule, not_before_utc=FLOOR)
     definition = replace(instrument, publication_rule=rule).definition()
-    assert definition["publication_rule"]["not_before_utc"] == FLOOR.isoformat()
+    serialized_rule = definition["publication_rule"]
+    assert isinstance(serialized_rule, dict)
+    assert serialized_rule["not_before_utc"] == FLOOR.isoformat()
 
 
 @pytest.mark.parametrize(
@@ -64,6 +67,7 @@ def test_unset_floor_preserves_definition_and_set_floor_serializes():
 def test_toml_floor_accepts_datetime_or_iso_string(tmp_path, text):
     path = write_toml(tmp_path, SAMPLE_TOML + f"\nnot_before_utc = {text}\n")
     rule = InstrumentRegistry.from_toml(path).get("US10Y").publication_rule
+    assert rule is not None
     assert rule.not_before_utc == FLOOR
 
 

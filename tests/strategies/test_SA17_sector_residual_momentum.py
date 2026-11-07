@@ -178,12 +178,14 @@ def market(build_market, holes) -> MarketDataReader:
 
 def candidate(**changes: object) -> SA17SectorResidualMomentum:
     """Return the candidate on the test funds, other parameters as declared."""
+    sectors = changes.get("sector_ids", SECTORS)
+    assert isinstance(sectors, tuple)
     parameters: dict[str, object] = {
         "sector_ids": SECTORS,
         "market_id": MARKET,
         "monetary_id": MONETARY,
-        "signal_input_ids": tuple(f"{name}_NAV" for name in changes.get("sector_ids", SECTORS)),
-        "risk_input_ids": tuple(f"{name}_NAV" for name in changes.get("sector_ids", SECTORS)),
+        "signal_input_ids": tuple(f"{name}_NAV" for name in sectors),
+        "risk_input_ids": tuple(f"{name}_NAV" for name in sectors),
         "usd_per_eur_fx_id": "FX",
     }
     return SA17SectorResidualMomentum(**(parameters | changes))  # type: ignore[arg-type]

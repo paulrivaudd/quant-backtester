@@ -83,7 +83,7 @@ def test_industry_snapshot_and_explicit_normalization(dataset, count):
     assert result.raw is raw
     assert raw.rows[0][1] == " 2.50"
     with pytest.raises(FrozenInstanceError):
-        raw.units = "fraction"
+        raw.units = "fraction"  # pyright: ignore[reportAttributeAccessIssue] -- test immutability
 
 
 def test_market_is_excess_plus_rf_and_missing_propagates():

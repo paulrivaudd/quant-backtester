@@ -24,13 +24,12 @@ def test_override_copy_is_frozen_and_definition_is_sorted() -> None:
     overrides = {"B": CostModel(minimum_commission=2), "A": CostModel()}
     model = ExecutionModel(CostModel(), costs_by_instrument=overrides)
     overrides.clear()
-    assert list(model.definition()["costs_by_instrument"]) == ["A", "B"]
+    definition = model.definition()["costs_by_instrument"]
+    assert isinstance(definition, dict)
+    assert list(definition) == ["A", "B"]
     with pytest.raises(TypeError):
-        model.costs_by_instrument["A"] = CostModel(minimum_commission=5)
-    assert (
-        model.definition()["costs_by_instrument"]["B"]
-        == CostModel(minimum_commission=2).definition()
-    )
+        model.costs_by_instrument["A"] = CostModel(minimum_commission=5)  # pyright: ignore[reportIndexIssue] -- test immutability
+    assert definition["B"] == CostModel(minimum_commission=2).definition()
 
 
 @pytest.mark.parametrize("sizing", list(Sizing))
@@ -48,10 +47,14 @@ def test_empty_overrides_preserve_definition_and_execution(sizing) -> None:
     }
     assert json.dumps(empty.definition()) == json.dumps(expected)
     args = (book(1000, A=2), {"B": 1.0}, {"A": 100.0, "B": 50.0})
-    kwargs = {"decision_closes": {"A": 90.0, "B": 45.0}}
-    assert trade(legacy, *args, **kwargs) == trade(empty, *args, **kwargs)
+    closes = {"A": 90.0, "B": 45.0}
+    assert trade(legacy, *args, decision_closes=closes) == trade(
+        empty, *args, decision_closes=closes
+    )
     uniform = ExecutionModel(costs, sizing=sizing, costs_by_instrument={"A": costs, "B": costs})
-    assert trade(legacy, *args, **kwargs) == trade(uniform, *args, **kwargs)
+    assert trade(legacy, *args, decision_closes=closes) == trade(
+        uniform, *args, decision_closes=closes
+    )
 
 
 def test_heterogeneous_buy_and_sell_costs_with_global_fallback() -> None:

@@ -63,6 +63,7 @@ def test_retrieval_only_availability_schema_range_and_lineage(instrument, downlo
     result = normalizer.normalize(instrument, download)
     assert result.bars is result.corporate_actions is result.vintages is None
     levels = result.levels
+    assert levels is not None
     assert levels.columns.tolist() == LEVELS_SCHEMA.names
     assert levels.observation_date.tolist() == [date(2026, 11, 5), date(2026, 11, 6)]
     assert levels.value.tolist() == [102.0, 103.0]
@@ -141,6 +142,7 @@ def test_empty_range_keeps_schema(instrument, download):
         download, request=download.request | {"start": "2026-11-07", "end_inclusive": "2026-11-07"}
     )
     levels = SsgaNavNormalizer().normalize(instrument, raw).levels
+    assert levels is not None
     assert levels.empty
     assert levels.columns.tolist() == LEVELS_SCHEMA.names
 
@@ -154,12 +156,14 @@ def test_source_download_to_normalizer(instrument):
     assert raw.request["historical_publication"] == "UNKNOWN"
     assert source.download_corporate_actions(instrument, date.min, date.max) is None
     result = SsgaNavNormalizer().normalize(instrument, raw)
+    assert result.levels is not None
     assert result.levels.value.tolist() == [101.25]
     assert result.levels.available_at_utc.tolist() == [now]
 
 
 def test_pinned_floor_passes_validator_and_earlier_availability_fails(instrument, download):
     levels = SsgaNavNormalizer().normalize(instrument, download).levels
+    assert levels is not None
     assert validate_levels(instrument, levels).valid
     early = levels.copy()
     early["available_at_utc"] -= timedelta(microseconds=1)
@@ -183,5 +187,6 @@ def test_later_schedule_is_unavailable_at_fetch(instrument, download):
         request=download.request | {"report_date": "2026-11-07", "end_inclusive": "2026-11-07"},
     )
     result = SsgaNavNormalizer().normalize(replace(instrument, publication_rule=rule), raw)
+    assert result.levels is not None
     assert result.levels.empty
     assert result.rejected.unpublished == (date(2026, 11, 7),)

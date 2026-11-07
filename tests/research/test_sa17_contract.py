@@ -13,6 +13,8 @@ def test_declared_costs_and_real_stress_all_terms():
     assert base["SA17_ETF_TECHNOLOGY"].half_spread_rate == 0.0015
     assert len({cost.half_spread_rate for cost in base.values()}) > 1
     for name, cost in base.items():
+        terms = cost.definition()
+        assert all(isinstance(value, float) for value in terms.values())
         assert stress[name].definition() == pytest.approx(
-            {term: 2 * value for term, value in cost.definition().items()}
+            {term: 2 * value for term, value in terms.items() if isinstance(value, float)}
         )
