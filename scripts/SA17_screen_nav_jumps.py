@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -51,26 +52,42 @@ def screen() -> dict[str, object]:
         # The market's close on or before each NAV date: a NAV struck on a US
         # holiday is compared with the last US close.
         aligned = market.reindex(series.index, method="ffill")
-        changes = series.pct_change().dropna()
+        changes = series.pct_change(fill_method=None).dropna()
         dates = [day.date().isoformat() for day in pd.DatetimeIndex(changes.index)]
         nav_changes = [float(value) for value in changes.to_numpy()]
         market_changes = [
-            float(value) for value in aligned.pct_change().reindex(changes.index).to_numpy()
+            float(value)
+            for value in aligned.pct_change(fill_method=None).reindex(changes.index).to_numpy()
         ]
+        # A NAV change without a market change to compare it with (no close on
+        # or before its dates) cannot pass the screen: it is flagged, not
+        # waved through as a NaN that no threshold catches.
         distances = [abs(a - b) for a, b in zip(nav_changes, market_changes, strict=True)]
+        compared = [distance for distance in distances if math.isfinite(distance)]
         funds.append(
             {
                 "id": name,
                 "file_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                 "changes": len(nav_changes),
                 "max_abs_change": max(abs(value) for value in nav_changes),
-                "max_distance_from_market": max(distances),
+                "max_distance_from_market": max(compared) if compared else None,
+                "without_market": len(distances) - len(compared),
             }
         )
         for day, change, move, distance in zip(
             dates, nav_changes, market_changes, distances, strict=True
         ):
-            if abs(change) > ABSOLUTE or distance > RELATIVE:
+            if not math.isfinite(distance):
+                flags.append(
+                    {
+                        "id": name,
+                        "date": day,
+                        "nav_change": change,
+                        "market_change": None,
+                        "explanation": "UNEXPLAINED: no market close to compare with",
+                    }
+                )
+            elif abs(change) > ABSOLUTE or distance > RELATIVE:
                 flags.append(
                     {
                         "id": name,
@@ -80,7 +97,7 @@ def screen() -> dict[str, object]:
                         "explanation": EXPLANATIONS.get((name, day), "UNEXPLAINED"),
                     }
                 )
-    unexplained = sum(1 for flag in flags if flag["explanation"] == "UNEXPLAINED")
+    unexplained = sum(1 for flag in flags if str(flag["explanation"]).startswith("UNEXPLAINED"))
     return {
         "gate": "2b fund actions",
         "thresholds": {"absolute": ABSOLUTE, "distance_from_market": RELATIVE},
@@ -95,7 +112,7 @@ def screen() -> dict[str, object]:
 def main() -> int:
     """Write the screen and fail on an unexplained flag."""
     result = screen()
-    OUTPUT.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    OUTPUT.write_text(json.dumps(result, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     print(f"{result['flag_count']} flags, {result['unexplained']} unexplained")
     return 1 if result["unexplained"] else 0
 

@@ -29,7 +29,8 @@ What is not a score is settled explicitly, as the proposal states it:
   fund (in cash when none is declared or it cannot be held yet).
 
 ``signal_input_ids`` must explicitly name USD LEVEL NAV against a USD SP500TR
-market on identical XNYS observation dates. ``risk_input_ids`` separately name
+market on identical observation dates: the sessions of ``observation_calendar_id``,
+``XNYS`` or a declared subset of it such as ``XNYS_XLON``. ``risk_input_ids`` name
 NAV for EUR risk: USD NAV divided by synchronized USD-per-EUR FX, or explicitly
 validated synchronous EUR NAV. WM16 London EUR reference NAV is not equivalent.
 The shared cutoff is the previous completed calendar month of each decision; no
@@ -214,7 +215,11 @@ class SA17SectorResidualMomentum(Strategy):
         Annualised volatility the equity sleeve is scaled down to, as a
         fraction; ``None`` holds the sectors at the whole book.
     annualization : int
-        Sessions per year the daily covariance is scaled by.
+        Observations per year the daily covariance is scaled by: sessions per
+        year of ``observation_calendar_id``. 252 suits ``XNYS``; on
+        ``XNYS_XLON`` a return across a UK holiday spans two NYSE sessions,
+        so the grid's own count (about 248) has to be declared, or the basket
+        volatility is overstated and the exposure understated.
     observation_calendar_id : str
         The calendar whose sessions are the expected observation dates of
         both signals: month ends for the ranking, daily returns for the risk.

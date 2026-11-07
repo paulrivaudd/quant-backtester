@@ -90,8 +90,9 @@ class NavRiskReturnsSignal(Signal):
         Raises
         ------
         ValueError
-            If the FX series is not a non-tradable USD FX series on the
-            observation calendar, or is an ECB fixing; if an input is not a
+            If the FX series is not a non-tradable USD FX series - one of
+            bars trading on the observation calendar or on a venue that
+            calendar is a declared subset of - or is an ECB fixing; if an input is not a
             non-tradable LEVEL ETF series in ``input_currency``; or if a fixed
             ``observation_cutoff`` does not end the month before the
             decision's (:func:`require_previous_month_cutoff`): the sample
@@ -119,8 +120,10 @@ class NavRiskReturnsSignal(Signal):
                 or instrument.primary_source.upper() == "ECB"
                 or (
                     instrument.data_type is DataType.BAR
-                    and instrument.calendar_id != self.observation_calendar_id
-                    and calendar.subset_of != instrument.calendar_id
+                    and instrument.calendar_id is not None
+                    and not context.calendars.observes(
+                        self.observation_calendar_id, instrument.calendar_id
+                    )
                 )
             ):
                 raise ValueError(

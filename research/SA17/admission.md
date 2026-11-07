@@ -40,13 +40,23 @@ has a NAV on each of its dates, and it drops the NAVs struck on UK holidays
 that no rule fixed in advance could anticipate. It becomes the grid only
 through the executable-run amendment.
 
-The grid is registered as `market_data/metadata/calendars/XNYS_XLON.toml`.
+The grid is registered as `research/SA17/calendars/XNYS_XLON.toml`, beside
+the study rather than among the venues: every run loading
+`market_data/metadata/calendars` hashes that whole folder, so a calendar added
+there would change the identity of runs that never use it.
 `scripts/generate_calendars.py` generates it from `exchange-calendars`, with
-NYSE hours and early closes, and it declares `subset_of = "XNYS"`; the calendar
-registry refuses it if any of its sessions is not an XNYS session at the same
-hours. The signals read the S&P 500 (bars on XNYS) and an FX series on it,
+NYSE hours and early closes, and it declares `subset_of = "XNYS"`. Before the
+file is written, the generator loads it with the committed XNYS file, and any
+registry holding both refuses it if one of its sessions is not an XNYS
+session at the same hours. The executable study's store will carry it beside
+the venue calendars. The signals read the S&P 500 (bars on XNYS) and an FX series on it,
 and still refuse an unrelated calendar. `SA17SectorResidualMomentum` takes
 the grid as `observation_calendar_id` (default `XNYS`, unchanged).
+
+A return on this grid that spans a UK holiday covers two NYSE sessions, and
+the grid has about 248 sessions a year, not 252. The amendment must declare
+the strategy's `annualization` from the grid's own count, or the basket
+volatility is overstated and the exposure understated.
 
 The definitions come from the 2026 edition. The check over the whole
 2015–2026 history is what supports applying them to earlier years.
@@ -104,12 +114,20 @@ before it, and they agreed on the probe day 2024-03-06 (bid 1.08990). That
 means about 270 requests instead of about 5,700 daily minute files. A seeded
 sample of 24 days is checked against the minute files.
 
+The rate is read at each session's close as the XNYS calendar gives it:
+16:00 New York, or 13:00 on the roughly 25 half days of the period. A bar
+without a tick (zero volume) is skipped: the feed fills it with an earlier
+close, which would pass for a quote at its end. `build` fails unless every
+sampled session's hourly rate equals its minute rate.
+
 The feed refuses Python's default client name with HTTP 429. The adapter sends
 a plain one, `quant-backtester research client`, and does not imitate a
 browser. After the probes on 2026-11-07 the feed throttled this address, and
 the acquisition was stopped rather than retried against a refusal. The
-fetcher waits five seconds between requests, waits five minutes once after a
-refusal, and stops at the second one. A later run resumes the archive.
+fetcher waits five seconds between requests and five minutes after a first
+refusal, and stops the run at the second. Each file is recorded in the
+manifest before it is moved into place, so a later run resumes the archive
+without leaving a file nobody recorded.
 
 ## Owner's decisions, 2026-11-07
 
@@ -117,6 +135,6 @@ refusal, and stops at the second one. A later run resumes the archive.
   assumption: the NAV of day D is usable from the 23:00 Paris decision of the
   next UK business day. The gate stays `PARTIAL`, so the run is
   `PROVISIONAL_NOT_ADMITTED`.
-- **2d**: EUR/USD at the US close is taken from Dukascopy minute bars. The owner
-  takes responsibility for checking Dukascopy's terms for personal research
-  use.
+- **2d**: EUR/USD at the US close is taken from Dukascopy bars (hourly files,
+  checked against minute files on a sample). The owner takes responsibility
+  for checking Dukascopy's terms for personal research use.

@@ -11,70 +11,80 @@
       "file_sha256": "c7ed1aa4a6579ff0f9d6013308b6415eee65148437faea5ae359b044927511c7",
       "changes": 2102,
       "max_abs_change": 0.11003953892177987,
-      "max_distance_from_market": 0.0523696485191909
+      "max_distance_from_market": 0.0523696485191909,
+      "without_market": 0
     },
     {
       "id": "SA17_NAV_CONSUMER_DISCRETIONARY",
       "file_sha256": "82aa451e012336fd0ff5da8a5b881d1cb5d86951078ad5804571bb7a524f53d9",
       "changes": 2895,
       "max_abs_change": 0.13183672009158565,
-      "max_distance_from_market": 0.040575175181613465
+      "max_distance_from_market": 0.040575175181613465,
+      "without_market": 0
     },
     {
       "id": "SA17_NAV_CONSUMER_STAPLES",
       "file_sha256": "54981e509960d45b7f475e07d3308c8a859c9d253b6a398ebbbabaaac68af5cc",
       "changes": 2895,
       "max_abs_change": 0.09283548542810593,
-      "max_distance_from_market": 0.0552567724342935
+      "max_distance_from_market": 0.0552567724342935,
+      "without_market": 0
     },
     {
       "id": "SA17_NAV_ENERGY",
       "file_sha256": "cbe080179bf1a836ed59b09a8c9b973f84a9fd8bc05d40f3349d88653ab3cbf6",
       "changes": 2895,
       "max_abs_change": 0.20338437588875413,
-      "max_distance_from_market": 0.13300896112681548
+      "max_distance_from_market": 0.13300896112681548,
+      "without_market": 0
     },
     {
       "id": "SA17_NAV_FINANCIALS",
       "file_sha256": "d72152798c9d2260eeeab455fc1cb7dd2d06aafdf8da95f9e3c05c05d9515276",
       "changes": 2895,
       "max_abs_change": 0.13931437789877,
-      "max_distance_from_market": 0.06961678089862433
+      "max_distance_from_market": 0.06961678089862433,
+      "without_market": 0
     },
     {
       "id": "SA17_NAV_HEALTH_CARE",
       "file_sha256": "ca5db808f796feb7d894ef130fc0263c239ef1e701a91ff910faa31ec2f470a7",
       "changes": 2895,
       "max_abs_change": 0.09973643895455409,
-      "max_distance_from_market": 0.051906806244775616
+      "max_distance_from_market": 0.051906806244775616,
+      "without_market": 0
     },
     {
       "id": "SA17_NAV_INDUSTRIALS",
       "file_sha256": "74ee0b8ef3d701ee3acd0af8f8df176d57d0b8a39cf85ee9ea29565aaebb0e97",
       "changes": 2895,
       "max_abs_change": 0.12727244974279905,
-      "max_distance_from_market": 0.041302417273477054
+      "max_distance_from_market": 0.041302417273477054,
+      "without_market": 0
     },
     {
       "id": "SA17_NAV_MATERIALS",
       "file_sha256": "828b3520b0b80ebe9efba3023a3d9d6334bdf8a4bd80b67255bd1039539361ee",
       "changes": 2895,
       "max_abs_change": 0.11573818399374103,
-      "max_distance_from_market": 0.03854229340255688
+      "max_distance_from_market": 0.03854229340255688,
+      "without_market": 0
     },
     {
       "id": "SA17_NAV_TECHNOLOGY",
       "file_sha256": "91e3d786d8aa707fe3b28c167a199bba42ba1d31d91e46f367bff78d27b4a705",
       "changes": 2895,
       "max_abs_change": 0.14216849686778388,
-      "max_distance_from_market": 0.04700020163321317
+      "max_distance_from_market": 0.04700020163321317,
+      "without_market": 0
     },
     {
       "id": "SA17_NAV_UTILITIES",
       "file_sha256": "20716d5bd0d46f1809b0a0f50bd3441fe7da67db1878838527205dbc394df839",
       "changes": 2895,
       "max_abs_change": 0.13025420904399665,
-      "max_distance_from_market": 0.07026724067115508
+      "max_distance_from_market": 0.07026724067115508,
+      "without_market": 0
     }
   ],
   "flags": [

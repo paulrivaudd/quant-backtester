@@ -22,7 +22,6 @@ from quant_backtester.data.sources.dukascopy import (
     parse_hour_bars,
     parse_minute_bars,
     rate_at,
-    us_close_utc,
 )
 
 DAY = date(2024, 3, 6)
@@ -136,11 +135,6 @@ def test_a_malformed_file_is_refused(payload: bytes) -> None:
         parse_minute_bars(payload, "EURUSD", DAY)
 
 
-def test_the_us_close_follows_new_york_daylight_saving() -> None:
-    assert us_close_utc(date(2024, 3, 6)) == datetime(2024, 3, 6, 21, 0, tzinfo=UTC)
-    assert us_close_utc(date(2024, 7, 1)) == datetime(2024, 7, 1, 20, 0, tzinfo=UTC)
-
-
 def test_the_rate_is_the_mid_of_the_bar_ending_at_the_instant() -> None:
     at = datetime(2024, 3, 6, 21, 0, tzinfo=UTC)
     bid = [bar(1258, 1.0), bar(1259, 1.08990), bar(1260, 2.0)]  # 20:58, 20:59, 21:00
@@ -212,3 +206,17 @@ def test_a_month_download_is_addressed_by_its_first_day() -> None:
     )
     assert download.day == date(2024, 3, 1)
     assert download.url == month_hours_url("EURUSD", 2024, 3, Side.ASK)
+
+
+def test_a_bar_without_a_tick_is_not_a_quote() -> None:
+    # The feed fills an hour or minute without ticks with the previous close,
+    # at zero volume: read as a quote, it would carry an old price to the
+    # instant with no staleness.
+    at = datetime(2024, 3, 6, 21, 0, tzinfo=UTC)
+    filled = QuoteBar(at - timedelta(minutes=1), timedelta(minutes=1), 1.2, 1.2, 1.2, 1.2, 0.0)
+    real = bar(1257, 1.1)  # ends 20:58, with volume
+    observed = rate_at([real, filled], [bar(1257, 1.1002), filled], at, timedelta(minutes=5))
+    assert observed is not None
+    assert observed.rate == pytest.approx(1.1001)
+    assert observed.staleness == timedelta(minutes=2)
+    assert rate_at([filled], [filled], at, timedelta(minutes=5)) is None

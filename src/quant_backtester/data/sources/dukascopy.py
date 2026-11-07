@@ -1,7 +1,8 @@
 """Dukascopy minute bars: a currency rate read at a stated instant, from a free feed.
 
 SA17 converts USD fund NAVs into EUR with the rate at the moment the NAVs were
-priced: the US close, 16:00 New York. Daily reference rates are taken at other
+priced: the US close, which the XNYS calendar gives for each session (16:00
+New York, 13:00 on a half day). Daily reference rates are taken at other
 instants (ECB at 14:15 CET, WM at 16:00 London), so a minute feed is read
 instead. Dukascopy publishes, without an account, LZMA-compressed files of
 bars per pair and side (bid or ask): one file of minute bars per day, and one
@@ -37,7 +38,6 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from enum import Enum
-from zoneinfo import ZoneInfo
 
 from quant_backtester.data.sources.base import (
     ProviderResponseError,
@@ -52,8 +52,6 @@ POINTS = {"EURUSD": 100_000}
 """Integer units per unit of price, by supported pair."""
 
 SECONDS_PER_DAY = 86_400
-US_CLOSE = time(16, 0)
-NEW_YORK = ZoneInfo("America/New_York")
 
 
 class Side(Enum):
@@ -76,7 +74,8 @@ class QuoteBar:
     open, close, low, high : float
         Quotes over the bar; ``close`` is the last quote before its end.
     volume : float
-        As the feed reports it; not used.
+        As the feed reports it. Zero marks a bar without a tick, which the
+        feed fills with the previous close: not a quote of its own.
     """
 
     start_utc: datetime
@@ -304,11 +303,6 @@ def _parse(
     return tuple(bars)
 
 
-def us_close_utc(day: date) -> datetime:
-    """Return 16:00 New York on ``day``, as an aware UTC instant (20:00 or 21:00 UTC)."""
-    return datetime.combine(day, US_CLOSE, NEW_YORK).astimezone(UTC)
-
-
 def rate_at(
     bid: Sequence[QuoteBar],
     ask: Sequence[QuoteBar],
@@ -326,7 +320,9 @@ def rate_at(
     max_staleness : timedelta
         How long before the instant the bar used may end. The bar ending at
         the instant is used when both sides have it; otherwise the latest bar
-        both sides share that ends within this delay.
+        both sides share that ends within this delay. A bar without a tick on
+        either side (zero volume) is skipped: the feed fills it with an
+        earlier close, which would pass for a quote at its end.
 
     Returns
     -------
@@ -348,6 +344,8 @@ def rate_at(
     for bar in bid:
         end = bar.start_utc + bar.length
         if end > instant_utc or instant_utc - end > max_staleness or bar.start_utc not in asks:
+            continue
+        if bar.volume <= 0.0 or asks[bar.start_utc].volume <= 0.0:
             continue
         if best is None or bar.start_utc > best[0].start_utc:
             best = (bar, asks[bar.start_utc])
