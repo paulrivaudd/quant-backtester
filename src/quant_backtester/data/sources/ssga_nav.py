@@ -29,7 +29,8 @@ from quant_backtester.data.sources.base import (
     utc_now,
 )
 
-NAV_ROOT = "https://www.ssga.com/library-content/products/fund-data/etfs/emea"
+SSGA_SITE = "https://www.ssga.com"
+NAV_ROOT = f"{SSGA_SITE}/library-content/products/fund-data/etfs/emea"
 _NS = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 _MONTHS = {
     m: n
@@ -40,7 +41,24 @@ _MONTHS = {
 
 
 def nav_date(value: str) -> date:
-    """Parse the issuer's English dates without depending on the host locale."""
+    """Parse the issuer's English dates without depending on the host locale.
+
+    Parameters
+    ----------
+    value : str
+        A date as the workbook prints it, such as ``"06-Nov-2026"``.
+
+    Returns
+    -------
+    date
+        The valuation date the row describes: not the day the NAV was
+        published, which the workbook does not state.
+
+    Raises
+    ------
+    ProviderResponseError
+        If the text is not a ``DD-Mon-YYYY`` date with an English month.
+    """
     try:
         day, month, year = value.split("-")
         return date(int(year), _MONTHS[month], int(day))
@@ -68,6 +86,30 @@ class NavWorkbook:
 def parse_nav_workbook(payload: bytes, *, isin: str) -> NavWorkbook:
     """Read the issuer's navhist sheet and reject identity/schema/value changes.
 
+    Parameters
+    ----------
+    payload : bytes
+        The exact XLSX bytes the issuer served.
+    isin : str
+        The fund the workbook must describe.
+
+    Returns
+    -------
+    NavWorkbook
+        The fund's identity and report date, the original string-valued rows
+        (dates as printed, NAV per share in USD) and the exact bytes. Rows
+        carry valuation dates only, no publication instant.
+
+    Raises
+    ------
+    ProviderResponseError
+        If the workbook is malformed or unpacks to more than 25 MB, describes
+        another fund or a currency other than USD, its header or footer
+        changed, a cell is a formula, a date repeats or follows the report
+        date, or a NAV is not finite and positive.
+
+    Notes
+    -----
     This deliberately supports only the observed plain-text date format and
     cached scalar cells. Formula cells, duplicate dates, nonpositive NAVs,
     unknown columns and another fund/currency are errors, never repairs.
@@ -173,6 +215,39 @@ class SsgaNavSource:
         return parse_nav_workbook(
             self._fetch_bytes(f"{NAV_ROOT}/navhist-emea-en-{ticker}.xlsx"), isin=isin
         )
+
+    def fetch_document(self, url: str) -> bytes:
+        """Download one issuer document - a fund page or a supplement PDF - as exact bytes.
+
+        Parameters
+        ----------
+        url : str
+            An ``https://www.ssga.com/`` address, absolute or site-relative
+            (``/library-content/...``), as the issuer's pages link them.
+
+        Returns
+        -------
+        bytes
+            The response, unaltered, for an acquisition archive. Nothing is
+            parsed here: the page text and its links are evidence, not data.
+
+        Raises
+        ------
+        ValueError
+            If the address is not on the issuer's site; nothing is fetched.
+        ProviderError
+            If the transport fails, as for any other download.
+
+        Notes
+        -----
+        The one network path for SA17's sourcing evidence, so that a script
+        archiving it performs no I/O of its own and a test can replay it with
+        an injected transport.
+        """
+        absolute = f"{SSGA_SITE}{url}" if url.startswith("/") else url
+        if not absolute.startswith(f"{SSGA_SITE}/"):
+            raise ValueError(f"Expected a State Street address, got {url!r}")
+        return self._fetch_bytes(absolute)
 
     def available_from(self, instrument: Instrument) -> date | None:
         """Return the declared inception; actual coverage is audited after download."""

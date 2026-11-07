@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from quant_backtester.data.calendars import TradingCalendar
 from quant_backtester.data.instruments import DataType, Instrument
 from quant_backtester.data.reader import ObservationStatus
 from quant_backtester.data.schemas import BarField
@@ -218,10 +219,86 @@ def month_end_anchors(decided: date, months: int) -> tuple[date, ...]:
 
 
 def completed_month_cutoff(context: SignalContext) -> date:
-    """Return the last calendar day before the decision's reference month."""
+    """Return the last calendar day before the decision's reference month.
+
+    Parameters
+    ----------
+    context : SignalContext
+        Environment of the decision. Its timezone-aware instant is dated on
+        the reader's reference calendar, in that calendar's timezone.
+
+    Returns
+    -------
+    date
+        The last calendar day of the month before the decision's: a calendar
+        date, not necessarily a session. A window ends at the observation
+        calendar's last session on or before it.
+    """
     reference = context.calendars.get(context.market.reference_calendar_id)
     day = context.as_of.astimezone(ZoneInfo(reference.timezone)).date()
     return day.replace(day=1) - timedelta(days=1)
+
+
+def require_previous_month_cutoff(
+    context: SignalContext, cutoff: date, venue: TradingCalendar
+) -> date:
+    """Return a fixed cutoff of a completed-months signal, refused unless it ends the month before.
+
+    Parameters
+    ----------
+    context : SignalContext
+        Environment of the decision; its instant is dated on the reader's
+        reference calendar.
+    cutoff : date
+        The last observation date the signal was configured with, a date of
+        ``venue``.
+    venue : TradingCalendar
+        The observation calendar: the window ends at its last session on or
+        before ``cutoff``.
+
+    Returns
+    -------
+    date
+        ``cutoff`` itself.
+
+    Raises
+    ------
+    ValueError
+        If the cutoff is after the decision's day, or if the last session on
+        or before it is not the last session of the month preceding the
+        decision's month. A signal reading completed months reads that month,
+        whole, and no other: a session of the decision's own month is a
+        partial month; an earlier session of the month before (15 September,
+        decided on 30 October) ends the window on a partial month too, read as
+        if it were complete; and an older one is a window that a fixed date -
+        the same at every decision of a run - would hand every later decision,
+        each reporting a fresh, valid number. A cutoff falling after that last
+        session but before the next month's first (31 October, a Saturday, or
+        1 November, a Sunday) ends on it and is accepted.
+
+    Notes
+    -----
+    Only for completed-months signals. A signal reading up to an arbitrary
+    fixed date, for an analysis of one past window, keeps the loader's own
+    contract: a completed month may be read long after its end.
+    """
+    reference = context.calendars.get(context.market.reference_calendar_id)
+    decided = context.as_of.astimezone(ZoneInfo(reference.timezone)).date()
+    if cutoff > decided:
+        raise ValueError(f"observation_cutoff {cutoff} must not be after the decision on {decided}")
+    last = (venue.session(cutoff) or venue.previous_session(cutoff)).session_date
+    previous = completed_month_cutoff(context)
+    # The month alone is not enough: a mid-month session of the month before
+    # would end the window on a partial month, scored as a completed one.
+    expected = (venue.session(previous) or venue.previous_session(previous)).session_date
+    if last != expected:
+        raise ValueError(
+            f"observation_cutoff {cutoff} ends on the {venue.calendar_id} session of {last}, "
+            f"not on {expected}, the last session of {previous:%Y-%m}, the month before the "
+            f"decision on {decided}: a completed-months signal reads that month whole, and a "
+            "fixed date reused across a run would freeze every later window"
+        )
+    return cutoff
 
 
 def load_dated_window(
@@ -234,6 +311,35 @@ def load_dated_window(
 ) -> LoadedWindow:
     """Read exact observation dates from PIT history, without filling holes.
 
+    Parameters
+    ----------
+    context : SignalContext
+        Environment of the decision: the reader serves what was available at
+        its timezone-aware instant, and nothing published after it.
+    instrument_id : str
+        A registered instrument. A LEVEL series is read raw.
+    dates : tuple[date, ...]
+        The expected observation dates, oldest first, as dates of the
+        observation calendar. Not empty.
+    basis : PriceBasis
+        Basis of a bars instrument's closes; ignored for a LEVEL series.
+    nav : bool
+        Also require each date's 22:15 Europe/Dublin valuation to precede the
+        decision instant.
+
+    Returns
+    -------
+    LoadedWindow
+        The values found on ``dates``, oldest first, in the instrument's
+        currency. ``OK`` only when every date is served, known at the decision
+        and finite and positive. Otherwise, in the order they are asked:
+        ``NOT_LISTED`` (listed after the latest date, or delisted before it),
+        ``INSUFFICIENT_HISTORY`` (listed after the oldest),
+        ``MISSING_INPUT`` (a date not served, or not yet known),
+        ``INVALID_INPUT`` (a value not finite and positive).
+
+    Notes
+    -----
     LEVEL inputs are levels, never adjusted OHLC. For NAV, 22:15 Dublin
     valuation is only a lower bound: publication must independently be
     established by the upstream reader's availability timestamps.
@@ -245,17 +351,24 @@ def load_dated_window(
         PriceBasis.RAW if instrument.data_type is DataType.LEVEL else basis,
     )
     # The reader's index contract is observation dates; pandas stubs also allow ints.
-    observed = cast(list[date], series.index.tolist())
-    if nav:
-        observed = [
-            day
-            for day in observed
-            if datetime.combine(day, time(22, 15), ZoneInfo("Europe/Dublin")) < context.as_of
-        ]
-    series = series.loc[[day for day in observed if day <= context.as_of.date()]]
-    held = tuple(day for day in dates if day in series.index)
+    present = set(cast(list[date], series.index.tolist()))
+
+    def visible(day: date) -> bool:
+        """Return whether ``day`` is served, not after the decision, and valued before it."""
+        if day not in present or day > context.as_of.date():
+            return False
+        return not nav or (
+            datetime.combine(day, time(22, 15), ZoneInfo("Europe/Dublin")) < context.as_of
+        )
+
+    # Only the dates asked for are judged: the history around them changes nothing.
+    held = tuple(day for day in dates if visible(day))
     points = tuple(float(series.loc[day]) for day in held)
     if instrument.first_session is not None and instrument.first_session > dates[-1]:
+        status = SignalStatus.NOT_LISTED
+    elif instrument.last_session is not None and instrument.last_session < dates[-1]:
+        # Delisted before the latest date asked for: not a hole in its history
+        # but a fund that no longer exists, as the reader says of it.
         status = SignalStatus.NOT_LISTED
     elif instrument.first_session is not None and instrument.first_session > dates[0]:
         status = SignalStatus.INSUFFICIENT_HISTORY
@@ -324,9 +437,10 @@ def load_month_end_window(
     Raises
     ------
     ValueError
-        If the instrument is a published series or declares no calendar, or
-        ``max_age_sessions`` is not a non-negative integer: configuration
-        mistakes, which stop the run.
+        If the instrument is a published series or declares no calendar, if
+        a bars instrument is asked for the month ends of another calendar than
+        its own, or ``max_age_sessions`` is not a non-negative integer:
+        configuration mistakes, which stop the run.
     KeyError
         If the instrument is not registered.
 
@@ -354,16 +468,30 @@ def load_month_end_window(
         if calendar_id is None:
             raise ValueError("LEVEL month ends require an explicit observation calendar")
         if instrument.data_type is DataType.BAR and instrument.calendar_id != calendar_id:
-            return LoadedWindow(status=SignalStatus.INVALID_INPUT)
+            raise ValueError(
+                f"{instrument_id} trades on {instrument.calendar_id} and is asked for month "
+                f"ends of {calendar_id}: a configuration mistake, not a market situation"
+            )
         venue = context.calendars.get(calendar_id)
-        anchors = month_end_anchors(cutoff, months)
-        if instrument.first_session is not None and instrument.first_session > cutoff:
+        # The window ends at the last session on or before the cutoff, and the
+        # month grid is that session's. Anchored on the cutoff itself, a cutoff
+        # falling before its month's first session (1 January, a Saturday 1st)
+        # would end on the previous month end a second time: one month short,
+        # and a flat month nobody observed.
+        last = (venue.session(cutoff) or venue.previous_session(cutoff)).session_date
+        anchors = month_end_anchors(last, months)
+        if instrument.first_session is not None and instrument.first_session > last:
             return LoadedWindow(status=SignalStatus.NOT_LISTED)
         if instrument.first_session is not None and instrument.first_session > anchors[0]:
             return LoadedWindow(status=SignalStatus.INSUFFICIENT_HISTORY)
         dates = tuple(
             (venue.session(day) or venue.previous_session(day)).session_date for day in anchors
         )
+        if len(set(dates)) != len(dates):
+            raise ValueError(
+                f"{calendar_id} holds no session in a month of the window ending {last}; "
+                "its month ends cannot describe a monthly window"
+            )
         return load_dated_window(context, instrument_id, dates=dates, basis=basis, nav=nav)
     if instrument.data_type is not DataType.BAR:
         raise ValueError(

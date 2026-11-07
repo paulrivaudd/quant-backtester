@@ -572,7 +572,6 @@ def test_signal_inputs_score_one_series_and_hold_another(decision) -> None:
         {"target_volatility": float("inf")},
         {"score_months": 36},
         {"skip_months": -1},
-        {"max_age_sessions": -1},
         {"strategy_id": ""},
     ],
 )
@@ -658,12 +657,162 @@ def test_same_day_nav_at_2300_is_missing_even_if_upstream_claims_early_publicati
     ],
 )
 def test_sa17_rejects_currency_or_market_calendar_mismatch(context, name, changes) -> None:
+    # A registry entry contradicting the signal is a configuration mistake: it
+    # stops the run instead of leaving every decision in cash.
     changed = [
         dataclasses.replace(i, **changes) if i.id == name else i for i in context.instruments
     ]
     context = dataclasses.replace(context, instruments=InstrumentRegistry(changed))
+    with pytest.raises(ValueError):
+        candidate(**SHORT).momentum().compute(context, ["S_A_NAV"])
+
+
+def test_a_tradable_or_bar_sector_input_is_refused_as_a_nav(context) -> None:
+    changed = [
+        dataclasses.replace(i, tradable=True) if i.id == "S_A_NAV" else i
+        for i in context.instruments
+    ]
+    context = dataclasses.replace(context, instruments=InstrumentRegistry(changed))
+    with pytest.raises(ValueError, match="not one"):
+        candidate(**SHORT).momentum().compute(context, ["S_A_NAV"])
+
+
+def test_a_cutoff_before_its_months_first_session_does_not_repeat_a_month_end(
+    market,
+    make_context,
+    evening,
+) -> None:
+    # Sunday 1 November: the last session on or before it is Friday 30 October.
+    # Anchored on the 1st itself, the window ended on 30 October twice - a flat
+    # month nobody observed, one month short, and still OK.
+    context = make_context(market, evening(date(2026, 11, 2)))
+    window = load_month_end_window(
+        context,
+        "S_A_NAV",
+        months=4,
+        basis=PriceBasis.ADJUSTED,
+        max_age_sessions=0,
+        observation_calendar_id="XNYS",
+        observation_cutoff=date(2026, 11, 1),
+        nav=True,
+    )
+    assert window.status is SignalStatus.OK
+    assert window.dates == (
+        date(2026, 6, 30),
+        date(2026, 7, 31),
+        date(2026, 8, 31),
+        date(2026, 9, 30),
+        date(2026, 10, 30),
+    )
+    signal = dataclasses.replace(
+        candidate(**SHORT).momentum(), observation_cutoff=date(2026, 11, 1)
+    )
+    computed = signal.compute(context, ["S_A_NAV"])
+    assert computed.status("S_A_NAV") is SignalStatus.OK
+    assert computed.frame.loc["S_A_NAV", "input_end_date"] == date(2026, 10, 30)
+
+
+def test_sa17_holds_no_fixed_cutoff() -> None:
+    # Each decision reads the month before its own; a date in the strategy's
+    # configuration would be the same at every decision of a run.
+    with pytest.raises(TypeError):
+        candidate(observation_cutoff=date(2026, 9, 30))
+    assert candidate(**SHORT).momentum().completed_months_only
+    assert candidate(**SHORT).momentum().observation_cutoff is None
+    assert candidate(**SHORT).risk_signal().observation_cutoff is None
+
+
+@pytest.mark.parametrize(
+    "cutoff, decided",
+    [
+        (date(2026, 8, 31), date(2026, 10, 30)),  # two months back: a frozen window
+        (date(2026, 9, 15), date(2026, 9, 30)),  # the decision's own month: partial
+        # The month before, but mid-month: August 31 -> September 15 would be
+        # scored as September's completed return.
+        (date(2026, 9, 15), date(2026, 10, 30)),
+        (date(2026, 9, 29), date(2026, 10, 30)),  # one session short is still short
+    ],
+)
+def test_a_completed_months_cutoff_must_end_the_month_before(
+    market,
+    make_context,
+    evening,
+    cutoff,
+    decided,
+) -> None:
+    context = make_context(market, evening(decided))
+    momentum = dataclasses.replace(candidate(**SHORT).momentum(), observation_cutoff=cutoff)
+    risk = dataclasses.replace(candidate(**SHORT).risk_signal(), observation_cutoff=cutoff)
+    with pytest.raises(ValueError, match="the month before the decision"):
+        momentum.compute(context, ["S_A_NAV"])
+    with pytest.raises(ValueError, match="the month before the decision"):
+        risk.compute(context, ["S_A_NAV"])
+
+
+def test_a_cutoff_in_the_month_before_is_read(market, make_context, evening) -> None:
+    context = make_context(market, evening(date(2026, 10, 30)))
+    momentum = dataclasses.replace(
+        candidate(**SHORT).momentum(), observation_cutoff=date(2026, 9, 30)
+    )
+    result = momentum.compute(context, ["S_A_NAV"])
+    assert result.status("S_A_NAV") is SignalStatus.OK
+    assert result.frame.loc["S_A_NAV", "input_end_date"] == date(2026, 9, 30)
+
+
+def test_a_cutoff_after_the_last_session_resolves_to_it(market, make_context, evening) -> None:
+    # Saturday 31 October: the last session on or before it is Friday 30
+    # October, October's last - the same window as the computed cutoff.
+    context = make_context(market, evening(date(2026, 11, 2)))
+    explicit = dataclasses.replace(
+        candidate(**SHORT).momentum(), observation_cutoff=date(2026, 10, 31)
+    )
+    computed = candidate(**SHORT).momentum()
+    result = explicit.compute(context, ["S_A_NAV"])
+    assert result.status("S_A_NAV") is SignalStatus.OK
+    assert result.frame.loc["S_A_NAV", "input_end_date"] == date(2026, 10, 30)
+    assert result.frame.loc["S_A_NAV", "value"] == pytest.approx(
+        computed.compute(context, ["S_A_NAV"]).frame.loc["S_A_NAV", "value"]
+    )
+
+
+def test_an_analysis_of_one_past_window_keeps_the_loaders_contract(
+    market,
+    make_context,
+    evening,
+) -> None:
+    # Outside completed-months mode a fixed cutoff may be any day up to the
+    # decision: a completed month can be read long after its end.
+    context = make_context(market, evening(date(2026, 10, 30)))
+    momentum = dataclasses.replace(
+        candidate(**SHORT).momentum(),
+        observation_cutoff=date(2026, 8, 31),
+        completed_months_only=False,
+    )
+    result = momentum.compute(context, ["S_A_NAV"])
+    assert result.status("S_A_NAV") is SignalStatus.OK
+    assert result.frame.loc["S_A_NAV", "input_end_date"] == date(2026, 8, 31)
+
+
+def test_a_delisted_nav_is_not_listed_rather_than_missing(context) -> None:
+    # Delisted before the cutoff's month end: a sector that no longer exists,
+    # which the plan leaves out, not a hole that keeps the book forever.
+    changed = [
+        dataclasses.replace(i, last_session=date(2026, 8, 28)) if i.id == "S_A_NAV" else i
+        for i in context.instruments
+    ]
+    context = dataclasses.replace(context, instruments=InstrumentRegistry(changed))
     result = candidate(**SHORT).momentum().compute(context, ["S_A_NAV"])
-    assert result.status("S_A_NAV") is SignalStatus.INVALID_INPUT
+    assert result.status("S_A_NAV") is SignalStatus.NOT_LISTED
+    risk = candidate(risk_returns=3).risk_signal().compute(context, ["S_A_NAV"])
+    assert risk.status("S_A_NAV") is SignalStatus.NOT_LISTED
+
+
+def test_signals_declare_the_market_and_the_fx_they_read() -> None:
+    strategy = candidate(**SHORT)
+    assert strategy.momentum().referenced_instruments() == (MARKET,)
+    assert strategy.risk_signal().referenced_instruments() == ("FX",)
+    eur = candidate(risk_input_currency="EUR", usd_per_eur_fx_id=None).risk_signal()
+    assert eur.referenced_instruments() == ()
 
 
 @pytest.mark.parametrize("missing", [date(2026, 7, 31), date(2026, 8, 31)])
@@ -733,8 +882,8 @@ def test_wrong_fx_currency_and_ecb_fixings_are_refused(context, changes) -> None
         dataclasses.replace(i, **changes) if i.id == "FX" else i for i in context.instruments
     ]
     context = dataclasses.replace(context, instruments=InstrumentRegistry(changed))
-    result = candidate(risk_returns=3).risk_signal().compute(context, ["S_A_NAV"])
-    assert result.status("S_A_NAV") is SignalStatus.INVALID_INPUT
+    with pytest.raises(ValueError, match="cannot convert"):
+        candidate(risk_returns=3).risk_signal().compute(context, ["S_A_NAV"])
 
 
 def test_retrieval_only_publication_cannot_admit_historical_nav(
@@ -804,15 +953,16 @@ def test_explicit_validated_eur_nav_needs_no_fx(context, xnys) -> None:
 
 def test_risk_rejects_unconverted_currency_mismatch(context) -> None:
     signal = candidate(risk_input_currency="EUR", usd_per_eur_fx_id=None).risk_signal()
-    assert signal.compute(context, ["S_A_NAV"]).status("S_A_NAV") is SignalStatus.INVALID_INPUT
+    with pytest.raises(ValueError, match="EUR fund NAVs"):
+        signal.compute(context, ["S_A_NAV"])
 
 
 def test_future_cutoff_is_rejected(context) -> None:
-    strategy = candidate(**SHORT, observation_cutoff=date(2026, 9, 30))
-    with pytest.raises(ValueError, match="after the decision"):
-        strategy.momentum().compute(context, ["S_A_NAV"])
-    with pytest.raises(ValueError, match="after the decision"):
-        strategy.risk_signal().compute(context, ["S_A_NAV"])
+    strategy = candidate(**SHORT)
+    for signal in (strategy.momentum(), strategy.risk_signal()):
+        future = dataclasses.replace(signal, observation_cutoff=date(2026, 9, 30))
+        with pytest.raises(ValueError, match="after the decision"):
+            future.compute(context, ["S_A_NAV"])
 
 
 # -- through the engine -------------------------------------------------------------------
@@ -884,6 +1034,11 @@ def test_the_candidate_runs_through_the_engine_at_month_ends(runner) -> None:
         assert float(held.max()) == pytest.approx(float(held.min()))  # equal parts
         assert float(row.sum()) == pytest.approx(1.0)
     assert_invested_with_only_cash_trims(result)
+    # The market and the FX are read inside the signals, never asked about:
+    # the report still names their history.
+    basis = result.configuration["history_basis"]
+    assert isinstance(basis, Mapping)
+    assert {MARKET, "FX"} <= set(basis)
     again = runner.run(strategy, UNIVERSE, "2026-06-01", "2026-12-31")
     assert result.equity().equals(again.equity())
 

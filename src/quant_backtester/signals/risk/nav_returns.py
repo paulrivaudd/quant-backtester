@@ -22,9 +22,9 @@ from quant_backtester.signals.types import (
     require_positive_int,
 )
 from quant_backtester.signals.windows import (
-    LoadedWindow,
     completed_month_cutoff,
     load_dated_window,
+    require_previous_month_cutoff,
 )
 
 
@@ -80,12 +80,30 @@ class NavRiskReturnsSignal(Signal):
             "window": "EXACT_EXPECTED_SESSIONS_NO_BACKFILL",
         }
 
+    def referenced_instruments(self) -> tuple[str, ...]:
+        """Return the FX series every NAV is converted with, read beside them."""
+        return () if self.usd_per_eur_fx_id is None else (self.usd_per_eur_fx_id,)
+
     def compute(self, context: SignalContext, instrument_ids: Sequence[str]) -> SignalResult:
-        """Read known NAV and FX on exactly the same expected observation dates."""
-        cutoff = self.observation_cutoff or completed_month_cutoff(context)
-        if cutoff > context.as_of.date():
-            raise ValueError("observation_cutoff must not be after the decision")
+        """Read known NAV and FX on exactly the same expected observation dates.
+
+        Raises
+        ------
+        ValueError
+            If the FX series is not a non-tradable USD FX series on the
+            observation calendar, or is an ECB fixing; if an input is not a
+            non-tradable LEVEL ETF series in ``input_currency``; or if a fixed
+            ``observation_cutoff`` does not end the month before the
+            decision's (:func:`require_previous_month_cutoff`): the sample
+            always ends at a completed month. The registry does not change between
+            decisions, so each is a configuration mistake: it stops the run
+            rather than leave every decision without a risk estimate.
+        """
         calendar = context.calendars.get(self.observation_calendar_id)
+        if self.observation_cutoff is not None:
+            cutoff = require_previous_month_cutoff(context, self.observation_cutoff, calendar)
+        else:
+            cutoff = completed_month_cutoff(context)
         session = calendar.session(cutoff) or calendar.previous_session(cutoff)
         days = [session.session_date]
         for _ in range(self.risk_returns):
@@ -104,11 +122,14 @@ class NavRiskReturnsSignal(Signal):
                     and instrument.calendar_id != self.observation_calendar_id
                 )
             ):
-                fx = LoadedWindow(status=SignalStatus.INVALID_INPUT)
-            else:
-                fx = load_dated_window(
-                    context, self.usd_per_eur_fx_id, dates=dates, basis=PriceBasis.RAW
+                raise ValueError(
+                    f"{self.usd_per_eur_fx_id} cannot convert {self.signal_id}'s NAVs: a "
+                    "non-tradable, non-ECB USD FX series on "
+                    f"{self.observation_calendar_id} is required"
                 )
+            fx = load_dated_window(
+                context, self.usd_per_eur_fx_id, dates=dates, basis=PriceBasis.RAW
+            )
         rows = {}
         samples = []
         sample_dates = []
@@ -120,11 +141,11 @@ class NavRiskReturnsSignal(Signal):
                 or instrument.asset_type is not AssetType.ETF
                 or instrument.tradable
             ):
-                window = LoadedWindow(status=SignalStatus.INVALID_INPUT)
-            else:
-                window = load_dated_window(
-                    context, name, dates=dates, basis=PriceBasis.RAW, nav=True
+                raise ValueError(
+                    f"{self.signal_id} reads {self.input_currency} fund NAVs and {name} is not "
+                    "one: a non-tradable LEVEL ETF series in that currency is required"
                 )
+            window = load_dated_window(context, name, dates=dates, basis=PriceBasis.RAW, nav=True)
             if window.status is SignalStatus.OK and fx is not None:
                 if fx.status is not SignalStatus.OK:
                     window = replace(window, status=fx.status)

@@ -15,9 +15,12 @@ evidence; it is not an admitted strategy input set.
 - Publication is distinct from valuation: all supplements state 22:15 Dublin,
   later than the 23:00 Paris decision. The historical workbooks provide no
   release timestamps. Normalization initially permits use only after retrieval.
-- Monthly sampling now defaults to the previous completed US month with an
-  explicit common observation cutoff. It no longer pairs Xetra and New York
-  month-end prints or implicitly takes a partial current month.
+- Monthly sampling reads the previous completed US month of each decision,
+  one cutoff shared by every signal of that decision. It no longer pairs
+  Xetra and New York month-end prints or implicitly takes a partial current
+  month. Amended after review: the cutoff cannot be fixed in the strategy's
+  configuration, and an explicit signal cutoff must resolve to that month's
+  last session.
 - [Ken French source evidence](ken_french_source_evidence.json) covers monthly
   10/49-industry portfolios and matching factors since July 1926. This is a
   separate restated research study, not executable ETF history.

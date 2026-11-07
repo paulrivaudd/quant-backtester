@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import json
+import pickle
 
 import pytest
 from tests.execution.test_model import book, reasons, trade
@@ -149,3 +151,53 @@ def test_scaled_purchase_minimum_uses_override_fill_price() -> None:
     result = trade(model, book(249), {"W": 1.0}, {"W": 100.0})
     assert result.state.quantity("W") == 1
     assert result.state.cash == pytest.approx(109)
+
+
+def test_a_model_hashes_pickles_and_copies_by_value_with_or_without_overrides() -> None:
+    # A model was hashable, picklable and deep-copyable before overrides
+    # existed; the frozen view of the overrides must not take that away.
+    costs = CostModel(commission_rate=0.001, minimum_commission=1.0)
+    override = CostModel(half_spread_rate=0.002)
+    for overrides in ({}, {"A": override}):
+        model = ExecutionModel(costs, minimum_trade_value=5.0, costs_by_instrument=overrides)
+        twin = ExecutionModel(costs, minimum_trade_value=5.0, costs_by_instrument=dict(overrides))
+        assert hash(model) == hash(twin)
+        for copied in (pickle.loads(pickle.dumps(model)), copy.deepcopy(model), copy.copy(model)):
+            assert copied == model
+            assert hash(copied) == hash(model)
+            assert copied.definition() == model.definition()
+            with pytest.raises(TypeError):
+                copied.costs_by_instrument["B"] = override  # pyright: ignore[reportIndexIssue] -- still frozen
+    assert ExecutionModel(costs) != ExecutionModel(costs, costs_by_instrument={"A": override})
+
+
+def test_scaled_stresses_the_default_and_every_override() -> None:
+    # replace(execution, costs=...) would leave every override at 1x.
+    costs = CostModel(commission_rate=0.0005, minimum_commission=1.0, slippage_rate=0.0005)
+    override = CostModel(
+        commission_rate=0.0005,
+        minimum_commission=1.0,
+        half_spread_rate=0.0012,
+        slippage_rate=0.0005,
+    )
+    model = ExecutionModel(
+        costs,
+        minimum_trade_value=10.0,
+        sizing=Sizing.AT_DECISION,
+        costs_by_instrument={"A": override},
+    )
+    stressed = model.scaled(2.0)
+    assert stressed.costs == costs.scaled(2.0)
+    assert stressed.costs_by_instrument["A"].definition() == pytest.approx(
+        {
+            term: 2 * value
+            for term, value in override.definition().items()
+            if isinstance(value, float)
+        }
+    )
+    assert stressed.minimum_trade_value == model.minimum_trade_value
+    assert stressed.sizing is model.sizing
+    assert model.costs_by_instrument["A"] == override  # the original is untouched
+    for factor in (0.0, -1.0, float("nan")):
+        with pytest.raises(ValueError, match="factor"):
+            model.scaled(factor)

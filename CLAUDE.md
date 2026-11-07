@@ -38,6 +38,12 @@ src/quant_backtester/
     analytics/    performance, risk, attribution, reporting
     strategies/   concrete strategies composed from the layers above
     research/     the reference books a study measures a strategy against
+    ml/           fitted models, in two halves at two different levels:
+      runtime       config, features, network, artifacts and
+                    signatures/{config,models,artifacts}: what a fitted
+                    model reads, and how it is loaded and evaluated
+      training      dataset, training and signatures/training: how a model
+                    is fitted, by running the backtest it will be used in
 tests/            mirrors the package layout
 market_data/      metadata/ is committed; raw/, clean/ and validation/ are not
 ```
@@ -46,6 +52,18 @@ Dependencies flow one way: `data -> signals -> portfolio -> execution ->
 backtest -> analytics`, with `research` on top of everything. A lower layer
 must never import a higher one. If a layer needs something from above, the
 dependency is wrong - pass it in.
+
+`ml/` is not one layer: its two halves sit at opposite ends of that order.
+
+- The **runtime** half lives inside `signals`. It builds on `data` and on the
+  core of `signals` (`types`, `context`, `windows`, `signatures`), and is
+  imported by `signals/ml/` and by the strategies that load a fitted model
+  (SA13, SA14).
+- The **training** half sits at the top, beside `research`. `dataset.py`,
+  `training.py` and `signatures/training.py` import `backtest`, `analytics`
+  and `strategies`; only scripts and tests import them.
+- Nothing in the runtime half, and nothing in `src/` outside `ml/`, may import
+  the training half.
 
 ## Design principles
 
