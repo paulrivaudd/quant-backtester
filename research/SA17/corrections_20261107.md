@@ -38,6 +38,15 @@ résultats sont conservés.
   n'ont que ~14 % et ~30 % de puissance. Ce ne sont pas des estimations validées
   du rendement de SA17.
 
+## Amendement après revue, avant toute exécution
+
+La date limite commune n'est plus configurable dans la stratégie : chaque
+décision lit le dernier mois terminé qui la précède. Une date fixe réutilisée
+sur tout un backtest figerait les fenêtres des décisions suivantes. Un signal
+en mois terminés qui reçoit une date explicite exige qu'elle tombe sur la
+dernière séance XNYS de ce mois : une séance du milieu du mois traiterait un
+mois partiel comme terminé. Voir l'amendement du [protocole](protocol.md).
+
 ## Ce que la vérification corrige dans les hypothèses de départ
 
 1. **Clôture, valorisation et publication diffèrent.** Les dix suppléments
