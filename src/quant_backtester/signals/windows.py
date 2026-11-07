@@ -265,13 +265,16 @@ def require_previous_month_cutoff(
     ------
     ValueError
         If the cutoff is after the decision's day, or if the last session on
-        or before it does not fall in the month preceding the decision's
-        month. A signal reading completed months reads that month and no
-        other: a session of the decision's own month is a partial month, and
-        an older one is a window that a fixed date - the same at every
-        decision of a run - would hand every later decision, each reporting a
-        fresh, valid number. A cutoff falling before its month's first session
-        (1 November, a Sunday) ends on the month before and is accepted.
+        or before it is not the last session of the month preceding the
+        decision's month. A signal reading completed months reads that month,
+        whole, and no other: a session of the decision's own month is a
+        partial month; an earlier session of the month before (15 September,
+        decided on 30 October) ends the window on a partial month too, read as
+        if it were complete; and an older one is a window that a fixed date -
+        the same at every decision of a run - would hand every later decision,
+        each reporting a fresh, valid number. A cutoff falling after that last
+        session but before the next month's first (31 October, a Saturday, or
+        1 November, a Sunday) ends on it and is accepted.
 
     Notes
     -----
@@ -285,12 +288,15 @@ def require_previous_month_cutoff(
         raise ValueError(f"observation_cutoff {cutoff} must not be after the decision on {decided}")
     last = (venue.session(cutoff) or venue.previous_session(cutoff)).session_date
     previous = completed_month_cutoff(context)
-    if (last.year, last.month) != (previous.year, previous.month):
+    # The month alone is not enough: a mid-month session of the month before
+    # would end the window on a partial month, scored as a completed one.
+    expected = (venue.session(previous) or venue.previous_session(previous)).session_date
+    if last != expected:
         raise ValueError(
             f"observation_cutoff {cutoff} ends on the {venue.calendar_id} session of {last}, "
-            f"not in {previous:%Y-%m}, the month before the decision on {decided}: a "
-            "completed-months signal reads that month, and a fixed date reused across a run "
-            "would freeze every later window"
+            f"not on {expected}, the last session of {previous:%Y-%m}, the month before the "
+            f"decision on {decided}: a completed-months signal reads that month whole, and a "
+            "fixed date reused across a run would freeze every later window"
         )
     return cutoff
 

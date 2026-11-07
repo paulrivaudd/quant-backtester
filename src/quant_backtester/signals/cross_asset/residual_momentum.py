@@ -208,7 +208,8 @@ class MonthlyMomentumSignal(Signal):
         Optional exact-date contract. LEVEL inputs require the explicit
         observation calendar and are read raw. ``completed_months_only`` ends
         the window at the month before the decision's; an explicit cutoff then
-        has to end that same month (:func:`require_previous_month_cutoff`).
+        has to resolve to that month's last session
+        (:func:`require_previous_month_cutoff`).
         Without it, an explicit cutoff may be any day up to the decision, for
         the analysis of one past window. Availability always remains the
         actual decision. ``max_age_sessions`` plays no part in this contract
