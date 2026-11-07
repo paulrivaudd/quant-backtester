@@ -176,6 +176,83 @@ used extensively in prior research; this is replication/robustness, not a
 new discovery or independent validation. Prespecify 1929–1969, 1970–1999,
 2000–2017, 2018–2026 descriptive regimes; disclose all, select none.
 
+## Mechanism study: frozen design
+
+Written 2026-11-07, before any score, weight or portfolio return was computed
+on the French data. Only the archive's coverage (columns, first and last
+month, hashes) had been read. Every parameter is in
+[`mechanism.toml`](mechanism.toml); the run reads it and nothing else. A
+change after the run is a new hypothesis, not a correction.
+
+**Inputs.** The three archived ZIPs of `runs/sa17_french_inputs_20261107`,
+replayed offline through the Ken French adapter and refused if their SHA-256
+differs from `coverage.json`: monthly value-weighted 10 and 49 industries, and
+the factors, with `Mkt = Mkt-RF + RF`. Returns are USD fractions labelled by
+month, restated, not point-in-time.
+
+**Formation.** At the end of month *t*, an industry is eligible when its 36
+returns *t−35..t* are all present. `residual_fit` (the function SA17's signal
+uses) regresses them on the market's with an intercept and scores the mean of
+the 11 residuals *t−11..t−1*, the latest month skipped, over their sample
+standard deviation. A fit that `residual_fit` refuses leaves the industry
+ineligible that month; such months are counted.
+
+**Books.** Each holds its industries in equal weight over month *t+1*,
+rebalanced every month:
+
+- `RESIDUAL` (the candidate): the top 3 of 10 by score, or the top 15 of 49
+  (the same 30% share);
+- `C1_MOMENTUM_12_1`: the same count, ranked by the compounded return of the
+  same months *t−11..t−1*;
+- `C2_EQUAL_WEIGHT`: every eligible industry;
+- `MARKET`: `Mkt`, held at no cost, descriptive only.
+
+Ties go to the earlier column of the file. With fewer eligible industries than
+a book holds, that book holds the risk-free rate for the month. A held
+industry whose return for *t+1* is missing earns `RF` that month; these cases
+are counted and reported.
+
+**Costs.** These are hypothetical, since the portfolios are not tradable: 10 bp of
+the traded value, one way. At each rebalancing, turnover is the sum over
+industries of the absolute difference between the target weight and the
+weight drifted by the month's returns; moves to and from `RF` are free. The
+first formation buys from cash. The month's net return is
+`(1 − cost × turnover)(1 + gross) − 1`. Doubled costs (20 bp) are a second
+real run.
+
+**Window.** Holding months July 1929 to September 2026: the first formation is
+the first month with 36 returns behind it. The 10- and 49-industry studies
+share the window.
+
+**Statistics.** Each book's monthly returns are taken in excess of `RF`. The
+primary statistic is the Sharpe ratio of excess returns (mean over sample
+standard deviation, times √12). CAGR, maximum drawdown and, against each
+control, active mean, tracking error and information ratio are reported. So
+are the turnover and cost paid by each book.
+
+**Inference.** The candidate is compared with each control by a paired
+stationary bootstrap (Politis–Romano: geometric block lengths, circular wrap,
+the same indices for both books). Excess returns are resampled, with an
+expected block of 12 months, 10,000 draws, seed 20261107. The 95% intervals
+are percentile intervals. The two-sided p-value of a zero difference is
+`(1 + #{|d* − d| ≥ |d|}) / (draws + 1)`, from the resampled differences
+centred on the estimate. Holm's adjustment is applied within the family
+{vs `C1_MOMENTUM_12_1`, vs `C2_EQUAL_WEIGHT`}. Blocks of 6 and 24 months are
+reported as sensitivities, never selected.
+
+**Verdict.** It is read on 10 industries at the declared costs, one per
+comparison:
+
+- vs `C1_MOMENTUM_12_1` judges the market adjustment;
+- vs `C2_EQUAL_WEIGHT` judges the selection.
+
+`SUPPORTED_RETROSPECTIVE` requires a positive Sharpe difference, a Holm
+p-value below 0.05, and a difference still positive at doubled costs.
+`UNCERTAIN` is a positive difference that misses either. `NOT_SUPPORTED` is a
+difference at or below zero. The 49-industry study, the block sensitivities and
+the four regimes (holding months 1929-07–1969-12, 1970–1999, 2000–2017,
+2018-01–2026-09) are reported in full and cannot change a verdict.
+
 ## Future comparison and admission gates
 
 Fixed executable references remain SA16_it2 as archived and Nasdaq held; four

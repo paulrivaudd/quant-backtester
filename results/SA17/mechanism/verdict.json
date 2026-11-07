@@ -1,0 +1,1058 @@
+{
+  "study": "SA17 mechanism study on Ken French industries",
+  "hypothesis_id": "sa17_mechanism_ken_french",
+  "provenance": {
+    "git_commit": "98da1efcdedc7fed19ae23fd46cd97cabe17a55b",
+    "dirty": false,
+    "source_state": "CLEAN",
+    "configuration_sha256": "e108adcebe90e56fedc1c85e37b4669964ddc4b3ffb8c02538c82db15ef3e412",
+    "archive": "runs/sa17_french_inputs_20261107",
+    "coverage_sha256": "01cd7ea4d1a256c834f5675940b8ccc2e065cfca08908cd3c8d79e7c83658beb",
+    "inputs": [
+      {
+        "dataset": "10_Industry_Portfolios",
+        "sha256": "cee051709825e60cc38f2aff01c2dec52265aa7ea4a1fefa023a2c8114a5166e",
+        "retrieved_at_utc": "2026-11-07T16:01:15.882294+00:00",
+        "history_basis": "RESTATED"
+      },
+      {
+        "dataset": "49_Industry_Portfolios",
+        "sha256": "d1a3b0b9896e1e633ed2aa85e24ca144d7998f8ab2ff344e2379383ebeb7b836",
+        "retrieved_at_utc": "2026-11-07T16:01:16.658543+00:00",
+        "history_basis": "RESTATED"
+      },
+      {
+        "dataset": "F-F_Research_Data_Factors",
+        "sha256": "b03d39e4bb253dda0f14893db3b78e64b40b8d6549a0fc0fd4111dae84c98618",
+        "retrieved_at_utc": "2026-11-07T16:01:17.584121+00:00",
+        "history_basis": "RESTATED"
+      }
+    ]
+  },
+  "window": {
+    "first_holding_month": "1929-07-01",
+    "last_holding_month": "2026-09-01"
+  },
+  "universes": {
+    "INDUSTRY_10": {
+      "role": "primary",
+      "held": 3,
+      "industries": 10,
+      "formations": 1167,
+      "eligible_min": 10,
+      "eligible_max": 10,
+      "refused_fits": 0,
+      "books": {
+        "RESIDUAL/declared": {
+          "months": 1167.0,
+          "sharpe_excess": 0.5412120516694272,
+          "mean_excess": 0.1019296677615342,
+          "volatility": 0.18784598489708282,
+          "cagr": 0.12307495338930585,
+          "max_drawdown": -0.7834269299737594,
+          "sharpe_excess_gross": 0.5741476908435253,
+          "cagr_gross": 0.13000813887978557,
+          "turnover_per_year": 6.151715283335651,
+          "cost_per_year": 0.006151715283335651,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 0.0
+        },
+        "C1_MOMENTUM_12_1/declared": {
+          "months": 1167.0,
+          "sharpe_excess": 0.540587305364682,
+          "mean_excess": 0.09897574313517524,
+          "volatility": 0.18262628625881192,
+          "cagr": 0.12072314532038253,
+          "max_drawdown": -0.7424454292533954,
+          "sharpe_excess_gross": 0.5687230121792048,
+          "cagr_gross": 0.1264987299880782,
+          "turnover_per_year": 5.138144579044146,
+          "cost_per_year": 0.005138144579044145,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 0.0
+        },
+        "C2_EQUAL_WEIGHT/declared": {
+          "months": 1167.0,
+          "sharpe_excess": 0.45992990864814254,
+          "mean_excess": 0.08243760866276073,
+          "volatility": 0.178885019189051,
+          "cagr": 0.10347562689790624,
+          "max_drawdown": -0.8192867466816144,
+          "sharpe_excess_gross": 0.4615200651718413,
+          "cagr_gross": 0.1037910796960888,
+          "turnover_per_year": 0.2858219791241118,
+          "cost_per_year": 0.00028582197912411177,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 0.0
+        },
+        "RESIDUAL/stressed": {
+          "months": 1167.0,
+          "sharpe_excess": 0.5082389495347752,
+          "mean_excess": 0.09571914700550208,
+          "volatility": 0.18783986426751406,
+          "cagr": 0.11617826539768106,
+          "max_drawdown": -0.7860425614482832,
+          "sharpe_excess_gross": 0.5741476908435253,
+          "cagr_gross": 0.13000813887978557,
+          "turnover_per_year": 6.151715283335651,
+          "cost_per_year": 0.012303430566671303,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 0.0
+        },
+        "C1_MOMENTUM_12_1/stressed": {
+          "months": 1167.0,
+          "sharpe_excess": 0.5123941119772999,
+          "mean_excess": 0.0937742797579256,
+          "volatility": 0.18254564127264916,
+          "cagr": 0.11497255830184172,
+          "max_drawdown": -0.7455327072249829,
+          "sharpe_excess_gross": 0.5687230121792048,
+          "cagr_gross": 0.1264987299880782,
+          "turnover_per_year": 5.138144579044146,
+          "cost_per_year": 0.01027628915808829,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 0.0
+        },
+        "C2_EQUAL_WEIGHT/stressed": {
+          "months": 1167.0,
+          "sharpe_excess": 0.45833941700250247,
+          "mean_excess": 0.08214853352089418,
+          "volatility": 0.17887632255365962,
+          "cagr": 0.1031602439840309,
+          "max_drawdown": -0.819498981994518,
+          "sharpe_excess_gross": 0.4615200651718413,
+          "cagr_gross": 0.1037910796960888,
+          "turnover_per_year": 0.2858219791241118,
+          "cost_per_year": 0.0005716439582482235,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 0.0
+        },
+        "MARKET/none": {
+          "months": 1167.0,
+          "sharpe_excess": 0.42423111312318396,
+          "mean_excess": 0.07832904884318767,
+          "volatility": 0.18426924697631109,
+          "cagr": 0.09786153687806776,
+          "max_drawdown": -0.8365224657023863
+        }
+      },
+      "regimes": {
+        "1929-1969": {
+          "RESIDUAL": {
+            "months": 486.0,
+            "sharpe_excess": 0.4977265872762645,
+            "mean_excess": 0.10822153511158926,
+            "volatility": 0.2171662459639817,
+            "cagr": 0.10653845083837532,
+            "max_drawdown": -0.7834269299737594
+          },
+          "C1_MOMENTUM_12_1": {
+            "months": 486.0,
+            "sharpe_excess": 0.528338940471143,
+            "mean_excess": 0.10776323750351235,
+            "volatility": 0.2036904870475477,
+            "cagr": 0.1087684036391432,
+            "max_drawdown": -0.7424454292533954
+          },
+          "C2_EQUAL_WEIGHT": {
+            "months": 486.0,
+            "sharpe_excess": 0.42051087044806823,
+            "mean_excess": 0.08977351278626246,
+            "volatility": 0.21319273489886334,
+            "cagr": 0.08762763537451246,
+            "max_drawdown": -0.8192867466816144
+          },
+          "MARKET": {
+            "months": 486.0,
+            "sharpe_excess": 0.3832799357935858,
+            "mean_excess": 0.08294074074074075,
+            "volatility": 0.21607925155077837,
+            "cagr": 0.07952891170616705,
+            "max_drawdown": -0.8365224657023863
+          }
+        },
+        "1970-1999": {
+          "RESIDUAL": {
+            "months": 360.0,
+            "sharpe_excess": 0.5499598541544325,
+            "mean_excess": 0.0907368951044221,
+            "volatility": 0.1640540421581412,
+            "cagr": 0.15180060715738986,
+            "max_drawdown": -0.4683330085370957
+          },
+          "C1_MOMENTUM_12_1": {
+            "months": 360.0,
+            "sharpe_excess": 0.5534443910476967,
+            "mean_excess": 0.09221138906785074,
+            "volatility": 0.16581079999866444,
+            "cagr": 0.15318102143596612,
+            "max_drawdown": -0.4229226394206993
+          },
+          "C2_EQUAL_WEIGHT": {
+            "months": 360.0,
+            "sharpe_excess": 0.4947828188326731,
+            "mean_excess": 0.07482728121411485,
+            "volatility": 0.1505407777197273,
+            "cagr": 0.13632805401381343,
+            "max_drawdown": -0.455853892864013
+          },
+          "MARKET": {
+            "months": 360.0,
+            "sharpe_excess": 0.4697871108713901,
+            "mean_excess": 0.07511333333333334,
+            "volatility": 0.15909842131755475,
+            "cagr": 0.13511139292447405,
+            "max_drawdown": -0.46507549984195606
+          }
+        },
+        "2000-2017": {
+          "RESIDUAL": {
+            "months": 216.0,
+            "sharpe_excess": 0.5233436751894442,
+            "mean_excess": 0.07949318181123262,
+            "volatility": 0.15122169963131174,
+            "cagr": 0.0871140307469862,
+            "max_drawdown": -0.4072889374596106
+          },
+          "C1_MOMENTUM_12_1": {
+            "months": 216.0,
+            "sharpe_excess": 0.4839105292947013,
+            "mean_excess": 0.06969357107928704,
+            "volatility": 0.14322293986133194,
+            "cagr": 0.07780758615305916,
+            "max_drawdown": -0.39597637134205155
+          },
+          "C2_EQUAL_WEIGHT": {
+            "months": 216.0,
+            "sharpe_excess": 0.4802187736663962,
+            "mean_excess": 0.06756335937563519,
+            "volatility": 0.14016561163860897,
+            "cagr": 0.07596995490167613,
+            "max_drawdown": -0.4808768144558144
+          },
+          "MARKET": {
+            "months": 216.0,
+            "sharpe_excess": 0.3487077849055846,
+            "mean_excess": 0.05245,
+            "volatility": 0.14964596700833757,
+            "cagr": 0.058424218975346776,
+            "max_drawdown": -0.5031170717166413
+          }
+        },
+        "2018-2026": {
+          "RESIDUAL": {
+            "months": 105.0,
+            "sharpe_excess": 0.839250519189517,
+            "mean_excess": 0.1573375876634271,
+            "volatility": 0.186729670069366,
+            "cagr": 0.17949334662491556,
+            "max_drawdown": -0.1964707101221197
+          },
+          "C1_MOMENTUM_12_1": {
+            "months": 105.0,
+            "sharpe_excess": 0.6853451825201815,
+            "mean_excess": 0.14173187994752615,
+            "volatility": 0.20603204324696184,
+            "cagr": 0.15725147698294117,
+            "max_drawdown": -0.21872860360147484
+          },
+          "C2_EQUAL_WEIGHT": {
+            "months": 105.0,
+            "sharpe_excess": 0.6324376140492077,
+            "mean_excess": 0.10517385936285405,
+            "volatility": 0.16602244665523927,
+            "cagr": 0.12385442408907865,
+            "max_drawdown": -0.22931261327970176
+          },
+          "MARKET": {
+            "months": 105.0,
+            "sharpe_excess": 0.717751077951578,
+            "mean_excess": 0.12124571428571429,
+            "volatility": 0.1689997244942159,
+            "cagr": 0.1412952563722023,
+            "max_drawdown": -0.24844932247034712
+          }
+        }
+      },
+      "comparisons": {
+        "C1_MOMENTUM_12_1": {
+          "sharpe_difference": {
+            "declared": 0.0006247463047451829,
+            "stressed": -0.004155162442524674
+          },
+          "active": {
+            "declared": {
+              "active_mean": 0.002953924626358957,
+              "tracking_error": 0.06292595699441977,
+              "information_ratio": 0.046942863763214736
+            },
+            "stressed": {
+              "active_mean": 0.0019448672475764748,
+              "tracking_error": 0.0631092547924559,
+              "information_ratio": 0.030817464949831178
+            }
+          },
+          "bootstrap": {
+            "SHARPE/block12": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": 0.0006247463047450719,
+              "low": -0.060421308069591485,
+              "high": 0.06771043090208852,
+              "p_value": 0.9861013898610139,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 12,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block12": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": 0.0029539246263589514,
+              "low": -0.00876549258637172,
+              "high": 0.014692829113208053,
+              "p_value": 0.6285371462853715,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 12,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "SHARPE/block6": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": 0.0006247463047450719,
+              "low": -0.0637788403416239,
+              "high": 0.06908124001028576,
+              "p_value": 0.9844015598440156,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 6,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block6": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": 0.0029539246263589514,
+              "low": -0.009434727493789423,
+              "high": 0.015347887675417166,
+              "p_value": 0.6399360063993601,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 6,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "SHARPE/block24": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": 0.0006247463047450719,
+              "low": -0.0571925397251432,
+              "high": 0.0660761060890308,
+              "p_value": 0.9836016398360165,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 24,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block24": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": 0.0029539246263589514,
+              "low": -0.008075190173598102,
+              "high": 0.013724061718855712,
+              "p_value": 0.5892410758924107,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 24,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            }
+          },
+          "holm_p_value": 0.9861013898610139,
+          "verdict": "UNCERTAIN"
+        },
+        "C2_EQUAL_WEIGHT": {
+          "sharpe_difference": {
+            "declared": 0.08128214302128467,
+            "stressed": 0.04989953253227275
+          },
+          "active": {
+            "declared": {
+              "active_mean": 0.019492059098773475,
+              "tracking_error": 0.0644897356570826,
+              "information_ratio": 0.30225056592603283
+            },
+            "stressed": {
+              "active_mean": 0.013570613484607892,
+              "tracking_error": 0.06461707437016104,
+              "information_ratio": 0.21001590704754267
+            }
+          },
+          "bootstrap": {
+            "SHARPE/block12": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": 0.08128214302128439,
+              "low": 0.016907794397832673,
+              "high": 0.14701794493478787,
+              "p_value": 0.013598640135986401,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 12,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block12": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": 0.019492059098773457,
+              "low": 0.007503265620665968,
+              "high": 0.03205172455466498,
+              "p_value": 0.0020997900209979003,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 12,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "SHARPE/block6": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": 0.08128214302128439,
+              "low": 0.011744080760000539,
+              "high": 0.1496981485035423,
+              "p_value": 0.020997900209979003,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 6,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block6": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": 0.019492059098773457,
+              "low": 0.006569940252542937,
+              "high": 0.03245609597244336,
+              "p_value": 0.0036996300369963003,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 6,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "SHARPE/block24": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": 0.08128214302128439,
+              "low": 0.01981876382018885,
+              "high": 0.14028944496487175,
+              "p_value": 0.007699230076992301,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 24,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block24": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": 0.019492059098773457,
+              "low": 0.008123172249170313,
+              "high": 0.03133268029440477,
+              "p_value": 0.000999900009999,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 24,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            }
+          },
+          "holm_p_value": 0.027197280271972803,
+          "verdict": "SUPPORTED_RETROSPECTIVE"
+        },
+        "MARKET": {
+          "description_only": true,
+          "active": {
+            "active_mean": 0.02360061891834654,
+            "tracking_error": 0.06903252284358599,
+            "information_ratio": 0.3418768132206448
+          }
+        }
+      }
+    },
+    "INDUSTRY_49": {
+      "role": "robustness",
+      "held": 15,
+      "industries": 49,
+      "formations": 1167,
+      "eligible_min": 40,
+      "eligible_max": 49,
+      "refused_fits": 0,
+      "books": {
+        "RESIDUAL/declared": {
+          "months": 1167.0,
+          "sharpe_excess": 0.5289871684575205,
+          "mean_excess": 0.10854319018668088,
+          "volatility": 0.2047953909822596,
+          "cagr": 0.126859578312712,
+          "max_drawdown": -0.8024675974254336,
+          "sharpe_excess_gross": 0.5578975186984361,
+          "cagr_gross": 0.13356127322291655,
+          "turnover_per_year": 5.927942677631548,
+          "cost_per_year": 0.0059279426776315475,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 1.0
+        },
+        "C1_MOMENTUM_12_1/declared": {
+          "months": 1167.0,
+          "sharpe_excess": 0.5892853286887982,
+          "mean_excess": 0.11695344103438891,
+          "volatility": 0.19808303221960297,
+          "cagr": 0.13753774349611558,
+          "max_drawdown": -0.775925881633455,
+          "sharpe_excess_gross": 0.6124474149052123,
+          "cagr_gross": 0.14276289395659414,
+          "turnover_per_year": 4.58181262826864,
+          "cost_per_year": 0.004581812628268641,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 1.0
+        },
+        "C2_EQUAL_WEIGHT/declared": {
+          "months": 1167.0,
+          "sharpe_excess": 0.43854321411319513,
+          "mean_excess": 0.08933032612252557,
+          "volatility": 0.20326626244437143,
+          "cagr": 0.10605648760647202,
+          "max_drawdown": -0.8445220015534924,
+          "sharpe_excess_gross": 0.4405483228909868,
+          "cagr_gross": 0.10651016513993916,
+          "turnover_per_year": 0.41007844761715206,
+          "cost_per_year": 0.0004100784476171521,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 1.0
+        },
+        "RESIDUAL/stressed": {
+          "months": 1167.0,
+          "sharpe_excess": 0.500034628979574,
+          "mean_excess": 0.10253769142734637,
+          "volatility": 0.20466741087703486,
+          "cagr": 0.1201937508261095,
+          "max_drawdown": -0.8053519153886984,
+          "sharpe_excess_gross": 0.5578975186984361,
+          "cagr_gross": 0.13356127322291655,
+          "turnover_per_year": 5.927942677631548,
+          "cost_per_year": 0.011855885355263095,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 1.0
+        },
+        "C1_MOMENTUM_12_1/stressed": {
+          "months": 1167.0,
+          "sharpe_excess": 0.5661014366587123,
+          "mean_excess": 0.11231332594195695,
+          "volatility": 0.19801593148489466,
+          "cagr": 0.1323340902844854,
+          "max_drawdown": -0.7781310332967558,
+          "sharpe_excess_gross": 0.6124474149052123,
+          "cagr_gross": 0.14276289395659414,
+          "turnover_per_year": 4.58181262826864,
+          "cost_per_year": 0.009163625256537283,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 1.0
+        },
+        "C2_EQUAL_WEIGHT/stressed": {
+          "months": 1167.0,
+          "sharpe_excess": 0.4365376573674601,
+          "mean_excess": 0.08891496922633632,
+          "volatility": 0.20325083515128922,
+          "cagr": 0.10560296690429061,
+          "max_drawdown": -0.8447992091675469,
+          "sharpe_excess_gross": 0.4405483228909868,
+          "cagr_gross": 0.10651016513993916,
+          "turnover_per_year": 0.41007844761715206,
+          "cost_per_year": 0.0008201568952343042,
+          "months_at_risk_free": 0.0,
+          "missing_held_returns": 1.0
+        },
+        "MARKET/none": {
+          "months": 1167.0,
+          "sharpe_excess": 0.42423111312318396,
+          "mean_excess": 0.07832904884318767,
+          "volatility": 0.18426924697631109,
+          "cagr": 0.09786153687806776,
+          "max_drawdown": -0.8365224657023863
+        }
+      },
+      "regimes": {
+        "1929-1969": {
+          "RESIDUAL": {
+            "months": 486.0,
+            "sharpe_excess": 0.5180206900186777,
+            "mean_excess": 0.12387528792818435,
+            "volatility": 0.23891415322933968,
+            "cagr": 0.11885190270341184,
+            "max_drawdown": -0.8024675974254336
+          },
+          "C1_MOMENTUM_12_1": {
+            "months": 486.0,
+            "sharpe_excess": 0.5955187517806608,
+            "mean_excess": 0.13494119914649175,
+            "volatility": 0.2263428530061692,
+            "cagr": 0.1337908053398702,
+            "max_drawdown": -0.775925881633455
+          },
+          "C2_EQUAL_WEIGHT": {
+            "months": 486.0,
+            "sharpe_excess": 0.4361175346089793,
+            "mean_excess": 0.10538615402190782,
+            "volatility": 0.24133595889330528,
+            "cagr": 0.09809969324353918,
+            "max_drawdown": -0.8445220015534924
+          },
+          "MARKET": {
+            "months": 486.0,
+            "sharpe_excess": 0.3832799357935858,
+            "mean_excess": 0.08294074074074075,
+            "volatility": 0.21607925155077837,
+            "cagr": 0.07952891170616705,
+            "max_drawdown": -0.8365224657023863
+          }
+        },
+        "1970-1999": {
+          "RESIDUAL": {
+            "months": 360.0,
+            "sharpe_excess": 0.5327452423061064,
+            "mean_excess": 0.09893950261313136,
+            "volatility": 0.18489142417105778,
+            "cagr": 0.15696389726717586,
+            "max_drawdown": -0.3670090168540051
+          },
+          "C1_MOMENTUM_12_1": {
+            "months": 360.0,
+            "sharpe_excess": 0.5773102394482267,
+            "mean_excess": 0.10482841337057244,
+            "volatility": 0.18088193620602042,
+            "cagr": 0.16454152518057286,
+            "max_drawdown": -0.3514717235555703
+          },
+          "C2_EQUAL_WEIGHT": {
+            "months": 360.0,
+            "sharpe_excess": 0.37410078701427735,
+            "mean_excess": 0.06618106858880675,
+            "volatility": 0.1762699840924032,
+            "cagr": 0.12183544200250362,
+            "max_drawdown": -0.4955464237903865
+          },
+          "MARKET": {
+            "months": 360.0,
+            "sharpe_excess": 0.4697871108713901,
+            "mean_excess": 0.07511333333333334,
+            "volatility": 0.15909842131755475,
+            "cagr": 0.13511139292447405,
+            "max_drawdown": -0.46507549984195606
+          }
+        },
+        "2000-2017": {
+          "RESIDUAL": {
+            "months": 216.0,
+            "sharpe_excess": 0.5038849904702642,
+            "mean_excess": 0.08139989978969944,
+            "volatility": 0.1610490056909648,
+            "cagr": 0.0872730597148319,
+            "max_drawdown": -0.544981193382479
+          },
+          "C1_MOMENTUM_12_1": {
+            "months": 216.0,
+            "sharpe_excess": 0.5776340190707718,
+            "mean_excess": 0.09285686063257456,
+            "volatility": 0.16026560903253032,
+            "cagr": 0.09995131157057457,
+            "max_drawdown": -0.49535692800976683
+          },
+          "C2_EQUAL_WEIGHT": {
+            "months": 216.0,
+            "sharpe_excess": 0.5489046364389274,
+            "mean_excess": 0.08722397855389076,
+            "volatility": 0.15853106841649195,
+            "cagr": 0.09414517425364788,
+            "max_drawdown": -0.5266360743819345
+          },
+          "MARKET": {
+            "months": 216.0,
+            "sharpe_excess": 0.3487077849055846,
+            "mean_excess": 0.05245,
+            "volatility": 0.14964596700833757,
+            "cagr": 0.058424218975346776,
+            "max_drawdown": -0.5031170717166413
+          }
+        },
+        "2018-2026": {
+          "RESIDUAL": {
+            "months": 105.0,
+            "sharpe_excess": 0.70534014997897,
+            "mean_excess": 0.1263420354233964,
+            "volatility": 0.1786530650343594,
+            "cagr": 0.14524411621082356,
+            "max_drawdown": -0.20920623717604336
+          },
+          "C1_MOMENTUM_12_1": {
+            "months": 105.0,
+            "sharpe_excess": 0.6706143847397253,
+            "mean_excess": 0.12483744944661601,
+            "volatility": 0.18585226860280998,
+            "cagr": 0.14204260277998437,
+            "max_drawdown": -0.23263785523461789
+          },
+          "C2_EQUAL_WEIGHT": {
+            "months": 105.0,
+            "sharpe_excess": 0.5485192865165743,
+            "mean_excess": 0.0987167206736126,
+            "volatility": 0.17976834375871076,
+            "cagr": 0.11396548363654779,
+            "max_drawdown": -0.25948212710573604
+          },
+          "MARKET": {
+            "months": 105.0,
+            "sharpe_excess": 0.717751077951578,
+            "mean_excess": 0.12124571428571429,
+            "volatility": 0.1689997244942159,
+            "cagr": 0.1412952563722023,
+            "max_drawdown": -0.24844932247034712
+          }
+        }
+      },
+      "comparisons": {
+        "C1_MOMENTUM_12_1": {
+          "sharpe_difference": {
+            "declared": -0.060298160231277764,
+            "stressed": -0.0660668076791383
+          },
+          "active": {
+            "declared": {
+              "active_mean": -0.008410250847708045,
+              "tracking_error": 0.04900190260740836,
+              "information_ratio": -0.1716311081855124
+            },
+            "stressed": {
+              "active_mean": -0.009775634514610583,
+              "tracking_error": 0.04899788366457478,
+              "information_ratio": -0.19951136219539042
+            }
+          },
+          "bootstrap": {
+            "SHARPE/block12": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": -0.060298160231277986,
+              "low": -0.10353756452622132,
+              "high": -0.01313360176023915,
+              "p_value": 0.0084991500849915,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 12,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block12": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": -0.00841025084770807,
+              "low": -0.017895234670107073,
+              "high": 0.0013481256633494888,
+              "p_value": 0.0842915708429157,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 12,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "SHARPE/block6": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": -0.060298160231277986,
+              "low": -0.1073455217700061,
+              "high": -0.013922959860417772,
+              "p_value": 0.012598740125987402,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 6,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block6": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": -0.00841025084770807,
+              "low": -0.01856195414753606,
+              "high": 0.001884650142826963,
+              "p_value": 0.10258974102589741,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 6,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "SHARPE/block24": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": -0.060298160231277986,
+              "low": -0.10033897840660203,
+              "high": -0.014529631667384262,
+              "p_value": 0.006399360063993601,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 24,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block24": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": -0.00841025084770807,
+              "low": -0.017179153685468056,
+              "high": 0.0004790573636229397,
+              "p_value": 0.0643935606439356,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 24,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            }
+          },
+          "holm_p_value": 0.0084991500849915
+        },
+        "C2_EQUAL_WEIGHT": {
+          "sharpe_difference": {
+            "declared": 0.09044395434432534,
+            "stressed": 0.06349697161211387
+          },
+          "active": {
+            "declared": {
+              "active_mean": 0.01921286406415528,
+              "tracking_error": 0.053251544204615295,
+              "information_ratio": 0.3607944962183859
+            },
+            "stressed": {
+              "active_mean": 0.013622722201010027,
+              "tracking_error": 0.0532611061823371,
+              "information_ratio": 0.25577242339603734
+            }
+          },
+          "bootstrap": {
+            "SHARPE/block12": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": 0.0904439543443249,
+              "low": 0.03654022787598589,
+              "high": 0.14961750050817332,
+              "p_value": 0.0031996800319968005,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 12,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block12": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": 0.01921286406415524,
+              "low": 0.008179025121022178,
+              "high": 0.030545953748917845,
+              "p_value": 0.0007999200079992001,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 12,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "SHARPE/block6": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": 0.0904439543443249,
+              "low": 0.03566559359359273,
+              "high": 0.1481594331656248,
+              "p_value": 0.0014998500149985001,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 6,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block6": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": 0.01921286406415524,
+              "low": 0.007932173036080771,
+              "high": 0.03060337996941977,
+              "p_value": 0.0011998800119988001,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 6,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "SHARPE/block24": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "SHARPE",
+              "estimate": 0.0904439543443249,
+              "low": 0.03382232953358431,
+              "high": 0.15255350453829047,
+              "p_value": 0.0026997300269973002,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 24,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            },
+            "MEAN_RETURN/block24": {
+              "method": "STATIONARY_CIRCULAR",
+              "statistic": "MEAN_RETURN",
+              "estimate": 0.01921286406415524,
+              "low": 0.007804685935901362,
+              "high": 0.030808070142057418,
+              "p_value": 0.000999900009999,
+              "level": 0.95,
+              "sessions": 1167,
+              "mean_block": 24,
+              "draws": 10000,
+              "seed": 20261107,
+              "analytics": {
+                "sessions_per_year": 12,
+                "risk_free_rate": 0.0,
+                "minimum_sessions": 60
+              }
+            }
+          },
+          "holm_p_value": 0.006399360063993601
+        },
+        "MARKET": {
+          "description_only": true,
+          "active": {
+            "active_mean": 0.030214141343493206,
+            "tracking_error": 0.06776731090930932,
+            "information_ratio": 0.4458512657220199
+          }
+        }
+      }
+    }
+  }
+}

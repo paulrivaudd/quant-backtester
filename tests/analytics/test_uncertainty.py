@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from itertools import pairwise
 
 import numpy as np
 import pandas as pd
@@ -13,7 +14,10 @@ from quant_backtester.analytics.performance import PerformanceStats
 from quant_backtester.analytics.uncertainty import (
     PairedStatistic,
     UndefinedStatistic,
+    holm_adjusted,
     paired_block_bootstrap,
+    paired_stationary_bootstrap,
+    stationary_indices,
 )
 
 
@@ -205,3 +209,149 @@ def test_returns_constant_in_theory_are_refused_like_the_report_refuses_them(rat
 
     with pytest.raises(UndefinedStatistic, match="strategy's returns do not vary"):
         boot(steady, curve(noise(100, 1)), PairedStatistic.SHARPE)
+
+
+# --- The stationary bootstrap (SA17) -------------------------------------------
+
+
+def stationary(
+    strategy: pd.Series,
+    control: pd.Series,
+    statistic: PairedStatistic,
+    *,
+    mean_block: int = 5,
+    draws: int = 400,
+    seed: int = 7,
+    level: float = 0.9,
+):
+    """Run the stationary bootstrap with the test settings, some of them replaced."""
+    return paired_stationary_bootstrap(
+        strategy,
+        control,
+        statistic=statistic,
+        mean_block=mean_block,
+        draws=draws,
+        seed=seed,
+        level=level,
+        config=CONFIG,
+    )
+
+
+def test_stationary_indices_are_reproducible_and_in_range() -> None:
+    first = stationary_indices(50, 4, np.random.default_rng(3))
+    again = stationary_indices(50, 4, np.random.default_rng(3))
+    other = stationary_indices(50, 4, np.random.default_rng(4))
+    assert first == again
+    assert first != other
+    assert len(first) == 50
+    assert all(0 <= index < 50 for index in first)
+
+
+def test_stationary_blocks_have_the_declared_mean_length_and_wrap() -> None:
+    # Over many sessions the share of restarts is 1 / mean_block, so the mean
+    # length of a block is mean_block.
+    count, mean_block = 20_000, 10
+    indices = stationary_indices(count, mean_block, np.random.default_rng(11))
+    breaks = sum(1 for before, after in pairwise(indices) if after != (before + 1) % count)
+    assert count / (breaks + 1) == pytest.approx(mean_block, rel=0.05)
+    # A block reaching the last session continues at the first.
+    small = stationary_indices(5, 1_000, np.random.default_rng(0))
+    assert any(before == 4 and after == 0 for before, after in pairwise(small))
+
+
+def test_a_mean_block_of_one_restarts_at_every_session() -> None:
+    # Every session is a new uniform draw: the ordinary bootstrap.
+    indices = stationary_indices(2_000, 1, np.random.default_rng(5))
+    continued = sum(1 for before, after in pairwise(indices) if after == before + 1)
+    assert continued < 10
+
+
+@pytest.mark.parametrize("statistic", list(PairedStatistic))
+def test_stationary_identical_books_differ_by_nothing(statistic: PairedStatistic) -> None:
+    book = curve(noise(120, 1))
+    result = stationary(book, book, statistic)
+    assert result.estimate == 0.0
+    assert result.low == result.high == 0.0
+    assert result.p_value == 1.0
+
+
+def test_stationary_constant_edge_is_exact_and_significant() -> None:
+    # Every return of the strategy is the control's plus 1 bp: each resample
+    # gives the same mean difference, and none is as far from it as zero is.
+    base = noise(200, 2)
+    result = stationary(
+        curve([value + 0.0001 for value in base]),
+        curve(base),
+        PairedStatistic.MEAN_RETURN,
+        draws=200,
+    )
+    assert result.estimate == pytest.approx(0.0001 * 255, rel=1e-6)
+    assert result.low == pytest.approx(result.estimate, rel=1e-6)
+    assert result.high == pytest.approx(result.estimate, rel=1e-6)
+    assert result.p_value == pytest.approx(1 / 201)
+
+
+def test_stationary_p_value_is_large_for_noise_and_seeded() -> None:
+    strategy, control = curve(noise(300, 21)), curve(noise(300, 22))
+    first = stationary(strategy, control, PairedStatistic.SHARPE, seed=9)
+    again = stationary(strategy, control, PairedStatistic.SHARPE, seed=9)
+    assert first == again
+    assert first.low < first.estimate < first.high
+    assert 0.0 < first.p_value <= 1.0
+    # A difference inside its own interval around zero is not significant.
+    if first.low < 0.0 < first.high:
+        assert first.p_value > 0.05
+
+
+def test_stationary_records_everything_it_rests_on() -> None:
+    book = curve(noise(80, 3))
+    recorded = stationary(book, curve(noise(80, 4)), PairedStatistic.SHARPE).definition()
+    assert recorded["method"] == "STATIONARY_CIRCULAR"
+    assert recorded["mean_block"] == 5
+    assert recorded["draws"] == 400
+    assert recorded["seed"] == 7
+    assert recorded["analytics"] == CONFIG.definition()
+    assert set(recorded) >= {"estimate", "low", "high", "p_value", "level", "sessions"}
+
+
+@pytest.mark.parametrize(
+    "change, message",
+    [
+        ({"mean_block": 0}, "does not fit"),
+        ({"mean_block": 500}, "does not fit"),
+        ({"mean_block": 2.5}, "whole number"),
+        ({"draws": 99}, "too few"),
+        ({"level": 1.0}, "coverage"),
+    ],
+)
+def test_stationary_parameters_out_of_range_are_refused(
+    change: dict[str, object], message: str
+) -> None:
+    book = curve(noise(60, 5))
+    with pytest.raises(ValueError, match=message):
+        stationary(book, book, PairedStatistic.SHARPE, **change)  # type: ignore[arg-type]
+
+
+def test_stationary_books_over_different_sessions_are_not_compared() -> None:
+    book = curve(noise(30, 6))
+    shifted = book.copy()
+    shifted.index = shifted.index + 1
+    with pytest.raises(ValueError, match="same sessions"):
+        stationary(book, shifted, PairedStatistic.SHARPE)
+
+
+def test_holm_adjusts_by_rank_and_keeps_the_order() -> None:
+    # Sorted: a 0.01 x3 = 0.03; c 0.03 x2 = 0.06; b 0.04 x1 = 0.04, raised to 0.06.
+    adjusted = holm_adjusted({"a": 0.01, "b": 0.04, "c": 0.03})
+    assert adjusted == pytest.approx({"a": 0.03, "b": 0.06, "c": 0.06})
+    assert list(adjusted) == ["a", "b", "c"]
+    assert holm_adjusted({"x": 0.6, "y": 0.7}) == {"x": 1.0, "y": 1.0}
+    assert holm_adjusted({"only": 0.02}) == {"only": 0.02}
+
+
+@pytest.mark.parametrize("values", [{}, {"a": -0.1}, {"a": 1.5}, {"a": float("nan")}])
+def test_holm_refuses_an_empty_family_or_a_value_that_is_not_a_probability(
+    values: dict[str, float],
+) -> None:
+    with pytest.raises(ValueError):
+        holm_adjusted(values)
