@@ -202,6 +202,12 @@ CATALOGUE: tuple[CatalogueEntry, ...] = (
         "growth gold budget",
         f"{_STRATEGIES}.SA16_risk_budget:SA16RiskBudget",
     ),
+    CatalogueEntry(
+        Family.SA,
+        17,
+        "sector residual momentum",
+        f"{_STRATEGIES}.SA17_sector_residual_momentum:SA17SectorResidualMomentum",
+    ),
 )
 """Every catalogued strategy, by number.
 
@@ -223,6 +229,11 @@ momentum and volatility-control strategy of 2026-10-15. Its recorded identifier
 ``SA16`` is the risk budget of 2026-10-31: US technology and gold held
 together at inverse-volatility weights scaled by a declared budget of risk;
 the configuration its study retained is in ``results/SA16/selected.json``.
+``SA17`` is the market-adjusted sector momentum proposed on 2026-11-01
+(``research/SA17/proposal.md``): the US sectors with the strongest residual
+momentum against the market, scaled to a volatility target. It is catalogued
+with its implementation and has not been run on the store; its controls are
+built by ``SA17SectorResidualMomentum.controls`` and carry no code.
 The reference books of studies (``quant_backtester.research.references``)
 are not candidates and carry
 no code. The exercises and the baselines that came before were removed on

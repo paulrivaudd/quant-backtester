@@ -9,5 +9,14 @@ from __future__ import annotations
 
 from quant_backtester.signals.cross_asset.correlation import ReturnLevelCorrelationSignal
 from quant_backtester.signals.cross_asset.relative_residual import RelativeResidualSignal
+from quant_backtester.signals.cross_asset.residual_momentum import (
+    MomentumMeasure,
+    MonthlyMomentumSignal,
+)
 
-__all__ = ["RelativeResidualSignal", "ReturnLevelCorrelationSignal"]
+__all__ = [
+    "MomentumMeasure",
+    "MonthlyMomentumSignal",
+    "RelativeResidualSignal",
+    "ReturnLevelCorrelationSignal",
+]

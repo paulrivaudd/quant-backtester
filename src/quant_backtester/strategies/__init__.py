@@ -23,7 +23,7 @@ would look identical in an import list and fail at the first decision, which is
 why there is no such thing here any more.
 
 Every strategy kept has a code and a label in ``catalogue``, ``SA1 - std MA20``
-to ``SA16 - growth gold budget``, and its module carries that code:
+to ``SA17 - sector residual momentum``, and its module carries that code:
 ``SA3_smooth_moving_average``. ``SA13`` and ``SA14`` are not imported here.
 ``SA13`` is built from a schedule of models calibrated before the run, and
 ``SA14`` needs PyTorch, an optional dependency (the ``ml`` extra), which the
@@ -58,6 +58,7 @@ from quant_backtester.strategies.SA11_garch_vol_control import EwmaVolControl, G
 from quant_backtester.strategies.SA12_arima_garch import ArimaGarch
 from quant_backtester.strategies.SA15_gpt61 import SA15GPT61
 from quant_backtester.strategies.SA16_risk_budget import SA16RiskBudget
+from quant_backtester.strategies.SA17_sector_residual_momentum import SA17SectorResidualMomentum
 
 __all__ = [
     "SA15GPT61",
@@ -72,6 +73,7 @@ __all__ = [
     "RealizedVolControl",
     "RelativeResidualTilt",
     "SA16RiskBudget",
+    "SA17SectorResidualMomentum",
     "SmoothMovingAverage",
     "Strategy",
     "TrendFilteredPullback",

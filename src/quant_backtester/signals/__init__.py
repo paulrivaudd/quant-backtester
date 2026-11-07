@@ -27,6 +27,10 @@ from quant_backtester.signals.base import Signal, SignalResult
 from quant_backtester.signals.context import SignalContext
 from quant_backtester.signals.cross_asset.correlation import ReturnLevelCorrelationSignal
 from quant_backtester.signals.cross_asset.relative_residual import RelativeResidualSignal
+from quant_backtester.signals.cross_asset.residual_momentum import (
+    MomentumMeasure,
+    MonthlyMomentumSignal,
+)
 from quant_backtester.signals.cross_sectional.rank import CrossSectionalRank
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
 from quant_backtester.signals.level.change import LevelChangeSignal
@@ -63,7 +67,9 @@ __all__ = [
     "LevelChangeSignal",
     "LevelZScoreSignal",
     "MeanReversionSignal",
+    "MomentumMeasure",
     "MomentumSignal",
+    "MonthlyMomentumSignal",
     "MovingAverageCrossSignal",
     "MovingAverageTrendSignal",
     "NormalizedPullbackSignal",

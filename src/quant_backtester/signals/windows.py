@@ -13,9 +13,13 @@ input, and the layers above decide what to do about it.
 
 from __future__ import annotations
 
+import calendar
 import math
 from dataclasses import dataclass
 from datetime import date
+from zoneinfo import ZoneInfo
+
+import pandas as pd
 
 from quant_backtester.data.instruments import DataType, Instrument
 from quant_backtester.data.reader import ObservationStatus
@@ -27,6 +31,7 @@ from quant_backtester.signals.types import (
     WindowMode,
     WindowSpec,
     require_non_negative_int,
+    require_positive_int,
 )
 
 _STATUS_OF_OBSERVATION = {
@@ -169,6 +174,160 @@ def load_window(
             age_sessions=age,
         )
     return LoadedWindow(status=SignalStatus.OK, points=points, dates=dates, age_sessions=age)
+
+
+MONTH_END_SAMPLING = "VENUE_LAST_SESSION_ON_OR_BEFORE_MONTH_END"
+"""How :func:`load_month_end_window` reads a month end on a venue, for definitions."""
+
+MONTH_END_WINDOW_MODE = "EXPECTED_MONTH_END_SESSIONS"
+"""The window contract of :func:`load_month_end_window`: every month-end session
+the venue held must be there; sessions inside a month are not read."""
+
+
+def month_end_anchors(decided: date, months: int) -> tuple[date, ...]:
+    """Return the day each month of a monthly window ends on, oldest first.
+
+    Parameters
+    ----------
+    decided : date
+        The day being decided, as the reference calendar dates the decision
+        instant. It ends the latest month of the window, which is therefore
+        the month to date.
+    months : int
+        Number of monthly returns the window holds.
+
+    Returns
+    -------
+    tuple[date, ...]
+        ``months + 1`` days: the last calendar day of each of the ``months``
+        months before the decision's month, then ``decided`` itself.
+
+    Raises
+    ------
+    ValueError
+        If ``months`` is not a positive integer.
+    """
+    require_positive_int(months, "months")
+    position = decided.year * 12 + decided.month - 1
+    anchors = []
+    for back in range(months, 0, -1):
+        year, index = divmod(position - back, 12)
+        anchors.append(date(year, index + 1, calendar.monthrange(year, index + 1)[1]))
+    return (*anchors, decided)
+
+
+def load_month_end_window(
+    context: SignalContext,
+    instrument_id: str,
+    *,
+    months: int,
+    basis: PriceBasis,
+    max_age_sessions: int,
+) -> LoadedWindow:
+    """Return a fund's closes at the ``months + 1`` month ends ending at the decision.
+
+    Parameters
+    ----------
+    context : SignalContext
+        Environment of the decision. The month grid is fixed by its instant,
+        dated on the reader's reference calendar, so every fund of one
+        decision shares it.
+    instrument_id : str
+        A bars instrument with a venue calendar.
+    months : int
+        Number of monthly returns wanted.
+    basis : PriceBasis
+        Raw closes, or closes adjusted for the actions known at the decision.
+    max_age_sessions : int
+        Largest age of the freshest close, in sessions of the reference
+        calendar. It must also belong to the decision's month.
+
+    Returns
+    -------
+    LoadedWindow
+        ``OK`` with the closes, oldest first, dated by the venue session each
+        month end fell on; the latest is the freshest close at the decision.
+        Otherwise, in the order they are asked: ``NOT_LISTED`` before the
+        listing; ``INSUFFICIENT_HISTORY`` when the history does not reach the
+        oldest month end, whatever the state of the latest close;
+        ``MISSING_INPUT`` for a latest session with no close; ``STALE_INPUT``
+        for a freshest close older than allowed or from a month already
+        closed; ``MISSING_INPUT`` when a month-end session the venue held has
+        no close.
+
+    Raises
+    ------
+    ValueError
+        If the instrument is a published series or declares no calendar, or
+        ``max_age_sessions`` is not a non-negative integer: configuration
+        mistakes, which stop the run.
+    KeyError
+        If the instrument is not registered.
+
+    Notes
+    -----
+    A month ends at the venue's last session on or before its last calendar
+    day (:data:`MONTH_END_SAMPLING`); a month end the provider did not serve
+    is never replaced by the session before it. A hole inside a month is not
+    read and changes nothing (:data:`MONTH_END_WINDOW_MODE`).
+
+    Whether the fund is old enough is asked before whether its latest close
+    is fresh: a fund that could not be eligible anyway is not a failure of
+    the decision because its newest bar is late. A refused window keeps the
+    month-end closes it did find.
+    """
+    require_non_negative_int(max_age_sessions, "max_age_sessions")
+    instrument = context.instruments.get(instrument_id)
+    if instrument.data_type is not DataType.BAR:
+        raise ValueError(
+            f"{instrument_id} is a {instrument.data_type.value} series and holds no venue "
+            "month ends"
+        )
+    if instrument.calendar_id is None:
+        raise ValueError(f"{instrument_id} is a BAR instrument and declares no calendar")
+
+    latest = context.market.values([instrument_id], BarField.CLOSE).loc[instrument_id]
+    if latest["status"] is ObservationStatus.NOT_LISTED:
+        return LoadedWindow(status=SignalStatus.NOT_LISTED)
+    age = None if pd.isna(latest["age_sessions"]) else int(latest["age_sessions"])
+    reference = context.calendars.get(context.market.reference_calendar_id)
+    decided = context.as_of.astimezone(ZoneInfo(reference.timezone)).date()
+    anchors = month_end_anchors(decided, months)
+    series = context.series(instrument_id, BarField.CLOSE, basis)
+    observed: tuple[date, ...] = tuple(series.index)
+    present = set(observed)
+    venue = context.calendars.get(instrument.calendar_id)
+
+    def month_ends(since: date) -> list[date]:
+        """Return the venue's month-end sessions of the window, from ``since`` on."""
+        ends = []
+        for anchor in anchors[:-1]:
+            if anchor >= since:  # the venue calendar need not reach before the history
+                session = venue.session(anchor) or venue.previous_session(anchor)
+                ends.append(session.session_date)
+        return ends
+
+    if not observed or observed[0] > anchors[0]:
+        found = [day for day in month_ends(observed[0]) if day in present] if observed else []
+        return LoadedWindow(
+            status=SignalStatus.INSUFFICIENT_HISTORY,
+            points=tuple(float(series.loc[day]) for day in found),
+            dates=tuple(found),
+            age_sessions=age,
+        )
+    refused = _STATUS_OF_OBSERVATION.get(latest["status"])
+    if refused is not None or age is None:
+        return LoadedWindow(status=refused or SignalStatus.MISSING_INPUT)
+    freshest = observed[-1]
+    if age > max_age_sessions or freshest <= anchors[-2]:
+        # Too old in sessions, or from a month already closed: the decision's
+        # month would have no return of its own.
+        return LoadedWindow(status=SignalStatus.STALE_INPUT, age_sessions=age)
+    ends = [*month_ends(observed[0]), freshest]
+    held = [day for day in ends if day in present]
+    points = tuple(float(series.loc[day]) for day in held)
+    status = SignalStatus.OK if len(held) == len(ends) else SignalStatus.MISSING_INPUT
+    return LoadedWindow(status=status, points=points, dates=tuple(held), age_sessions=age)
 
 
 ADJUSTED_OPEN_CONSTRUCTION = "RAW_OPEN_TIMES_PIT_CLOSE_ADJUSTMENT_V1"
