@@ -640,9 +640,16 @@ class BacktestEngine:
         }
 
     def _requested_names(self, sessions: Sequence[date]) -> set[str]:
-        """Return every instrument a declared signal names on any session of the run."""
+        """Return every instrument a declared signal names on any session of the run.
+
+        Includes what a signal reads beside the instruments it is asked about
+        (:meth:`~quant_backtester.signals.base.Signal.referenced_instruments`):
+        a market it fits on, an FX series it converts with.
+        """
         names: set[str] = set()
         for item in self._declared_signals():
+            signal = item.signal if isinstance(item, SignalRequest) else item
+            names.update(signal.referenced_instruments())
             if not isinstance(item, SignalRequest):
                 continue
             for session in sessions:

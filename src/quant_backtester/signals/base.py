@@ -360,6 +360,26 @@ class Signal(ABC):
             definitions must compute the same thing.
         """
 
+    def referenced_instruments(self) -> tuple[str, ...]:
+        """Return the instruments this signal reads beside those it is asked about.
+
+        Returns
+        -------
+        tuple[str, ...]
+            A market a fund is fitted on, an FX series a value is converted
+            with: series the numbers rest on although no one asked the signal
+            about them. Empty by default.
+
+        Notes
+        -----
+        The engine records the history basis of every instrument a run reads
+        (audit N08, decision D23). An instrument named in a request is found
+        there; one read inside :meth:`compute` is only found if the signal
+        says so here. A signal that reads such a series and does not declare it
+        leaves a ``RESTATED`` history out of the report that should name it.
+        """
+        return ()
+
     @abstractmethod
     def compute(self, context: SignalContext, instrument_ids: Sequence[str]) -> SignalResult:
         """Compute the signal for these instruments at the context's instant.
