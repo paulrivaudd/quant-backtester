@@ -34,6 +34,7 @@ from quant_backtester.data.sources.base import (
 from quant_backtester.data.sources.ecb import EcbSource
 from quant_backtester.data.sources.euronext import EuronextSource
 from quant_backtester.data.sources.fred import FredSource
+from quant_backtester.data.sources.ssga_nav import SsgaNavSource
 from quant_backtester.data.sources.yahoo import YahooSource
 
 
@@ -195,6 +196,7 @@ def test_raw_download_is_immutable() -> None:
 
 
 ALL_SOURCES: tuple[DataSource, ...] = (
+    SsgaNavSource(),
     YahooSource(),
     EuronextSource(),
     FredSource(),

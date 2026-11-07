@@ -1,0 +1,97 @@
+# Declared before any SA17 run. Illustrative execution cost assumptions, NOT historical quotes.
+written_on = 2026-11-07
+quote_date = 2026-11-06
+commission_rate = 0.0005
+minimum_commission_eur = 1.0
+slippage_rate = 0.0005
+stress_multiplier = 2.0
+assumption = "Half-spread=max(5bp, ceil(observed full spread in bp)); deliberately above the one-day half-spread. Technology crossed quote rejected: provisional 15bp. No historical calibration claim. Freeze before runs; x2 all costs including floor."
+
+[costs.SA17_ETF_ENERGY]
+isin = "IE00BWBXM492"
+bid_eur = 45.43
+ask_eur = 45.46
+quote_status = "VALID_DISPLAY_ONLY"
+observed_full_spread_bps = 6.60138629
+half_spread_rate = 0.0007
+source = "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-energy-select-sector-ucits-etf-acc-zpde-gy"
+
+[costs.SA17_ETF_MATERIALS]
+isin = "IE00BWBXM831"
+bid_eur = 47.3
+ask_eur = 47.36
+quote_status = "VALID_DISPLAY_ONLY"
+observed_full_spread_bps = 12.67694908
+half_spread_rate = 0.0013
+source = "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-materials-select-sector-ucits-etf-acc-zpdm-gy"
+
+[costs.SA17_ETF_INDUSTRIALS]
+isin = "IE00BWBXM724"
+bid_eur = 63.79
+ask_eur = 63.84
+quote_status = "VALID_DISPLAY_ONLY"
+observed_full_spread_bps = 7.83514848
+half_spread_rate = 0.0008
+source = "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-industrials-select-sector-ucits-etf-acc-zpdi-gy"
+
+[costs.SA17_ETF_CONSUMER_DISCRETIONARY]
+isin = "IE00BWBXM278"
+bid_eur = 66.97
+ask_eur = 67.03
+quote_status = "VALID_DISPLAY_ONLY"
+observed_full_spread_bps = 8.95522388
+half_spread_rate = 0.0009
+source = "https://www.ssga.com/no/en_gb/institutional/etfs/state-street-spdr-sp-us-consumer-discretionary-select-sector-ucits-etf-acc-zpdd-gy"
+
+[costs.SA17_ETF_CONSUMER_STAPLES]
+isin = "IE00BWBXM385"
+bid_eur = 44.87
+ask_eur = 44.93
+quote_status = "VALID_DISPLAY_ONLY"
+observed_full_spread_bps = 13.36302895
+half_spread_rate = 0.0014
+source = "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-consumer-staples-select-sector-ucits-etf-acc-zpds-gy"
+
+[costs.SA17_ETF_HEALTH_CARE]
+isin = "IE00BWBXM617"
+bid_eur = 51.66
+ask_eur = 51.71
+quote_status = "VALID_DISPLAY_ONLY"
+observed_full_spread_bps = 9.67398665
+half_spread_rate = 0.001
+source = "https://www.ssga.com/lu/en_gb/institutional/etfs/state-street-spdr-sp-us-health-care-select-sector-ucits-etf-acc-zpdh-gy"
+
+[costs.SA17_ETF_FINANCIALS]
+isin = "IE00BWBXM500"
+bid_eur = 61.38
+ask_eur = 61.45
+quote_status = "VALID_DISPLAY_ONLY"
+observed_full_spread_bps = 11.39786697
+half_spread_rate = 0.0012
+source = "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-financials-select-sector-ucits-etf-acc-zpdf-gy"
+
+[costs.SA17_ETF_TECHNOLOGY]
+isin = "IE00BWBXM948"
+bid_eur = 153.94
+ask_eur = 153.68
+quote_status = "REJECTED_CROSSED_QUOTE"
+half_spread_rate = 0.0015
+source = "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-technology-select-sector-ucits-etf-acc-zpdt-gy"
+
+[costs.SA17_ETF_COMMUNICATION]
+isin = "IE00BFWFPX50"
+bid_eur = 44.44
+ask_eur = 44.49
+quote_status = "VALID_DISPLAY_ONLY"
+observed_full_spread_bps = 11.24479928
+half_spread_rate = 0.0012
+source = "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-communication-services-select-sector-ucits-etf-acc-zpdk-gy"
+
+[costs.SA17_ETF_UTILITIES]
+isin = "IE00BWBXMB69"
+bid_eur = 49.36
+ask_eur = 49.42
+quote_status = "VALID_DISPLAY_ONLY"
+observed_full_spread_bps = 12.14820814
+half_spread_rate = 0.0013
+source = "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-utilities-select-sector-ucits-etf-acc-zpdu-gy"

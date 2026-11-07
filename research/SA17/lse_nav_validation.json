@@ -1,0 +1,119 @@
+{
+  "absolute_tolerance_usd": "0.00005",
+  "calendar_policy": "Only explicit valuations; no XNYS reindexing or invented holiday NAVs.",
+  "comparisons": [
+    {
+      "absolute_difference": "0.0000",
+      "instrument_id": "SA17_NAV_COMMUNICATION",
+      "isin": "IE00BFWFPX50",
+      "observation_date": "2026-11-05",
+      "primary_nav": "49.1778",
+      "primary_sha256": "9747ce51a697e6575b7c7029499045a2bbc8a7f3b311bd124e7219cfcd3c9beb",
+      "rns_nav": "49.1778",
+      "status": "MATCH"
+    },
+    {
+      "absolute_difference": "0.0000",
+      "instrument_id": "SA17_NAV_CONSUMER_DISCRETIONARY",
+      "isin": "IE00BWBXM278",
+      "observation_date": "2026-11-05",
+      "primary_nav": "74.0627",
+      "primary_sha256": "cda624d98a550cae67c97ec8e05be377902ebf1dcf906120012de9c483ec14bc",
+      "rns_nav": "74.0627",
+      "status": "MATCH"
+    },
+    {
+      "absolute_difference": "0.0000",
+      "instrument_id": "SA17_NAV_CONSUMER_STAPLES",
+      "isin": "IE00BWBXM385",
+      "observation_date": "2026-11-05",
+      "primary_nav": "50.4453",
+      "primary_sha256": "761f6232660008981fd41f3f964e9cf6ccb3ee28279cec53209f79367d8157b5",
+      "rns_nav": "50.4453",
+      "status": "MATCH"
+    },
+    {
+      "absolute_difference": "0.0000",
+      "instrument_id": "SA17_NAV_ENERGY",
+      "isin": "IE00BWBXM492",
+      "observation_date": "2026-11-05",
+      "primary_nav": "50.2084",
+      "primary_sha256": "454abc646cafa4c995b03079119c45d444bdfc801083985988fc316f8f835cca",
+      "rns_nav": "50.2084",
+      "status": "MATCH"
+    },
+    {
+      "absolute_difference": "0.0000",
+      "instrument_id": "SA17_NAV_FINANCIALS",
+      "isin": "IE00BWBXM500",
+      "observation_date": "2026-11-05",
+      "primary_nav": "68.5082",
+      "primary_sha256": "8ea57228f96bce4da01f4ccbc6f660d7c3e7b6e23daa56729be3df6c1db96479",
+      "rns_nav": "68.5082",
+      "status": "MATCH"
+    },
+    {
+      "absolute_difference": "0.000",
+      "instrument_id": "SA17_NAV_HEALTH_CARE",
+      "isin": "IE00BWBXM617",
+      "observation_date": "2026-11-05",
+      "primary_nav": "57.674",
+      "primary_sha256": "32e30890379718d370b348fefbeade186f3595fd1dad91f5d95fbeb2cfcb2087",
+      "rns_nav": "57.674",
+      "status": "MATCH"
+    },
+    {
+      "absolute_difference": "0.0000",
+      "instrument_id": "SA17_NAV_INDUSTRIALS",
+      "isin": "IE00BWBXM724",
+      "observation_date": "2026-11-05",
+      "primary_nav": "70.8047",
+      "primary_sha256": "0bfc09d7f6a08fcea17b5d325b2d75163b63f426a93f14889267098b15e115a8",
+      "rns_nav": "70.8047",
+      "status": "MATCH"
+    },
+    {
+      "absolute_difference": "0.0000",
+      "instrument_id": "SA17_NAV_MATERIALS",
+      "isin": "IE00BWBXM831",
+      "observation_date": "2026-11-05",
+      "primary_nav": "52.6333",
+      "primary_sha256": "5fb0ab4de984bfc65dc0d2d666427ad9bc0775e453eb123b62b725af0576981d",
+      "rns_nav": "52.6333",
+      "status": "MATCH"
+    },
+    {
+      "absolute_difference": "0.0000",
+      "instrument_id": "SA17_NAV_TECHNOLOGY",
+      "isin": "IE00BWBXM948",
+      "observation_date": "2026-11-05",
+      "primary_nav": "167.7938",
+      "primary_sha256": "9faa1ceacdc1aa24ca254a519f60b60a4ec3f2024f057e80b05bb4a7b9399d85",
+      "rns_nav": "167.7938",
+      "status": "MATCH"
+    },
+    {
+      "absolute_difference": "0.0000",
+      "instrument_id": "SA17_NAV_UTILITIES",
+      "isin": "IE00BWBXMB69",
+      "observation_date": "2026-11-05",
+      "primary_nav": "55.1021",
+      "primary_sha256": "eb471763a21aa8429c400d13b978e678e605f694899bd4aa99d46ee3ec1809fb",
+      "rns_nav": "55.1021",
+      "status": "MATCH"
+    }
+  ],
+  "economic_independence": false,
+  "historical_publication_evidence": false,
+  "mapping_note": "Internal IDs come from the supplied NAV registry. The original archive's SA17_NAV_COMMUNICATION_SERVICES maps to SA17_NAV_COMMUNICATION.",
+  "primary_manifest_sha256": "6ef06ca70772bb652a7c252fdeb0a1dc3b2c990f64a5850762a12fb0d5d39867",
+  "published_at_london": "2026-11-06 10:20:21+00:00",
+  "published_at_utc": "2026-11-06 10:20:21+00:00",
+  "raw_sha256": "70fae2ec2f37557cea71b5fb31a1b022de89f81d50f6c909cfd1f8c3e821b90a",
+  "registry_sha256": "e404c90d6e5abc0d1ce396f2512d79daf734564cc4b8371f67ef8de77d1cc0de",
+  "replayed_from": "runs/sa17_lse_nav_20261107",
+  "scope": "One notice only; exact publication is not full-history publication evidence.",
+  "script_sha256": "edaf02a60bfb9abf6654e973e508ef5155e38f513dd1eecc4c6f68d151df82ca",
+  "status": "VALIDATED_NOT_ADMITTED",
+  "validated_funds": 10
+}

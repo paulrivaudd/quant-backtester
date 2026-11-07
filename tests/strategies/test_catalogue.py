@@ -131,7 +131,12 @@ def test_sa17_is_the_sector_residual_momentum() -> None:
     item = entry("SA17")
     assert item.display_name == "SA17 - sector residual momentum"
     candidate = SA17SectorResidualMomentum(
-        sector_ids=("A", "B", "C"), market_id="M", monetary_id=None
+        sector_ids=("A", "B", "C"),
+        market_id="M",
+        monetary_id=None,
+        signal_input_ids=("NAV_A", "NAV_B", "NAV_C"),
+        risk_input_ids=("NAV_A", "NAV_B", "NAV_C"),
+        usd_per_eur_fx_id="FX",
     )
     assert item.strategy_id == candidate.strategy_id == "SA17_sector_residual_momentum"
     assert item.load() is SA17SectorResidualMomentum

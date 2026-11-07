@@ -269,6 +269,15 @@ def http_get_text(url: str) -> str:
     costs a cross-check; the second means a symbol or a format moved, and has to
     be looked at rather than absorbed.
     """
+    return http_get_bytes(url).decode("utf-8")
+
+
+def http_get_bytes(url: str) -> bytes:
+    """Fetch an immutable binary response with the same provider error contract.
+
+    Used for issuer workbooks and zipped research data; callers retain the
+    exact payload alongside its SHA-256 rather than reconstructing an archive.
+    """
     try:
         with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT_SECONDS) as response:
             body: bytes = response.read()
@@ -283,4 +292,4 @@ def http_get_text(url: str) -> str:
         raise ProviderUnavailable(f"{url} could not be reached: {error.reason}") from error
     except TimeoutError as error:
         raise ProviderUnavailable(f"{url} timed out after {HTTP_TIMEOUT_SECONDS}s") from error
-    return body.decode("utf-8")
+    return body

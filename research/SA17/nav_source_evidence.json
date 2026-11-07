@@ -1,0 +1,212 @@
+[
+  {
+    "isin": "IE00BWBXM492",
+    "ticker": "zpde-gy",
+    "page": "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-energy-select-sector-ucits-etf-acc-zpde-gy",
+    "nav_url": "https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-zpde-gy.xlsx",
+    "currency": "USD",
+    "report_date": "2026-11-06",
+    "first_observation": "2015-07-07",
+    "last_observation": "2026-11-05",
+    "observations": 2900,
+    "sha256": "454abc646cafa4c995b03079119c45d444bdfc801083985988fc316f8f835cca",
+    "page_sha256": "a85a09f175f20a4b46e7ccadd81d93462efbb6f557784bf5a595390d98e43923",
+    "retrieved_at_utc": "2026-11-07T15:59:01.951210+00:00",
+    "quote_evidence": "as of 06 Nov 2026 Bid Price \u20ac45.43 Offer Price \u20ac45.46 Closing Price \u20ac45.51 Bid/Offer Spread \u20ac0.02 Day High \u20ac45.51 Day Low \u20ac44.55 52 Week High \u20ac51.20 52 Week Low \u20ac29.56",
+    "supplements": [
+      "/library-content/products/fund-docs/etfs/emea/supplements/fund-sup-31-spdr-sp-us-energy-select-sector-en.pdf"
+    ],
+    "publication_time": "NOT_ESTABLISHED",
+    "history_basis": "RESTATED",
+    "tradable": false
+  },
+  {
+    "isin": "IE00BWBXM831",
+    "ticker": "zpdm-gy",
+    "page": "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-materials-select-sector-ucits-etf-acc-zpdm-gy",
+    "nav_url": "https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-zpdm-gy.xlsx",
+    "currency": "USD",
+    "report_date": "2026-11-06",
+    "first_observation": "2015-07-07",
+    "last_observation": "2026-11-05",
+    "observations": 2900,
+    "sha256": "5fb0ab4de984bfc65dc0d2d666427ad9bc0775e453eb123b62b725af0576981d",
+    "page_sha256": "c942b570fcb76d2ee04d6a4ad839b83889d8713c21c766c24e05011e5620b6c6",
+    "retrieved_at_utc": "2026-11-07T15:59:02.531513+00:00",
+    "quote_evidence": "as of 06 Nov 2026 Bid Price \u20ac47.30 Offer Price \u20ac47.36 Closing Price \u20ac47.33 Bid/Offer Spread \u20ac0.06 Day High \u20ac47.33 Day Low \u20ac46.65 52 Week High \u20ac48.60 52 Week Low \u20ac36.58",
+    "supplements": [
+      "/library-content/products/fund-docs/etfs/emea/supplements/fund-sup-35-spdr-sp-us-materials-select-sector-en.pdf"
+    ],
+    "publication_time": "NOT_ESTABLISHED",
+    "history_basis": "RESTATED",
+    "tradable": false
+  },
+  {
+    "isin": "IE00BWBXM724",
+    "ticker": "zpdi-gy",
+    "page": "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-industrials-select-sector-ucits-etf-acc-zpdi-gy",
+    "nav_url": "https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-zpdi-gy.xlsx",
+    "currency": "USD",
+    "report_date": "2026-11-06",
+    "first_observation": "2015-07-07",
+    "last_observation": "2026-11-05",
+    "observations": 2900,
+    "sha256": "0bfc09d7f6a08fcea17b5d325b2d75163b63f426a93f14889267098b15e115a8",
+    "page_sha256": "e0d8e2291c9c53c237c073a45fda1e37178f7e68974894ba9bad2b29f993c4ca",
+    "retrieved_at_utc": "2026-11-07T15:59:03.225777+00:00",
+    "quote_evidence": "as of 06 Nov 2026 Bid Price \u20ac63.79 Offer Price \u20ac63.84 Closing Price \u20ac63.82 Bid/Offer Spread \u20ac0.05 Day High \u20ac63.82 Day Low \u20ac63.22 52 Week High \u20ac71.07 52 Week Low \u20ac55.42",
+    "supplements": [
+      "/library-content/products/fund-docs/etfs/emea/supplements/fund-sup-34-spdr-sp-us-industrials-select-sector-en.pdf"
+    ],
+    "publication_time": "NOT_ESTABLISHED",
+    "history_basis": "RESTATED",
+    "tradable": false
+  },
+  {
+    "isin": "IE00BWBXM278",
+    "ticker": "zpdd-gy",
+    "page": "https://www.ssga.com/no/en_gb/institutional/etfs/state-street-spdr-sp-us-consumer-discretionary-select-sector-ucits-etf-acc-zpdd-gy",
+    "nav_url": "https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-zpdd-gy.xlsx",
+    "currency": "USD",
+    "report_date": "2026-11-06",
+    "first_observation": "2015-07-07",
+    "last_observation": "2026-11-05",
+    "observations": 2900,
+    "sha256": "cda624d98a550cae67c97ec8e05be377902ebf1dcf906120012de9c483ec14bc",
+    "page_sha256": "6f83462f572ed69dfc6b72ccc7dd231d5376d26e2bc3c93f8e616f70b5b3abbc",
+    "retrieved_at_utc": "2026-11-07T15:59:03.655979+00:00",
+    "quote_evidence": "as of 06 Nov 2026 Bid Price \u20ac66,97 Offer Price \u20ac67,03 Closing Price \u20ac67,00 Bid/Offer Spread \u20ac0,06 Day High \u20ac67,00 Day Low \u20ac65,90 52 Week High \u20ac69,25 52 Week Low \u20ac55,97",
+    "supplements": [
+      "/library-content/products/fund-docs/etfs/emea/supplements/fund-sup-29-spdr-sp-us-con-discretionary-select-sector-en.pdf"
+    ],
+    "publication_time": "NOT_ESTABLISHED",
+    "history_basis": "RESTATED",
+    "tradable": false
+  },
+  {
+    "isin": "IE00BWBXM385",
+    "ticker": "zpds-gy",
+    "page": "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-consumer-staples-select-sector-ucits-etf-acc-zpds-gy",
+    "nav_url": "https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-zpds-gy.xlsx",
+    "currency": "USD",
+    "report_date": "2026-11-06",
+    "first_observation": "2015-07-07",
+    "last_observation": "2026-11-05",
+    "observations": 2900,
+    "sha256": "761f6232660008981fd41f3f964e9cf6ccb3ee28279cec53209f79367d8157b5",
+    "page_sha256": "8909cea93ebf643a50a4c505cc5a1f6e3e3ad0fff19dac9e819e34d6ea30db1e",
+    "retrieved_at_utc": "2026-11-07T15:59:04.082547+00:00",
+    "quote_evidence": "as of 06 Nov 2026 Bid Price \u20ac44.87 Offer Price \u20ac44.93 Closing Price \u20ac44.90 Bid/Offer Spread \u20ac0.06 Day High \u20ac44.96 Day Low \u20ac44.16 52 Week High \u20ac45.97 52 Week Low \u20ac35.32",
+    "supplements": [
+      "/library-content/products/fund-docs/etfs/emea/supplements/fund-sup-30-spdr-sp-us-consumer-staples-select-sector-en.pdf"
+    ],
+    "publication_time": "NOT_ESTABLISHED",
+    "history_basis": "RESTATED",
+    "tradable": false
+  },
+  {
+    "isin": "IE00BWBXM617",
+    "ticker": "zpdh-gy",
+    "page": "https://www.ssga.com/lu/en_gb/institutional/etfs/state-street-spdr-sp-us-health-care-select-sector-ucits-etf-acc-zpdh-gy",
+    "nav_url": "https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-zpdh-gy.xlsx",
+    "currency": "USD",
+    "report_date": "2026-11-06",
+    "first_observation": "2015-07-07",
+    "last_observation": "2026-11-05",
+    "observations": 2900,
+    "sha256": "32e30890379718d370b348fefbeade186f3595fd1dad91f5d95fbeb2cfcb2087",
+    "page_sha256": "f9eeaac1385332e0d59c55874c13e28fd1b24c3c3300d9d8108078e8620a68b6",
+    "retrieved_at_utc": "2026-11-07T15:59:04.498579+00:00",
+    "quote_evidence": "as of 06 Nov 2026 Bid Price \u20ac51,66 Offer Price \u20ac51,71 Closing Price \u20ac51,68 Bid/Offer Spread \u20ac0,05 Day High \u20ac51,73 Day Low \u20ac50,87 52 Week High \u20ac53,47 52 Week Low \u20ac37,66",
+    "supplements": [
+      "/library-content/products/fund-docs/etfs/emea/supplements/fund-sup-33-spdr-sp-us-health-care-select-sector-en.pdf"
+    ],
+    "publication_time": "NOT_ESTABLISHED",
+    "history_basis": "RESTATED",
+    "tradable": false
+  },
+  {
+    "isin": "IE00BWBXM500",
+    "ticker": "zpdf-gy",
+    "page": "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-financials-select-sector-ucits-etf-acc-zpdf-gy",
+    "nav_url": "https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-zpdf-gy.xlsx",
+    "currency": "USD",
+    "report_date": "2026-11-06",
+    "first_observation": "2015-07-07",
+    "last_observation": "2026-11-05",
+    "observations": 2900,
+    "sha256": "8ea57228f96bce4da01f4ccbc6f660d7c3e7b6e23daa56729be3df6c1db96479",
+    "page_sha256": "d11faf6b839e042123e586dfb20d481e2ea375394019ada2995d9d8f89720287",
+    "retrieved_at_utc": "2026-11-07T15:59:04.939473+00:00",
+    "quote_evidence": "as of 06 Nov 2026 Bid Price \u20ac61.38 Offer Price \u20ac61.45 Closing Price \u20ac61.42 Bid/Offer Spread \u20ac0.07 Day High \u20ac61.46 Day Low \u20ac60.66 52 Week High \u20ac63.74 52 Week Low \u20ac49.26",
+    "supplements": [
+      "/library-content/products/fund-docs/etfs/emea/supplements/fund-sup-32-spdr-sp-us-financials-select-sector-en.pdf"
+    ],
+    "publication_time": "NOT_ESTABLISHED",
+    "history_basis": "RESTATED",
+    "tradable": false
+  },
+  {
+    "isin": "IE00BWBXM948",
+    "ticker": "zpdt-gy",
+    "page": "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-technology-select-sector-ucits-etf-acc-zpdt-gy",
+    "nav_url": "https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-zpdt-gy.xlsx",
+    "currency": "USD",
+    "report_date": "2026-11-06",
+    "first_observation": "2015-07-07",
+    "last_observation": "2026-11-05",
+    "observations": 2900,
+    "sha256": "9faa1ceacdc1aa24ca254a519f60b60a4ec3f2024f057e80b05bb4a7b9399d85",
+    "page_sha256": "b5ee47306bcd4ed426a6df68beb3eb3c36136e9570cf28eeeeb9332da808efe9",
+    "retrieved_at_utc": "2026-11-07T15:59:05.687270+00:00",
+    "quote_evidence": "as of 06 Nov 2026 Bid Price \u20ac153.94 Offer Price \u20ac153.68 Closing Price \u20ac153.80 Bid/Offer Spread - Day High \u20ac155.00 Day Low \u20ac151.72 52 Week High \u20ac181.00 52 Week Low \u20ac116.82",
+    "supplements": [
+      "/library-content/products/fund-docs/etfs/emea/supplements/fund-sup-36-spdr-sp-us-technology-select-sector-en.pdf"
+    ],
+    "publication_time": "NOT_ESTABLISHED",
+    "history_basis": "RESTATED",
+    "tradable": false
+  },
+  {
+    "isin": "IE00BFWFPX50",
+    "ticker": "zpdk-gy",
+    "page": "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-communication-services-select-sector-ucits-etf-acc-zpdk-gy",
+    "nav_url": "https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-zpdk-gy.xlsx",
+    "currency": "USD",
+    "report_date": "2026-11-07",
+    "first_observation": "2018-08-15",
+    "last_observation": "2026-11-06",
+    "observations": 2108,
+    "sha256": "9747ce51a697e6575b7c7029499045a2bbc8a7f3b311bd124e7219cfcd3c9beb",
+    "page_sha256": "7da68362a41b20334fa92599b1ec6031f4de3b49a8b1d07d7339afc98383aa93",
+    "retrieved_at_utc": "2026-11-07T15:59:06.420158+00:00",
+    "quote_evidence": "as of 06 Nov 2026 Bid Price \u20ac44.44 Offer Price \u20ac44.49 Closing Price \u20ac44.47 Bid/Offer Spread \u20ac0.04 Day High \u20ac44.47 Day Low \u20ac43.59 52 Week High \u20ac49.01 52 Week Low \u20ac42.22",
+    "supplements": [
+      "/library-content/products/fund-docs/etfs/emea/supplements/fund-sup-48-spdr-sp-us-communication-services-select-sector-en.pdf"
+    ],
+    "publication_time": "NOT_ESTABLISHED",
+    "history_basis": "RESTATED",
+    "tradable": false
+  },
+  {
+    "isin": "IE00BWBXMB69",
+    "ticker": "zpdu-gy",
+    "page": "https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-utilities-select-sector-ucits-etf-acc-zpdu-gy",
+    "nav_url": "https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-zpdu-gy.xlsx",
+    "currency": "USD",
+    "report_date": "2026-11-06",
+    "first_observation": "2015-07-07",
+    "last_observation": "2026-11-05",
+    "observations": 2900,
+    "sha256": "eb471763a21aa8429c400d13b978e678e605f694899bd4aa99d46ee3ec1809fb",
+    "page_sha256": "e662c0e5cbdbcdeb3647fd585e614d4c3205f88a3327368d262c208f42b2c424",
+    "retrieved_at_utc": "2026-11-07T15:59:07.102696+00:00",
+    "quote_evidence": "as of 06 Nov 2026 Bid Price \u20ac49.36 Offer Price \u20ac49.42 Closing Price \u20ac49.40 Bid/Offer Spread \u20ac0.06 Day High \u20ac49.40 Day Low \u20ac48.87 52 Week High \u20ac51.75 52 Week Low \u20ac43.78",
+    "supplements": [
+      "/library-content/products/fund-docs/etfs/emea/supplements/fund-sup-37-spdr-sp-us-utilities-select-sector-en.pdf"
+    ],
+    "publication_time": "NOT_ESTABLISHED",
+    "history_basis": "RESTATED",
+    "tradable": false
+  }
+]

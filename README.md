@@ -1102,11 +1102,12 @@ market explains: the three best are held in equal parts, the sleeve is scaled
 to a 15% volatility target, and the rest goes to the EUR monetary fund. It is
 `SA17SectorResidualMomentum`, catalogued `SA17 - sector residual momentum`,
 on `MonthlyMomentumSignal`. Four controls each remove one mechanism. All of it
-is tested offline and through the engine on a synthetic market, and nothing
-has been run on market data. The proposal stays `PROPOSED / NOT_TESTED`. Its
-data audit, the acquisition registry of ten Xetra sector funds and the
-decisions still open before a protocol can be frozen are in
-[`research/SA17/`](research/SA17/README.md).
+is tested offline and through the engine on a synthetic market. Its data, ten
+Xetra sector funds, the S&P 500 total return in USD, XEON, EUR/USD and the
+funds of the external references, was acquired on 2026-11-07. No strategy has
+been run on it. The proposal stays `PROPOSED / NOT_TESTED`. Its data audit,
+the coverage of the acquisition and the decisions still open before a
+protocol can be frozen are in [`research/SA17/`](research/SA17/README.md).
 
 ## What a strategy may not do
 

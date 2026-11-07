@@ -13,7 +13,7 @@ from types import ModuleType
 import pandas as pd
 import pytest
 
-from quant_backtester.data.instruments import Instrument, InstrumentRegistry
+from quant_backtester.data.instruments import DataType, Instrument, InstrumentRegistry
 from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.sources.base import RawDownload
 from quant_backtester.data.updater import MarketDataUpdater
@@ -37,12 +37,12 @@ ENERGY = "SA17_ETF_ENERGY"
 
 
 @pytest.fixture
-def project(tmp_path):
+def project(tmp_path: Path) -> Path:
     metadata = acquisition.ROOT / "market_data" / "metadata"
     shutil.copytree(metadata, tmp_path / "market_data/metadata")
-    research = tmp_path / "research" / "SA17"
-    research.mkdir(parents=True)
-    shutil.copyfile(acquisition.SOURCE_REGISTRY, research / "source_instruments.toml")
+    for part in acquisition.REGISTRY_PARTS:
+        (tmp_path / part).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(acquisition.ROOT / part, tmp_path / part)
     return tmp_path
 
 
@@ -114,7 +114,82 @@ def test_metadata_is_pinned_and_reuse_is_idempotent(project):
     before = acquisition.metadata_manifest(store / "metadata")
     assert acquisition.prepare_store(store, project) == store
     assert acquisition.metadata_manifest(store / "metadata") == before
-    assert len(InstrumentRegistry.from_toml(store / "metadata/instruments.toml")) == 10
+    stored = store / "metadata/instruments.toml"
+    assert stored.read_bytes() == acquisition.combined_registry(project).encode("utf-8")
+    registry = InstrumentRegistry.from_toml(stored)
+    for instrument_id in acquisition.INSTRUMENT_IDS:
+        registry.get(instrument_id)
+
+
+def test_store_registry_does_not_depend_on_line_endings(project):
+    part = project / acquisition.REGISTRY_PARTS[0]
+    unix = acquisition.combined_registry(project)
+    part.write_bytes(part.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+    assert acquisition.combined_registry(project) == unix
+
+
+def test_every_role_is_declared_once_with_its_existing_identifier(project):
+    registry = acquisition.check_registry(project)
+    assert set(acquisition.ROLES) == set(acquisition.INSTRUMENT_IDS)
+    assert {acquisition.ROLES[name] for name in acquisition.SECTOR_IDS} == {"SECTOR_FUND"}
+    market = registry.get("SP500TR")
+    assert (market.source_symbol, market.currency, market.calendar_id) == (
+        "^SP500TR",
+        "USD",
+        "XNYS",
+    )
+    assert not market.tradable
+    assert registry.get("ETF_MONETARY_EUR").source_symbol == "XEON.DE"
+    assert registry.get("ECB_EURUSD").data_type is DataType.LEVEL
+
+
+def test_identifier_declared_twice_is_refused_before_any_store(project):
+    sa17 = project / acquisition.REGISTRY_PARTS[-1]
+    monetary = (project / acquisition.REGISTRY_PARTS[0]).read_text(encoding="utf-8")
+    entry = monetary[monetary.index('[[instrument]]\nid = "ETF_MONETARY_EUR"') :]
+    with sa17.open("a", encoding="utf-8") as stream:
+        stream.write("\n" + entry)
+    with pytest.raises(ValueError, match="Duplicate instrument id ETF_MONETARY_EUR"):
+        acquisition.prepare_store(project / "runs/sa17_test", project)
+    assert not (project / "runs/sa17_test").exists()
+
+
+def test_undeclared_instrument_is_refused_before_any_store(project, monkeypatch):
+    monkeypatch.setattr(acquisition, "INSTRUMENT_IDS", (*acquisition.INSTRUMENT_IDS, "NOPE"))
+    with pytest.raises(KeyError, match="NOPE"):
+        acquisition.prepare_store(project / "runs/sa17_test", project)
+    assert not (project / "runs/sa17_test").exists()
+
+
+@pytest.mark.parametrize(
+    ("instrument_id", "start"),
+    [
+        ("SA17_ETF_ENERGY", date(2015, 7, 8)),
+        ("SA17_ETF_COMMUNICATION", date(2018, 8, 16)),
+        ("SP500TR", date(2014, 1, 2)),
+        ("ETF_MONETARY_EUR", date(2014, 1, 2)),
+        ("ECB_EURUSD", date(2014, 1, 2)),
+        ("ETF_US_TECH", date(2017, 1, 2)),
+        ("ETF_GOLD", date(2018, 1, 2)),
+    ],
+)
+def test_request_start_is_the_latest_of_archive_start_and_listing(project, instrument_id, start):
+    registry = acquisition.check_registry(project)
+    assert acquisition.request_start(registry.get(instrument_id)) == start
+
+
+def test_empty_store_reports_unknown_coverage_for_bars_and_levels(project):
+    store = acquisition.prepare_store(project / "runs/sa17_test", project)
+    gold, fixing = acquisition.coverage_rows(store, ["ETF_GOLD", "ECB_EURUSD"])
+    assert (gold["clean_rows"], gold["stored_from"], gold["raw_fetches"]) == (0, None, 0)
+    assert gold["requested_start"] == "2018-01-02"
+    missing = gold["missing_sessions"]
+    assert isinstance(missing, list) and missing[0] == "2018-01-02"
+    assert gold["role"] == "EXTERNAL_REFERENCE"
+    assert (fixing["clean_rows"], fixing["stored_from"]) == (0, None)
+    assert fixing["missing_sessions"] is None
+    assert fixing["contested_sessions"] == []
+    assert fixing["role"] == "EUR_USD_REFERENCE_RATE"
 
 
 @pytest.mark.parametrize("change_source", [False, True])

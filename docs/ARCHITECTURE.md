@@ -1,5 +1,13 @@
 # Architecture
 
+SA17 additions (2026-11-07): official NAVs are nontradable LEVELs with explicit
+availability floors or observed release evidence; monthly ranking uses common
+USD observation dates, while a separately declared signal supplies EUR NAV risk
+returns with synchronized FX. `ExecutionModel.costs_by_instrument` overrides
+the global cost model in sizing and fills; empty overrides retain the old
+definition/fingerprint. See [the SA17 protocol](../research/SA17/protocol.md)
+and [data additions](DATA.md#sa17-nav-and-research-data-additions-2026-11-07).
+
 State on 2026-09-27. This document describes how the project is divided, how
 a backtest session unfolds and which mechanisms ensure that a result is right
 and reproducible. The development rules are in [CLAUDE.md](../CLAUDE.md).

@@ -1,9 +1,21 @@
-"""Acquire SA17's verified EUR listings through the existing data pipeline.
+"""Acquire SA17's inputs through the existing data pipeline.
 
 This is a coverage study, not a backtest or a frozen strategy universe. Network
 I/O remains in data/sources; MarketDataUpdater owns archival, normalization,
 validation, revisions and publication to clean/. No prices are fabricated,
-forward-filled, converted to USD, or substituted for total-return indices.
+forward-filled, converted to another currency, or substituted for one another.
+
+What is fetched, by role (:data:`ROLES`):
+
+- the ten EUR sector funds declared in research/SA17/source_instruments.toml;
+- the market factor, the S&P 500 total-return index in USD (``SP500TR``);
+- the EUR monetary fund (XEON) and the ECB EUR/USD reference rate, under their
+  existing project declarations;
+- the funds of the external references (SA16_it2, its fixed C1 control and
+  Nasdaq held), under the SA15 declarations SA16 used.
+
+The store's registry concatenates :data:`REGISTRY_PARTS`, so a fund carries the
+same identifier and declaration here as in the earlier stores.
 
 The cutoff remains 2026-10-30, as in the original SA17 proposal. Provider
 snapshots are retrieved now, not historical vintages. Only isolated directories
@@ -33,19 +45,53 @@ from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.conflict_reviews import ConflictReviews
 from quant_backtester.data.corporate_actions import ActionCorrections
 from quant_backtester.data.crosscheck import CrossCheckPolicy
-from quant_backtester.data.instruments import InstrumentRegistry
+from quant_backtester.data.instruments import DataType, Instrument, InstrumentRegistry
 from quant_backtester.data.known_gaps import KnownGaps
 from quant_backtester.data.normalizer import NORMALIZERS
 from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.data.revisions import AcceptedRevisions
 from quant_backtester.data.schemas import CheckStatus
+from quant_backtester.data.sources.ecb import EcbSource
 from quant_backtester.data.sources.yahoo import YahooSource
 from quant_backtester.data.updater import MarketDataUpdater
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_REGISTRY = ROOT / "research" / "SA17" / "source_instruments.toml"
+REGISTRY_PARTS = (
+    Path("market_data/metadata/instruments.toml"),
+    Path("research/SA15_GPT-6.1/instruments.toml"),
+    Path("research/SA15_GPT-6.1/round4/instruments.toml"),
+    Path("research/SA17/source_instruments.toml"),
+)
 STORE = ROOT / "runs" / "sa17_store"
 CUTOFF = date(2026, 10, 30)
+# The project's common archive start; every SA17 month end is later (the
+# first sector listing is 2015-07-08). A later declared first session wins.
+REQUEST_START = date(2014, 1, 2)
+# As in SA16: the 2014-2017 Xetra-Gold archive holds two invalid bars, which
+# refuse the whole series. SA16_it2 was run on gold from 2018-01-02.
+ARCHIVE_STARTS = {"ETF_GOLD": date(2018, 1, 2)}
+SECTOR_IDS = (
+    "SA17_ETF_ENERGY",
+    "SA17_ETF_MATERIALS",
+    "SA17_ETF_INDUSTRIALS",
+    "SA17_ETF_CONSUMER_DISCRETIONARY",
+    "SA17_ETF_CONSUMER_STAPLES",
+    "SA17_ETF_HEALTH_CARE",
+    "SA17_ETF_FINANCIALS",
+    "SA17_ETF_TECHNOLOGY",
+    "SA17_ETF_COMMUNICATION",
+    "SA17_ETF_UTILITIES",
+)
+ROLES: dict[str, str] = {
+    **dict.fromkeys(SECTOR_IDS, "SECTOR_FUND"),
+    "SP500TR": "MARKET_FACTOR",
+    "ETF_MONETARY_EUR": "MONETARY_FUND",
+    "ECB_EURUSD": "EUR_USD_REFERENCE_RATE",
+    "ETF_US_TECH": "EXTERNAL_REFERENCE",
+    "ETF_GOLD": "EXTERNAL_REFERENCE",
+    "ETF_NASDAQ": "EXTERNAL_REFERENCE",
+}
+INSTRUMENT_IDS = tuple(ROLES)
 
 
 def require_isolated_store(store: Path, root: Path = ROOT) -> Path:
@@ -66,8 +112,38 @@ def metadata_manifest(metadata: Path) -> dict[str, str]:
     }
 
 
+def combined_registry(root: Path = ROOT) -> str:
+    """Return the store registry: every part of :data:`REGISTRY_PARTS`, in order.
+
+    Each part is read in text mode, so a Windows checkout (CRLF) and a POSIX
+    one give the same text, with LF line ends.
+    """
+    return "\n".join((root / part).read_text(encoding="utf-8") for part in REGISTRY_PARTS)
+
+
+def check_registry(root: Path = ROOT) -> InstrumentRegistry:
+    """Parse every part, refuse an identifier declared twice or one not declared.
+
+    Raises
+    ------
+    ValueError
+        If a part is malformed, or two parts declare the same identifier.
+    KeyError
+        If an instrument of :data:`INSTRUMENT_IDS` is declared by no part.
+    """
+    instruments = [
+        instrument
+        for part in REGISTRY_PARTS
+        for instrument in InstrumentRegistry.from_toml(root / part).list_all()
+    ]
+    registry = InstrumentRegistry(instruments)
+    for instrument_id in INSTRUMENT_IDS:
+        registry.get(instrument_id)
+    return registry
+
+
 def prepare_store(store: Path, root: Path = ROOT) -> Path:
-    """Copy the acquisition registry and project policies once, then pin them.
+    """Copy the combined registry and project policies once, then pin them.
 
     Parameters
     ----------
@@ -78,10 +154,10 @@ def prepare_store(store: Path, root: Path = ROOT) -> Path:
     """
     store = require_isolated_store(store, root)
     source_metadata = root / "market_data" / "metadata"
-    registry_path = root / "research" / "SA17" / "source_instruments.toml"
-    InstrumentRegistry.from_toml(registry_path)
+    check_registry(root)
+    combined = combined_registry(root)
     expected = metadata_manifest(source_metadata)
-    expected["instruments.toml"] = hashlib.sha256(registry_path.read_bytes()).hexdigest()
+    expected["instruments.toml"] = hashlib.sha256(combined.encode("utf-8")).hexdigest()
     pin = store / "metadata_sha256.json"
     if store.exists():
         if not pin.is_file():
@@ -92,7 +168,7 @@ def prepare_store(store: Path, root: Path = ROOT) -> Path:
         return store
     metadata = store / "metadata"
     shutil.copytree(source_metadata, metadata)
-    shutil.copyfile(registry_path, metadata / "instruments.toml")
+    (metadata / "instruments.toml").write_text(combined, encoding="utf-8", newline="\n")
     with pin.open("x", encoding="utf-8", newline="\n") as stream:
         stream.write(json.dumps(expected, indent=2, sort_keys=True) + "\n")
     return store
@@ -105,7 +181,7 @@ def build_updater(store: Path) -> MarketDataUpdater:
         repository=MarketDataRepository(store),
         instruments=InstrumentRegistry.from_toml(metadata / "instruments.toml"),
         calendars=CalendarRegistry.from_directory(metadata / "calendars"),
-        sources={"YAHOO": YahooSource()},
+        sources={"YAHOO": YahooSource(), "ECB": EcbSource()},
         normalizers=dict(NORMALIZERS),
         accepted_revisions=AcceptedRevisions.from_toml(metadata / "accepted_revisions.toml"),
         action_corrections=ActionCorrections.from_toml(metadata / "corporate_actions.toml"),
@@ -116,11 +192,22 @@ def build_updater(store: Path) -> MarketDataUpdater:
     )
 
 
+def request_start(instrument: Instrument) -> date:
+    """Return the first date fetched: the archive start, unless declared later."""
+    starts = [REQUEST_START, ARCHIVE_STARTS.get(instrument.id, REQUEST_START)]
+    if instrument.first_session is not None:
+        starts.append(instrument.first_session)
+    return max(starts)
+
+
 def coverage_rows(store: Path, instrument_ids: Sequence[str]) -> list[dict[str, object]]:
-    """Describe coverage over each listing's full requested range, gaps included.
+    """Describe coverage over each instrument's full requested range, gaps included.
 
     Everything is bounded by :data:`CUTOFF`, never by today's date: the same
-    store gives the same report whenever it is written.
+    store gives the same report whenever it is written. A bar series is
+    compared with its venue's sessions. A level series has no venue calendar
+    here (the ECB publishes on TARGET days, which are not modelled), so its
+    missing days are not computed and are reported as ``None``.
     """
     repository = MarketDataRepository(store)
     rows: list[dict[str, object]] = []
@@ -129,17 +216,27 @@ def coverage_rows(store: Path, instrument_ids: Sequence[str]) -> list[dict[str, 
         calendars = CalendarRegistry.from_directory(store / "metadata" / "calendars")
         for instrument_id in instrument_ids:
             instrument = registry.get(instrument_id)
-            assert instrument.first_session is not None and instrument.calendar_id is not None
-            first = instrument.first_session
-            frame = repository.load_checked_bars(instrument_id, start=first, end=CUTOFF)
-            observed = set(frame["session_date"])
-            expected = {
-                session.session_date
-                for session in calendars.get(instrument.calendar_id).sessions(first, CUTOFF)
-            }
-            contested = frame.loc[
-                frame["check_status"] == CheckStatus.CONFLICT.value, "session_date"
-            ]
+            first = request_start(instrument)
+            missing: list[str] | None
+            contested: list[str]
+            if instrument.data_type is DataType.BAR:
+                assert instrument.calendar_id is not None
+                frame = repository.load_checked_bars(instrument_id, start=first, end=CUTOFF)
+                observed = set(frame["session_date"])
+                expected = {
+                    session.session_date
+                    for session in calendars.get(instrument.calendar_id).sessions(first, CUTOFF)
+                }
+                missing = [day.isoformat() for day in sorted(expected - observed)]
+                conflicts = frame.loc[
+                    frame["check_status"] == CheckStatus.CONFLICT.value, "session_date"
+                ]
+                contested = [day.isoformat() for day in sorted(conflicts)]
+            else:
+                frame = repository.load_levels(instrument_id, start=first, end=CUTOFF)
+                observed = set(frame["observation_date"])
+                missing = None
+                contested = []
             fetches = sum(
                 len(repository.list_raw_fetches(instrument_id, source))
                 for source in instrument.sources
@@ -147,17 +244,18 @@ def coverage_rows(store: Path, instrument_ids: Sequence[str]) -> list[dict[str, 
             rows.append(
                 {
                     "instrument_id": instrument_id,
+                    "role": ROLES.get(instrument_id),
                     "symbol": instrument.source_symbol,
                     "requested_start": first.isoformat(),
                     "requested_end": CUTOFF.isoformat(),
                     "clean_rows": len(frame),
                     "stored_from": min(observed).isoformat() if observed else None,
                     "stored_until": max(observed).isoformat() if observed else None,
-                    "missing_sessions": [day.isoformat() for day in sorted(expected - observed)],
-                    "contested_sessions": [day.isoformat() for day in sorted(contested)],
+                    "missing_sessions": missing,
+                    "contested_sessions": contested,
                     "raw_fetches": fetches,
                     "usable_for_sa17": False,
-                    "reason": "Acquisition pool only; USD signal and historical universe unaudited",
+                    "reason": "Acquired, not admitted: the SA17 protocol is not frozen",
                 }
             )
     return rows
@@ -165,28 +263,27 @@ def coverage_rows(store: Path, instrument_ids: Sequence[str]) -> list[dict[str, 
 
 def main() -> int:
     """Acquire or replay data and write a new evidence file for every invocation."""
-    registry = InstrumentRegistry.from_toml(SOURCE_REGISTRY)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--store", type=Path, default=STORE)
-    parser.add_argument("--only", nargs="+", choices=[instrument.id for instrument in registry])
+    parser.add_argument("--only", nargs="+", choices=INSTRUMENT_IDS)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--coverage-only", action="store_true")
     mode.add_argument("--rebuild", action="store_true")
     arguments = parser.parse_args()
     store = prepare_store(arguments.store)
     updater = build_updater(store)
-    selected = tuple(dict.fromkeys(arguments.only or [instrument.id for instrument in registry]))
+    registry = InstrumentRegistry.from_toml(store / "metadata" / "instruments.toml")
+    selected = tuple(dict.fromkeys(arguments.only or INSTRUMENT_IDS))
     outcomes: list[dict[str, object]] = []
     failed = False
     if not arguments.coverage_only:
         for instrument_id in selected:
             instrument = registry.get(instrument_id)
-            assert instrument.first_session is not None
             try:
                 report = (
                     updater.rebuild_clean(instrument_id)
                     if arguments.rebuild
-                    else updater.download(instrument_id, instrument.first_session, CUTOFF)
+                    else updater.download(instrument_id, request_start(instrument), CUTOFF)
                 )
             except Exception as exc:  # preserve failures in evidence; return nonzero
                 failed = True
@@ -205,14 +302,20 @@ def main() -> int:
                 }
             )
             status = "VALIDATED" if report.valid else "REFUSED"
-            print(f"{instrument_id}: {status}; {len(report.errors)} errors", flush=True)
+            print(
+                f"{instrument_id}: {status}; {len(report.errors)} errors, "
+                f"{len(report.warnings)} warnings",
+                flush=True,
+            )
             for issue in report.errors:
                 print(f"  {issue.code} {issue.observation_date}: {issue.message}", flush=True)
     rows = coverage_rows(store, selected)
     for row in rows:
+        missing = row["missing_sessions"]
         print(
             f"{row['instrument_id']}: {row['clean_rows']} rows, "
-            f"{row['stored_from']} to {row['stored_until']}",
+            f"{row['stored_from']} to {row['stored_until']}, "
+            f"missing={len(missing) if isinstance(missing, list) else 'n/a'}",
             flush=True,
         )
     repository = MarketDataRepository(store)

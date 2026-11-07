@@ -1,7 +1,8 @@
 """SA17: the sectors with the strongest market-adjusted momentum, scaled to a risk target.
 
-The market of these tests is drawn from a fixed seed: five Paris sector funds
-of different volatilities, a New York market index and a flat monetary fund,
+The market of these tests is drawn from a fixed seed: five Paris sector funds,
+separate USD LEVEL NAV on XNYS dates, synchronized synthetic FX,
+a New York market index and a flat monetary fund,
 from January to December 2026 on the synthetic calendars of ``conftest``. The
 rule is tested on written scores where the ranking is the question, on the
 real monthly signal where the reading of the market is, and through the
@@ -14,7 +15,7 @@ import dataclasses
 import json
 import math
 from collections.abc import Callable, Mapping
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 import numpy as np
 import pandas as pd
@@ -25,20 +26,28 @@ from quant_backtester.backtest.context import StrategyContext
 from quant_backtester.backtest.runner import StrategyResult, StrategyRunner
 from quant_backtester.backtest.schedule import Monthly
 from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
-from quant_backtester.data.instruments import AssetType, DataType, Instrument, InstrumentRegistry
+from quant_backtester.data.instruments import (
+    AssetType,
+    DataType,
+    Instrument,
+    InstrumentRegistry,
+    PublicationRule,
+)
 from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.schemas import BarField
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel, Sizing
 from quant_backtester.signals.context import SignalContext
+from quant_backtester.signals.cross_asset.residual_momentum import simple_returns
 from quant_backtester.signals.engine import SignalEngine, SignalRequest
-from quant_backtester.signals.types import SignalStatus
+from quant_backtester.signals.snapshot import SignalSnapshot
+from quant_backtester.signals.types import PriceBasis, SignalStatus
+from quant_backtester.signals.windows import load_month_end_window
 from quant_backtester.strategies.SA17_sector_residual_momentum import (
     SA17SectorResidualMomentum,
     SectorPlan,
     SectorRanking,
     equal_weight_volatility,
-    simple_returns,
 )
 
 SECTORS = ("S_A", "S_B", "S_C", "S_D", "S_E")
@@ -58,7 +67,7 @@ def fund(name: str, calendar_id: str, *, tradable: bool = True) -> Instrument:
         name=f"Synthetic {name}",
         asset_type=AssetType.ETF if tradable else AssetType.INDEX,
         data_type=DataType.BAR,
-        currency="EUR",
+        currency="EUR" if tradable else "USD",
         primary_source="YAHOO",
         source_symbol=name,
         tradable=tradable,
@@ -76,6 +85,33 @@ def instruments() -> InstrumentRegistry:
             fund(ELSEWHERE, "XNYS"),
             fund(MONETARY, "XPAR"),
             fund(MARKET, "XNYS", tradable=False),
+            *(
+                Instrument(
+                    id=f"{name}_NAV",
+                    name=f"Synthetic USD NAV {name}",
+                    asset_type=AssetType.ETF,
+                    data_type=DataType.LEVEL,
+                    currency="USD",
+                    primary_source="FRED",
+                    source_symbol=name,
+                    tradable=False,
+                    first_session=FIRST,
+                    publication_rule=PublicationRule(time(23, 45), "Europe/Dublin"),
+                )
+                for name in (*SECTORS, ELSEWHERE)
+            ),
+            Instrument(
+                id="FX",
+                name="Synthetic synchronized USD per EUR",
+                asset_type=AssetType.FX,
+                data_type=DataType.LEVEL,
+                currency="USD",
+                primary_source="FRED",
+                source_symbol="FX",
+                tradable=False,
+                first_session=FIRST,
+                publication_rule=PublicationRule(time(23, 45), "Europe/Dublin"),
+            ),
         ]
     )
 
@@ -101,6 +137,7 @@ def holes() -> Mapping[str, tuple[date, ...]]:
 def build_market(
     make_market: Callable[..., MarketDataReader],
     make_bars: Callable[..., pd.DataFrame],
+    make_levels: Callable[..., pd.DataFrame],
     xpar: TradingCalendar,
     xnys: TradingCalendar,
 ) -> Callable[..., MarketDataReader]:
@@ -119,7 +156,16 @@ def build_market(
             bars[name] = make_bars(
                 name, calendar, closes, contested={day: [BarField.CLOSE] for day in missing}
             )
-        return make_market(bars)
+        levels = {}
+        for name in (*SECTORS, ELSEWHERE):
+            values = drawn(name, xnys)
+            missing = (holes or {}).get(name, ())
+            values = {d: p for d, p in values.items() if d not in missing}
+            if future_after is not None:
+                values = {d: p if d <= future_after else 1e6 for d, p in values.items()}
+            levels[f"{name}_NAV"] = make_levels(f"{name}_NAV", values)
+        levels["FX"] = make_levels("FX", {s.session_date: 1.2 for s in xnys.sessions(FIRST, LAST)})
+        return make_market(bars, levels=levels)
 
     return build
 
@@ -136,6 +182,9 @@ def candidate(**changes: object) -> SA17SectorResidualMomentum:
         "sector_ids": SECTORS,
         "market_id": MARKET,
         "monetary_id": MONETARY,
+        "signal_input_ids": tuple(f"{name}_NAV" for name in changes.get("sector_ids", SECTORS)),
+        "risk_input_ids": tuple(f"{name}_NAV" for name in changes.get("sector_ids", SECTORS)),
+        "usd_per_eur_fx_id": "FX",
     }
     return SA17SectorResidualMomentum(**(parameters | changes))  # type: ignore[arg-type]
 
@@ -143,11 +192,14 @@ def candidate(**changes: object) -> SA17SectorResidualMomentum:
 def scores(strategy: SA17SectorResidualMomentum, **values: float | SignalStatus) -> Written:
     """Write each sector's score, by sector name."""
     signal_id = strategy.momentum().signal_id
-    return {(signal_id, name): values[name] for name in SECTORS}
+    return {
+        (signal_id, source): values[name]
+        for name, source in zip(strategy.sector_ids, strategy.signal_input_ids, strict=True)
+    }
 
 
 @pytest.fixture
-def decision(written_decision) -> Callable[..., StrategyContext]:
+def decision(written_decision, context) -> Callable[..., StrategyContext]:
     """Return the decision of 14 September on written scores and a held book."""
 
     def build(
@@ -156,7 +208,21 @@ def decision(written_decision) -> Callable[..., StrategyContext]:
         held: Mapping[str, float] | None = None,
         universe: tuple[str, ...] = UNIVERSE,
     ) -> StrategyContext:
-        return written_decision(strategy, written, universe=universe, held=held)
+        result = written_decision(
+            dataclasses.replace(strategy, target_volatility=None),
+            written,
+            universe=universe,
+            held=held,
+        )
+        if strategy.target_volatility is not None:
+            risk = strategy.risk_signal().compute(context, strategy.risk_input_ids)
+            result = dataclasses.replace(
+                result,
+                signals=SignalSnapshot(
+                    context.as_of, dict(result.signals.results) | {risk.signal_id: risk}
+                ),
+            )
+        return result
 
     return build
 
@@ -264,8 +330,8 @@ def test_the_equal_sectors_control_holds_every_eligible_sector(decision) -> None
     strategy = candidate().controls()["equal_sectors"]
     signal_id = strategy.momentum().signal_id
     assert signal_id.startswith("sa17_total_")
-    written: Written = {(signal_id, name): -5.0 for name in SECTORS}
-    written[signal_id, "S_D"] = SignalStatus.INSUFFICIENT_HISTORY
+    written: Written = {(signal_id, name): -5.0 for name in strategy.signal_input_ids}
+    written[signal_id, "S_D_NAV"] = SignalStatus.INSUFFICIENT_HISTORY
     plan = strategy.plan(decision(strategy, written))
     assert plan.selected == ("S_A", "S_B", "S_C", "S_E")
     assert dict(plan.weights) == pytest.approx(dict.fromkeys(plan.selected, 0.25))
@@ -274,11 +340,11 @@ def test_the_equal_sectors_control_holds_every_eligible_sector(decision) -> None
 # -- the volatility target ----------------------------------------------------------------
 
 
-def test_the_sleeve_is_scaled_to_the_target_and_the_rest_is_monetary(decision, xpar) -> None:
+def test_the_sleeve_is_scaled_to_the_target_and_the_rest_is_monetary(decision, xnys) -> None:
     strategy = candidate(target_volatility=0.15)
     written = scores(strategy, S_A=1.0, S_B=0.5, S_C=2.0, S_D=-1.0, S_E=0.0)
     plan = strategy.plan(decision(strategy, written))
-    volatility = expected_volatility(("S_A", "S_B", "S_C"), date(2026, 9, 14), xpar)
+    volatility = expected_volatility(("S_A", "S_B", "S_C"), date(2026, 8, 31), xnys)
     assert plan.volatility == pytest.approx(volatility, rel=1e-9)
     assert volatility > 0.15  # the drawn sectors are more volatile than the target
     exposure = 0.15 / volatility
@@ -308,34 +374,37 @@ def test_without_a_monetary_fund_the_rest_stays_in_cash(decision) -> None:
     assert math.fsum(plan.weights.values()) == pytest.approx(plan.exposure)
 
 
-@pytest.mark.parametrize("holes", [{"S_B": (date(2026, 9, 1),)}])
+@pytest.mark.parametrize("holes", [{"S_B": (date(2026, 8, 28),)}])
 def test_a_hole_in_a_selected_fund_s_risk_window_keeps_the_book(decision, holes) -> None:
     strategy = candidate()
     written = scores(strategy, S_A=1.0, S_B=0.5, S_C=2.0, S_D=-1.0, S_E=0.0)
     held = {"S_D": 0.5, MONETARY: 0.5}
     plan = strategy.plan(decision(strategy, written, held))
     assert plan.selected == ("S_C", "S_A", "S_B")
-    assert plan.unusable == {"S_B": SignalStatus.NON_CONSECUTIVE_HISTORY}
+    assert plan.unusable == {"S_B": SignalStatus.MISSING_INPUT}
     assert strategy.decide(decision(strategy, written, held)).hold_positions
 
 
-@pytest.mark.parametrize("holes", [{"S_E": (date(2026, 9, 1),)}])
+@pytest.mark.parametrize("holes", [{"S_E": (date(2026, 8, 28),)}])
 def test_a_hole_in_a_fund_not_selected_changes_nothing(decision, holes) -> None:
     strategy = candidate()
     written = scores(strategy, S_A=1.0, S_B=0.5, S_C=2.0, S_D=-1.0, S_E=0.0)
     assert strategy.plan(decision(strategy, written)).complete
 
 
+@pytest.mark.parametrize("holes", [{ELSEWHERE: (date(2026, 8, 28),)}])
 def test_funds_that_do_not_hold_the_same_sessions_cannot_be_paired(decision) -> None:
     sectors = ("S_A", "S_B", ELSEWHERE, "S_D")
     strategy = candidate(sector_ids=sectors)
     signal_id = strategy.momentum().signal_id
     # The New York fund ranks first, so its window is the first one read.
-    written = {(signal_id, name): value for name, value in zip(sectors, (2, 1, 3, 0), strict=True)}
+    written = {
+        (signal_id, name): value
+        for name, value in zip(strategy.signal_input_ids, (2, 1, 3, 0), strict=True)
+    }
     plan = strategy.plan(decision(strategy, written, universe=(*sectors, MONETARY)))
     assert plan.selected == (ELSEWHERE, "S_A", "S_B")
-    # New York was shut on 7 September, a Labor Day: its sessions differ from
-    # those the two Paris funds share, and it is the one named.
+    # The missing NAV observation is not replaced by an earlier session.
     assert plan.unusable == {ELSEWHERE: SignalStatus.MISSING_INPUT}
 
 
@@ -508,6 +577,240 @@ def test_signal_inputs_score_one_series_and_hold_another(decision) -> None:
 def test_invalid_configurations_are_refused(changes) -> None:
     with pytest.raises(ValueError):
         candidate(**changes)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"signal_input_ids": ()},
+        {"risk_input_ids": ()},
+        {"usd_per_eur_fx_id": None},
+        {"risk_input_currency": "GBP"},
+        {"signal_input_ids": SECTORS},
+        {"risk_input_ids": SECTORS},
+        {"ranking": SectorRanking.TOTAL, "market_id": None},
+    ],
+)
+def test_explicit_nav_and_fx_contract_is_required(changes) -> None:
+    with pytest.raises(ValueError):
+        candidate(**changes)
+
+
+def test_level_month_ends_use_explicit_cutoff_not_the_new_decision_month(
+    market,
+    make_context,
+    evening,
+) -> None:
+    context = make_context(market, evening(date(2026, 10, 2)))
+    window = load_month_end_window(
+        context,
+        "S_A_NAV",
+        months=3,
+        basis=PriceBasis.ADJUSTED,
+        max_age_sessions=0,
+        observation_calendar_id="XNYS",
+        observation_cutoff=date(2026, 9, 30),
+        nav=True,
+    )
+    assert window.status is SignalStatus.OK
+    assert window.dates == (
+        date(2026, 6, 30),
+        date(2026, 7, 31),
+        date(2026, 8, 31),
+        date(2026, 9, 30),
+    )
+
+
+def test_same_day_nav_at_2300_is_missing_even_if_upstream_claims_early_publication(
+    market,
+    repository,
+    make_levels,
+    xnys,
+    make_context,
+    evening,
+) -> None:
+    frame = make_levels("S_A_NAV", drawn("S_A", xnys))
+    # Deliberately false availability: the signal still enforces valuation's lower bound.
+    frame["available_at_utc"] -= pd.Timedelta(hours=4)
+    repository.save_levels("S_A_NAV", frame)
+    context = make_context(market, evening(date(2026, 9, 30)))
+    window = load_month_end_window(
+        context,
+        "S_A_NAV",
+        months=3,
+        basis=PriceBasis.RAW,
+        max_age_sessions=1,
+        observation_calendar_id="XNYS",
+        observation_cutoff=date(2026, 9, 30),
+        nav=True,
+    )
+    assert window.status is SignalStatus.MISSING_INPUT
+
+
+@pytest.mark.parametrize(
+    "name, changes",
+    [
+        ("S_A_NAV", {"currency": "EUR"}),
+        (MARKET, {"currency": "EUR"}),
+        (MARKET, {"calendar_id": "XPAR"}),
+    ],
+)
+def test_sa17_rejects_currency_or_market_calendar_mismatch(context, name, changes) -> None:
+    changed = [
+        dataclasses.replace(i, **changes) if i.id == name else i for i in context.instruments
+    ]
+    context = dataclasses.replace(context, instruments=InstrumentRegistry(changed))
+    result = candidate(**SHORT).momentum().compute(context, ["S_A_NAV"])
+    assert result.status("S_A_NAV") is SignalStatus.INVALID_INPUT
+
+
+@pytest.mark.parametrize("missing", [date(2026, 7, 31), date(2026, 8, 31)])
+def test_missing_month_end_cannot_backfill_to_previous_available_nav(
+    market,
+    repository,
+    make_levels,
+    xnys,
+    context,
+    missing,
+) -> None:
+    values = drawn("S_A", xnys)
+    del values[missing]
+    repository.save_levels("S_A_NAV", make_levels("S_A_NAV", values))
+    result = candidate(**SHORT).momentum().compute(context, ["S_A_NAV"])
+    assert result.status("S_A_NAV") is SignalStatus.MISSING_INPUT
+
+
+@pytest.mark.parametrize("name", ["S_A_NAV", "FX"])
+def test_future_published_nav_or_fx_cancels_risk(
+    context,
+    repository,
+    make_levels,
+    xnys,
+    name,
+) -> None:
+    values = (
+        drawn("S_A", xnys)
+        if name == "S_A_NAV"
+        else {s.session_date: 1.2 for s in xnys.sessions(FIRST, LAST)}
+    )
+    frame = make_levels(name, values)
+    frame.loc[frame["observation_date"] == date(2026, 8, 31), "available_at_utc"] = pd.Timestamp(
+        "2026-11-07T12:00:00Z"
+    )
+    repository.save_levels(name, frame)
+    result = candidate(risk_returns=3).risk_signal().compute(context, ["S_A_NAV"])
+    assert result.status("S_A_NAV") is SignalStatus.MISSING_INPUT
+
+
+def test_fx_divides_nav_before_returns_and_changes_risk(
+    context,
+    repository,
+    make_levels,
+    xnys,
+) -> None:
+    dates = [date(2026, 8, 26), date(2026, 8, 27), date(2026, 8, 28), date(2026, 8, 31)]
+    rates = dict(zip(dates, [1.0, 1.1, 1.0, 1.25], strict=True))
+    repository.save_levels("FX", make_levels("FX", rates))
+    result = candidate(risk_returns=3).risk_signal().compute(context, ["S_A_NAV"])
+    nav = drawn("S_A", xnys)
+    expected = simple_returns([nav[day] / rates[day] for day in dates])
+    assert result.status("S_A_NAV") is SignalStatus.OK
+    assert result.frame.loc["S_A_NAV", "returns"] == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"currency": "EUR"},
+        {"primary_source": "ECB"},
+        {"asset_type": AssetType.INDEX},
+    ],
+)
+def test_wrong_fx_currency_and_ecb_fixings_are_refused(context, changes) -> None:
+    changed = [
+        dataclasses.replace(i, **changes) if i.id == "FX" else i for i in context.instruments
+    ]
+    context = dataclasses.replace(context, instruments=InstrumentRegistry(changed))
+    result = candidate(risk_returns=3).risk_signal().compute(context, ["S_A_NAV"])
+    assert result.status("S_A_NAV") is SignalStatus.INVALID_INPUT
+
+
+def test_retrieval_only_publication_cannot_admit_historical_nav(
+    market,
+    repository,
+    make_levels,
+    xnys,
+    make_context,
+    make_decision,
+    evening,
+) -> None:
+    for name in SECTORS:
+        frame = make_levels(f"{name}_NAV", drawn(name, xnys))
+        frame["available_at_utc"] = pd.Timestamp("2026-11-07T12:00:00Z")
+        repository.save_levels(f"{name}_NAV", frame)
+    strategy = candidate(**SHORT)
+    plan = real_plan(strategy, market, date(2026, 9, 30), make_context, make_decision, evening)
+    assert not plan.complete
+    assert plan.weights == {}
+    assert plan.unusable == dict.fromkeys(SECTORS, SignalStatus.MISSING_INPUT)
+
+
+@pytest.mark.parametrize("mode", ["missing", "shifted_date", "zero"])
+def test_fx_must_exist_and_match_each_nav_date(
+    context,
+    repository,
+    make_levels,
+    mode,
+) -> None:
+    values = {
+        date(2026, 8, 26): 1.0,
+        date(2026, 8, 27): 1.1,
+        date(2026, 8, 28): 1.0,
+        date(2026, 8, 31): 1.25,
+    }
+    if mode == "missing":
+        del values[date(2026, 8, 28)]
+    elif mode == "shifted_date":
+        values[date(2026, 8, 29)] = values.pop(date(2026, 8, 28))
+    else:
+        values[date(2026, 8, 28)] = 0.0
+    repository.save_levels("FX", make_levels("FX", dict(sorted(values.items()))))
+    result = candidate(risk_returns=3).risk_signal().compute(context, ["S_A_NAV"])
+    expected = SignalStatus.INVALID_INPUT if mode == "zero" else SignalStatus.MISSING_INPUT
+    assert result.status("S_A_NAV") is expected
+
+
+def test_explicit_validated_eur_nav_needs_no_fx(context, xnys) -> None:
+    changed = [
+        dataclasses.replace(i, currency="EUR") if i.id == "S_A_NAV" else i
+        for i in context.instruments
+    ]
+    context = dataclasses.replace(context, instruments=InstrumentRegistry(changed))
+    signal = candidate(
+        risk_returns=3,
+        risk_input_currency="EUR",
+        usd_per_eur_fx_id=None,
+    ).risk_signal()
+    result = signal.compute(context, ["S_A_NAV"])
+    dates = result.frame.loc["S_A_NAV", "dates"]
+    nav = drawn("S_A", xnys)
+    assert result.status("S_A_NAV") is SignalStatus.OK
+    assert result.frame.loc["S_A_NAV", "returns"] == pytest.approx(
+        simple_returns([nav[day] for day in dates])
+    )
+
+
+def test_risk_rejects_unconverted_currency_mismatch(context) -> None:
+    signal = candidate(risk_input_currency="EUR", usd_per_eur_fx_id=None).risk_signal()
+    assert signal.compute(context, ["S_A_NAV"]).status("S_A_NAV") is SignalStatus.INVALID_INPUT
+
+
+def test_future_cutoff_is_rejected(context) -> None:
+    strategy = candidate(**SHORT, observation_cutoff=date(2026, 9, 30))
+    with pytest.raises(ValueError, match="after the decision"):
+        strategy.momentum().compute(context, ["S_A_NAV"])
+    with pytest.raises(ValueError, match="after the decision"):
+        strategy.risk_signal().compute(context, ["S_A_NAV"])
 
 
 # -- through the engine -------------------------------------------------------------------

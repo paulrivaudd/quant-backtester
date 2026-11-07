@@ -107,7 +107,12 @@ EUR listing and a usable provider history; no provider ticker is invented.
 
 *Addendum 2026-11-07:* the EUR listings marked "Unverified" above were checked
 against the issuer's listing tables; see [sourcing_20261102.md](sourcing_20261102.md).
-The audit's other findings are unchanged.
+The same day, the ten funds, an S&P 500 total-return series, XEON, the ECB
+EUR/USD rate and the funds of the external references were acquired into
+`runs/sa17_store`. The coverage is in the
+[README](README.md#acquisition-2026-11-07). The audit's other findings are
+unchanged: nothing acquired reaches before 2014, and the 1999–2018 study
+still lacks its data.
 
 The Invesco factsheet confirms a 2016-02-17 launch, accumulation, synthetic
 replication and a capped real-estate benchmark. It does not establish an earlier

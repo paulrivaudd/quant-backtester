@@ -41,6 +41,7 @@ from quant_backtester.data.sources.alfred import AlfredSource
 from quant_backtester.data.sources.ecb import EcbSource
 from quant_backtester.data.sources.euronext import EuronextSource
 from quant_backtester.data.sources.fred import FredSource
+from quant_backtester.data.sources.ssga_nav import SsgaNavSource
 from quant_backtester.data.sources.yahoo import YahooSource
 from quant_backtester.data.updater import HistoryCoverage, MarketDataUpdater
 from quant_backtester.data.validator import Severity, ValidationReport
@@ -54,6 +55,7 @@ SOURCES = {
     "ALFRED": AlfredSource,
     "ECB": EcbSource,
     "EURONEXT": EuronextSource,
+    "SSGA_NAV": SsgaNavSource,
 }
 """Adapter per source identifier, built on demand.
 

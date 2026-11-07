@@ -12,10 +12,11 @@ because a backtest result must follow from committed code plus committed config.
 
 from __future__ import annotations
 
+import math
 import tomllib
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, fields, replace
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -127,6 +128,9 @@ class PublicationRule:
         Calendar the lag is counted on, required when ``lag_sessions`` is not
         zero and forbidden when it is - a calendar with nothing to count would
         only suggest the rule consults one.
+    not_before_utc : datetime | None
+        Optional UTC availability floor for a frozen retrieval archive. The
+        observation is available at the later of its schedule and this instant.
 
     Raises
     ------
@@ -149,9 +153,22 @@ class PublicationRule:
     timezone: str
     lag_sessions: int = 0
     calendar_id: str | None = None
+    not_before_utc: datetime | None = None
 
     def __post_init__(self) -> None:
         """Reject a lag that cannot be counted, or a calendar with nothing to count."""
+        if self.not_before_utc is not None:
+            floor = self.not_before_utc
+            try:
+                valid_floor = (
+                    isinstance(floor, datetime)
+                    and floor.utcoffset() == timedelta(0)
+                    and math.isfinite(floor.timestamp())
+                )
+            except (ValueError, OverflowError, OSError):
+                valid_floor = False
+            if not valid_floor:
+                raise ValueError("not_before_utc must be a finite UTC-aware datetime")
         if self.lag_sessions < 0:
             raise ValueError(f"lag_sessions must be zero or more, got {self.lag_sessions}")
         if self.lag_sessions > 0 and self.calendar_id is None:
@@ -216,7 +233,8 @@ class PublicationRule:
         # UTC decalerait la publication d'une heure autour d'un changement d'heure.
         zone = ZoneInfo(self.timezone)
         local_time = datetime.combine(release_date, self.publication_time, tzinfo=zone)
-        return local_time.astimezone(UTC)
+        scheduled = local_time.astimezone(UTC)
+        return max(scheduled, self.not_before_utc) if self.not_before_utc is not None else scheduled
 
 
 @dataclass(frozen=True, slots=True)
@@ -532,7 +550,11 @@ def _plain(value: object) -> object:
     if isinstance(value, date | time):
         return value.isoformat()
     if isinstance(value, PublicationRule | CheckSource):
-        return {field.name: _plain(getattr(value, field.name)) for field in fields(value)}
+        return {
+            field.name: _plain(getattr(value, field.name))
+            for field in fields(value)
+            if not (field.name == "not_before_utc" and getattr(value, field.name) is None)
+        }
     if isinstance(value, tuple | list):
         return [_plain(item) for item in value]
     return value
@@ -748,11 +770,18 @@ def _instrument_from_table(table: Mapping[str, Any], path: Path) -> Instrument:
         _require(raw_rule, ("publication_time",), rule_context)
         publication_time = _as_publication_time(raw_rule["publication_time"], rule_context)
         _require(raw_rule, ("timezone",), rule_context)
+        floor = raw_rule.get("not_before_utc")
+        if isinstance(floor, str):
+            try:
+                floor = datetime.fromisoformat(floor)
+            except ValueError as error:
+                raise ValueError(f"{rule_context}: invalid not_before_utc") from error
         publication_rule = PublicationRule(
             publication_time=publication_time,
             timezone=raw_rule["timezone"],
             lag_sessions=raw_rule.get("lag_sessions", 0),
             calendar_id=raw_rule.get("calendar_id"),
+            not_before_utc=floor,
         )
 
     raw_checks = table.get("check_sources", [])

@@ -27,8 +27,20 @@
   sourcing note its header cited (written 2026-11-07, after the ten issuer
   listings were checked), the audit and acquisition scripts with their
   tests, and an updated README.
-- **Nothing was run on market data.** The acquisition has not been run; the
-  market factor, monetary fund and window are still open.
+- **Data acquired, no strategy run.** `scripts/SA17_download_data.py` now
+  builds `runs/sa17_store` from the project registry, the SA15 registries
+  and the SA17 registry.
+  - The SA17 registry gains the market factor `SP500TR` (`^SP500TR`, S&P 500
+    total return in USD).
+  - The store also holds XEON, the ECB EUR/USD rate and the funds of the
+    external references, under their existing declarations.
+  - The download of 2026-11-07 validated all 16 series with no error. The
+    shared funds' bars are identical to SA16's.
+  - Two coverage findings are recorded in `research/SA17/README.md`: sector
+    funds with no trade on many sessions before 2021, and two missing Xetra
+    sessions.
+  - The currency of the regression, the start of the window and the
+    treatment of no-trade bars remain open.
 
 ### The results in English (2026-10-31)
 - **Reports regenerated in English.**

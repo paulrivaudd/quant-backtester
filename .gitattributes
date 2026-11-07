@@ -1,0 +1,2 @@
+# POSIX hooks must remain executable by sh in Windows/WSL checkouts.
+.githooks/* text eol=lf

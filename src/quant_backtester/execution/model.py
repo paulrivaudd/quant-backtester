@@ -36,9 +36,10 @@ from __future__ import annotations
 
 import math
 from collections.abc import Collection, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from enum import Enum
+from types import MappingProxyType
 from typing import Final
 
 from quant_backtester.data.instruments import InstrumentRegistry
@@ -220,6 +221,9 @@ class ExecutionModel:
         rebalancing that moves a position by a few currency units pays a
         commission floor to change nothing, and a backtest without this
         threshold spends its return on noise no one would have traded.
+    costs_by_instrument : Mapping[str, CostModel]
+        Optional overrides keyed by non-empty instrument IDs. Copied and frozen
+        on construction; instruments without an override use ``costs``.
 
     Raises
     ------
@@ -232,21 +236,41 @@ class ExecutionModel:
     costs: CostModel
     minimum_trade_value: float = 0.0
     sizing: Sizing = Sizing.AT_AUCTION
+    costs_by_instrument: Mapping[str, CostModel] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Reject a threshold that is not a value, or a cost model that is not one."""
         if not isinstance(self.costs, CostModel):
             raise ValueError(f"costs must be a CostModel, got {self.costs!r}")
         require_finite_non_negative(self.minimum_trade_value, "minimum_trade_value")
+        if not isinstance(self.costs_by_instrument, Mapping):
+            raise ValueError("costs_by_instrument must be a mapping")
+        overrides = dict(self.costs_by_instrument)
+        for instrument_id, costs in overrides.items():
+            if not isinstance(instrument_id, str) or not instrument_id.strip():
+                raise ValueError("costs_by_instrument keys must be non-empty instrument IDs")
+            if not isinstance(costs, CostModel):
+                raise ValueError(f"costs_by_instrument[{instrument_id!r}] must be a CostModel")
+        object.__setattr__(self, "costs_by_instrument", MappingProxyType(overrides))
+
+    def _costs_for(self, instrument_id: str) -> CostModel:
+        """Return the instrument's override or the global cost model."""
+        return self.costs_by_instrument.get(instrument_id, self.costs)
 
     def definition(self) -> dict[str, object]:
         """Return the model as it is recorded with a run."""
-        return {
+        definition: dict[str, object] = {
             "fill_model": FILL_MODELS[self.sizing],
             "fill": "market order at the opening auction, sized at its price",
             "costs": self.costs.definition(),
             "minimum_trade_value": self.minimum_trade_value,
         }
+        if self.costs_by_instrument:
+            definition["costs_by_instrument"] = {
+                name: self.costs_by_instrument[name].definition()
+                for name in sorted(self.costs_by_instrument)
+            }
+        return definition
 
     def rebalance(
         self,
@@ -405,7 +429,7 @@ class ExecutionModel:
         fills: list[Fill] = []
         book = state
         for line in sells:
-            fill = Fill.of(line.order, line.market_price, self.costs)
+            fill = self._fill(line, line.order.quantity)
             if book.cash + fill.cash_flow < 0.0:
                 # A commission floor larger than what the sale brings in, on a
                 # book with nothing left in cash to pay the difference.
@@ -457,13 +481,13 @@ class ExecutionModel:
             rejects=tuple(sorted(rejects, key=lambda reject: reject.instrument_id)),
         )
 
-    def _spendable(self, cash: float) -> float:
+    def _spendable(self, cash: float, instrument_id: str) -> float:
         """Return the notional a purchase can be worth and still pay its commission.
 
         The fill price already carries the spread and the slippage; what is
         left to fit in the cash is the commission, a rate with a floor.
         """
-        costs = self.costs
+        costs = self._costs_for(instrument_id)
         return max(
             0.0,
             min(cash - costs.minimum_commission, cash / (1.0 + costs.commission_rate)),
@@ -604,7 +628,7 @@ class ExecutionModel:
                         price=price,
                         sizing_price=closes[instrument_id] if at_decision else price,
                         value=(
-                            self._spendable(state.cash * shares[instrument_id])
+                            self._spendable(state.cash * shares[instrument_id], instrument_id)
                             if instrument_id in shares
                             else equity * weight
                         ),
@@ -647,17 +671,18 @@ class ExecutionModel:
             side and the quantity refused. All four are ``None`` when the line
             is already at its target, to within a lot.
         """
-        buy = _units_to_buy(value, self.costs.fill_price(Side.BUY, sizing_price), held, step)
+        costs = self._costs_for(instrument_id)
+        buy = _units_to_buy(value, costs.fill_price(Side.BUY, sizing_price), held, step)
         if buy > 0.0:
             if not in_universe:
                 return None, ExecutionRejectReason.OUTSIDE_TRADING_UNIVERSE, Side.BUY, buy
-            if buy * self.costs.fill_price(Side.BUY, price) < self.minimum_trade_value:
+            if buy * costs.fill_price(Side.BUY, price) < self.minimum_trade_value:
                 return None, ExecutionRejectReason.BELOW_MINIMUM_TRADE, Side.BUY, buy
             line = _Line(Order(instrument_id, Side.BUY, buy, at), price, step, buy)
             return line, None, None, None
         sell = _units_to_sell(value, sizing_price, held, step)
         if sell > 0.0:
-            if sell * self.costs.fill_price(Side.SELL, price) < self.minimum_trade_value:
+            if sell * costs.fill_price(Side.SELL, price) < self.minimum_trade_value:
                 return None, ExecutionRejectReason.BELOW_MINIMUM_TRADE, Side.SELL, sell
             line = _Line(Order(instrument_id, Side.SELL, sell, at), price, step, sell)
             return line, None, None, None
@@ -690,8 +715,10 @@ class ExecutionModel:
         the capped quantity above the budget, one lot less is taken (audit of
         archive 10).
         """
-        price = self.costs.fill_price(Side.BUY, line.market_price)
-        affordable = _units_to_buy(self._spendable(budget), price, 0.0, line.step)
+        price = self._costs_for(line.order.instrument_id).fill_price(Side.BUY, line.market_price)
+        affordable = _units_to_buy(
+            self._spendable(budget, line.order.instrument_id), price, 0.0, line.step
+        )
         executable = min(line.order.quantity, affordable)
         for _ in range(64):
             if executable <= 0.0 or -self._fill(line, executable).cash_flow <= budget:
@@ -708,7 +735,7 @@ class ExecutionModel:
         order = line.order
         if quantity != order.quantity:
             order = Order(order.instrument_id, order.side, quantity, order.submitted_at)
-        return Fill.of(order, line.market_price, self.costs)
+        return Fill.of(order, line.market_price, self._costs_for(order.instrument_id))
 
     def _scaled(self, line: _Line, scale: float) -> float:
         """Return the units of a purchase sent at ``scale`` of its size, or ``0.0``.
@@ -728,7 +755,7 @@ class ExecutionModel:
             quantity = whole_lots(wanted * scale, line.step) * line.step
         if quantity <= 0.0:
             return 0.0
-        price = self.costs.fill_price(Side.BUY, line.market_price)
+        price = self._costs_for(line.order.instrument_id).fill_price(Side.BUY, line.market_price)
         if quantity * price < self.minimum_trade_value:
             return 0.0
         return quantity

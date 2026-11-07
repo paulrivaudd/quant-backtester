@@ -3,7 +3,8 @@
 This is the only layer that knows a provider's column names, its date handling
 and its sign conventions. It is also where availability is stamped: a BAR gets
 its two timestamps from the venue calendar, a LEVEL gets its single timestamp
-from the instrument's publication rule.
+from the instrument's publication rule. Issuer NAVs have unknown historical
+publication and require that rule's availability floor to equal retrieval.
 
 Normalisation is a pure function of (raw frame, instrument, calendar). It must
 never look at the clock, the filesystem or the network - that is what makes
@@ -16,7 +17,7 @@ import math
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Protocol
 
 import pandas as pd
@@ -38,6 +39,7 @@ from quant_backtester.data.schemas import (
 )
 from quant_backtester.data.sources.alfred import vintage_column
 from quant_backtester.data.sources.base import RawDownload
+from quant_backtester.data.sources.ssga_nav import nav_date
 
 
 @dataclass(frozen=True, slots=True)
@@ -1356,6 +1358,94 @@ class EcbNormalizer:
         return NormalizedData(levels=levels, rejected=rejected)
 
 
+class SsgaNavNormalizer:
+    """Store USD NAV levels with an enforced retrieval availability floor.
+
+    Historical publication is unknown. The instrument's publication rule must
+    pin ``not_before_utc`` to this frozen fetch: earlier decisions cannot
+    use these values. A later scheduled release remains unavailable at fetch.
+    Shares outstanding and total assets never become volume or OHLC fields.
+    """
+
+    source_id = "SSGA_NAV"
+
+    def normalize(
+        self,
+        instrument: Instrument,
+        download: RawDownload,
+        calendar: TradingCalendar | None = None,
+    ) -> NormalizedData:
+        """Validate the archived identity and range, then stamp retrieval time."""
+        _require_same_download("SsgaNavNormalizer", self.source_id, instrument, download)
+        if instrument.data_type is not DataType.LEVEL or instrument.tradable:
+            raise ValueError("SSGA NAV requires a nontradable LEVEL instrument")
+        metadata = download.request
+        isin, separator, _ = instrument.source_symbol.partition(":")
+        if (
+            not separator
+            or metadata.get("isin") != isin
+            or metadata.get("currency") != "USD"
+            or instrument.currency != "USD"
+        ):
+            raise ValueError("SSGA NAV identity or currency mismatch")
+        raw = download.frame
+        expected = {"Date", "NAV", "Shares Outstanding", "Total Net Assets"}
+        if len(raw.columns) != len(expected) or set(raw.columns) != expected:
+            raise ValueError("SSGA NAV schema changed")
+        start = _iso_date(str(metadata.get("start")), "SSGA NAV start")
+        end = _iso_date(str(metadata.get("end_inclusive")), "SSGA NAV end")
+        report = _iso_date(str(metadata.get("report_date")), "SSGA NAV report date")
+        retrieved = pd.Timestamp(download.retrieved_at_utc)
+        if pd.isna(retrieved) or retrieved.tzinfo is None:
+            raise ValueError("SSGA NAV retrieval must be timezone-aware")
+        retrieval_date = download.retrieved_at_utc.astimezone(UTC).date()
+        retrieved = retrieved.tz_convert("UTC")
+        rule = instrument.publication_rule
+        if rule is None or rule.not_before_utc != retrieved:
+            raise ValueError("SSGA NAV not_before_utc must equal the retrieval timestamp")
+        if start > end or report > retrieval_date:
+            raise ValueError("SSGA NAV invalid range or future report date")
+        seen: set[date] = set()
+        records = []
+        unlisted = []
+        unpublished = []
+        for text_day, text_value in zip(raw["Date"], raw["NAV"], strict=True):
+            day = nav_date(str(text_day))
+            if day in seen or day > report or day > retrieval_date:
+                raise ValueError("SSGA NAV duplicate or future observation")
+            seen.add(day)
+            value = _finite_number(str(text_value), "SSGA NAV")
+            if value <= 0:
+                raise ValueError("SSGA NAV must be positive")
+            if not start <= day <= end:
+                continue
+            if not instrument.is_listed(day):
+                unlisted.append(day)
+                continue
+            available = rule.available_at(day, calendar)
+            if available > retrieved:
+                unpublished.append(day)
+                continue
+            records.append(
+                {
+                    "instrument_id": instrument.id,
+                    "observation_date": day,
+                    "value": value,
+                    "available_at_utc": available,
+                    "source": download.source,
+                    "source_fetch_id": download.fetch_id,
+                }
+            )
+        records.sort(key=lambda row: row["observation_date"])
+        levels = pa.Table.from_pylist(records, schema=LEVELS_SCHEMA).to_pandas()
+        return NormalizedData(
+            levels=levels,
+            rejected=RejectedRows(
+                unlisted=tuple(sorted(unlisted)), unpublished=tuple(sorted(unpublished))
+            ),
+        )
+
+
 NORMALIZERS: Mapping[str, Normalizer] = {
     normalizer.source_id: normalizer
     for normalizer in (
@@ -1364,6 +1454,7 @@ NORMALIZERS: Mapping[str, Normalizer] = {
         FredNormalizer(),
         AlfredNormalizer(),
         EcbNormalizer(),
+        SsgaNavNormalizer(),
     )
 }
 """Registered normalizers, keyed by source identifier. They hold no state."""

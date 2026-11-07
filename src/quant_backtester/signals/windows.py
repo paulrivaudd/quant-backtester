@@ -16,7 +16,8 @@ from __future__ import annotations
 import calendar
 import math
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, time, timedelta
+from typing import cast
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -216,6 +217,57 @@ def month_end_anchors(decided: date, months: int) -> tuple[date, ...]:
     return (*anchors, decided)
 
 
+def completed_month_cutoff(context: SignalContext) -> date:
+    """Return the last calendar day before the decision's reference month."""
+    reference = context.calendars.get(context.market.reference_calendar_id)
+    day = context.as_of.astimezone(ZoneInfo(reference.timezone)).date()
+    return day.replace(day=1) - timedelta(days=1)
+
+
+def load_dated_window(
+    context: SignalContext,
+    instrument_id: str,
+    *,
+    dates: tuple[date, ...],
+    basis: PriceBasis,
+    nav: bool = False,
+) -> LoadedWindow:
+    """Read exact observation dates from PIT history, without filling holes.
+
+    LEVEL inputs are levels, never adjusted OHLC. For NAV, 22:15 Dublin
+    valuation is only a lower bound: publication must independently be
+    established by the upstream reader's availability timestamps.
+    """
+    instrument = context.instruments.get(instrument_id)
+    series = context.series(
+        instrument_id,
+        BarField.CLOSE,
+        PriceBasis.RAW if instrument.data_type is DataType.LEVEL else basis,
+    )
+    # The reader's index contract is observation dates; pandas stubs also allow ints.
+    observed = cast(list[date], series.index.tolist())
+    if nav:
+        observed = [
+            day
+            for day in observed
+            if datetime.combine(day, time(22, 15), ZoneInfo("Europe/Dublin")) < context.as_of
+        ]
+    series = series.loc[[day for day in observed if day <= context.as_of.date()]]
+    held = tuple(day for day in dates if day in series.index)
+    points = tuple(float(series.loc[day]) for day in held)
+    if instrument.first_session is not None and instrument.first_session > dates[-1]:
+        status = SignalStatus.NOT_LISTED
+    elif instrument.first_session is not None and instrument.first_session > dates[0]:
+        status = SignalStatus.INSUFFICIENT_HISTORY
+    elif len(held) != len(dates):
+        status = SignalStatus.MISSING_INPUT
+    elif any(not math.isfinite(value) or value <= 0 for value in points):
+        status = SignalStatus.INVALID_INPUT
+    else:
+        status = SignalStatus.OK
+    return LoadedWindow(status=status, points=points, dates=held)
+
+
 def load_month_end_window(
     context: SignalContext,
     instrument_id: str,
@@ -223,6 +275,9 @@ def load_month_end_window(
     months: int,
     basis: PriceBasis,
     max_age_sessions: int,
+    observation_cutoff: date | None = None,
+    observation_calendar_id: str | None = None,
+    nav: bool = False,
 ) -> LoadedWindow:
     """Return a fund's closes at the ``months + 1`` month ends ending at the decision.
 
@@ -241,6 +296,17 @@ def load_month_end_window(
     max_age_sessions : int
         Largest age of the freshest close, in sessions of the reference
         calendar. It must also belong to the decision's month.
+    observation_cutoff : date | None
+        Explicit final observation date. Availability is still checked at
+        the actual decision, so a completed month can be read after its end.
+        In this mode freshness is enforced by exact expected dates, rather
+        than the age of a newer, unrelated observation at the decision.
+    observation_calendar_id : str | None
+        Expected observation calendar; mandatory for LEVEL month ends.
+        BAR inputs must declare the same calendar. No missing endpoint is
+        replaced by an earlier available observation.
+    nav : bool
+        Also enforce the 22:15 Europe/Dublin valuation lower bound.
 
     Returns
     -------
@@ -278,6 +344,27 @@ def load_month_end_window(
     """
     require_non_negative_int(max_age_sessions, "max_age_sessions")
     instrument = context.instruments.get(instrument_id)
+    if observation_cutoff is not None or observation_calendar_id is not None:
+        reference = context.calendars.get(context.market.reference_calendar_id)
+        decided = context.as_of.astimezone(ZoneInfo(reference.timezone)).date()
+        cutoff = observation_cutoff or decided
+        if cutoff > decided:
+            raise ValueError("observation_cutoff must not be after the decision")
+        calendar_id = observation_calendar_id or instrument.calendar_id
+        if calendar_id is None:
+            raise ValueError("LEVEL month ends require an explicit observation calendar")
+        if instrument.data_type is DataType.BAR and instrument.calendar_id != calendar_id:
+            return LoadedWindow(status=SignalStatus.INVALID_INPUT)
+        venue = context.calendars.get(calendar_id)
+        anchors = month_end_anchors(cutoff, months)
+        if instrument.first_session is not None and instrument.first_session > cutoff:
+            return LoadedWindow(status=SignalStatus.NOT_LISTED)
+        if instrument.first_session is not None and instrument.first_session > anchors[0]:
+            return LoadedWindow(status=SignalStatus.INSUFFICIENT_HISTORY)
+        dates = tuple(
+            (venue.session(day) or venue.previous_session(day)).session_date for day in anchors
+        )
+        return load_dated_window(context, instrument_id, dates=dates, basis=basis, nav=nav)
     if instrument.data_type is not DataType.BAR:
         raise ValueError(
             f"{instrument_id} is a {instrument.data_type.value} series and holds no venue "

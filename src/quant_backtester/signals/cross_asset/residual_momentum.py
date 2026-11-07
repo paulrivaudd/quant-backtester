@@ -24,9 +24,11 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from datetime import date
 from enum import Enum
 from typing import Final
 
+from quant_backtester.data.instruments import AssetType, DataType
 from quant_backtester.data.schemas import BarField
 from quant_backtester.signals.base import Signal, SignalResult, build_result_frame, result_row
 from quant_backtester.signals.context import SignalContext
@@ -42,6 +44,7 @@ from quant_backtester.signals.windows import (
     MONTH_END_SAMPLING,
     MONTH_END_WINDOW_MODE,
     LoadedWindow,
+    completed_month_cutoff,
     load_month_end_window,
 )
 
@@ -200,6 +203,15 @@ class MonthlyMomentumSignal(Signal):
         in sessions of the reference calendar. A Xetra fund read on the last
         Paris session of December, when Xetra is shut on the 31st, is one
         session old.
+    observation_calendar_id, observation_cutoff, completed_months_only
+        Optional exact-date contract. LEVEL inputs require the explicit
+        observation calendar and are read raw. An explicit cutoff takes
+        precedence; otherwise completed_months_only ends at the previous
+        calendar month. Availability always remains the actual decision.
+    required_currency, require_nav
+        Optional strict input guards. require_nav accepts only LEVEL sector
+        inputs and enforces the Dublin valuation lower bound. It does not
+        establish publication or validate the upstream source provenance.
 
     Raises
     ------
@@ -236,10 +248,23 @@ class MonthlyMomentumSignal(Signal):
     skip_months: int
     price_basis: PriceBasis
     max_age_sessions: int = 1
+    observation_calendar_id: str | None = None
+    observation_cutoff: date | None = None
+    completed_months_only: bool = False
+    required_currency: str | None = None
+    require_nav: bool = False
 
     def __post_init__(self) -> None:
         """Reject a configuration that cannot describe the window and its score."""
         require_identifier(self.signal_id, "signal_id")
+        if self.observation_cutoff is not None and type(self.observation_cutoff) is not date:
+            raise ValueError("observation_cutoff must be a date")
+        if self.observation_calendar_id is not None:
+            require_identifier(self.observation_calendar_id, "observation_calendar_id")
+        if self.require_nav and self.observation_calendar_id is None:
+            raise ValueError("NAV requires an explicit observation calendar")
+        if self.required_currency is not None:
+            require_identifier(self.required_currency, "required_currency")
         if not isinstance(self.measure, MomentumMeasure):
             raise ValueError(f"measure must be a MomentumMeasure, got {self.measure!r}")
         if not isinstance(self.price_basis, PriceBasis):
@@ -265,8 +290,19 @@ class MonthlyMomentumSignal(Signal):
     def definition(self) -> Mapping[str, object]:
         """Return every parameter that changes the number."""
         residual = self.measure is MomentumMeasure.RESIDUAL
+        strict = {
+            "observation_calendar_id": self.observation_calendar_id,
+            "observation_cutoff": self.observation_cutoff.isoformat()
+            if self.observation_cutoff
+            else None,
+            "completed_months_only": self.completed_months_only,
+            "required_currency": self.required_currency,
+            "require_nav": self.require_nav,
+        }
+        strict = strict if any(strict.values()) else {}
         return {
             "type": "MonthlyMomentumSignal",
+            **strict,
             "measure": self.measure.value,
             "market_id": self.market_id,
             "market_role": (
@@ -281,9 +317,17 @@ class MonthlyMomentumSignal(Signal):
             "ddof": 1 if residual else None,
             "variance_floor": VARIANCE_FLOOR if residual else None,
             "sampling": MONTH_END_SAMPLING,
-            "month_grid": "CALENDAR_MONTHS_OF_THE_DECISION_DAY_ON_THE_REFERENCE_CALENDAR",
-            "latest_month": "MONTH_TO_DECISION",
-            "bar_field": BarField.CLOSE.value,
+            "month_grid": "EXACT_OBSERVATION_CALENDAR_MONTH_ENDS"
+            if strict
+            else "CALENDAR_MONTHS_OF_THE_DECISION_DAY_ON_THE_REFERENCE_CALENDAR",
+            "latest_month": (
+                "EXPLICIT_OBSERVATION_CUTOFF"
+                if self.observation_cutoff is not None
+                else "PREVIOUS_COMPLETED_MONTH"
+                if self.completed_months_only
+                else "MONTH_TO_DECISION"
+            ),
+            "bar_field": "LEVEL_OR_CLOSE" if strict else BarField.CLOSE.value,
             "price_basis": self.price_basis.value,
             "max_age_sessions": self.max_age_sessions,
             "window_mode": MONTH_END_WINDOW_MODE,
@@ -308,6 +352,12 @@ class MonthlyMomentumSignal(Signal):
             if window.status is SignalStatus.OK:
                 if market is not None and market.status is not SignalStatus.OK:
                     window = replace(window, status=market.status)
+                elif (
+                    market is not None
+                    and self.observation_calendar_id is not None
+                    and window.dates != market.dates
+                ):
+                    window = replace(window, status=SignalStatus.MISSING_INPUT)
                 elif residual and market is not None:
                     fit = self._fit(window, market)
                     value = None if fit is None else fit.score
@@ -329,10 +379,26 @@ class MonthlyMomentumSignal(Signal):
 
     def _window(self, context: SignalContext, instrument_id: str) -> LoadedWindow:
         """Return one fund's month-end closes."""
+        instrument = context.instruments.get(instrument_id)
+        if self.required_currency is not None and instrument.currency != self.required_currency:
+            return LoadedWindow(status=SignalStatus.INVALID_INPUT)
+        nav = self.require_nav and instrument_id != self.market_id
+        if nav and (
+            instrument.data_type is not DataType.LEVEL
+            or instrument.asset_type is not AssetType.ETF
+            or instrument.tradable
+        ):
+            return LoadedWindow(status=SignalStatus.INVALID_INPUT)
+        cutoff = self.observation_cutoff
+        if cutoff is None and self.completed_months_only:
+            cutoff = completed_month_cutoff(context)
         return load_month_end_window(
             context,
             instrument_id,
             months=self.estimation_months,
+            observation_cutoff=cutoff,
+            observation_calendar_id=self.observation_calendar_id,
+            nav=nav,
             basis=self.price_basis,
             max_age_sessions=self.max_age_sessions,
         )

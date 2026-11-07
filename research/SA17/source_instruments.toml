@@ -1,4 +1,5 @@
-# SA17 acquisition registry, declared 2026-11-02 before ingestion.
+# SA17 acquisition registry, declared 2026-11-02 before ingestion; the market
+# factor at the end was added on 2026-11-07, before the first download.
 # This is a sourcing pool, NOT the strategy's frozen historical universe.
 # EUR exchange quotations of accumulating UCITS funds; no synthetic USD or
 # total-return-index series is manufactured from them. Real estate is missing.
@@ -6,6 +7,11 @@
 # earlier fund inception dates. See sourcing_20261102.md for evidence/limits.
 # All use the project's existing Yahoo adapter and normalizer, including its
 # refusal of split-adjusted histories and normal corporate-action checks.
+#
+# runs/sa17_store concatenates the project registry, the two SA15 additions and
+# this file (scripts/SA17_download_data.py). The monetary fund, ECB EUR/USD and
+# the funds of the external references are fetched under their existing
+# declarations and identifiers, not redeclared here.
 
 # ISIN IE00BWBXM492; source consulted 2026-11-02:
 # https://www.ssga.com/uk/en_gb/institutional/etfs/state-street-spdr-sp-us-energy-select-sector-ucits-etf-acc-zpde-gy
@@ -187,3 +193,24 @@ distribution_policy = "ACCUMULATING"
 history_basis = "ASSUMED_UNREVISED"
 history_note = "EUR exchange OHLC as served by Yahoo at retrieval. No historical provider vintages; exchange prints assumed unrevised, with later corrections subject to the repository revision policy. Accumulating UCITS fund IE00BWBXMB69. Current benchmark and current GICS membership are not backdated; historical index mapping is still under audit. Acquisition only, not admission to the SA17 strategy universe."
 
+
+# The market factor of the proposal: S&P 500 total returns in USD. The project
+# SP500 (^GSPC) is a price index and does not qualify. Yahoo serves the S&P Dow
+# Jones Indices total-return index under ^SP500TR; by its name it is the gross
+# series (dividends reinvested before withholding tax), checked on the data
+# only (sourcing note, 2026-11-07), not against S&P's own published levels.
+# An index cannot split or pay, so the Yahoo adapter's split check does not
+# apply. Signal only, never held. Its close is the 16:00 New York close.
+[[instrument]]
+id = "SP500TR"
+name = "S&P 500 total return index (USD)"
+asset_type = "INDEX"
+data_type = "BAR"
+currency = "USD"
+primary_source = "YAHOO"
+source_symbol = "^SP500TR"
+calendar_id = "XNYS"
+tradable = false
+first_session = 1990-01-02
+history_basis = "ASSUMED_UNREVISED"
+history_note = "An index close is a final print. Levels as served by Yahoo at retrieval; no earlier fetch to compare with and not checked against S&P Dow Jones Indices. Total return in USD, dividends reinvested; gross by its name, unverified against the issuer. Signal only: the SA17 market factor candidate, not admitted until the protocol is frozen."

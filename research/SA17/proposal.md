@@ -2,6 +2,12 @@
 
 Date : 2026-11-01. Statut : **PROPOSED / NOT_TESTED**.
 
+**Mise à jour du 2026-11-07 :** cette proposition historique est conservée.
+Le [protocole corrigé](protocol.md) prévaut pour les données et la chronologie :
+VL officielles USD, dates américaines communes, disponibilité après publication,
+risque EUR séparé, coûts par fonds et étude longue Ken French. Aucune performance
+SA17 n'a été calculée. Une VL datée du jour n'est pas disponible à sa clôture.
+
 Cette note propose une seule candidate. Aucun résultat SA17 n'a été calculé.
 Ce n'est pas encore un protocole exécutable préenregistré : le registre des
 instruments, les sources et les fenêtres réellement couvertes restent à auditer.
