@@ -416,8 +416,9 @@ def load_month_end_window(
         than the age of a newer, unrelated observation at the decision.
     observation_calendar_id : str | None
         Expected observation calendar; mandatory for LEVEL month ends.
-        BAR inputs must declare the same calendar. No missing endpoint is
-        replaced by an earlier available observation.
+        A BAR input must trade on it, or on a venue it is a declared subset
+        of (``CalendarRegistry.observes``). No missing endpoint is replaced
+        by an earlier available observation.
     nav : bool
         Also enforce the 22:15 Europe/Dublin valuation lower bound.
 
@@ -474,8 +475,8 @@ def load_month_end_window(
         # them: XNYS sessions on which London is open too.
         if (
             instrument.data_type is DataType.BAR
-            and instrument.calendar_id != calendar_id
-            and venue.subset_of != instrument.calendar_id
+            and instrument.calendar_id is not None
+            and not context.calendars.observes(calendar_id, instrument.calendar_id)
         ):
             raise ValueError(
                 f"{instrument_id} trades on {instrument.calendar_id} and is asked for month "

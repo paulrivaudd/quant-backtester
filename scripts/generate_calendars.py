@@ -13,7 +13,12 @@ Run it when a covered period is extended or the library publishes a correction::
 
 A calendar can also restrict a venue to the days another one is open too:
 ``XNYS_XLON`` holds the NYSE sessions on which London is open, at NYSE hours,
-and declares ``subset_of = "XNYS"`` so the registry can check it is one.
+and declares ``subset_of = "XNYS"`` so the registry can check it is one. It is
+SA17's observation grid, written to ``research/SA17/calendars`` rather than
+beside the venues: every run loading ``market_data/metadata/calendars`` hashes
+the whole folder, so a calendar added there would change their identities.
+Before it is written, it is loaded with the committed XNYS file into a
+registry, which refuses it unless every session is an XNYS session.
 
 Extend the horizon by about a year at a time, not ten. An exchange announces an
 exceptional closure - a state funeral, a market holiday moved - months ahead,
@@ -41,7 +46,7 @@ from zoneinfo import ZoneInfo
 
 import exchange_calendars as xc
 
-from quant_backtester.data.calendars import TradingCalendar
+from quant_backtester.data.calendars import CalendarRegistry, TradingCalendar
 
 CALENDARS_DIR = Path(__file__).resolve().parents[1] / "market_data" / "metadata" / "calendars"
 """Where the committed calendar files live."""
@@ -69,6 +74,8 @@ class Venue:
     restricted_to : str | None
         Another library venue: only the sessions on which it is open too are
         kept, and the file declares itself a subset of ``library_id``.
+    directory : Path
+        Folder the file is written to.
     """
 
     calendar_id: str
@@ -79,6 +86,7 @@ class Venue:
     coverage_note: str
     library_id: str | None = None
     restricted_to: str | None = None
+    directory: Path = CALENDARS_DIR
 
     @property
     def source_id(self) -> str:
@@ -134,6 +142,7 @@ VENUES = (
         ),
         library_id="XNYS",
         restricted_to="XLON",
+        directory=Path(__file__).resolve().parents[1] / "research" / "SA17" / "calendars",
     ),
 )
 
@@ -326,7 +335,17 @@ def main(only: Sequence[str] | None = None) -> None:
             candidate = Path(scratch) / f"{venue.calendar_id}.toml"
             candidate.write_text(text, encoding="utf-8")
             check_against_library(candidate, venue, sessions)
-        target = CALENDARS_DIR / f"{venue.calendar_id}.toml"
+            if venue.restricted_to is not None:
+                # Checked against the committed parent as well: a subset the
+                # library agrees with but the parent file does not would make
+                # every registry loading both refuse to build.
+                CalendarRegistry(
+                    [
+                        TradingCalendar.from_toml(CALENDARS_DIR / f"{venue.source_id}.toml"),
+                        TradingCalendar.from_toml(candidate),
+                    ]
+                )
+        target = venue.directory / f"{venue.calendar_id}.toml"
         target.write_text(text, encoding="utf-8")
         print(f"{venue.calendar_id}: {len(sessions)} sessions checked, written to {target}")
 

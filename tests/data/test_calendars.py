@@ -789,11 +789,10 @@ def test_registry_from_empty_directory_fails(tmp_path):
 
 
 def test_registry_loads_the_committed_calendars():
-    """The real calendar folder yields Xetra, New York, its London subset and Paris."""
+    """The real calendar folder yields Xetra, New York and Paris."""
     registry = CalendarRegistry.from_directory(COMMITTED_CALENDARS)
 
-    assert [c.calendar_id for c in registry] == ["XETR", "XNYS", "XNYS_XLON", "XPAR"]
-    assert registry.get("XNYS_XLON").subset_of == "XNYS"
+    assert [c.calendar_id for c in registry] == ["XETR", "XNYS", "XPAR"]
 
 
 # --- coverage: a calendar only answers for the period its holiday list covers --
@@ -979,9 +978,21 @@ def test_subset_of_is_read_from_toml_and_an_unknown_key_is_still_refused(tmp_pat
         TradingCalendar.from_toml(path)
 
 
+SA17_CALENDARS = Path(__file__).resolve().parents[2] / "research" / "SA17" / "calendars"
+
+
 def test_the_committed_london_subset_drops_uk_holidays_and_keeps_us_hours():
-    registry = CalendarRegistry.from_directory(COMMITTED_CALENDARS)
+    # SA17's grid lives beside its study, not among the venues every run hashes.
+    registry = CalendarRegistry(
+        [
+            TradingCalendar.from_toml(COMMITTED_CALENDARS / "XNYS.toml"),
+            TradingCalendar.from_toml(SA17_CALENDARS / "XNYS_XLON.toml"),
+        ]
+    )
     new_york, both = registry.get("XNYS"), registry.get("XNYS_XLON")
+    assert both.subset_of == "XNYS"
+    assert registry.observes("XNYS_XLON", "XNYS")
+    assert not registry.observes("XNYS", "XNYS_XLON")
     for uk_holiday in (date(2024, 4, 1), date(2024, 5, 6), date(2024, 12, 26)):
         assert new_york.is_open(uk_holiday)
         assert not both.is_open(uk_holiday)
@@ -989,3 +1000,19 @@ def test_the_committed_london_subset_drops_uk_holidays_and_keeps_us_hours():
     friday = both.session(date(2024, 11, 29))
     assert friday is not None
     assert friday == new_york.session(date(2024, 11, 29))
+
+
+def test_observes_follows_the_declared_chain_of_subsets():
+    grandchild = child(
+        calendar_id="XTST_SUB2",
+        holidays=frozenset({date(2026, 11, 26), date(2026, 12, 28), date(2026, 12, 29)}),
+        subset_of="XTST_SUB",
+    )
+    other = make_calendar(calendar_id="XOTH")
+    registry = CalendarRegistry([make_calendar(), child(), grandchild, other])
+    assert registry.observes("XTST_SUB2", "XTST")
+    assert registry.observes("XTST", "XTST")
+    assert not registry.observes("XTST", "XTST_SUB")
+    assert not registry.observes("XTST_SUB2", "XOTH")
+    with pytest.raises(KeyError):
+        registry.observes("XNOPE", "XTST")

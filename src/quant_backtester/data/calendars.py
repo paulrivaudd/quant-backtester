@@ -657,6 +657,35 @@ class CalendarRegistry:
             known = ", ".join(sorted(self._calendars))
             raise KeyError(f"unknown calendar {calendar_id!r}; known: {known}") from None
 
+    def observes(self, calendar_id: str, venue_id: str) -> bool:
+        """Return whether every session of ``calendar_id`` is a session of ``venue_id``.
+
+        Parameters
+        ----------
+        calendar_id : str
+            The calendar an instrument is asked to be read on.
+        venue_id : str
+            The calendar the instrument trades on.
+
+        Returns
+        -------
+        bool
+            ``True`` for the venue itself, or for a calendar whose chain of
+            declared ``subset_of`` - each link checked when the registry was
+            built - leads to it.
+
+        Raises
+        ------
+        KeyError
+            If ``calendar_id`` is not registered.
+        """
+        current: str | None = calendar_id
+        while current is not None:
+            if current == venue_id:
+                return True
+            current = self.get(current).subset_of
+        return False
+
     def __iter__(self) -> Iterator[TradingCalendar]:
         """Iterate over calendars in id order."""
         return iter([self._calendars[key] for key in sorted(self._calendars)])
