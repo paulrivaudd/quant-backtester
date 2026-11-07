@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
+from typing import cast
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -16,6 +18,8 @@ pytest.importorskip("torch")
 from quant_backtester.backtest.runner import StrategyRunner
 from quant_backtester.data.calendars import CalendarRegistry
 from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.execution.costs import CostModel
+from quant_backtester.execution.model import ExecutionModel
 from quant_backtester.ml.artifacts import ArtifactError, NeuralArtifact
 from quant_backtester.ml.config import NeuralStrategyConfig
 from quant_backtester.ml.training import (
@@ -249,3 +253,14 @@ def test_outputs_declared_out_of_the_engines_canonical_order_still_run(
 
     assert artifact.config.tradable_ids == ("ETF_OTHER", "ETF_EU")
     assert len(result.fills()) > 0
+
+
+def test_per_instrument_costs_have_no_single_proportional_rate() -> None:
+    # The default model's rate would understate what the engine charges on
+    # every instrument that has its own costs.
+    execution = ExecutionModel(
+        CostModel(commission_rate=0.001), costs_by_instrument={"ETF_EU": CostModel()}
+    )
+    runner = cast(StrategyRunner, SimpleNamespace(execution=execution))
+    with pytest.raises(ValueError, match="per-instrument"):
+        proportional_cost_rate(runner)

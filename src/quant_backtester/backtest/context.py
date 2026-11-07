@@ -18,6 +18,16 @@ not apply the portfolio's rules: a maximum weight, a gross limit, a turnover
 budget are applied to what comes out of a strategy, and keeping them separate
 is what lets a report say what each of them cost.
 
+One rule it does apply: the weights of an allocation add up to at most one,
+because this book does not borrow. :meth:`StrategyContext.weights`, which
+every helper that holds something goes through, raises rather than build an
+allocation above that bound - the bound
+:class:`~quant_backtester.portfolio.targets.TargetAllocation` also enforces
+when it is constructed. It is not one of the rules above: a gross limit cuts
+a legitimate allocation down to policy, and the report says what that cost;
+this one refuses an allocation that is not a fraction of a book at all, and
+the run stops.
+
 It lives beside the engine rather than in ``strategies`` because the engine
 builds it, and a lower layer never imports a higher one.
 """
@@ -139,6 +149,11 @@ class StrategyContext:
         Every signal computed for this decision.
     market : StrategyMarketView
         What the market says at this instant, status and staleness included.
+        Not read without trace: every instrument asked about through
+        ``value``, ``values`` or ``history`` is recorded, usable or not, and
+        the run adds it to the ``history_basis`` of its configuration beside
+        the universe and the declared signals, so the report names the history
+        of every series a decision rested on (audit N08, decision D23).
     portfolio : PortfolioView
         The book as it stands, before the order this decision will produce.
     universe : tuple[str, ...]

@@ -110,3 +110,36 @@ def test_invalid_identifiers_never_fetch(isin, ticker):
 
     with pytest.raises(ValueError):
         SsgaNavSource(fetch_bytes=fetch).fetch(isin, ticker)
+
+
+@pytest.mark.parametrize(
+    ("link", "expected"),
+    [
+        (
+            "/library-content/products/fund-docs/fund-sup-31.pdf",
+            "https://www.ssga.com/library-content/products/fund-docs/fund-sup-31.pdf",
+        ),
+        ("https://www.ssga.com/uk/en_gb/etfs/x", "https://www.ssga.com/uk/en_gb/etfs/x"),
+    ],
+)
+def test_documents_are_fetched_from_the_issuer_through_the_transport(link, expected):
+    urls = []
+
+    def fetch(url) -> bytes:
+        urls.append(url)
+        return b"%PDF"
+
+    assert SsgaNavSource(fetch_bytes=fetch).fetch_document(link) == b"%PDF"
+    assert urls == [expected]
+
+
+@pytest.mark.parametrize(
+    "link",
+    ["https://evil.example/fund-sup.pdf", "http://www.ssga.com/x", "https://www.ssga.com.evil/x"],
+)
+def test_documents_outside_the_issuer_site_never_fetch(link):
+    def fetch(url) -> bytes:
+        pytest.fail("a foreign address reached transport")
+
+    with pytest.raises(ValueError, match="State Street address"):
+        SsgaNavSource(fetch_bytes=fetch).fetch_document(link)

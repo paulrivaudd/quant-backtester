@@ -2,6 +2,9 @@
 
 Run with --archive pointing to a NEW directory. Existing archives are refused.
 Only identity, coverage, quotes and hashes are reported; returns are not read.
+Every download goes through the State Street and Ken French adapters of
+``data/``: this script parses and archives what they return, and performs no
+network I/O of its own.
 """
 
 from __future__ import annotations
@@ -14,34 +17,52 @@ import re
 from datetime import date
 from pathlib import Path
 
-from quant_backtester.data.sources.base import http_get_bytes, utc_now
+from quant_backtester.data.sources.base import utc_now
 from quant_backtester.data.sources.ken_french import KenFrenchDataset, KenFrenchSource
-from quant_backtester.data.sources.ssga_nav import NAV_ROOT, nav_date, parse_nav_workbook
+from quant_backtester.data.sources.ssga_nav import NAV_ROOT, SsgaNavSource, nav_date
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def acquire(archive: Path, registry: Path) -> dict[str, object]:
-    """Create an immutable raw audit with issuer links, hashes and coverage only."""
+def acquire(
+    archive: Path, registry: Path, source: SsgaNavSource | None = None
+) -> dict[str, object]:
+    """Create an immutable raw audit with issuer links, hashes and coverage only.
+
+    Parameters
+    ----------
+    archive : Path
+        A new directory; an existing one is refused before anything is fetched.
+    registry : Path
+        The sourcing registry naming each fund's ISIN and issuer page.
+    source : SsgaNavSource | None
+        The adapter every document is fetched through; the live one by default.
+
+    Returns
+    -------
+    dict[str, object]
+        The manifest written to ``archive``: per fund, identity, coverage,
+        hashes and the UTC retrieval instant.
+    """
     archive.mkdir(parents=True, exist_ok=False)
+    source = source or SsgaNavSource()
     raw = archive / "raw"
     raw.mkdir()
-    source = registry.read_text(encoding="utf-8")
-    entries = re.findall(r"# ISIN (IE\w+);[^\n]*\n# (https://[^\n]+)", source)
+    sourcing = registry.read_text(encoding="utf-8")
+    entries = re.findall(r"# ISIN (IE\w+);[^\n]*\n# (https://[^\n]+)", sourcing)
     if len(entries) != 10:
         raise ValueError("Expected ten explicitly sourced sector funds")
     records = []
     for isin, url in entries:
         ticker = url.rsplit("-", 2)[-2] + "-gy"
-        page_bytes = http_get_bytes(url)
+        page_bytes = source.fetch_document(url)
         (raw / f"{ticker}.html").write_bytes(page_bytes)
         page = page_bytes.decode("utf-8")
         nav_url = f"{NAV_ROOT}/navhist-emea-en-{ticker}.xlsx"
         if f"navhist-emea-en-{ticker}.xlsx" not in page:
             raise ValueError(f"Issuer page does not link expected NAV file: {isin}")
-        payload = http_get_bytes(nav_url)
-        (raw / f"{ticker}.xlsx").write_bytes(payload)
-        book = parse_nav_workbook(payload, isin=isin)
+        book = source.fetch(isin, ticker)
+        (raw / f"{ticker}.xlsx").write_bytes(book.payload)
         dates = sorted(nav_date(v) for v in book.frame["Date"])
         text = html.unescape(re.sub(r"<[^>]+>", " ", page))
         text = re.sub(r"\s+", " ", text)
@@ -50,12 +71,7 @@ def acquire(archive: Path, registry: Path) -> dict[str, object]:
         supplements = sorted(set(re.findall(r'[^"\s<>]*fund-sup-[^"\s<>]+\.pdf', page)))
         supplements = [html.unescape(u) for u in supplements]
         for i, supplement in enumerate(supplements):
-            full = (
-                supplement
-                if supplement.startswith("https://")
-                else "https://www.ssga.com" + supplement
-            )
-            pdf = http_get_bytes(full)
+            pdf = source.fetch_document(supplement)
             (raw / f"{ticker}-supplement-{i}.pdf").write_bytes(pdf)
         record = {
             "isin": isin,

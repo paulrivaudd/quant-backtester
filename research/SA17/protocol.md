@@ -40,6 +40,12 @@ substituted. Retain the project's 23:00 Paris decision and next tradable open;
 choose the first eligible monthly decision from validated publication evidence
 before freezing the execution schedule. Merely delaying by one day without
 evidence is a sensitivity assumption, not verified historical availability.
+Amended 2026-11-07, after review and before any run: the strategy holds no
+configurable cutoff. Each decision's cutoff is the previous completed month of
+that decision, recorded in the signal definitions; a fixed date reused across a
+run would freeze every later window. An explicit cutoff given to a signal must
+resolve to the last XNYS session of that month: a mid-month session would score
+a partial month as a completed one.
 
 The OLS window stays 36 monthly returns with an intercept; score the mean of
 the 11 residuals excluding the latest month over their sample standard

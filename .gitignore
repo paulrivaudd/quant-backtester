@@ -66,3 +66,8 @@ results/**
 .idea/
 .vscode/
 
+# Per-developer, never committed: the graphify knowledge graph of the working
+# tree, and personal Claude Code instructions.
+graphify-out/
+CLAUDE.local.md
+

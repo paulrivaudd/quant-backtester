@@ -46,6 +46,7 @@ from quant_backtester.signals.windows import (
     LoadedWindow,
     completed_month_cutoff,
     load_month_end_window,
+    require_previous_month_cutoff,
 )
 
 VARIANCE_FLOOR: Final[float] = 1e-12
@@ -205,9 +206,14 @@ class MonthlyMomentumSignal(Signal):
         session old.
     observation_calendar_id, observation_cutoff, completed_months_only
         Optional exact-date contract. LEVEL inputs require the explicit
-        observation calendar and are read raw. An explicit cutoff takes
-        precedence; otherwise completed_months_only ends at the previous
-        calendar month. Availability always remains the actual decision.
+        observation calendar and are read raw. ``completed_months_only`` ends
+        the window at the month before the decision's; an explicit cutoff then
+        has to resolve to that month's last session
+        (:func:`require_previous_month_cutoff`).
+        Without it, an explicit cutoff may be any day up to the decision, for
+        the analysis of one past window. Availability always remains the
+        actual decision. ``max_age_sessions`` plays no part in this contract
+        and is recorded as ``None``.
     required_currency, require_nav
         Optional strict input guards. require_nav accepts only LEVEL sector
         inputs and enforces the Dublin valuation lower bound. It does not
@@ -218,7 +224,10 @@ class MonthlyMomentumSignal(Signal):
     ValueError
         If a name is empty, a count is not valid, the scored and skipped
         months do not fit in the window, a residual measure names no market,
-        or the signal is asked about its market.
+        or the signal is asked about its market. When computing, also if an
+        input contradicts the currency or NAV guards, or, reading completed
+        months, a fixed ``observation_cutoff`` does not end the month before
+        the decision's.
     KeyError
         If an instrument is not registered.
 
@@ -300,6 +309,14 @@ class MonthlyMomentumSignal(Signal):
             "require_nav": self.require_nav,
         }
         strict = strict if any(strict.values()) else {}
+        # The grid follows the path _window actually takes, not the presence of
+        # any strict field: a currency guard alone still reads the venue's
+        # month ends up to the decision.
+        exact = (
+            self.observation_cutoff is not None
+            or self.observation_calendar_id is not None
+            or self.completed_months_only
+        )
         return {
             "type": "MonthlyMomentumSignal",
             **strict,
@@ -318,7 +335,7 @@ class MonthlyMomentumSignal(Signal):
             "variance_floor": VARIANCE_FLOOR if residual else None,
             "sampling": MONTH_END_SAMPLING,
             "month_grid": "EXACT_OBSERVATION_CALENDAR_MONTH_ENDS"
-            if strict
+            if exact
             else "CALENDAR_MONTHS_OF_THE_DECISION_DAY_ON_THE_REFERENCE_CALENDAR",
             "latest_month": (
                 "EXPLICIT_OBSERVATION_CUTOFF"
@@ -327,9 +344,9 @@ class MonthlyMomentumSignal(Signal):
                 if self.completed_months_only
                 else "MONTH_TO_DECISION"
             ),
-            "bar_field": "LEVEL_OR_CLOSE" if strict else BarField.CLOSE.value,
+            "bar_field": "LEVEL_OR_CLOSE" if exact else BarField.CLOSE.value,
             "price_basis": self.price_basis.value,
-            "max_age_sessions": self.max_age_sessions,
+            "max_age_sessions": None if exact else self.max_age_sessions,
             "window_mode": MONTH_END_WINDOW_MODE,
             "unit": (SignalUnit.ZSCORE if residual else SignalUnit.FRACTION).value,
         }
@@ -377,21 +394,51 @@ class MonthlyMomentumSignal(Signal):
             definition=self.definition(),
         )
 
+    def referenced_instruments(self) -> tuple[str, ...]:
+        """Return the market the funds are fitted on or gated by, read beside them."""
+        return () if self.market_id is None else (self.market_id,)
+
     def _window(self, context: SignalContext, instrument_id: str) -> LoadedWindow:
-        """Return one fund's month-end closes."""
+        """Return one fund's month-end closes.
+
+        Raises
+        ------
+        ValueError
+            If the instrument's registry entry contradicts the declared guards:
+            another currency than ``required_currency``, or, under
+            ``require_nav``, anything but a non-tradable LEVEL fund series. The
+            registry does not change between decisions, so these are
+            configuration mistakes and stop the run rather than leave every
+            decision in cash. Likewise, reading completed months, for a fixed
+            ``observation_cutoff`` that does not end the month before the
+            decision's (:func:`require_previous_month_cutoff`).
+        """
         instrument = context.instruments.get(instrument_id)
         if self.required_currency is not None and instrument.currency != self.required_currency:
-            return LoadedWindow(status=SignalStatus.INVALID_INPUT)
+            raise ValueError(
+                f"{self.signal_id} requires {self.required_currency} inputs and {instrument_id} "
+                f"is declared in {instrument.currency}"
+            )
         nav = self.require_nav and instrument_id != self.market_id
         if nav and (
             instrument.data_type is not DataType.LEVEL
             or instrument.asset_type is not AssetType.ETF
             or instrument.tradable
         ):
-            return LoadedWindow(status=SignalStatus.INVALID_INPUT)
+            raise ValueError(
+                f"{self.signal_id} reads fund NAVs and {instrument_id} is not one: a non-tradable "
+                "LEVEL ETF series is required"
+            )
         cutoff = self.observation_cutoff
-        if cutoff is None and self.completed_months_only:
-            cutoff = completed_month_cutoff(context)
+        if self.completed_months_only:
+            if cutoff is None:
+                cutoff = completed_month_cutoff(context)
+            else:
+                calendar_id = self.observation_calendar_id or instrument.calendar_id
+                if calendar_id is not None:  # otherwise the loader refuses the window
+                    require_previous_month_cutoff(
+                        context, cutoff, context.calendars.get(calendar_id)
+                    )
         return load_month_end_window(
             context,
             instrument_id,

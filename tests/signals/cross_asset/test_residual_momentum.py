@@ -312,6 +312,30 @@ def test_definition_is_complete_and_serialisable() -> None:
     assert signal(MomentumMeasure.TOTAL).definition()["unit"] == "FRACTION"
 
 
+def test_a_currency_guard_alone_records_the_grid_it_actually_reads() -> None:
+    # The guard does not switch _window to exact observation dates, so the
+    # definition must not say it did.
+    guarded = signal(required_currency="USD").definition()
+    assert guarded["required_currency"] == "USD"
+    assert guarded["month_grid"] == "CALENDAR_MONTHS_OF_THE_DECISION_DAY_ON_THE_REFERENCE_CALENDAR"
+    assert guarded["bar_field"] == BarField.CLOSE.value
+    assert guarded["latest_month"] == "MONTH_TO_DECISION"
+    exact = signal(required_currency="USD", observation_calendar_id="XNYS").definition()
+    assert exact["month_grid"] == "EXACT_OBSERVATION_CALENDAR_MONTH_ENDS"
+    assert exact["bar_field"] == "LEVEL_OR_CLOSE"
+    # The exact-date contract does not read the freshest close's age.
+    assert exact["max_age_sessions"] is None
+    assert guarded["max_age_sessions"] == 1
+    assert signal(completed_months_only=True).definition()["month_grid"] == (
+        "EXACT_OBSERVATION_CALENDAR_MONTH_ENDS"
+    )
+
+
+def test_the_market_is_declared_as_read_beside_the_funds() -> None:
+    assert signal().referenced_instruments() == ("IDX_US",)
+    assert signal(MomentumMeasure.TOTAL).referenced_instruments() == ()
+
+
 def test_a_published_series_or_the_market_itself_is_refused(build) -> None:
     context = build()
     with pytest.raises(ValueError, match="its own market"):

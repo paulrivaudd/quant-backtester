@@ -120,7 +120,19 @@ def validation_score(result: StrategyResult, config: NeuralStrategyConfig) -> fl
 
 
 def proportional_cost_rate(runner: StrategyRunner) -> float:
-    """Return the cost of one euro traded: commission, half-spread and slippage rates."""
+    """Return the cost of one euro traded: commission, half-spread and slippage rates.
+
+    Raises
+    ------
+    ValueError
+        If the runner's execution has per-instrument costs. They have no single
+        rate, and the default model's would understate what the engine charges
+        on every instrument that has its own.
+    """
+    if runner.execution.costs_by_instrument:
+        raise ValueError(
+            "the execution has per-instrument costs, which have no single proportional rate"
+        )
     costs = runner.execution.costs
     return costs.commission_rate + costs.half_spread_rate + costs.slippage_rate
 

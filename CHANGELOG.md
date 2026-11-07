@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+### SA17: review fixes, before any run (2026-11-07)
+- **Each decision reads its own previous completed month.**
+  - `SA17SectorResidualMomentum` no longer takes `observation_cutoff`: a
+    fixed date reused across a run would freeze every later window. The
+    unused `max_age_sessions` goes too.
+  - A completed-months signal given an explicit cutoff requires it to
+    resolve to the last session of the month before the decision
+    (`require_previous_month_cutoff` in `signals/windows.py`). A mid-month
+    session of that month is refused: it would score a partial month as a
+    completed one.
+  - The protocol records the amendment, made before any run.
+- **Month grid.** A cutoff falling before its month's first session no
+  longer repeats the previous month end. A calendar with no session in a
+  month of the window raises.
+- **Configuration mistakes stop the run.** A currency, NAV, FX or calendar
+  contradiction in the registry now raises. It used to return
+  `INVALID_INPUT` at every decision and leave the book in cash. A fund
+  delisted before the end of its window is `NOT_LISTED`.
+- **History basis.** New `Signal.referenced_instruments()`: the market a
+  fund is fitted on and the FX series its NAV is converted with enter the
+  run's `history_basis` (audit N08, decision D23).
+- **Costs.**
+  - `CostModel.scaled` and `ExecutionModel.scaled` stress the
+    per-instrument overrides as well as the default model;
+    `replace(execution, costs=...)` left the overrides unstressed.
+  - `load_sector_costs` requires exactly one override per traded sector,
+    and accepts only `1.0` or the preregistered stress multiplier.
+  - `ExecutionModel` with overrides hashes and pickles.
+    `proportional_cost_rate` refuses per-instrument costs, which have no
+    single rate.
+- **No network I/O outside `data/`.** `SA17_acquire_research_inputs.py`
+  fetches issuer pages and supplements through
+  `SsgaNavSource.fetch_document`.
+- **Docs.** `CLAUDE.md` describes the runtime and training halves of `ml/`.
+  Numpy docstrings for the State Street, LSE and Ken French adapters and
+  the power calculation.
+- **No committed result changes.** Only the SA17 signals declare referenced
+  instruments, and SA17 has not been run.
+
 ### SA17: market-adjusted sector momentum, implemented and not run (2026-11-07)
 - **New signal `MonthlyMomentumSignal`**
   (`signals/cross_asset/residual_momentum.py`).
