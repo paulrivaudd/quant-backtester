@@ -272,14 +272,26 @@ def http_get_text(url: str) -> str:
     return http_get_bytes(url).decode("utf-8")
 
 
-def http_get_bytes(url: str) -> bytes:
+def http_get_bytes(url: str, *, headers: Mapping[str, str] | None = None) -> bytes:
     """Fetch an immutable binary response with the same provider error contract.
 
     Used for issuer workbooks and zipped research data; callers retain the
     exact payload alongside its SHA-256 rather than reconstructing an archive.
+
+    Parameters
+    ----------
+    url : str
+        The address to fetch.
+    headers : Mapping[str, str] | None
+        Request headers, for a provider that refuses the library's default
+        client name (Dukascopy answers 429 to it). ``None`` sends the request
+        exactly as before.
     """
+    target: str | urllib.request.Request = (
+        url if not headers else urllib.request.Request(url, headers=dict(headers))
+    )
     try:
-        with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(target, timeout=HTTP_TIMEOUT_SECONDS) as response:
             body: bytes = response.read()
     except urllib.error.HTTPError as error:
         error.close()
