@@ -133,7 +133,7 @@ refutation = "Insufficient publication, synchronous FX or executable-price cover
 
 [[hypothesis]]
 hypothesis_id = "sa17_mechanism_ken_french"
-status = "PREREGISTERED"
+status = "UNCERTAIN"
 written_on = 2026-11-07
 statement = "Ranking US industries by the residual momentum of SA17 - the mean of the 11 residuals t-11..t-1 of a 36-month OLS of each industry on the market, over their sample standard deviation - selects better than ranking them by plain 12-1 momentum, and better than holding them all in equal weight."
 universe = "Ken French value-weighted 10 industries (primary) and 49 industries (robustness), with Mkt = Mkt-RF + RF, holding months 1929-07 to 2026-09, archive runs/sa17_french_inputs_20261107 replayed offline. Top 3 of 10 and top 15 of 49 in equal weight, rebalanced monthly; hypothetical costs 10 bp one way, x2 as a second run. Design frozen in research/SA17/protocol.md and mechanism.toml before any score was computed on these files. Retrospective: these portfolios and industry and residual momentum are heavily published, so this is replication and robustness, not discovery, and says nothing about the executable ETF book."

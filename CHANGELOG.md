@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### SA17: the mechanism study on Ken French industries, run (2026-11-07)
+- **Frozen before any score.** `research/SA17/protocol.md` ("Mechanism study:
+  frozen design"), `research/SA17/mechanism.toml` and the hypothesis
+  `sa17_mechanism_ken_french` were committed and pushed before the study code
+  existed.
+- **New `analytics.uncertainty.paired_stationary_bootstrap`.** It uses geometric
+  blocks around a declared mean and circular wrap, and returns a p-value; the
+  SA17 protocol asks for it. Also new: `holm_adjusted`.
+  `paired_block_bootstrap` is unchanged.
+- **New `research/sa17_mechanism.py`.** It forms the candidate (top industries
+  by residual momentum, scored by the signal's `residual_fit`), plain 12-1
+  momentum and equal weight every month, with drifted weights and
+  proportional costs. It replays the archived ZIPs offline after checking
+  their hashes.
+- **New `scripts/SA17_run_mechanism_study.py`.** It writes `study.md`,
+  `metrics.csv` and `verdict.json` into a new folder. It refuses a dirty
+  checkout and writes no wall-clock time; a second run gave byte-identical
+  files.
+- **Result** (`results/SA17/mechanism/study.md`, 10 industries, 1929-07 to
+  2026-09):
+  - against plain 12-1 momentum `UNCERTAIN`: Sharpe difference +0.001
+    [−0.060, +0.068];
+  - against equal weight `SUPPORTED_RETROSPECTIVE`: +0.081 [+0.017, +0.147],
+    Holm p 0.027, +0.050 at ×2 costs.
+  - The 49-industry robustness check puts the residual ranking *below* plain
+    momentum. The hypothesis is `UNCERTAIN`.
+  - What it means is in `research/SA17/README.md`.
+- **`runs/sa17_store` downloaded again** (2026-11-07 21:10 UTC). All 16 series
+  validated, with the same coverage as before.
+
 ### SA17: review fixes, before any run (2026-11-07)
 - **Each decision reads its own previous completed month.**
   - `SA17SectorResidualMomentum` no longer takes `observation_cutoff`: a
