@@ -283,7 +283,25 @@ class LseNavSource:
 
 
 def available_nav_rows(rows: Sequence[NavRow], as_of_utc: datetime) -> tuple[NavRow, ...]:
-    """Exclude announcements not yet published at the aware UTC decision instant."""
+    """Exclude announcements not yet published at the aware UTC decision instant.
+
+    Parameters
+    ----------
+    rows : Sequence[NavRow]
+        Parsed announcement rows, each with its publication instant.
+    as_of_utc : datetime
+        The decision instant, timezone-aware UTC.
+
+    Returns
+    -------
+    tuple[NavRow, ...]
+        The rows published at or before ``as_of_utc``, in their given order.
+
+    Raises
+    ------
+    ValueError
+        If ``as_of_utc`` is naive or not UTC.
+    """
     make_fetch_id(as_of_utc)
     return tuple(row for row in rows if row.available_at_utc <= as_of_utc)
 
@@ -307,6 +325,35 @@ def reconcile_nav_rows(
 ) -> tuple[NavRow, ...]:
     """Fill primary gaps only and refuse unreviewed differences above USD 0.00005.
 
+    Parameters
+    ----------
+    primary : Sequence[NavRow]
+        Rows of the issuer's workbook: the source kept where both agree.
+    secondary : Sequence[NavRow]
+        Announcement rows, used to fill the primary's gaps.
+    as_of_utc : datetime
+        The decision instant, timezone-aware UTC. Rows and reviews published
+        after it are not seen.
+    reviews : Mapping[tuple[str, date], NavConflictReview] | None
+        Reviewed conflicts, keyed by instrument and valuation date.
+
+    Returns
+    -------
+    tuple[NavRow, ...]
+        One row per instrument and valuation date, sorted on that key, NAV per
+        share in USD.
+
+    Raises
+    ------
+    ProviderResponseError
+        On a NAV that is not positive or not USD, a repeated key, an ISIN
+        mismatch, an unreviewed difference above the tolerance, or a review
+        that does not match both values or is not yet available.
+    ValueError
+        If an instant is naive or not UTC.
+
+    Notes
+    -----
     Filter publication availability before comparison. Reviewed conflicts retain
     both provenances and the maximum input/review availability; they cannot make
     a secondary announcement usable before publication. Matching overlaps keep

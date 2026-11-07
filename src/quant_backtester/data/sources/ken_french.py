@@ -235,6 +235,25 @@ class KenFrenchSource:
 def normalize_monthly_returns(raw: KenFrenchDownload) -> MonthlyReturns:
     """Convert raw percent returns to fractions without mutating the snapshot.
 
+    Parameters
+    ----------
+    raw : KenFrenchDownload
+        One downloaded table: monthly rows of percent returns, as published.
+
+    Returns
+    -------
+    MonthlyReturns
+        Fractions (``0.0123`` for 1.23%) for the months of the requested
+        range, each labelled by its first day: a month, not the instant it
+        became available. Missing sentinels are ``None``.
+
+    Raises
+    ------
+    ProviderResponseError
+        If a month label or a cell is not a number the library publishes.
+
+    Notes
+    -----
     Both -99.99 and -999 are missing, never extreme losses. Factor snapshots
     retain all factors and append the dividend-included USD market return Mkt.
     This operation does not make RESTATED data point-in-time safe.
