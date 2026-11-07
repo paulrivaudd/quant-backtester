@@ -38,17 +38,62 @@ store are the data checks [below](#acquisition-2026-11-07). The proposal stays
 `PROPOSED / NOT_TESTED`. The data audit's `INSUFFICIENT_EVIDENCE` is about the
 inputs available on 2026-11-01, not a verdict on the mechanism.
 
+## Mechanism study on Ken French industries, 2026-11-07
+
+The long monthly study the protocol separates from execution was frozen
+([protocol.md](protocol.md), "Mechanism study: frozen design";
+[mechanism.toml](mechanism.toml); commit `235b0bf`, pushed before the study
+code existed), then run once at commit `98da1ef`. A second run into another
+folder gave byte-identical files. Report:
+[results/SA17/mechanism/study.md](../../results/SA17/mechanism/study.md).
+
+| Comparison, 10 industries, 10 bp | Sharpe difference | 95% interval | Holm p | At ×2 costs | Verdict |
+| --- | ---: | --- | ---: | ---: | --- |
+| Residual vs plain 12-1 momentum | +0.001 | [−0.060, +0.068] | 0.99 | −0.004 | `UNCERTAIN` |
+| Residual vs all industries, equal weight | +0.081 | [+0.017, +0.147] | 0.027 | +0.050 | `SUPPORTED_RETROSPECTIVE` |
+
+How to read this, in plain terms:
+
+- **The market adjustment, SA17's distinctive idea, shows no advantage.** Over
+  1929–2026 the residual ranking and plain 12-1 momentum have the same Sharpe
+  ratio (0.54) among 10 industries. On the 49 industries, the robustness
+  check, the residual ranking is *worse* than plain momentum (−0.060,
+  interval [−0.104, −0.013]). By the frozen rules a robustness result cannot
+  change a verdict, but it points against the premise rather than for it.
+- **Selection is supported, but it is momentum's, not the residual's.** The
+  top three industries beat holding all ten (+0.081). Plain momentum beats
+  them by about as much (0.54 against 0.46), so this confirms the known
+  industry momentum effect, not anything specific to SA17.
+- **The recent regime is not a rescue.** From 2018 to 2026 the residual
+  ranking leads plain momentum (0.84 against 0.69 on 10 industries). Those
+  nine descriptive years overlap the executable study's window and cannot
+  stand in for a test.
+- The overall hypothesis `sa17_mechanism_ken_french` is `UNCERTAIN`: it
+  predicted an advantage against both controls.
+
+What it changes: nothing in SA17's design, which stays as preregistered;
+changing it after this reading would be a new hypothesis. It sets the
+expectation for the executable study, where plain momentum is one of the four
+controls. A long history gives no reason to expect the residual ranking to beat
+it.
+
+The execution store `runs/sa17_store` was downloaded again on 2026-11-07 at
+21:10 UTC: the earlier copy had not survived the move to WSL. All 16 series
+validated with no error. Coverage matches what is recorded below,
+including the two missing Xetra sessions.
+
 ## Where it stands
 
 | Step | State | Where |
 | --- | --- | --- |
+| Mechanism study (Ken French) | **Run 2026-11-07**: vs 12-1 momentum `UNCERTAIN`, vs equal weight `SUPPORTED_RETROSPECTIVE` | [results/SA17/mechanism/study.md](../../results/SA17/mechanism/study.md) |
 | Proposal | Written 2026-11-01, unchanged | [proposal.md](proposal.md) |
 | Data audit | `INSUFFICIENT_EVIDENCE` for the 1999–2018 study; local store inventoried | [data_audit.md](data_audit.md), [local_inventory.json](local_inventory.json), [`SA17_audit_data.py`](../../scripts/SA17_audit_data.py) |
 | Acquisition registry | Ten Xetra EUR sector funds, declared 2026-11-02; every listing checked against the issuer on 2026-11-07; real estate missing. The market factor `SP500TR` was added 2026-11-07, before the download | [source_instruments.toml](source_instruments.toml), [sourcing_20261102.md](sourcing_20261102.md) |
 | Acquisition | **Run 2026-11-07**: 16 series, every one validated with no error; `runs/sa17_store` | [`SA17_download_data.py`](../../scripts/SA17_download_data.py), [below](#acquisition-2026-11-07) |
 | Signal | `MonthlyMomentumSignal`: residual or total-return momentum on month-end closes | [`signals/cross_asset/residual_momentum.py`](../../src/quant_backtester/signals/cross_asset/residual_momentum.py) |
 | Strategy and its sector controls | `SA17SectorResidualMomentum`, catalogued `SA17 - sector residual momentum`; `controls()` builds the four sector controls | [`strategies/SA17_sector_residual_momentum.py`](../../src/quant_backtester/strategies/SA17_sector_residual_momentum.py) |
-| Hypothesis, executable protocol, study script | Not written | — |
+| Hypothesis, executable protocol, study script | Hypothesis and protocol written 2026-11-07 (`PREREGISTERED_DATA_GATED`); executable study script not written | [protocol.md](protocol.md), [`research/hypotheses.toml`](../hypotheses.toml) |
 
 ## Original rule before the NAV correction (superseded)
 
