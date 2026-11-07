@@ -14,7 +14,32 @@ from quant_backtester.numbers import require_finite_positive
 
 
 def information_ratio_power(information_ratio: float, years: float, alpha: float = 0.05) -> float:
-    """Return approximate two-sided power for an annual active information ratio."""
+    """Return approximate two-sided power for an annual active information ratio.
+
+    Parameters
+    ----------
+    information_ratio : float
+        True annual active information ratio: annualised mean active return
+        over annualised tracking error, dimensionless. A planning scenario,
+        not an estimate from data.
+    years : float
+        Length of the sample, in years.
+    alpha : float
+        Two-sided significance level, strictly between zero and one.
+
+    Returns
+    -------
+    float
+        Probability, in ``[0, 1]``, that a two-sided test at ``alpha`` rejects
+        a zero information ratio, under ``t = IR * sqrt(years)``: independent
+        Gaussian active returns of known variance.
+
+    Raises
+    ------
+    ValueError
+        If ``years`` is not finite and positive, the information ratio is not
+        finite, or ``alpha`` is not strictly between zero and one.
+    """
     require_finite_positive(years, "years")
     if not math.isfinite(information_ratio) or not 0 < alpha < 1:
         raise ValueError("Expected a finite IR and alpha strictly between zero and one")
@@ -27,6 +52,31 @@ def information_ratio_power(information_ratio: float, years: float, alpha: float
 def detectable_information_ratio(years: float, power: float = 0.8, alpha: float = 0.05) -> float:
     """Return the usual normal approximation to the IR needed for target power.
 
+    Parameters
+    ----------
+    years : float
+        Length of the sample, in years.
+    power : float
+        Target probability of rejecting a zero information ratio, in
+        ``(0.5, 1)``.
+    alpha : float
+        Two-sided significance level, strictly between zero and one.
+
+    Returns
+    -------
+    float
+        The true annual information ratio, dimensionless, detected with
+        probability ``power`` under the assumptions of
+        :func:`information_ratio_power`.
+
+    Raises
+    ------
+    ValueError
+        If ``years`` is not finite and positive, or ``power`` or ``alpha`` is
+        out of its range.
+
+    Notes
+    -----
     ``(z[1-alpha/2] + z[power]) / sqrt(years)`` neglects the tiny opposite-tail
     contribution. It is not the critical observed IR for a significance test.
     """
