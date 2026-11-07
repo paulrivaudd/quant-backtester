@@ -1,5 +1,29 @@
 # The `data` layer
 
+## SA17 NAV and research-data additions (2026-11-07)
+
+`sources/ssga_nav.py` reads official State Street USD NAV XLSX files with
+identity/schema validation and exact-byte hashes. `SsgaNavNormalizer` emits
+nontradable LEVELs, not fabricated OHLC. Unknown historical publication is
+handled by a pinned `PublicationRule.not_before_utc` equal to retrieval; the
+ordinary validator verifies the later of schedule and floor. The optional
+field is omitted from definitions when unset, preserving existing fingerprints.
+
+`sources/lse_nav.py` parses explicitly identified official RNS NAV announcements
+with their publication timestamp, USD/ISIN checks and source reconciliation.
+It is a second distribution channel of issuer NAV, not independent valuation
+and not an automatic complete historical publication archive.
+
+`sources/ken_french.py` serves monthly value-weighted 10/49-industry research
+returns and factors, retains ZIP bytes, and explicitly converts percent to
+fraction. It does not implement daily BAR ingestion: these restated research
+portfolios are not tradable ETF prices. SIC, revisions and the FIZ/CIZ change
+are documented in [SA17's protocol](../research/SA17/protocol.md).
+
+NAV, fund dealing days, US valuation dates and release dates are distinct.
+Neither a missing Xetra print nor zero reported volume justifies inventing
+prices or treating a fund NAV as an executable opening quote.
+
 State on 2026-09-27. This document explains how a provider's answer becomes an
 observation a decision could have known, and how to add an instrument or a
 source. The summary is in [ARCHITECTURE.md](ARCHITECTURE.md) §5, the formulas

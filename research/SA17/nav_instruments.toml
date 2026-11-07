@@ -1,0 +1,229 @@
+[[instrument]]
+id = "SA17_NAV_ENERGY"
+name = "Official USD NAV IE00BWBXM492"
+asset_type = "ETF"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "SSGA_NAV"
+source_symbol = "IE00BWBXM492:zpde-gy"
+tradable = false
+first_session = 2015-07-07
+distribution_policy = "ACCUMULATING"
+history_basis = "RESTATED"
+history_note = """
+Current issuer NAV history; historical publication and revisions unverified.
+Retrieval floor prevents historical decisions. Never execution prices.
+"""
+[instrument.publication_rule]
+# Structural LEVEL requirement only; NOT an assertion of midnight publication.
+# SsgaNavNormalizer never uses this rule.
+publication_time = "00:00:00"
+timezone = "UTC"
+not_before_utc = 2026-11-07T15:59:01.951210Z
+
+[[instrument]]
+id = "SA17_NAV_MATERIALS"
+name = "Official USD NAV IE00BWBXM831"
+asset_type = "ETF"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "SSGA_NAV"
+source_symbol = "IE00BWBXM831:zpdm-gy"
+tradable = false
+first_session = 2015-07-07
+distribution_policy = "ACCUMULATING"
+history_basis = "RESTATED"
+history_note = """
+Current issuer NAV history; historical publication and revisions unverified.
+Retrieval floor prevents historical decisions. Never execution prices.
+"""
+[instrument.publication_rule]
+# Structural LEVEL requirement only; NOT an assertion of midnight publication.
+# SsgaNavNormalizer never uses this rule.
+publication_time = "00:00:00"
+timezone = "UTC"
+not_before_utc = 2026-11-07T15:59:02.531513Z
+
+[[instrument]]
+id = "SA17_NAV_INDUSTRIALS"
+name = "Official USD NAV IE00BWBXM724"
+asset_type = "ETF"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "SSGA_NAV"
+source_symbol = "IE00BWBXM724:zpdi-gy"
+tradable = false
+first_session = 2015-07-07
+distribution_policy = "ACCUMULATING"
+history_basis = "RESTATED"
+history_note = """
+Current issuer NAV history; historical publication and revisions unverified.
+Retrieval floor prevents historical decisions. Never execution prices.
+"""
+[instrument.publication_rule]
+# Structural LEVEL requirement only; NOT an assertion of midnight publication.
+# SsgaNavNormalizer never uses this rule.
+publication_time = "00:00:00"
+timezone = "UTC"
+not_before_utc = 2026-11-07T15:59:03.225777Z
+
+[[instrument]]
+id = "SA17_NAV_CONSUMER_DISCRETIONARY"
+name = "Official USD NAV IE00BWBXM278"
+asset_type = "ETF"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "SSGA_NAV"
+source_symbol = "IE00BWBXM278:zpdd-gy"
+tradable = false
+first_session = 2015-07-07
+distribution_policy = "ACCUMULATING"
+history_basis = "RESTATED"
+history_note = """
+Current issuer NAV history; historical publication and revisions unverified.
+Retrieval floor prevents historical decisions. Never execution prices.
+"""
+[instrument.publication_rule]
+# Structural LEVEL requirement only; NOT an assertion of midnight publication.
+# SsgaNavNormalizer never uses this rule.
+publication_time = "00:00:00"
+timezone = "UTC"
+not_before_utc = 2026-11-07T15:59:03.655979Z
+
+[[instrument]]
+id = "SA17_NAV_CONSUMER_STAPLES"
+name = "Official USD NAV IE00BWBXM385"
+asset_type = "ETF"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "SSGA_NAV"
+source_symbol = "IE00BWBXM385:zpds-gy"
+tradable = false
+first_session = 2015-07-07
+distribution_policy = "ACCUMULATING"
+history_basis = "RESTATED"
+history_note = """
+Current issuer NAV history; historical publication and revisions unverified.
+Retrieval floor prevents historical decisions. Never execution prices.
+"""
+[instrument.publication_rule]
+# Structural LEVEL requirement only; NOT an assertion of midnight publication.
+# SsgaNavNormalizer never uses this rule.
+publication_time = "00:00:00"
+timezone = "UTC"
+not_before_utc = 2026-11-07T15:59:04.082547Z
+
+[[instrument]]
+id = "SA17_NAV_HEALTH_CARE"
+name = "Official USD NAV IE00BWBXM617"
+asset_type = "ETF"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "SSGA_NAV"
+source_symbol = "IE00BWBXM617:zpdh-gy"
+tradable = false
+first_session = 2015-07-07
+distribution_policy = "ACCUMULATING"
+history_basis = "RESTATED"
+history_note = """
+Current issuer NAV history; historical publication and revisions unverified.
+Retrieval floor prevents historical decisions. Never execution prices.
+"""
+[instrument.publication_rule]
+# Structural LEVEL requirement only; NOT an assertion of midnight publication.
+# SsgaNavNormalizer never uses this rule.
+publication_time = "00:00:00"
+timezone = "UTC"
+not_before_utc = 2026-11-07T15:59:04.498579Z
+
+[[instrument]]
+id = "SA17_NAV_FINANCIALS"
+name = "Official USD NAV IE00BWBXM500"
+asset_type = "ETF"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "SSGA_NAV"
+source_symbol = "IE00BWBXM500:zpdf-gy"
+tradable = false
+first_session = 2015-07-07
+distribution_policy = "ACCUMULATING"
+history_basis = "RESTATED"
+history_note = """
+Current issuer NAV history; historical publication and revisions unverified.
+Retrieval floor prevents historical decisions. Never execution prices.
+"""
+[instrument.publication_rule]
+# Structural LEVEL requirement only; NOT an assertion of midnight publication.
+# SsgaNavNormalizer never uses this rule.
+publication_time = "00:00:00"
+timezone = "UTC"
+not_before_utc = 2026-11-07T15:59:04.939473Z
+
+[[instrument]]
+id = "SA17_NAV_TECHNOLOGY"
+name = "Official USD NAV IE00BWBXM948"
+asset_type = "ETF"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "SSGA_NAV"
+source_symbol = "IE00BWBXM948:zpdt-gy"
+tradable = false
+first_session = 2015-07-07
+distribution_policy = "ACCUMULATING"
+history_basis = "RESTATED"
+history_note = """
+Current issuer NAV history; historical publication and revisions unverified.
+Retrieval floor prevents historical decisions. Never execution prices.
+"""
+[instrument.publication_rule]
+# Structural LEVEL requirement only; NOT an assertion of midnight publication.
+# SsgaNavNormalizer never uses this rule.
+publication_time = "00:00:00"
+timezone = "UTC"
+not_before_utc = 2026-11-07T15:59:05.687270Z
+
+[[instrument]]
+id = "SA17_NAV_COMMUNICATION"
+name = "Official USD NAV IE00BFWFPX50"
+asset_type = "ETF"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "SSGA_NAV"
+source_symbol = "IE00BFWFPX50:zpdk-gy"
+tradable = false
+first_session = 2018-08-15
+distribution_policy = "ACCUMULATING"
+history_basis = "RESTATED"
+history_note = """
+Current issuer NAV history; historical publication and revisions unverified.
+Retrieval floor prevents historical decisions. Never execution prices.
+"""
+[instrument.publication_rule]
+# Structural LEVEL requirement only; NOT an assertion of midnight publication.
+# SsgaNavNormalizer never uses this rule.
+publication_time = "00:00:00"
+timezone = "UTC"
+not_before_utc = 2026-11-07T15:59:06.420158Z
+
+[[instrument]]
+id = "SA17_NAV_UTILITIES"
+name = "Official USD NAV IE00BWBXMB69"
+asset_type = "ETF"
+data_type = "LEVEL"
+currency = "USD"
+primary_source = "SSGA_NAV"
+source_symbol = "IE00BWBXMB69:zpdu-gy"
+tradable = false
+first_session = 2015-07-07
+distribution_policy = "ACCUMULATING"
+history_basis = "RESTATED"
+history_note = """
+Current issuer NAV history; historical publication and revisions unverified.
+Retrieval floor prevents historical decisions. Never execution prices.
+"""
+[instrument.publication_rule]
+# Structural LEVEL requirement only; NOT an assertion of midnight publication.
+# SsgaNavNormalizer never uses this rule.
+publication_time = "00:00:00"
+timezone = "UTC"
+not_before_utc = 2026-11-07T15:59:07.102696Z

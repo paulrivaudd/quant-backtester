@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+### SA17: market-adjusted sector momentum, implemented and not run (2026-11-07)
+- **New signal `MonthlyMomentumSignal`**
+  (`signals/cross_asset/residual_momentum.py`).
+  - Reads month-end closes through the new `load_month_end_window` in
+    `signals/windows.py`. Each month ends at the venue's last session on or
+    before its last calendar day; a month end not served is `MISSING_INPUT`,
+    never replaced. A fund whose history does not reach the window is
+    `INSUFFICIENT_HISTORY` before its latest close is judged.
+  - `RESIDUAL` scores the mean of a fund's recent OLS residuals against a
+    market, over their sample standard deviation. `TOTAL` gives the
+    compounded return of the same months, optionally gated on the same
+    market.
+- **New strategy `SA17SectorResidualMomentum`**, catalogued
+  `SA17 - sector residual momentum`.
+  - Holds the top three sectors in equal parts, scaled to a volatility
+    target from the 63-session covariance; the rest goes to a monetary fund.
+  - Keeps the book when an eligible sector or the covariance cannot be read.
+  - `controls()` builds the four sector controls of the proposal.
+- **Tests.** Offline signal and strategy tests: hand-computed values,
+  comparisons with numpy, statuses, look-ahead guards and engine runs on a
+  synthetic market.
+- **SA17 research folder.** It now holds the acquisition registry, the
+  sourcing note its header cited (written 2026-11-07, after the ten issuer
+  listings were checked), the audit and acquisition scripts with their
+  tests, and an updated README.
+- **Data acquired, no strategy run.** `scripts/SA17_download_data.py` now
+  builds `runs/sa17_store` from the project registry, the SA15 registries
+  and the SA17 registry.
+  - The SA17 registry gains the market factor `SP500TR` (`^SP500TR`, S&P 500
+    total return in USD).
+  - The store also holds XEON, the ECB EUR/USD rate and the funds of the
+    external references, under their existing declarations.
+  - The download of 2026-11-07 validated all 16 series with no error. The
+    shared funds' bars are identical to SA16's.
+  - Two coverage findings are recorded in `research/SA17/README.md`: sector
+    funds with no trade on many sessions before 2021, and two missing Xetra
+    sessions.
+  - The currency of the regression, the start of the window and the
+    treatment of no-trade bars remain open.
+
 ### The results in English (2026-10-31)
 - **Reports regenerated in English.**
   - The scripts that write them are translated:

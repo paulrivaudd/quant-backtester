@@ -1,0 +1,24 @@
+{
+  "years": 8.25,
+  "alpha": 0.05,
+  "critical_observed_ir": 0.6823718723726443,
+  "ir_for_80pct_power": 0.9753867754584759,
+  "scenarios": [
+    {
+      "ir": 0.3,
+      "power": 0.1384300876972533,
+      "years_for_80pct": 87.20977482610098
+    },
+    {
+      "ir": 0.5,
+      "power": 0.30054247610419327,
+      "years_for_80pct": 31.395518937396343
+    },
+    {
+      "ir": 0.7,
+      "power": 0.520226845429081,
+      "years_for_80pct": 16.01812190683487
+    }
+  ],
+  "assumptions": "IID Gaussian active returns, known variance, single two-sided test. Not validated literature estimates."
+}

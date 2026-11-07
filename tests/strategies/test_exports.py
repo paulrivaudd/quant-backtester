@@ -23,6 +23,7 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands() -> None:
         RealizedVolControl,
         RelativeResidualTilt,
         SA16RiskBudget,
+        SA17SectorResidualMomentum,
         SmoothMovingAverage,
         TrendFilteredPullback,
         VixReliefEntry,
@@ -49,6 +50,14 @@ def test_every_strategy_this_package_exports_can_be_run_as_it_stands() -> None:
             core_id="ETF_EU",
         ),
         SA16RiskBudget(growth_id="ETF_EU", hedge_id="ETF_OTHER"),
+        SA17SectorResidualMomentum(
+            sector_ids=("ETF_EU", "ETF_OTHER", "ETF_LATE"),
+            market_id="IDX_US",
+            monetary_id=None,
+            signal_input_ids=("NAV_A", "NAV_B", "NAV_C"),
+            risk_input_ids=("NAV_A", "NAV_B", "NAV_C"),
+            usd_per_eur_fx_id="FX",
+        ),
         ETFEnsemble(
             enable_factors=False,
             enable_monetary=False,

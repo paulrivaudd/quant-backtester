@@ -30,8 +30,8 @@ def test_a_code_gives_the_three_spellings_of_a_name() -> None:
         entry("SA99")
 
 
-def test_the_catalogue_runs_from_sa1_to_sa16_and_names_the_one_that_needs_an_extra() -> None:
-    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 17)]
+def test_the_catalogue_runs_from_sa1_to_sa17_and_names_the_one_that_needs_an_extra() -> None:
+    assert [item.code for item in family(Family.SA)] == [f"SA{n}" for n in range(1, 18)]
     assert family(Family.SA) == CATALOGUE
     assert [(item.code, item.extra) for item in CATALOGUE if item.extra] == [("SA14", "ml")]
     assert entry("SA13").display_name == "SA13 - Signatures Neurons"
@@ -121,3 +121,26 @@ def test_sa16_is_the_growth_gold_risk_budget() -> None:
     assert item.strategy_id == SA16RiskBudget().strategy_id == "SA16_growth_gold_budget"
     assert item.load() is SA16RiskBudget
     assert entry_of(SA16RiskBudget) is item
+
+
+def test_sa17_is_the_sector_residual_momentum() -> None:
+    from quant_backtester.strategies.SA17_sector_residual_momentum import (
+        SA17SectorResidualMomentum,
+    )
+
+    item = entry("SA17")
+    assert item.display_name == "SA17 - sector residual momentum"
+    candidate = SA17SectorResidualMomentum(
+        sector_ids=("A", "B", "C"),
+        market_id="M",
+        monetary_id=None,
+        signal_input_ids=("NAV_A", "NAV_B", "NAV_C"),
+        risk_input_ids=("NAV_A", "NAV_B", "NAV_C"),
+        usd_per_eur_fx_id="FX",
+    )
+    assert item.strategy_id == candidate.strategy_id == "SA17_sector_residual_momentum"
+    assert item.load() is SA17SectorResidualMomentum
+    assert entry_of(candidate) is item
+    # A control is a run of its own, recorded under a research identifier.
+    for control in candidate.controls().values():
+        assert control.strategy_id.startswith("SA17_control_")

@@ -122,3 +122,11 @@ statement = "Tilting it2's risk budget of US technology from 0.75 to 0.85 when i
 universe = "ETF_US_TECH and ETF_GOLD; store runs/sa16_store, window 2018-08-01 to 2026-10-30, SA15 conventions. Written after it2 was read and before any it3 run: retrospective."
 prediction = "Net CAGR 0.5 to 1.5 points above it2 with a net Sharpe at least equal, maximum drawdown no deeper than 24%, both references beaten at x1 and x2 costs."
 refutation = "Net CAGR or net Sharpe at or below it2's, or criterion 1 of research/SA16/protocol.md lost against either reference."
+[[hypothesis]]
+hypothesis_id = "sa17_usd_nav_residual_momentum"
+status = "PREREGISTERED_DATA_GATED"
+written_on = 2026-11-07
+statement = "Residual momentum on official USD accumulating-sector NAVs and a USD market on identical US observation dates may improve sector selection, without ranking on FX or stale exchange prints."
+universe = "Ten explicitly identified UCITS sector funds, dated eligibility; separate NAV LEVEL inputs, EUR unhedged execution. Independent mechanism robustness on Ken French 10 industries and matching Mkt-RF+RF; 49 industries prespecified robustness, not selectable."
+prediction = "36-month OLS with intercept, score 11 residual months skipping one, top three equal weight; daily NAV/FX EUR covariance over 63 returns with 15% cap. Compare actual controls before attributing improvements to residual selection. No run until protocol.md admission gates are satisfied."
+refutation = "Insufficient publication, synchronous FX or executable-price coverage: INSUFFICIENT_EVIDENCE. No net advantage against plain momentum and equal-sector controls: NOT_SUPPORTED for selection mechanism. Intervals containing zero: UNCERTAIN. Eight-year executable history is underpowered for moderate IR; long SIC research portfolios are retrospective robustness, not an ETF execution claim."

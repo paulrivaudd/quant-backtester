@@ -99,6 +99,8 @@ docstring-code-format = true
 [tool.pytest.ini_options]
 minversion = "9.0"
 testpaths = ["tests"]
+# Keep shared test helpers and research scripts importable with both entry points.
+pythonpath = ["."]
 addopts = [
     "--strict-markers",
     "--strict-config",
