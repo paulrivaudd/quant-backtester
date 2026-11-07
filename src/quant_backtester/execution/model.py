@@ -253,6 +253,71 @@ class ExecutionModel:
                 raise ValueError(f"costs_by_instrument[{instrument_id!r}] must be a CostModel")
         object.__setattr__(self, "costs_by_instrument", MappingProxyType(overrides))
 
+    def __hash__(self) -> int:
+        """Hash the model by value, its overrides in instrument order.
+
+        Written out because the generated hash would hash the frozen mapping
+        view of the overrides, which has none: a model without overrides was
+        hashable before they existed and has to stay so.
+        """
+        return hash(
+            (
+                self.costs,
+                self.minimum_trade_value,
+                self.sizing,
+                tuple(sorted(self.costs_by_instrument.items())),
+            )
+        )
+
+    def __reduce__(
+        self,
+    ) -> tuple[type[ExecutionModel], tuple[CostModel, float, Sizing, dict[str, CostModel]]]:
+        """Rebuild through the constructor, so the model pickles and copies.
+
+        A frozen mapping view can be neither pickled nor deep-copied; the
+        overrides travel as a plain mapping and are frozen again on arrival.
+        """
+        return (
+            ExecutionModel,
+            (self.costs, self.minimum_trade_value, self.sizing, dict(self.costs_by_instrument)),
+        )
+
+    def scaled(self, factor: float) -> ExecutionModel:
+        """Return the same execution with every cost term multiplied by ``factor``.
+
+        Parameters
+        ----------
+        factor : float
+            Multiplier applied to the default model and to every instrument's
+            override alike: rates and commission floors. ``2.0`` is the
+            doubled-cost stress.
+
+        Returns
+        -------
+        ExecutionModel
+            The stressed model. Sizing and the minimum trade value are kept.
+
+        Raises
+        ------
+        ValueError
+            If ``factor`` is not a finite positive number, or a scaled model
+            does not describe a cost.
+
+        Notes
+        -----
+        ``replace(execution, costs=...)`` changes the default model only: with
+        overrides, every instrument that has one keeps its unstressed costs,
+        and a run labelled "costs x2" would mostly not be. This is the one way
+        to stress a model that has overrides.
+        """
+        return replace(
+            self,
+            costs=self.costs.scaled(factor),
+            costs_by_instrument={
+                name: costs.scaled(factor) for name, costs in self.costs_by_instrument.items()
+            },
+        )
+
     def _costs_for(self, instrument_id: str) -> CostModel:
         """Return the instrument's override or the global cost model."""
         return self.costs_by_instrument.get(instrument_id, self.costs)
