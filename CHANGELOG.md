@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### SA17: market-adjusted sector momentum, implemented and not run (2026-11-07)
+- **New signal `MonthlyMomentumSignal`**
+  (`signals/cross_asset/residual_momentum.py`).
+  - Reads month-end closes through the new `load_month_end_window` in
+    `signals/windows.py`. Each month ends at the venue's last session on or
+    before its last calendar day; a month end not served is `MISSING_INPUT`,
+    never replaced. A fund whose history does not reach the window is
+    `INSUFFICIENT_HISTORY` before its latest close is judged.
+  - `RESIDUAL` scores the mean of a fund's recent OLS residuals against a
+    market, over their sample standard deviation. `TOTAL` gives the
+    compounded return of the same months, optionally gated on the same
+    market.
+- **New strategy `SA17SectorResidualMomentum`**, catalogued
+  `SA17 - sector residual momentum`.
+  - Holds the top three sectors in equal parts, scaled to a volatility
+    target from the 63-session covariance; the rest goes to a monetary fund.
+  - Keeps the book when an eligible sector or the covariance cannot be read.
+  - `controls()` builds the four sector controls of the proposal.
+- **Tests.** Offline signal and strategy tests: hand-computed values,
+  comparisons with numpy, statuses, look-ahead guards and engine runs on a
+  synthetic market.
+- **SA17 research folder.** It now holds the acquisition registry, the
+  sourcing note its header cited (written 2026-11-07, after the ten issuer
+  listings were checked), the audit and acquisition scripts with their
+  tests, and an updated README.
+- **Nothing was run on market data.** The acquisition has not been run; the
+  market factor, monetary fund and window are still open.
+
 ### The results in English (2026-10-31)
 - **Reports regenerated in English.**
   - The scripts that write them are translated:
