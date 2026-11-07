@@ -131,6 +131,35 @@ class CostModel:
             "slippage_rate": self.slippage_rate,
         }
 
+    def scaled(self, factor: float) -> CostModel:
+        """Return the same model with every term multiplied by ``factor``.
+
+        Parameters
+        ----------
+        factor : float
+            Multiplier of the three rates and of the commission floor, in the
+            floor's currency for the latter. ``2.0`` is a doubled-cost stress.
+
+        Returns
+        -------
+        CostModel
+            The scaled model, checked like any other: a factor that pushes a
+            rate to 100% or more is refused.
+
+        Raises
+        ------
+        ValueError
+            If ``factor`` is not a finite positive number, or the scaled terms
+            do not describe a cost.
+        """
+        require_finite_positive(factor, "factor")
+        return CostModel(
+            commission_rate=self.commission_rate * factor,
+            minimum_commission=self.minimum_commission * factor,
+            half_spread_rate=self.half_spread_rate * factor,
+            slippage_rate=self.slippage_rate * factor,
+        )
+
     @property
     def drag(self) -> float:
         """Return the fraction of the market price a fill moves by, spread and slippage."""
