@@ -32,8 +32,8 @@ What is not a score is settled explicitly, as the proposal states it:
 market on identical XNYS observation dates. ``risk_input_ids`` separately name
 NAV for EUR risk: USD NAV divided by synchronized USD-per-EUR FX, or explicitly
 validated synchronous EUR NAV. WM16 London EUR reference NAV is not equivalent.
-The default shared cutoff is the previous completed calendar month; an explicit
-observation_cutoff may override it. Missing expected dates are never backfilled.
+The shared cutoff is the previous completed calendar month of each decision; no
+fixed date can be configured. Missing expected dates are never backfilled.
 The decision still controls publication availability. Valuation at 22:15 Dublin
 is not publication, and a 23:00 Paris decision cannot use that day's NAV.
 Historical publication and synchronous FX are upstream admission requirements;
@@ -47,7 +47,6 @@ import math
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
 from enum import Enum
 from types import MappingProxyType
 from typing import Final
@@ -66,7 +65,6 @@ from quant_backtester.signals.types import (
     PriceBasis,
     SignalStatus,
     require_identifier,
-    require_non_negative_int,
     require_positive_int,
 )
 from quant_backtester.strategies.base import Strategy
@@ -182,12 +180,11 @@ class SA17SectorResidualMomentum(Strategy):
     ----------
     sector_ids : tuple[str, ...]
         The sector funds the book may hold, one per sector.
-    market_id : str | None
-        The market the residuals are taken against; required for
-        ``RESIDUAL``. The other rankings read it only as a gate - a sector is
-        refused with the market's status when the market cannot be read - so
-        that a control and its candidate invest from the same dates; ``None``
-        drops the gate.
+    market_id : str
+        The USD SP500TR market the residuals are taken against. Required for
+        every ranking: the others read it only as a gate - a sector is refused
+        with the market's status when the market cannot be read - so that a
+        control and its candidate invest from the same dates.
     monetary_id : str | None
         The EUR monetary fund that receives what the sectors do not; ``None``
         leaves it in cash.
@@ -202,8 +199,6 @@ class SA17SectorResidualMomentum(Strategy):
         validated synchronous EUR NAV, not WM16 London reference NAV.
     usd_per_eur_fx_id : str | None
         Validated synchronous FX, quoting USD per EUR, required for USD risk NAV.
-    observation_cutoff : date | None
-        Shared last observation date; None uses the previous completed month.
     top_n : int
         Number of sectors held. Also the fewest eligible sectors the book
         invests with, for every ranking.
@@ -220,9 +215,6 @@ class SA17SectorResidualMomentum(Strategy):
         fraction; ``None`` holds the sectors at the whole book.
     annualization : int
         Sessions per year the daily covariance is scaled by.
-    max_age_sessions : int
-        Legacy generic-signal parameter recorded for compatibility. SA17's
-        exact-date contract requires every cutoff endpoint regardless of age.
     strategy_id : str
         Identity of the strategy in its results.
 
@@ -243,14 +235,13 @@ class SA17SectorResidualMomentum(Strategy):
     """
 
     sector_ids: tuple[str, ...]
-    market_id: str | None
+    market_id: str
     monetary_id: str | None
     ranking: SectorRanking = SectorRanking.RESIDUAL
     signal_input_ids: tuple[str, ...] = ()
     risk_input_ids: tuple[str, ...] = ()
     risk_input_currency: str = "USD"
     usd_per_eur_fx_id: str | None = None
-    observation_cutoff: date | None = None
     top_n: int = 3
     estimation_months: int = 36
     score_months: int = 11
@@ -258,7 +249,6 @@ class SA17SectorResidualMomentum(Strategy):
     risk_returns: int = 63
     target_volatility: float | None = 0.15
     annualization: int = 252
-    max_age_sessions: int = 1
     strategy_id: str = "SA17_sector_residual_momentum"
 
     def __post_init__(self) -> None:
@@ -290,13 +280,12 @@ class SA17SectorResidualMomentum(Strategy):
         require_positive_int(self.top_n, "top_n")
         if len(self.sector_ids) < self.top_n:
             raise ValueError(f"{len(self.sector_ids)} sectors cannot fill {self.top_n} places")
-        if self.market_id is not None:
-            require_identifier(self.market_id, "market_id")
-        else:
+        if not isinstance(self.market_id, str):
             raise ValueError("SA17 requires an explicit USD SP500TR market for every ranking")
+        require_identifier(self.market_id, "market_id")
         if self.monetary_id is not None:
             require_identifier(self.monetary_id, "monetary_id")
-        roles = [name for name in (self.market_id, self.monetary_id) if name is not None]
+        roles = [self.market_id, *([] if self.monetary_id is None else [self.monetary_id])]
         shared = sorted(
             set(roles) & {*self.sector_ids, *self.signal_input_ids, *self.risk_input_ids}
         )
@@ -315,7 +304,6 @@ class SA17SectorResidualMomentum(Strategy):
         if self.target_volatility is not None:
             require_finite_positive(self.target_volatility, "target_volatility")
         require_positive_int(self.annualization, "annualization")
-        require_non_negative_int(self.max_age_sessions, "max_age_sessions")
         self.momentum()  # the window and its score are checked by the signal
         self.risk_signal()
         self.validate()
@@ -331,13 +319,11 @@ class SA17SectorResidualMomentum(Strategy):
         """
         months = f"{self.estimation_months}m_{self.score_months}m_skip{self.skip_months}"
         residual = self.ranking is SectorRanking.RESIDUAL
-        market = None if self.market_id is None else self.market_id.lower()
+        market = self.market_id.lower()
         if residual:
             signal_id = f"sa17_residual_vs_{market}_{months}"
-        elif market is not None:
-            signal_id = f"sa17_total_gated_by_{market}_{months}"
         else:
-            signal_id = f"sa17_total_{months}"
+            signal_id = f"sa17_total_gated_by_{market}_{months}"
         return MonthlyMomentumSignal(
             signal_id=signal_id,
             measure=MomentumMeasure.RESIDUAL if residual else MomentumMeasure.TOTAL,
@@ -346,10 +332,8 @@ class SA17SectorResidualMomentum(Strategy):
             score_months=self.score_months,
             skip_months=self.skip_months,
             price_basis=PriceBasis.ADJUSTED,
-            max_age_sessions=self.max_age_sessions,
             required_currency="USD",
             observation_calendar_id="XNYS",
-            observation_cutoff=self.observation_cutoff,
             completed_months_only=True,
             require_nav=True,
         )
@@ -365,7 +349,6 @@ class SA17SectorResidualMomentum(Strategy):
             risk_returns=self.risk_returns,
             input_currency=self.risk_input_currency,
             usd_per_eur_fx_id=self.usd_per_eur_fx_id,
-            observation_cutoff=self.observation_cutoff,
         )
 
     def required_signals(self) -> Sequence[Signal | SignalRequest]:
@@ -532,12 +515,10 @@ class SA17SectorResidualMomentum(Strategy):
         }
         if refused:
             return None, refused
-        dates = [frame.loc[sources[fund], "dates"] for fund in selected]
-        if any(days != dates[0] for days in dates):
-            return None, dict.fromkeys(selected, SignalStatus.MISSING_INPUT)
+        # Every OK row of the risk signal holds the same ``risk_returns``
+        # returns on the same dates: it reads one set of expected sessions for
+        # all funds and refuses any fund missing one (NavRiskReturnsSignal).
         returns = [frame.loc[sources[fund], "returns"] for fund in selected]
-        if any(len(series) != self.risk_returns for series in returns):
-            return None, dict.fromkeys(selected, SignalStatus.MISSING_INPUT)
         return equal_weight_volatility(returns, self.annualization), {}
 
     @staticmethod
