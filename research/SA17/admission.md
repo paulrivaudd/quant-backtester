@@ -11,7 +11,7 @@ Status on 2026-11-07:
 
 | Gate | Status | Evidence | What remains |
 | --- | --- | --- | --- |
-| 2a. Fund valuation calendar | **PASSED** | [fund_calendar_evidence.json](fund_calendar_evidence.json), [`SA17_check_fund_calendar.py`](../../scripts/SA17_check_fund_calendar.py) | Adopt the XNYS ∩ XLON grid in the amendment. Code: let a signal read a BAR instrument on a registered sub-calendar of its own |
+| 2a. Fund valuation calendar | **PASSED** | [fund_calendar_evidence.json](fund_calendar_evidence.json), [`SA17_check_fund_calendar.py`](../../scripts/SA17_check_fund_calendar.py) | The grid is registered (`XNYS_XLON`, a checked subset of `XNYS`) and the strategy takes it as `observation_calendar_id`; the amendment adopts it |
 | 2b. Fund actions and index changes | **PASSED** (data screen); notices not exhaustively read | [nav_jump_screen.json](nav_jump_screen.json), [`SA17_screen_nav_jumps.py`](../../scripts/SA17_screen_nav_jumps.py) | Disclose the 2018 GICS reshuffle of the sector indices |
 | 2c. Historical NAV publication | **PARTIAL**: owner chose the declared prospectus rule (2026-11-07) | Prospectus rule (below); one dated notice ([lse_nav_validation.json](lse_nav_validation.json)) | Per-row historical timestamps not obtained |
 | 2d. Synchronous EUR/USD | IN PROGRESS: owner chose Dukascopy (2026-11-07) | Adapter [`dukascopy.py`](../../src/quant_backtester/data/sources/dukascopy.py), [`SA17_acquire_fx.py`](../../scripts/SA17_acquire_fx.py); three probe days read 1.08991, 1.09471, 1.09363 at the US close | Acquisition throttled (HTTP 429) on 2026-11-07; resume with `fetch`, then `verify` and `build` |
@@ -39,6 +39,14 @@ sessions**. It is known in advance from two published calendars, every fund
 has a NAV on each of its dates, and it drops the NAVs struck on UK holidays
 that no rule fixed in advance could anticipate. It becomes the grid only
 through the executable-run amendment.
+
+The grid is registered as `market_data/metadata/calendars/XNYS_XLON.toml`.
+`scripts/generate_calendars.py` generates it from `exchange-calendars`, with
+NYSE hours and early closes, and it declares `subset_of = "XNYS"`; the calendar
+registry refuses it if any of its sessions is not an XNYS session at the same
+hours. The signals read the S&P 500 (bars on XNYS) and an FX series on it,
+and still refuse an unrelated calendar. `SA17SectorResidualMomentum` takes
+the grid as `observation_calendar_id` (default `XNYS`, unchanged).
 
 The definitions come from the 2026 edition. The check over the whole
 2015–2026 history is what supports applying them to earlier years.
