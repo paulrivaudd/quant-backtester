@@ -789,10 +789,11 @@ def test_registry_from_empty_directory_fails(tmp_path):
 
 
 def test_registry_loads_the_committed_calendars():
-    """The real calendar folder yields Xetra, New York and Paris."""
+    """The real calendar folder yields Xetra, New York, its London subset and Paris."""
     registry = CalendarRegistry.from_directory(COMMITTED_CALENDARS)
 
-    assert [c.calendar_id for c in registry] == ["XETR", "XNYS", "XPAR"]
+    assert [c.calendar_id for c in registry] == ["XETR", "XNYS", "XNYS_XLON", "XPAR"]
+    assert registry.get("XNYS_XLON").subset_of == "XNYS"
 
 
 # --- coverage: a calendar only answers for the period its holiday list covers --
@@ -897,3 +898,94 @@ def test_from_toml_requires_the_coverage(tmp_path, key):
         TradingCalendar.from_toml(write_toml(tmp_path, without))
 
     assert "XTST.toml" in str(excinfo.value)
+
+
+# --- subsets: a calendar declared to hold only sessions of another --------------
+
+
+def child(**overrides: object) -> TradingCalendar:
+    """Build a subset of ``make_calendar()``: one more holiday, the same early close."""
+    fields: dict[str, Any] = {
+        "calendar_id": "XTST_SUB",
+        "holidays": frozenset({date(2026, 11, 26), date(2026, 12, 28)}),
+        "subset_of": "XTST",
+    }
+    fields.update(overrides)
+    return make_calendar(**fields)
+
+
+def test_a_true_subset_is_registered_and_keeps_the_parent_definition_unchanged():
+    registry = CalendarRegistry([make_calendar(), child()])
+    sub = registry.get("XTST_SUB")
+    assert sub.subset_of == "XTST"
+    assert not sub.is_open(date(2026, 12, 28))
+    assert registry.get("XTST").is_open(date(2026, 12, 28))
+    assert sub.definition()["subset_of"] == "XTST"
+    # A venue's own calendar records no such key: earlier signatures stand.
+    assert "subset_of" not in make_calendar().definition()
+
+
+@pytest.mark.parametrize(
+    "overrides, message",
+    [
+        ({"subset_of": "XNOPE"}, "not registered"),
+        ({"timezone": "Europe/London"}, "timezone and hours"),
+        ({"regular_close": time(17, 0)}, "timezone and hours"),
+        ({"covered_until": date(2028, 12, 29)}, "covers days"),
+        ({"holidays": frozenset({date(2026, 12, 28)})}, "trades on XTST holidays"),
+        ({"early_closes": {}}, "early closes"),
+        ({"early_closes": {date(2026, 11, 27): time(12, 0)}}, "early closes"),
+    ],
+)
+def test_a_calendar_that_is_not_the_subset_it_claims_is_refused(
+    overrides: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        CalendarRegistry([make_calendar(), child(**overrides)])
+
+
+def test_a_subset_that_drops_an_early_close_session_drops_its_early_close():
+    # The parent's early close falls on a child holiday: the child has none.
+    registry = CalendarRegistry(
+        [
+            make_calendar(),
+            child(
+                holidays=frozenset({date(2026, 11, 26), date(2026, 11, 27)}),
+                early_closes={},
+            ),
+        ]
+    )
+    assert not registry.get("XTST_SUB").is_open(date(2026, 11, 27))
+
+
+@pytest.mark.parametrize("value", ["", "XTST_SUB", 3])
+def test_subset_of_must_name_another_calendar(value: object) -> None:
+    with pytest.raises(ValueError, match="another calendar"):
+        child(subset_of=value)
+
+
+def test_subset_of_is_read_from_toml_and_an_unknown_key_is_still_refused(tmp_path: Path):
+    path = tmp_path / "XTST_SUB.toml"
+    path.write_text(
+        'calendar_id = "XTST_SUB"\nsubset_of = "XTST"\ntimezone = "America/New_York"\n'
+        'regular_open = "09:30:00"\nregular_close = "16:00:00"\n'
+        "covered_from = 2026-01-01\ncovered_until = 2027-12-31\n"
+        "holidays = [2026-11-26, 2026-12-28]\n[early_closes]\n"
+        '2026-11-27 = "13:00:00"\n'
+    )
+    assert TradingCalendar.from_toml(path).subset_of == "XTST"
+    path.write_text(path.read_text().replace("subset_of", "subset_off"))
+    with pytest.raises(ValueError, match="unknown key"):
+        TradingCalendar.from_toml(path)
+
+
+def test_the_committed_london_subset_drops_uk_holidays_and_keeps_us_hours():
+    registry = CalendarRegistry.from_directory(COMMITTED_CALENDARS)
+    new_york, both = registry.get("XNYS"), registry.get("XNYS_XLON")
+    for uk_holiday in (date(2024, 4, 1), date(2024, 5, 6), date(2024, 12, 26)):
+        assert new_york.is_open(uk_holiday)
+        assert not both.is_open(uk_holiday)
+    # Black Friday: London is open, so it is a session, with New York's early close.
+    friday = both.session(date(2024, 11, 29))
+    assert friday is not None
+    assert friday == new_york.session(date(2024, 11, 29))

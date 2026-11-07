@@ -439,7 +439,8 @@ def load_month_end_window(
     ValueError
         If the instrument is a published series or declares no calendar, if
         a bars instrument is asked for the month ends of another calendar than
-        its own, or ``max_age_sessions`` is not a non-negative integer:
+        its own or a declared subset of it, or ``max_age_sessions`` is not a
+        non-negative integer:
         configuration mistakes, which stop the run.
     KeyError
         If the instrument is not registered.
@@ -467,12 +468,19 @@ def load_month_end_window(
         calendar_id = observation_calendar_id or instrument.calendar_id
         if calendar_id is None:
             raise ValueError("LEVEL month ends require an explicit observation calendar")
-        if instrument.data_type is DataType.BAR and instrument.calendar_id != calendar_id:
+        venue = context.calendars.get(calendar_id)
+        # A bars instrument is read on its own venue's sessions, or on a
+        # calendar declared - and checked by the registry - to be a subset of
+        # them: XNYS sessions on which London is open too.
+        if (
+            instrument.data_type is DataType.BAR
+            and instrument.calendar_id != calendar_id
+            and venue.subset_of != instrument.calendar_id
+        ):
             raise ValueError(
                 f"{instrument_id} trades on {instrument.calendar_id} and is asked for month "
                 f"ends of {calendar_id}: a configuration mistake, not a market situation"
             )
-        venue = context.calendars.get(calendar_id)
         # The window ends at the last session on or before the cutoff, and the
         # month grid is that session's. Anchored on the cutoff itself, a cutoff
         # falling before its month's first session (1 January, a Saturday 1st)

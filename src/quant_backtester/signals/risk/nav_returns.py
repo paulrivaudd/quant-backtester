@@ -120,12 +120,13 @@ class NavRiskReturnsSignal(Signal):
                 or (
                     instrument.data_type is DataType.BAR
                     and instrument.calendar_id != self.observation_calendar_id
+                    and calendar.subset_of != instrument.calendar_id
                 )
             ):
                 raise ValueError(
                     f"{self.usd_per_eur_fx_id} cannot convert {self.signal_id}'s NAVs: a "
                     "non-tradable, non-ECB USD FX series on "
-                    f"{self.observation_calendar_id} is required"
+                    f"{self.observation_calendar_id} or the venue it restricts is required"
                 )
             fx = load_dated_window(
                 context, self.usd_per_eur_fx_id, dates=dates, basis=PriceBasis.RAW
