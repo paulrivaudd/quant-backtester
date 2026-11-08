@@ -18,7 +18,10 @@ controls, SA16_it2 rebuilt from its archived selection, Nasdaq bought and
 held, and it2's C1, which is descriptive only. A run whose signature matches a
 saved one is read back instead of run again. The signature covers the
 strategy and schedule definitions, the window, every cost model, the
-universe, the store digest and the analytics.
+universe, the store digest, the analytics, the code revision and the installed
+dependency environment. Reuse also requires a completion manifest and matching
+hashes for every output artifact. A different or incomplete run is preserved
+and refused; use a new output folder for a corrected run.
 
 The comparisons then follow the frozen inference: a paired stationary
 bootstrap of the candidate against each reference and control, Holm within
@@ -45,6 +48,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 import pandas as pd
@@ -71,7 +75,7 @@ from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel, Sizing
-from quant_backtester.provenance import SourceState, git_source_state
+from quant_backtester.provenance import SourceState, environment_state, git_source_state
 from quant_backtester.research.references import BuyAndHold, FixedWeights
 from quant_backtester.research.sa17_contract import load_sector_costs, month_end_release_decisions
 from quant_backtester.strategies.base import Strategy
@@ -293,9 +297,13 @@ def signature(
     study: Mapping[str, Any],
     multiplier: float,
     digest: str,
+    source: SourceState,
+    environment: Mapping[str, str],
 ) -> str:
-    """Hash what makes two runs the same run, the code state aside."""
+    """Hash the run inputs, code revision and installed dependency environment."""
     content = {
+        "source": source.definition(),
+        "environment": dict(environment),
         "strategy": dict(book.strategy.definition()),
         "schedule": book.schedule.definition(),
         "window": [study["window"]["start"], study["window"]["end"]],
@@ -422,8 +430,48 @@ def save_run(
     models: Mapping[str, CostModel],
     study: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Write one run's measures, curves, trades and decisions."""
-    folder.mkdir(parents=True, exist_ok=True)
+    """Publish a complete run atomically, refusing any existing output folder."""
+    if folder.exists():
+        raise FileExistsError(f"{folder} already exists; choose a new folder")
+    folder.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix=f".{folder.name}-", dir=folder.parent) as temporary:
+        staged = Path(temporary) / "run"
+        staged.mkdir()
+        values = _write_run(staged, result, book, key, config, models, study)
+        hashes = {
+            name: hashlib.sha256((staged / name).read_bytes()).hexdigest() for name in RUN_ARTIFACTS
+        }
+        write_json(staged / "complete.json", {"signature": key, "sha256": hashes})
+        staged.rename(folder)
+    return values
+
+
+RUN_ARTIFACTS = (
+    "metrics.json",
+    "strategy.json",
+    "schedule.json",
+    "configuration.json",
+    "equity.csv",
+    "gross_equity.csv",
+    "weights.csv",
+    "fills.csv",
+    "orders.csv",
+    "rejects.csv",
+    "decisions.csv",
+)
+"""Artifacts required to reuse a completed study run."""
+
+
+def _write_run(
+    folder: Path,
+    result: StrategyResult,
+    book: BookSpec,
+    key: str,
+    config: AnalyticsConfig,
+    models: Mapping[str, CostModel],
+    study: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Write the run inside its unpublished staging directory."""
     values = run_metrics(result, config, models)
     if isinstance(book.strategy, SA17SectorResidualMomentum):
         values.update(sector_exposure(result, study["strategy"]["sector_ids"], "ETF_MONETARY_EUR"))
@@ -461,6 +509,28 @@ def save_run(
     return values
 
 
+def checked_saved_run(folder: Path, key: str) -> dict[str, Any]:
+    """Read a completed run only when its identity and every artifact hash agree."""
+    try:
+        completion = json.loads((folder / "complete.json").read_text(encoding="utf-8"))
+        if completion["signature"] != key:
+            raise ValueError("different run identity")
+        hashes = completion["sha256"]
+        if set(hashes) != set(RUN_ARTIFACTS):
+            raise ValueError("incomplete artifact manifest")
+        for name in RUN_ARTIFACTS:
+            if hashlib.sha256((folder / name).read_bytes()).hexdigest() != hashes[name]:
+                raise ValueError(f"changed artifact: {name}")
+        values = json.loads((folder / "metrics.json").read_text(encoding="utf-8"))
+        if values["signature"] != key:
+            raise ValueError("different metrics identity")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise FileExistsError(
+            f"{folder} is incomplete, changed or holds a different run; choose a new folder"
+        ) from error
+    return values
+
+
 def run_book(
     book: BookSpec,
     study: Mapping[str, Any],
@@ -471,14 +541,13 @@ def run_book(
 ) -> dict[str, Any]:
     """Run one book, or read it back if the same run is already saved."""
     folder = output / f"{book.name}_x{multiplier:g}"
-    key = signature(book, study, multiplier, digest)
-    saved = folder / "metrics.json"
-    if saved.exists():
-        values = json.loads(saved.read_text(encoding="utf-8"))
-        if values.get("signature") == key:
-            print(f"  reused {folder.relative_to(ROOT)}", flush=True)
-            return values
-        raise FileExistsError(f"{folder} holds a different run; choose a new folder")
+    key = signature(
+        book, study, multiplier, digest, runner.source, environment_state(runner.lockfile)
+    )
+    if folder.exists():
+        values = checked_saved_run(folder, key)
+        print(f"  reused {folder}", flush=True)
+        return values
     window = study["window"]
     print(f"  running {book.name} x{multiplier:g}", flush=True)
     result = runner.run(
