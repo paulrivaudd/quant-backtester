@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### SA17: pre-run review corrections (2026-11-08)
+- Saved-run identity now includes the code revision and dependency environment,
+  so a code correction cannot silently reuse an earlier result.
+- Runs are staged and published only after all artifacts and their completion
+  manifest are written. Reuse verifies every artifact hash; incomplete or
+  mismatched output is preserved and requires a new output folder.
+- The store builder requires gate 2d's exact 24 seeded verification dates,
+  seed and successful comparisons, rather than trusting a self-reported count.
+- These are implementation corrections; frozen study parameters are unchanged.
+
 ### SA17: the executable run, frozen and tooled (2026-11-08)
 - **Frozen before any code or run.** The amendment "Executable run: frozen
   schedule and assumptions" (`research/SA17/protocol.md`) and

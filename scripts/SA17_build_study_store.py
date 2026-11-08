@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import random
 import shutil
 import tomllib
 from collections.abc import Mapping
@@ -63,6 +64,20 @@ ROOT = Path(__file__).resolve().parents[1]
 STUDY = ROOT / "research" / "SA17" / "study.toml"
 NAV_END = date(2026, 10, 30)
 """Last NAV date ingested: the window's end, as for the retrieval-floored store."""
+
+FX_SAMPLE_SEED = 20261107
+FX_SAMPLE_SIZE = 24
+"""Gate 2d's frozen verification design, checked against the acquisition in tests."""
+
+
+def fx_verification_days() -> list[str]:
+    """Derive the prescribed 24 FX verification dates from the committed XNYS calendar."""
+    calendar = CalendarRegistry.from_directory(ROOT / "market_data/metadata/calendars").get("XNYS")
+    sessions = calendar.sessions(date(2015, 7, 1), date(2026, 10, 30))
+    return sorted(
+        session.session_date.isoformat()
+        for session in random.Random(FX_SAMPLE_SEED).sample(list(sessions), FX_SAMPLE_SIZE)
+    )
 
 
 def load_study(path: Path = STUDY) -> dict[str, Any]:
@@ -201,7 +216,13 @@ def checked_fx_table(archive: Path) -> tuple[pd.DataFrame, dict[str, Any], datet
     if hashlib.sha256(table_path.read_bytes()).hexdigest() != coverage["table_sha256"]:
         raise ValueError("the US-close table does not hash to its coverage record")
     days = coverage["verification"]["days"]
-    if len(days) != coverage["verification"]["sample"] or not all(day["agree"] for day in days):
+    expected = fx_verification_days()
+    if (
+        coverage["verification"].get("seed") != FX_SAMPLE_SEED
+        or coverage["verification"]["sample"] != FX_SAMPLE_SIZE
+        or sorted(day["date"] for day in days) != expected
+        or not all(day["agree"] is True for day in days)
+    ):
         raise ValueError("gate 2d has not passed: the hourly and minute rates do not all agree")
     if coverage["missing_months"] or coverage["without_rate"]:
         raise ValueError(

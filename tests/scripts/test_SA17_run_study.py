@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import shutil
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from quant_backtester.backtest.schedule import EverySession, ListedSessions, Weekly
 from quant_backtester.data.calendars import CalendarRegistry
+from quant_backtester.provenance import SourceState, SourceStatus
 from quant_backtester.strategies.SA17_sector_residual_momentum import (
     SA17SectorResidualMomentum,
     SectorRanking,
@@ -105,16 +109,93 @@ def test_the_books_are_the_frozen_ones(study) -> None:
 def test_a_run_signature_changes_with_costs_data_and_schedule(study) -> None:
     schedule = ListedSessions((date(2018, 8, 1),), rule="test")
     book = study_run.books_of(study, schedule)[0]
-    base = study_run.signature(book, study, 1.0, "digest")
-    assert study_run.signature(book, study, 1.0, "digest") == base
-    assert study_run.signature(book, study, 2.0, "digest") != base
-    assert study_run.signature(book, study, 1.0, "other") != base
+    provenance = (SourceState(SourceStatus.CLEAN, "a" * 40), {"numpy": "test"})
+    base = study_run.signature(book, study, 1.0, "digest", *provenance)
+    assert study_run.signature(book, study, 1.0, "digest", *provenance) == base
+    assert study_run.signature(book, study, 2.0, "digest", *provenance) != base
+    assert study_run.signature(book, study, 1.0, "other", *provenance) != base
     moved = replace(book, schedule=ListedSessions((date(2018, 8, 2),), rule="test"))
-    assert study_run.signature(moved, study, 1.0, "digest") != base
+    assert study_run.signature(moved, study, 1.0, "digest", *provenance) != base
 
 
 def metrics(cagr: float, sharpe: float, drawdown: float) -> dict[str, float]:
     return {"cagr": cagr, "sharpe": sharpe, "max_drawdown": drawdown}
+
+
+def test_cache_identity_covers_code_and_installed_environment(study) -> None:
+    book = study_run.books_of(study, ListedSessions((date(2018, 8, 1),), rule="test"))[0]
+    source = SourceState(SourceStatus.CLEAN, "a" * 40)
+    environment = {"numpy": "1", "lockfile_sha256": "lock-a"}
+    key = study_run.signature(book, study, 1.0, "digest", source, environment)
+    assert (
+        study_run.signature(
+            book, study, 1.0, "digest", replace(source, git_commit="b" * 40), environment
+        )
+        != key
+    )
+    for change in ({"numpy": "2"}, {"lockfile_sha256": "lock-b"}):
+        assert study_run.signature(book, study, 1.0, "digest", source, environment | change) != key
+
+
+@pytest.mark.parametrize(
+    "fault", ["valid", "no_marker", "missing", "changed", "identity", "environment"]
+)
+def test_run_book_refuses_incomplete_or_changed_cache(study, tmp_path, monkeypatch, fault):
+    book = study_run.books_of(study, ListedSessions((date(2018, 8, 1),), rule="test"))[0]
+    source = SourceState(SourceStatus.CLEAN, "a" * 40)
+    monkeypatch.setattr(study_run, "environment_state", lambda _: {"numpy": "1"})
+    key = study_run.signature(book, study, 1.0, "digest", source, {"numpy": "1"})
+    folder = tmp_path / f"{book.name}_x1"
+    folder.mkdir()
+    for name in study_run.RUN_ARTIFACTS:
+        (folder / name).write_text(json.dumps({"signature": key}))
+    hashes = {
+        name: hashlib.sha256((folder / name).read_bytes()).hexdigest()
+        for name in study_run.RUN_ARTIFACTS
+    }
+    if fault != "no_marker":
+        study_run.write_json(folder / "complete.json", {"signature": key, "sha256": hashes})
+    if fault == "missing":
+        (folder / "equity.csv").unlink()
+    elif fault == "changed":
+        (folder / "fills.csv").write_text("changed")
+    elif fault == "identity":
+        source = replace(source, git_commit="b" * 40)
+    elif fault == "environment":
+        monkeypatch.setattr(study_run, "environment_state", lambda _: {"numpy": "2"})
+    runner = SimpleNamespace(source=source, lockfile=None)
+    if fault == "valid":
+        assert study_run.run_book(book, study, runner, 1.0, "digest", tmp_path) == {
+            "signature": key
+        }
+        return
+    # No run method: a rejected cache must not trigger an implicit replacement run.
+    with pytest.raises(FileExistsError, match="choose a new folder"):
+        study_run.run_book(book, study, runner, 1.0, "digest", tmp_path)
+
+
+def test_interrupted_save_does_not_publish_a_run(tmp_path, monkeypatch):
+    folder = tmp_path / "book"
+
+    def interrupted(staged: Path, *args: object) -> None:
+        (staged / "metrics.json").write_text("partial output")
+        raise OSError("simulated interruption")
+
+    monkeypatch.setattr(study_run, "_write_run", interrupted)
+    with pytest.raises(OSError, match="simulated interruption"):
+        study_run.save_run(folder, None, None, "key", None, {}, {})
+    assert not folder.exists()
+    assert not list(tmp_path.iterdir())
+
+
+def test_save_preserves_existing_output(tmp_path):
+    folder = tmp_path / "book"
+    folder.mkdir()
+    artifact = folder / "metrics.json"
+    artifact.write_text("existing output")
+    with pytest.raises(FileExistsError, match="already exists"):
+        study_run.save_run(folder, None, None, "key", None, {}, {})
+    assert artifact.read_text() == "existing output"
 
 
 @pytest.mark.parametrize(
@@ -273,6 +354,8 @@ def test_runs_are_saved_compared_and_reported(
                 study,
             )
             assert saved["net"]["sharpe"] is not None
+            folder = tmp_path / f"{book.name}_x{multiplier:g}"
+            assert study_run.checked_saved_run(folder, "key")["run_id"] == saved["run_id"]
             assert saved["costs_eur"] == pytest.approx(
                 saved["spread_eur"] + saved["commission_eur"] + saved["slippage_eur"]
             )

@@ -104,10 +104,11 @@ def archive(tmp_path: Path, agree: bool = True, holes: bool = False) -> Path:
     derived.mkdir(parents=True)
     path = derived / "eurusd_us_close.parquet"
     table().to_parquet(path, index=False)
-    days = [{"date": "2025-11-26", "agree": True}, {"date": "2025-11-28", "agree": agree}]
+    days = [{"date": day, "agree": True} for day in builder.fx_verification_days()]
+    days[-1]["agree"] = agree
     coverage = {
         "table_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        "verification": {"sample": 2, "days": days},
+        "verification": {"sample": 24, "seed": 20261107, "days": days},
         "missing_months": ["2016-01"] if holes else [],
         "without_rate": [],
     }
@@ -125,13 +126,44 @@ def archive(tmp_path: Path, agree: bool = True, holes: bool = False) -> Path:
 def test_a_verified_table_is_read_with_its_last_retrieval(tmp_path: Path) -> None:
     frame, coverage, retrieved = builder.checked_fx_table(archive(tmp_path))
     assert len(frame) == 3
-    assert coverage["verification"]["sample"] == 2
+    assert coverage["verification"]["sample"] == 24
     assert retrieved == datetime(2026, 11, 8, 11, tzinfo=UTC)
 
 
 def test_gate_2d_must_have_passed(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="2d has not passed"):
         builder.checked_fx_table(archive(tmp_path, agree=False))
+
+
+def test_verification_dates_match_the_acquisition() -> None:
+    from scripts import SA17_acquire_fx as acquisition
+
+    expected = acquisition.sample(acquisition.xnys().sessions(acquisition.START, acquisition.END))
+    assert builder.fx_verification_days() == [day.session_date.isoformat() for day in expected]
+    assert builder.FX_SAMPLE_SEED == acquisition.SAMPLE_SEED
+    assert builder.FX_SAMPLE_SIZE == acquisition.SAMPLE_SIZE
+
+
+@pytest.mark.parametrize("fault", ["empty", "short", "duplicate", "wrong_date", "seed"])
+def test_gate_refuses_an_unprescribed_sample(tmp_path: Path, fault: str) -> None:
+    folder = archive(tmp_path)
+    path = folder / "derived/coverage.json"
+    coverage = json.loads(path.read_text())
+    verification = coverage["verification"]
+    if fault == "empty":
+        verification.update(sample=0, days=[])
+    elif fault == "short":
+        verification["days"].pop()
+        verification["sample"] = 23
+    elif fault == "duplicate":
+        verification["days"][-1] = verification["days"][0]
+    elif fault == "wrong_date":
+        verification["days"][0]["date"] = "2000-01-03"
+    else:
+        verification["seed"] += 1
+    path.write_text(json.dumps(coverage))
+    with pytest.raises(ValueError, match="2d has not passed"):
+        builder.checked_fx_table(folder)
 
 
 def test_a_table_with_holes_is_refused(tmp_path: Path) -> None:
