@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### SA17: the executable run, frozen and tooled (2026-11-08)
+- **Frozen before any code or run.** The amendment "Executable run: frozen
+  schedule and assumptions" (`research/SA17/protocol.md`) and
+  `research/SA17/study.toml` were approved by the owner, then committed and
+  pushed as `15e67dc` before the study code.
+  - The run is `PROVISIONAL_NOT_ADMITTED`: gates 2c and 2e stay partial, so
+    the formal verdict is `INSUFFICIENT_EVIDENCE`.
+  - The amendment fixes the 99 decision dates, the window (2018-08-01 to
+    2026-10-30), the 8 books at ×1 and ×2, every fund's costs, the inference
+    and the provisional reading.
+- **New `XLON` calendar**, generated in `research/SA17/calendars/` beside the
+  grid. The declared NAV release counts its one-business-day lag on it.
+- **`SsgaNavNormalizer(declared_release=True)`.** It accepts a release rule a
+  study declares (a lag of at least one session, no retrieval floor). The
+  registered instance still requires the retrieval floor.
+- **New `DukascopyUsCloseNormalizer`.** It turns the verified US-close
+  EUR/USD table into levels. It checks mid, bid ≤ ask, a bar ending no later
+  than the instant read, the New York date, and that no release comes before
+  the instant. It is not registered: no live adapter serves that table.
+- **New `backtest.schedule.ListedSessions`.** It replays decision dates
+  derived beforehand from published calendars. The dates and their rule are
+  part of the run's identity, and a listed date that is not a session is
+  refused.
+- **New `research.sa17_contract.month_end_release_decisions`.** It derives
+  SA17's decision dates from the grid, London and Paris calendars and the
+  declared release. A test checks it against the 99 dates in `study.toml`.
+- **New `scripts/SA17_build_study_store.py` and `scripts/SA17_run_study.py`.**
+  - The store builder copies `runs/sa17_store`, replays the NAVs under the
+    declared release and checks every value against the retrieval-floored
+    store. It loads the FX only if 2d's verification passed.
+  - The runner refuses a schedule, store digest or decision time that differ
+    from the frozen ones. It reads back any run whose signature it already
+    saved.
+
 ### SA17: the mechanism study on Ken French industries, run (2026-11-07)
 - **Frozen before any score.** `research/SA17/protocol.md` ("Mechanism study:
   frozen design"), `research/SA17/mechanism.toml` and the hypothesis

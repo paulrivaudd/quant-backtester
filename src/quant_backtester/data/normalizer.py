@@ -4,7 +4,8 @@ This is the only layer that knows a provider's column names, its date handling
 and its sign conventions. It is also where availability is stamped: a BAR gets
 its two timestamps from the venue calendar, a LEVEL gets its single timestamp
 from the instrument's publication rule. Issuer NAVs have unknown historical
-publication and require that rule's availability floor to equal retrieval.
+publication and require that rule's availability floor to equal retrieval,
+unless a study builds the NAV normalizer to accept a release rule it declares.
 
 Normalisation is a pure function of (raw frame, instrument, calendar). It must
 never look at the clock, the filesystem or the network - that is what makes
@@ -19,12 +20,14 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Protocol
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pyarrow as pa
 
 from quant_backtester.data.calendars import TradingCalendar
 from quant_backtester.data.instruments import (
+    AssetType,
     DataType,
     Instrument,
     PublicationRule,
@@ -1359,15 +1362,39 @@ class EcbNormalizer:
 
 
 class SsgaNavNormalizer:
-    """Store USD NAV levels with an enforced retrieval availability floor.
+    """Store USD NAV levels, available from their retrieval or a declared release.
 
-    Historical publication is unknown. The instrument's publication rule must
-    pin ``not_before_utc`` to this frozen fetch: earlier decisions cannot
-    use these values. A later scheduled release remains unavailable at fetch.
-    Shares outstanding and total assets never become volume or OHLC fields.
+    Historical publication is unknown, so by default the instrument's
+    publication rule must pin ``not_before_utc`` to this frozen fetch: earlier
+    decisions cannot use these values. That is the instance registered in
+    :data:`NORMALIZERS`.
+
+    A study may instead declare a release rule as an assumption - SA17's
+    executable run states that the NAV of day D is public at 23:00 Paris on
+    the next London business day (``research/SA17/protocol.md``). Only an
+    instance built with ``declared_release=True`` accepts it, and only a rule
+    that releases at least one session after the valuation date and carries
+    no retrieval floor: a same-day release would precede the 22:15 Dublin
+    valuation point. Building that instance is the study's explicit choice; no
+    registry entry turns it on.
+
+    In both modes a release later than the fetch remains unavailable, and
+    shares outstanding and total assets never become volume or OHLC fields.
+
+    Attributes
+    ----------
+    declared_release : bool
+        ``False`` (default) requires the retrieval floor; ``True`` requires a
+        lagged release rule with no floor, stated by the study that uses it.
     """
 
     source_id = "SSGA_NAV"
+
+    def __init__(self, *, declared_release: bool = False) -> None:
+        """Choose how the instrument's publication rule is checked."""
+        if not isinstance(declared_release, bool):
+            raise ValueError("declared_release must be a bool")
+        self.declared_release = declared_release
 
     def normalize(
         self,
@@ -1401,7 +1428,15 @@ class SsgaNavNormalizer:
         retrieval_date = download.retrieved_at_utc.astimezone(UTC).date()
         retrieved = retrieved.tz_convert("UTC")
         rule = instrument.publication_rule
-        if rule is None or rule.not_before_utc != retrieved:
+        if rule is None:
+            raise ValueError("SSGA NAV needs a publication rule")
+        if self.declared_release:
+            if rule.not_before_utc is not None or rule.lag_sessions < 1:
+                raise ValueError(
+                    "a declared SSGA NAV release must lag the valuation by at least one "
+                    "session and carry no not_before_utc floor"
+                )
+        elif rule.not_before_utc != retrieved:
             raise ValueError("SSGA NAV not_before_utc must equal the retrieval timestamp")
         if start > end or report > retrieval_date:
             raise ValueError("SSGA NAV invalid range or future report date")
@@ -1444,6 +1479,114 @@ class SsgaNavNormalizer:
                 unlisted=tuple(sorted(unlisted)), unpublished=tuple(sorted(unpublished))
             ),
         )
+
+
+DUKASCOPY_US_CLOSE_COLUMNS: frozenset[str] = frozenset(
+    {"observation_date", "instant_utc", "usd_per_eur", "bid", "ask", "bar_end_utc"}
+)
+"""Columns of the US-close rate table ``scripts/SA17_acquire_fx.py build`` writes."""
+
+
+class DukascopyUsCloseNormalizer:
+    """Store a currency rate read at each session's close from Dukascopy bars.
+
+    The download is the table the acquisition script derives from its
+    archive of hourly bid and ask bars: one row per session, the mid of the
+    bid and ask closes of the last bar with ticks ending at the session close
+    (``instant_utc``). Bars are a quote record, not a fixing: the rate is the
+    one a client could see at that instant, and Dukascopy may restate its
+    history, so the instrument should declare it ``RESTATED``.
+
+    The value is kept as quoted, USD per EUR for ``EURUSD``; nothing is
+    inverted. Each row is checked to describe a quote no later than its
+    instant, on its own date in New York, and not public before it was seen.
+
+    It is not in :data:`NORMALIZERS`: no live adapter downloads this table,
+    which is derived offline from an archive of hashed bar files, so the
+    study that replays it (``scripts/SA17_build_study_store.py``) passes
+    this normalizer to its updater explicitly.
+    """
+
+    source_id = "DUKASCOPY"
+
+    def normalize(
+        self,
+        instrument: Instrument,
+        download: RawDownload,
+        calendar: TradingCalendar | None = None,
+    ) -> NormalizedData:
+        """Convert the US-close table to canonical levels.
+
+        Parameters
+        ----------
+        instrument : Instrument
+            A non-tradable ``LEVEL`` FX instrument whose ``source_symbol`` is
+            the pair, e.g. ``EURUSD``.
+        download : RawDownload
+            The table, with ``request`` naming the ``pair`` and the ``quote``
+            (``USD_PER_EUR``).
+        calendar : TradingCalendar | None
+            Calendar the publication rule counts a lag on, if it has one.
+
+        Returns
+        -------
+        NormalizedData
+            Canonical ``levels``, sorted by observation date.
+
+        Raises
+        ------
+        ValueError
+            If the download or instrument is not this series, a column is
+            missing or extra, a date repeats, a quote is not positive and
+            finite or is crossed, the rate is not the mid, a bar ends after
+            the instant it is read at, the instant is not on its date in New
+            York, or the publication rule releases a rate before its instant.
+        """
+        rule = _require_level_call(
+            "DukascopyUsCloseNormalizer", self.source_id, instrument, download
+        )
+        if (
+            instrument.asset_type is not AssetType.FX
+            or instrument.tradable
+            or instrument.currency != "USD"
+            or download.request.get("pair") != instrument.source_symbol
+            or download.request.get("quote") != "USD_PER_EUR"
+        ):
+            raise ValueError(
+                f"{instrument.id} is not the USD-per-EUR Dukascopy series this table holds"
+            )
+        raw = download.frame
+        if set(raw.columns) != DUKASCOPY_US_CLOSE_COLUMNS:
+            raise ValueError(f"Dukascopy US-close table of {instrument.id} changed schema")
+        new_york = ZoneInfo("America/New_York")
+        observations: dict[date, float] = {}
+        for row in raw.itertuples(index=False):
+            day = pd.Timestamp(row.observation_date).date()
+            if day in observations:
+                raise ValueError(f"Dukascopy US-close table of {instrument.id} repeats {day}")
+            bid = _finite_number(str(row.bid), f"bid of {instrument.id} on {day}")
+            ask = _finite_number(str(row.ask), f"ask of {instrument.id} on {day}")
+            rate = _finite_number(str(row.usd_per_eur), f"rate of {instrument.id} on {day}")
+            if not 0.0 < bid <= ask:
+                raise ValueError(f"{instrument.id} on {day}: bid {bid}, ask {ask} is not a quote")
+            if not math.isclose(rate, (bid + ask) / 2.0, rel_tol=1e-12, abs_tol=0.0):
+                raise ValueError(f"{instrument.id} on {day}: {rate} is not the mid of its quote")
+            instant = pd.Timestamp(row.instant_utc)
+            bar_end = pd.Timestamp(row.bar_end_utc)
+            if instant.tzinfo is None or bar_end.tzinfo is None:
+                raise ValueError(f"{instrument.id} on {day}: instants must be timezone-aware")
+            if bar_end > instant:
+                raise ValueError(f"{instrument.id} on {day}: a bar ending after {instant} is read")
+            if instant.tz_convert(new_york).date() != day:
+                raise ValueError(f"{instrument.id} on {day}: read at {instant}, another day")
+            if rule.available_at(day, calendar) < instant.to_pydatetime():
+                raise ValueError(
+                    f"{instrument.id} on {day}: the publication rule releases it before "
+                    f"{instant}, the instant it was read at"
+                )
+            observations[day] = rate
+        levels, rejected = _levels_frame(instrument, download, rule, observations, calendar)
+        return NormalizedData(levels=levels, rejected=rejected)
 
 
 NORMALIZERS: Mapping[str, Normalizer] = {

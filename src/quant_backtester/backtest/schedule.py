@@ -171,6 +171,89 @@ class Monthly:
         return _last_of(sessions, following, lambda day: (day.year, day.month))
 
 
+@dataclass(frozen=True, slots=True)
+class ListedSessions:
+    """Decide on a stated list of sessions, derived beforehand from published calendars.
+
+    Some decision dates follow a rule no session list of the reference
+    calendar can express alone: SA17 decides on the first Paris session after
+    a London-dated release of a New York-dated month end. Such a rule is
+    computed once, from calendars that are data, and the dates are frozen in
+    the study's configuration. This schedule only replays them, so the
+    dates - and the rule they come from - are part of a run's identity.
+
+    Parameters
+    ----------
+    dates : tuple[date, ...]
+        Decision sessions, strictly increasing.
+    rule : str
+        How the dates were derived, in words; recorded with every run.
+
+    Raises
+    ------
+    ValueError
+        If a date is not a ``date``, the dates do not strictly increase, or
+        the rule is empty.
+    """
+
+    dates: tuple[date, ...]
+    rule: str
+
+    def __post_init__(self) -> None:
+        """Refuse a list that cannot be replayed unambiguously."""
+        object.__setattr__(self, "dates", tuple(self.dates))
+        if any(type(day) is not date for day in self.dates):
+            raise ValueError("every listed decision must be a date")
+        pairs = zip(self.dates, self.dates[1:], strict=False)
+        if any(later <= earlier for earlier, later in pairs):
+            raise ValueError("listed decisions must strictly increase")
+        if not isinstance(self.rule, str) or not self.rule.strip():
+            raise ValueError("say how the listed decisions were derived")
+
+    def definition(self) -> dict[str, object]:
+        """Return what identifies this schedule, for the record of a run."""
+        return {
+            "type": "ListedSessions",
+            "parameters": {"dates": [day.isoformat() for day in self.dates], "rule": self.rule},
+        }
+
+    def decision_sessions(
+        self, sessions: Sequence[date], following: date | None
+    ) -> frozenset[date]:
+        """Return the listed dates inside the run.
+
+        Parameters
+        ----------
+        sessions : Sequence[date]
+            The run's sessions, in order.
+        following : date | None
+            Unused: a listed date is decided on whatever follows it.
+
+        Returns
+        -------
+        frozenset[date]
+            The listed dates between the run's first and last sessions.
+
+        Raises
+        ------
+        ValueError
+            If a listed date inside the run is not one of its sessions: the
+            decision would be skipped silently, so the list is wrong for
+            this calendar.
+        """
+        if not sessions:
+            return frozenset()
+        inside = [day for day in self.dates if sessions[0] <= day <= sessions[-1]]
+        known = set(sessions)
+        absent = [day for day in inside if day not in known]
+        if absent:
+            raise ValueError(
+                f"listed decisions {[day.isoformat() for day in absent[:3]]} are not "
+                "sessions of the reference calendar"
+            )
+        return frozenset(inside)
+
+
 def _definition_of(schedule: object) -> dict[str, object]:
     """Return a schedule as its type and its parameters.
 
@@ -214,9 +297,9 @@ def _last_of(
     return frozenset(last.values())
 
 
-DecisionSchedule = EverySession | EveryNSessions | Weekly | Monthly
+DecisionSchedule = EverySession | EveryNSessions | Weekly | Monthly | ListedSessions
 """Every schedule a run may be given.
 
-A union rather than a protocol: there are four of them, they are all data, and
+A union rather than a protocol: there are five of them, they are all data, and
 a reader of a configuration should be able to see the whole list at once.
 """
