@@ -9,7 +9,7 @@ Nothing outside this script imports the library.
 Run it when a covered period is extended or the library publishes a correction::
 
     uv run python scripts/generate_calendars.py
-    uv run python scripts/generate_calendars.py --only XNYS_XLON
+    uv run python scripts/generate_calendars.py --only XNYS_XLON XLON
 
 A calendar can also restrict a venue to the days another one is open too:
 ``XNYS_XLON`` holds the NYSE sessions on which London is open, at NYSE hours,
@@ -142,6 +142,19 @@ VENUES = (
         ),
         library_id="XNYS",
         restricted_to="XLON",
+        directory=Path(__file__).resolve().parents[1] / "research" / "SA17" / "calendars",
+    ),
+    Venue(
+        calendar_id="XLON",
+        title="London Stock Exchange trading calendar.",
+        timezone="Europe/London",
+        covered_from=date(2015, 1, 1),
+        covered_until=date(2027, 12, 31),
+        coverage_note=(
+            "From 2015, before the first SA17 fund NAV (July 2015). SA17's NAV release\n"
+            "# rule counts its one-business-day lag on it (research/SA17/protocol.md,\n"
+            "# executable run); it is not a venue any book trades on."
+        ),
         directory=Path(__file__).resolve().parents[1] / "research" / "SA17" / "calendars",
     ),
 )

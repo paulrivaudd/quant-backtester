@@ -23,6 +23,7 @@ from quant_backtester.backtest.schedule import (
     DecisionSchedule,
     EveryNSessions,
     EverySession,
+    ListedSessions,
     Monthly,
     Weekly,
 )
@@ -91,7 +92,9 @@ class BacktestConfig:
                 f"base_currency must be an ISO 4217 code such as 'EUR', got {self.base_currency!r}"
             )
         require_identifier(self.reference_calendar, "reference_calendar")
-        if not isinstance(self.schedule, EverySession | EveryNSessions | Weekly | Monthly):
+        if not isinstance(
+            self.schedule, EverySession | EveryNSessions | Weekly | Monthly | ListedSessions
+        ):
             raise ValueError(f"schedule must be a DecisionSchedule, got {self.schedule!r}")
         if not isinstance(self.timetable, BacktestTimetable):
             raise ValueError(f"timetable must be a BacktestTimetable, got {self.timetable!r}")
