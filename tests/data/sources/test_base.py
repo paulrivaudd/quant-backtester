@@ -6,6 +6,7 @@ clock, and its test checks the timezone, never the value.
 
 from __future__ import annotations
 
+import http.client
 import io
 import urllib.request
 from dataclasses import FrozenInstanceError
@@ -27,6 +28,7 @@ from quant_backtester.data.sources.base import (
     ProviderResponseError,
     ProviderUnavailable,
     RawDownload,
+    http_get_bytes,
     http_get_text,
     make_fetch_id,
     utc_now,
@@ -216,3 +218,26 @@ def test_source_ids_are_unique_and_each_has_a_normalizer() -> None:
     source_ids = [source.source_id for source in ALL_SOURCES]
     assert len(set(source_ids)) == len(source_ids)
     assert sorted(source_ids) == sorted(NORMALIZERS)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        http.client.RemoteDisconnected("Remote end closed connection without response"),
+        ConnectionResetError(104, "Connection reset by peer"),
+        http.client.IncompleteRead(b"partial"),
+    ],
+)
+def test_a_dropped_connection_is_a_transient_unavailability(
+    monkeypatch: pytest.MonkeyPatch, failure: Exception
+) -> None:
+    """The server hung up before answering: retry later, like an unreachable host."""
+
+    def fake_urlopen(url: str, timeout: float) -> FakeResponse:
+        raise failure
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(ProviderUnavailable, match="dropped the connection") as raised:
+        http_get_bytes("https://example.test/file.bi5")
+    assert raised.value.__cause__ is failure
+    assert not isinstance(raised.value, ProviderRateLimited)
