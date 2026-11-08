@@ -5,16 +5,17 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import subprocess
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
-from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 from quant_backtester.backtest.schedule import EverySession, ListedSessions, Weekly
 from quant_backtester.data.calendars import CalendarRegistry
-from quant_backtester.provenance import SourceState, SourceStatus
+from quant_backtester.provenance import SourceState
 from quant_backtester.strategies.SA17_sector_residual_momentum import (
     SA17SectorResidualMomentum,
     SectorRanking,
@@ -109,7 +110,7 @@ def test_the_books_are_the_frozen_ones(study) -> None:
 def test_a_run_signature_changes_with_costs_data_and_schedule(study) -> None:
     schedule = ListedSessions((date(2018, 8, 1),), rule="test")
     book = study_run.books_of(study, schedule)[0]
-    provenance = (SourceState(SourceStatus.CLEAN, "a" * 40), {"numpy": "test"})
+    provenance = ("content-a", {"numpy": "test"})
     base = study_run.signature(book, study, 1.0, "digest", *provenance)
     assert study_run.signature(book, study, 1.0, "digest", *provenance) == base
     assert study_run.signature(book, study, 2.0, "digest", *provenance) != base
@@ -124,15 +125,10 @@ def metrics(cagr: float, sharpe: float, drawdown: float) -> dict[str, float]:
 
 def test_cache_identity_covers_code_and_installed_environment(study) -> None:
     book = study_run.books_of(study, ListedSessions((date(2018, 8, 1),), rule="test"))[0]
-    source = SourceState(SourceStatus.CLEAN, "a" * 40)
+    source = "content-a"
     environment = {"numpy": "1", "lockfile_sha256": "lock-a"}
     key = study_run.signature(book, study, 1.0, "digest", source, environment)
-    assert (
-        study_run.signature(
-            book, study, 1.0, "digest", replace(source, git_commit="b" * 40), environment
-        )
-        != key
-    )
+    assert study_run.signature(book, study, 1.0, "digest", "content-b", environment) != key
     for change in ({"numpy": "2"}, {"lockfile_sha256": "lock-b"}):
         assert study_run.signature(book, study, 1.0, "digest", source, environment | change) != key
 
@@ -140,9 +136,9 @@ def test_cache_identity_covers_code_and_installed_environment(study) -> None:
 @pytest.mark.parametrize(
     "fault", ["valid", "no_marker", "missing", "changed", "identity", "environment"]
 )
-def test_run_book_refuses_incomplete_or_changed_cache(study, tmp_path, monkeypatch, fault):
+def test_run_book_refuses_incomplete_or_changed_cache(study, tmp_path, monkeypatch, fault) -> None:
     book = study_run.books_of(study, ListedSessions((date(2018, 8, 1),), rule="test"))[0]
-    source = SourceState(SourceStatus.CLEAN, "a" * 40)
+    source = "content-a"
     monkeypatch.setattr(study_run, "environment_state", lambda _: {"numpy": "1"})
     key = study_run.signature(book, study, 1.0, "digest", source, {"numpy": "1"})
     folder = tmp_path / f"{book.name}_x1"
@@ -160,21 +156,23 @@ def test_run_book_refuses_incomplete_or_changed_cache(study, tmp_path, monkeypat
     elif fault == "changed":
         (folder / "fills.csv").write_text("changed")
     elif fault == "identity":
-        source = replace(source, git_commit="b" * 40)
+        source = "content-b"
     elif fault == "environment":
         monkeypatch.setattr(study_run, "environment_state", lambda _: {"numpy": "2"})
-    runner = SimpleNamespace(source=source, lockfile=None)
+    runner = Mock(spec=StrategyRunner)
+    environment = {"numpy": "2" if fault == "environment" else "1"}
     if fault == "valid":
-        assert study_run.run_book(book, study, runner, 1.0, "digest", tmp_path) == {
-            "signature": key
-        }
+        assert study_run.run_book(
+            book, study, runner, 1.0, "digest", tmp_path, source, environment
+        ) == {"signature": key}
         return
     # No run method: a rejected cache must not trigger an implicit replacement run.
-    with pytest.raises(FileExistsError, match="choose a new folder"):
-        study_run.run_book(book, study, runner, 1.0, "digest", tmp_path)
+    expected_error = OSError if fault in ("no_marker", "missing") else FileExistsError
+    with pytest.raises(expected_error):
+        study_run.run_book(book, study, runner, 1.0, "digest", tmp_path, source, environment)
 
 
-def test_interrupted_save_does_not_publish_a_run(tmp_path, monkeypatch):
+def test_interrupted_save_does_not_publish_a_run(tmp_path, monkeypatch) -> None:
     folder = tmp_path / "book"
 
     def interrupted(staged: Path, *args: object) -> None:
@@ -183,19 +181,138 @@ def test_interrupted_save_does_not_publish_a_run(tmp_path, monkeypatch):
 
     monkeypatch.setattr(study_run, "_write_run", interrupted)
     with pytest.raises(OSError, match="simulated interruption"):
-        study_run.save_run(folder, None, None, "key", None, {}, {})
-    assert not folder.exists()
-    assert not list(tmp_path.iterdir())
+        study_run.save_run(
+            folder,
+            Mock(spec=StrategyResult),
+            Mock(spec=study_run.BookSpec),
+            "key",
+            Mock(spec=AnalyticsConfig),
+            {},
+            {},
+        )
+    assert folder.is_dir()
+    assert not (folder / "complete.json").exists()
 
 
-def test_save_preserves_existing_output(tmp_path):
+def test_save_preserves_existing_output(tmp_path) -> None:
     folder = tmp_path / "book"
     folder.mkdir()
     artifact = folder / "metrics.json"
     artifact.write_text("existing output")
     with pytest.raises(FileExistsError, match="already exists"):
-        study_run.save_run(folder, None, None, "key", None, {}, {})
+        study_run.save_run(
+            folder,
+            Mock(spec=StrategyResult),
+            Mock(spec=study_run.BookSpec),
+            "key",
+            Mock(spec=AnalyticsConfig),
+            {},
+            {},
+        )
     assert artifact.read_text() == "existing output"
+
+
+def test_content_identity_survives_reports_and_docs_commits(study, tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(study_run, "ROOT", tmp_path)
+    for path in study_run.producing_files(study):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("input")
+    code = tmp_path / "src/quant_backtester/example.py"
+    code.parent.mkdir(parents=True)
+    code.write_text("x = 1")
+
+    def git(*args: str) -> None:
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(tmp_path),
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.test",
+                *args,
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+    git("init", "-q")
+    git("add", ".")
+    git("commit", "-qm", "inputs")
+    inputs = study_run.producing_files(study)
+    original = study_run.producing_digest(inputs)
+    output = tmp_path / "results/SA17/executable"
+    report = tmp_path / "results/SA17/study.md"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text("generated report")
+    assert study_run.checked_source(output, report, inputs).dirty
+    git("add", ".")
+    git("commit", "-qm", "report only")
+    assert study_run.producing_digest(study_run.producing_files(study)) == original
+    report.write_text("regenerated report")
+    assert study_run.checked_source(output, report, inputs).dirty
+    code.write_text("x = 2")
+    assert study_run.producing_digest(inputs) != original
+    with pytest.raises(SystemExit, match="commit changes"):
+        study_run.checked_source(output, report, inputs)
+    code.write_text("x = 1")
+    extra = code.with_name("added.py")
+    extra.write_text("x = 3")
+    assert study_run.producing_digest(study_run.producing_files(study)) != original
+
+
+def test_main_captures_environment_once_and_accepts_external_report(
+    study, tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(study_run, "load_study", lambda: study)
+    monkeypatch.setattr(study_run, "producing_files", lambda _: ())
+    monkeypatch.setattr(study_run, "checked_source", lambda *args: SourceState.unrecorded())
+    monkeypatch.setattr(study_run, "calendars_of", lambda _: Mock())
+    monkeypatch.setattr(study_run, "checked_schedule", lambda *args: Mock())
+    monkeypatch.setattr(study_run, "checked_digest", lambda *args: "data")
+    monkeypatch.setattr(study_run, "books_of", lambda *args: [Mock()])
+    environment = {"numpy": "test"}
+    captured = Mock(return_value=environment)
+    monkeypatch.setattr(study_run, "environment_state", captured)
+    build = Mock(return_value=Mock(spec=StrategyRunner))
+    run = Mock()
+    monkeypatch.setattr(study_run, "build_runner", build)
+    monkeypatch.setattr(study_run, "run_book", run)
+    monkeypatch.setattr(study_run, "analyse", lambda *args: {})
+    monkeypatch.setattr(study_run, "markdown", lambda *args: "report")
+    report = tmp_path / "external/nested/study.md"
+    assert study_run.main(["--output", str(tmp_path / "output"), "--report", str(report)]) == 0
+    assert report.read_text() == "report"
+    captured.assert_called_once()
+    assert build.call_count == run.call_count == 2
+    assert all(call.args[-1] is environment for call in build.call_args_list + run.call_args_list)
+
+
+def test_run_reserves_directory_before_computation(study, tmp_path) -> None:
+    book = study_run.books_of(study, ListedSessions((date(2018, 8, 1),), rule="test"))[0]
+    folder = tmp_path / f"{book.name}_x1"
+    runner = Mock(spec=StrategyRunner)
+
+    def competing_writer(*args: object, **kwargs: object) -> None:
+        assert folder.is_dir()
+        with pytest.raises(FileExistsError, match="already exists"):
+            study_run.reserve_run(folder)
+        raise RuntimeError("stop synthetic run")
+
+    runner.run.side_effect = competing_writer
+    with pytest.raises(RuntimeError, match="stop synthetic run"):
+        study_run.run_book(book, study, runner, 1.0, "data", tmp_path, "content", {})
+    assert not (folder / "complete.json").exists()
+
+
+def test_run_refuses_a_configuration_environment_mismatch(study, tmp_path) -> None:
+    book = study_run.books_of(study, ListedSessions((date(2018, 8, 1),), rule="test"))[0]
+    runner = Mock(spec=StrategyRunner)
+    runner.run.return_value.configuration = {"environment": {"numpy": "different"}}
+    with pytest.raises(ValueError, match="environment differs"):
+        study_run.run_book(book, study, runner, 1.0, "data", tmp_path, "content", {"numpy": "one"})
+    assert not (tmp_path / f"{book.name}_x1/complete.json").exists()
 
 
 @pytest.mark.parametrize(
@@ -271,7 +388,7 @@ from tests.strategies.test_SA17_sector_residual_momentum import (  # noqa: E402
 )
 
 from quant_backtester.analytics.config import AnalyticsConfig  # noqa: E402
-from quant_backtester.backtest.runner import StrategyRunner  # noqa: E402
+from quant_backtester.backtest.runner import StrategyResult, StrategyRunner  # noqa: E402
 from quant_backtester.backtest.schedule import Monthly  # noqa: E402
 from quant_backtester.execution.costs import CostModel  # noqa: E402
 from quant_backtester.execution.model import ExecutionModel, Sizing  # noqa: E402
@@ -283,6 +400,7 @@ def test_runs_are_saved_compared_and_reported(
     market,  # noqa: F811 - the imported fixture, requested by name
     calendars,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The whole chain after the runner, on a drawn market: save, analyse, report."""
     config = AnalyticsConfig(sessions_per_year=252, risk_free_rate=0.0, minimum_sessions=20)
@@ -293,6 +411,9 @@ def test_runs_are_saved_compared_and_reported(
         slippage_rate=0.0005,
     )
     traded = (*SECTORS, MONETARY)
+    captured_environment = {"numpy": "captured once"}
+    unexpected_capture = Mock(side_effect=AssertionError("environment was sampled again"))
+    monkeypatch.setattr("quant_backtester.backtest.runner.environment_state", unexpected_capture)
     strategy = candidate(**SHORT)
     books = [
         study_run.BookSpec(study_run.CANDIDATE, strategy, Monthly(), "candidate"),
@@ -339,11 +460,13 @@ def test_runs_are_saved_compared_and_reported(
                 costs=scaled, sizing=Sizing.AT_DECISION, costs_by_instrument=models
             ),
             initial_cash=100_000.0,
+            environment=captured_environment,
         )
         for book in books:
             result = runner.run(
                 book.strategy, traded, "2026-06-01", "2026-12-31", schedule=book.schedule
             )
+            assert result.configuration["environment"] == captured_environment
             saved = study_run.save_run(
                 tmp_path / f"{book.name}_x{multiplier:g}",
                 result,
@@ -375,3 +498,4 @@ def test_runs_are_saved_compared_and_reported(
     assert "## Admission gates" in report
     assert "INSUFFICIENT_EVIDENCE" in report
     study_run.write_json(tmp_path / "summary.json", summary)
+    unexpected_capture.assert_not_called()

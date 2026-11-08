@@ -53,6 +53,7 @@ def test_the_fx_entry_is_a_non_tradable_usd_rate_released_at_the_us_close(tmp_pa
     assert fx.primary_source == "DUKASCOPY"
     assert fx.source_symbol == "EURUSD"
     assert not fx.tradable
+    assert fx.history_basis is not None
     assert fx.history_basis.value == "RESTATED"
     rule = fx.publication_rule
     assert rule is not None
@@ -104,11 +105,15 @@ def archive(tmp_path: Path, agree: bool = True, holes: bool = False) -> Path:
     derived.mkdir(parents=True)
     path = derived / "eurusd_us_close.parquet"
     table().to_parquet(path, index=False)
-    days = [{"date": day, "agree": True} for day in builder.fx_verification_days()]
+    days = [
+        {"date": day, "agree": True, "hourly": 1.1, "minute": 1.1, "minute_staleness_seconds": 0}
+        for day in builder.fx_verification_days()
+    ]
     days[-1]["agree"] = agree
     coverage = {
         "table_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        "verification": {"sample": 24, "seed": 20261107, "days": days},
+        "verification": {"sample": 24, "seed": 20261107, "tolerance": 1e-9, "days": days},
+        "max_staleness_seconds": 300,
         "missing_months": ["2016-01"] if holes else [],
         "without_rate": [],
     }
@@ -140,8 +145,23 @@ def test_verification_dates_match_the_acquisition() -> None:
 
     expected = acquisition.sample(acquisition.xnys().sessions(acquisition.START, acquisition.END))
     assert builder.fx_verification_days() == [day.session_date.isoformat() for day in expected]
-    assert builder.FX_SAMPLE_SEED == acquisition.SAMPLE_SEED
-    assert builder.FX_SAMPLE_SIZE == acquisition.SAMPLE_SIZE
+    design = json.loads((builder.ROOT / "research/SA17/fx_verification.json").read_text())
+    assert design["seed"] == acquisition.SAMPLE_SEED
+    assert design["sample"] == acquisition.SAMPLE_SIZE
+    assert design["range"] == [acquisition.START.isoformat(), acquisition.END.isoformat()]
+    assert design["tolerance"] == acquisition.TOLERANCE
+    assert design["max_staleness_seconds"] == acquisition.MAX_STALENESS.total_seconds()
+
+
+def test_archive_refuses_missing_observation_dates(tmp_path: Path) -> None:
+    fx = registry_of(
+        tmp_path, builder.fx_instrument_toml(builder.load_study()["fx"], date(2025, 11, 26))
+    ).get("SA17_FX_EURUSD_US_CLOSE")
+    frame = table()
+    frame.loc[0, "observation_date"] = pd.NaT
+    source = builder.ArchivedTable(frame, datetime(2026, 11, 8, tzinfo=UTC), {})
+    with pytest.raises(ValueError, match="observation date is missing"):
+        source.available_from(fx)
 
 
 @pytest.mark.parametrize("fault", ["empty", "short", "duplicate", "wrong_date", "seed"])
@@ -162,7 +182,44 @@ def test_gate_refuses_an_unprescribed_sample(tmp_path: Path, fault: str) -> None
     else:
         verification["seed"] += 1
     path.write_text(json.dumps(coverage))
-    with pytest.raises(ValueError, match="2d has not passed"):
+    with pytest.raises(ValueError, match="verification design mismatch"):
+        builder.checked_fx_table(folder)
+
+
+@pytest.mark.parametrize("field,value", [("tolerance", 1e-3), ("max_staleness_seconds", 3600)])
+def test_gate_refuses_loosened_limits(tmp_path: Path, field: str, value: float) -> None:
+    folder = archive(tmp_path)
+    path = folder / "derived/coverage.json"
+    coverage = json.loads(path.read_text())
+    target = coverage["verification"] if field == "tolerance" else coverage
+    target[field] = value
+    path.write_text(json.dumps(coverage))
+    with pytest.raises(ValueError, match="verification design mismatch"):
+        builder.checked_fx_table(folder)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("minute", 1.2),
+        ("hourly", None),
+        ("minute", float("nan")),
+        ("hourly", float("inf")),
+        ("minute", "1.1"),
+        ("minute", True),
+        ("minute_staleness_seconds", 301),
+        ("minute_staleness_seconds", -1),
+    ],
+)
+def test_gate_recomputes_evidence_despite_agree_true(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    folder = archive(tmp_path)
+    path = folder / "derived/coverage.json"
+    coverage = json.loads(path.read_text())
+    coverage["verification"]["days"][0][field] = value
+    path.write_text(json.dumps(coverage))
+    with pytest.raises(ValueError, match="invalid verification values"):
         builder.checked_fx_table(folder)
 
 

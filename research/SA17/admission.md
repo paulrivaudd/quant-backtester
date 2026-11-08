@@ -147,11 +147,11 @@ it stops the fetch, waits an hour and starts again. It allows at most six
 pauses per step (`fetch`, then `verify`). A pass that ends with a file skipped
 also ends in a pause.
 
-The running watchdog is archived verbatim as
-[`scripts/SA17_fx_watchdog.sh`](../../scripts/SA17_fx_watchdog.sh). This is a
-record of the machine-specific script, including its initial 40-minute pause;
-copying it does not replace the running process. Do not launch a second copy
-while acquisition is active.
+The running watchdog was copied verbatim in `2de9ed5` as
+[`scripts/SA17_fx_watchdog.sh`](../../scripts/SA17_fx_watchdog.sh). Subsequent
+corrections to this repository copy count only expected complete files and do
+not rely on a manifest to detect progress. They do not replace the running
+process. Do not launch a second copy while acquisition is active.
 
 - **The six-pause limit stays.**
 - **If the six pauses run out, or no new file has arrived after about 24

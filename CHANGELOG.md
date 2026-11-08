@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### SA17: review follow-up before the executable run (2026-11-08)
+- Cache identity hashes producing source and configuration contents, independently
+  of HEAD; generated output may dirty the checkout during read-back. Other
+  uncommitted changes remain refused. The batch captures one environment snapshot
+  for cache keys and recorded configurations.
+- Gate 2d reads the committed 24-date design, enforces the frozen tolerance and
+  staleness limits, and checks finite recorded quotes and their difference.
+  Design mismatches and failed quote comparisons have distinct diagnostics.
+- The repository watchdog counts only expected complete files and does not need
+  a manifest to detect progress. The existing running watchdog is unchanged.
+- Output directories are reserved before computation; completion markers and
+  artifact hashes protect read-back. Existing directories are never replaced.
+  External report paths work, and file I/O errors retain their own diagnostics.
+
 ### SA17: pre-run review corrections (2026-11-08)
 - Saved-run identity now includes the code revision and dependency environment,
   so a code correction cannot silently reuse an earlier result.

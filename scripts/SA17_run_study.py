@@ -7,7 +7,7 @@ Run under WSL/POSIX from the repository root, after
 
 Before any run it refuses to go on unless:
 
-- the checkout is clean, so every run records the commit it came from;
+- producing inputs are committed; only generated study output may be dirty;
 - the decision dates the calendars give under the declared NAV release are
   the 99 listed in ``study.toml``;
 - the store's digest is the one its build recorded;
@@ -18,8 +18,9 @@ controls, SA16_it2 rebuilt from its archived selection, Nasdaq bought and
 held, and it2's C1, which is descriptive only. A run whose signature matches a
 saved one is read back instead of run again. The signature covers the
 strategy and schedule definitions, the window, every cost model, the
-universe, the store digest, the analytics, the code revision and the installed
-dependency environment. Reuse also requires a completion manifest and matching
+universe, the store digest, the analytics, producing file contents and the
+captured dependency environment. HEAD remains provenance, not cache identity.
+Reuse also requires a completion manifest and matching
 hashes for every output artifact. A different or incomplete run is preserved
 and refused; use a new output folder for a corrected run.
 
@@ -42,13 +43,13 @@ import importlib
 import json
 import math
 import statistics
+import subprocess
 import sys
 import tomllib
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Any
 
 import pandas as pd
@@ -111,6 +112,65 @@ def load_study(path: Path = STUDY) -> dict[str, Any]:
     """Return the frozen study configuration."""
     with path.open("rb") as stream:
         return tomllib.load(stream)
+
+
+def producing_files(study: Mapping[str, Any]) -> tuple[Path, ...]:
+    """List producing code and configuration; store contents have their own digest."""
+    paths = {
+        path
+        for path in (ROOT / "src/quant_backtester").rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+    }
+    paths.update(
+        ROOT / name
+        for name in (
+            "scripts/SA17_run_study.py",
+            "scripts/SA17_build_study_store.py",
+            "research/SA17/study.toml",
+            "research/SA17/fx_verification.json",
+            "uv.lock",
+            "pyproject.toml",
+            "results/SA16/selected.json",
+            study["costs"]["sector_costs"],
+            *study["store"]["study_calendars"],
+        )
+    )
+    return tuple(sorted(paths))
+
+
+def producing_digest(paths: Sequence[Path]) -> str:
+    """Hash paths and bytes of producing inputs, independently of HEAD and reports."""
+    hashes = {
+        str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths
+    }
+    return hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
+
+
+def checked_source(output: Path, report: Path, inputs: Sequence[Path]) -> SourceState:
+    """Require committed inputs, allowing only generated output to dirty the checkout."""
+    source = git_source_state(ROOT)
+    if source.dirty is False:
+        return source
+    if source.dirty is None:
+        raise SystemExit("refused: the checkout has no recorded commit")
+    changed = set()
+    for arguments in (
+        ["diff", "HEAD", "--no-renames", "--name-only", "-z"],
+        ["ls-files", "--others", "--exclude-standard", "-z"],
+    ):
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), *arguments], check=True, capture_output=True
+        )
+        changed.update(
+            (ROOT / name.decode()).resolve() for name in result.stdout.split(b"\0") if name
+        )
+    protected = {path.resolve() for path in inputs}
+    output, report = output.resolve(), report.resolve()
+    if any(
+        path in protected or not (path == report or path.is_relative_to(output)) for path in changed
+    ):
+        raise SystemExit("refused: commit changes outside generated study output first")
+    return source
 
 
 def analytics_of(study: Mapping[str, Any]) -> AnalyticsConfig:
@@ -217,6 +277,7 @@ def build_runner(
     calendars: CalendarRegistry,
     multiplier: float,
     source: SourceState,
+    environment: Mapping[str, str],
 ) -> StrategyRunner:
     """Wire the EUR runner: Paris decisions, next-open fills, every fund's own costs."""
     models = cost_models(study, multiplier)
@@ -234,6 +295,7 @@ def build_runner(
         schedule=EverySession(),
         source=source,
         lockfile=ROOT / "uv.lock",
+        environment=environment,
     )
     if runner.timetable.decision_time != study["schedule"]["decision_time"]:
         raise ValueError("the runner does not decide at the declared time")
@@ -297,12 +359,12 @@ def signature(
     study: Mapping[str, Any],
     multiplier: float,
     digest: str,
-    source: SourceState,
+    content_digest: str,
     environment: Mapping[str, str],
 ) -> str:
-    """Hash the run inputs, code revision and installed dependency environment."""
+    """Hash producing content, run inputs and the captured dependency environment."""
     content = {
-        "source": source.definition(),
+        "content_sha256": content_digest,
         "environment": dict(environment),
         "strategy": dict(book.strategy.definition()),
         "schedule": book.schedule.definition(),
@@ -430,19 +492,32 @@ def save_run(
     models: Mapping[str, CostModel],
     study: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Publish a complete run atomically, refusing any existing output folder."""
-    if folder.exists():
-        raise FileExistsError(f"{folder} already exists; choose a new folder")
+    """Reserve an output directory exclusively, then publish its completion marker last."""
+    reserve_run(folder)
+    return _save_reserved_run(folder, result, book, key, config, models, study)
+
+
+def reserve_run(folder: Path) -> None:
+    """Atomically reserve a run directory, preserving even empty existing directories."""
     folder.parent.mkdir(parents=True, exist_ok=True)
-    with TemporaryDirectory(prefix=f".{folder.name}-", dir=folder.parent) as temporary:
-        staged = Path(temporary) / "run"
-        staged.mkdir()
-        values = _write_run(staged, result, book, key, config, models, study)
-        hashes = {
-            name: hashlib.sha256((staged / name).read_bytes()).hexdigest() for name in RUN_ARTIFACTS
-        }
-        write_json(staged / "complete.json", {"signature": key, "sha256": hashes})
-        staged.rename(folder)
+    try:
+        folder.mkdir()
+    except FileExistsError as error:
+        raise FileExistsError(f"{folder} already exists; choose a new folder") from error
+
+
+def _save_reserved_run(
+    folder: Path,
+    result: StrategyResult,
+    book: BookSpec,
+    key: str,
+    config: AnalyticsConfig,
+    models: Mapping[str, CostModel],
+    study: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Finish an exclusively reserved run; interruptions leave it visibly incomplete."""
+    values = _write_run(folder, result, book, key, config, models, study)
+    write_json(folder / "complete.json", {"signature": key, "sha256": artifact_hashes(folder)})
     return values
 
 
@@ -462,6 +537,13 @@ RUN_ARTIFACTS = (
 """Artifacts required to reuse a completed study run."""
 
 
+def artifact_hashes(folder: Path) -> dict[str, str]:
+    """Hash the complete required artifact set, surfacing file I/O failures."""
+    return {
+        name: hashlib.sha256((folder / name).read_bytes()).hexdigest() for name in RUN_ARTIFACTS
+    }
+
+
 def _write_run(
     folder: Path,
     result: StrategyResult,
@@ -471,7 +553,7 @@ def _write_run(
     models: Mapping[str, CostModel],
     study: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Write the run inside its unpublished staging directory."""
+    """Write artifacts inside the reserved directory before its completion marker."""
     values = run_metrics(result, config, models)
     if isinstance(book.strategy, SA17SectorResidualMomentum):
         values.update(sector_exposure(result, study["strategy"]["sector_ids"], "ETF_MONETARY_EUR"))
@@ -518,13 +600,14 @@ def checked_saved_run(folder: Path, key: str) -> dict[str, Any]:
         hashes = completion["sha256"]
         if set(hashes) != set(RUN_ARTIFACTS):
             raise ValueError("incomplete artifact manifest")
-        for name in RUN_ARTIFACTS:
-            if hashlib.sha256((folder / name).read_bytes()).hexdigest() != hashes[name]:
-                raise ValueError(f"changed artifact: {name}")
+        if artifact_hashes(folder) != hashes:
+            raise ValueError("artifact hashes changed")
         values = json.loads((folder / "metrics.json").read_text(encoding="utf-8"))
         if values["signature"] != key:
             raise ValueError("different metrics identity")
-    except (OSError, ValueError, KeyError, TypeError) as error:
+    except OSError as error:
+        raise OSError(f"cannot read saved run {folder}: {error}") from error
+    except (ValueError, KeyError, TypeError) as error:
         raise FileExistsError(
             f"{folder} is incomplete, changed or holds a different run; choose a new folder"
         ) from error
@@ -538,16 +621,17 @@ def run_book(
     multiplier: float,
     digest: str,
     output: Path,
+    content_digest: str,
+    environment: Mapping[str, str],
 ) -> dict[str, Any]:
     """Run one book, or read it back if the same run is already saved."""
     folder = output / f"{book.name}_x{multiplier:g}"
-    key = signature(
-        book, study, multiplier, digest, runner.source, environment_state(runner.lockfile)
-    )
+    key = signature(book, study, multiplier, digest, content_digest, environment)
     if folder.exists():
         values = checked_saved_run(folder, key)
         print(f"  reused {folder}", flush=True)
         return values
+    reserve_run(folder)
     window = study["window"]
     print(f"  running {book.name} x{multiplier:g}", flush=True)
     result = runner.run(
@@ -557,8 +641,17 @@ def run_book(
         window["end"].isoformat(),
         schedule=book.schedule,
     )
+    if result.configuration["environment"] != dict(environment):
+        raise ValueError("the run environment differs from its cache identity")
+    result = replace(
+        result,
+        configuration=dict(result.configuration)
+        | {
+            "run_content_sha256": content_digest,
+        },
+    )
     models = cost_models(study, multiplier)
-    return save_run(folder, result, book, key, analytics_of(study), models, study)
+    return _save_reserved_run(folder, result, book, key, analytics_of(study), models, study)
 
 
 def load_curve(folder: Path, name: str = "equity.csv") -> pd.Series:  # type: ignore[type-arg]
@@ -915,28 +1008,27 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument("--report", type=Path, default=REPORT)
     parsed = parser.parse_args(arguments)
-    source = git_source_state(ROOT)
-    if source.dirty is not False:
-        raise SystemExit(
-            f"refused: the checkout is {source.status.value}; commit first so every run "
-            "records the code it came from"
-        )
     study = load_study()
+    output = parsed.output if parsed.output.is_absolute() else ROOT / parsed.output
+    report = parsed.report if parsed.report.is_absolute() else ROOT / parsed.report
+    inputs = producing_files(study)
+    source = checked_source(output, report, inputs)
+    content_digest = producing_digest(inputs)
+    environment = environment_state(ROOT / "uv.lock")
     store = store_path(study)
     calendars = calendars_of(store)
     schedule = checked_schedule(study, calendars)
     digest = checked_digest(store, calendars)
     books = books_of(study, schedule)
-    output = parsed.output if parsed.output.is_absolute() else ROOT / parsed.output
     for multiplier in study["costs"]["multipliers"]:
-        runner = build_runner(store, study, calendars, multiplier, source)
+        runner = build_runner(store, study, calendars, multiplier, source, environment)
         for book in books:
-            run_book(book, study, runner, multiplier, digest, output)
+            run_book(book, study, runner, multiplier, digest, output, content_digest, environment)
     summary = analyse(study, books, output)
     write_json(output / "summary.json", summary)
-    report = parsed.report if parsed.report.is_absolute() else ROOT / parsed.report
+    report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(markdown(summary, books), encoding="utf-8")
-    print(f"report: {report.relative_to(ROOT)}", flush=True)
+    print(f"report: {report}", flush=True)
     return 0
 
 
