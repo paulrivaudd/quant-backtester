@@ -30,7 +30,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import random
+import math
 import shutil
 import tomllib
 from collections.abc import Mapping
@@ -65,19 +65,10 @@ STUDY = ROOT / "research" / "SA17" / "study.toml"
 NAV_END = date(2026, 10, 30)
 """Last NAV date ingested: the window's end, as for the retrieval-floored store."""
 
-FX_SAMPLE_SEED = 20261107
-FX_SAMPLE_SIZE = 24
-"""Gate 2d's frozen verification design, checked against the acquisition in tests."""
-
 
 def fx_verification_days() -> list[str]:
-    """Derive the prescribed 24 FX verification dates from the committed XNYS calendar."""
-    calendar = CalendarRegistry.from_directory(ROOT / "market_data/metadata/calendars").get("XNYS")
-    sessions = calendar.sessions(date(2015, 7, 1), date(2026, 10, 30))
-    return sorted(
-        session.session_date.isoformat()
-        for session in random.Random(FX_SAMPLE_SEED).sample(list(sessions), FX_SAMPLE_SIZE)
-    )
+    """Read the committed verification dates; never redraw them during admission."""
+    return json.loads((ROOT / "research/SA17/fx_verification.json").read_text())["dates"]
 
 
 def load_study(path: Path = STUDY) -> dict[str, Any]:
@@ -138,6 +129,14 @@ Read at the NYSE close (13:00 New York on a half day), released at 16:00.
 '''
 
 
+def _observation_date(value: str | date) -> date:
+    """Refuse a missing observation date before deriving archive bounds."""
+    parsed = pd.Timestamp(value).date()
+    if pd.isna(parsed) or not isinstance(parsed, date):
+        raise ValueError("FX observation date is missing")
+    return parsed
+
+
 class ArchivedTable:
     """Serve the verified US-close table as the Dukascopy source's one download.
 
@@ -157,11 +156,11 @@ class ArchivedTable:
 
     def available_from(self, instrument: Instrument) -> date | None:
         """Return the first date of the table."""
-        return min(pd.Timestamp(day).date() for day in self._table["observation_date"])
+        return min(_observation_date(day) for day in self._table["observation_date"])
 
     def download(self, instrument: Instrument, start: date, end: date) -> RawDownload:
         """Return the rows of the table inside ``[start, end]``."""
-        days = [pd.Timestamp(day).date() for day in self._table["observation_date"]]
+        days = [_observation_date(day) for day in self._table["observation_date"]]
         kept = self._table.loc[[start <= day <= end for day in days]].reset_index(drop=True)
         return RawDownload(
             instrument.id,
@@ -216,14 +215,32 @@ def checked_fx_table(archive: Path) -> tuple[pd.DataFrame, dict[str, Any], datet
     if hashlib.sha256(table_path.read_bytes()).hexdigest() != coverage["table_sha256"]:
         raise ValueError("the US-close table does not hash to its coverage record")
     days = coverage["verification"]["days"]
-    expected = fx_verification_days()
+    design = json.loads((ROOT / "research/SA17/fx_verification.json").read_text())
     if (
-        coverage["verification"].get("seed") != FX_SAMPLE_SEED
-        or coverage["verification"]["sample"] != FX_SAMPLE_SIZE
-        or sorted(day["date"] for day in days) != expected
-        or not all(day["agree"] is True for day in days)
+        coverage["verification"].get("seed") != design["seed"]
+        or coverage["verification"]["sample"] != design["sample"]
+        or sorted(day["date"] for day in days) != design["dates"]
+        or coverage["verification"].get("tolerance") != design["tolerance"]
+        or coverage.get("max_staleness_seconds") != design["max_staleness_seconds"]
     ):
-        raise ValueError("gate 2d has not passed: the hourly and minute rates do not all agree")
+        raise ValueError("gate 2d verification design mismatch: seed, dates, size or tolerances")
+    for day in days:
+        hourly, minute = day.get("hourly"), day.get("minute")
+        staleness = day.get("minute_staleness_seconds")
+        if (
+            any(
+                type(value) not in (int, float) or not math.isfinite(value)
+                for value in (hourly, minute, staleness)
+            )
+            or hourly <= 0
+            or minute <= 0
+            or not 0 <= staleness <= design["max_staleness_seconds"]
+            or abs(hourly - minute) > design["tolerance"]
+            or day.get("agree") is not True
+        ):
+            raise ValueError(
+                f"gate 2d has not passed: invalid verification values on {day['date']}"
+            )
     if coverage["missing_months"] or coverage["without_rate"]:
         raise ValueError(
             f"the US-close table has holes: months {coverage['missing_months']}, "
@@ -268,7 +285,7 @@ def build(store: Path, study: Mapping[str, Any]) -> dict[str, Any]:
     for fund in funds:
         ticker = symbols[fund].split(".")[0].lower() + "-gy"
         pairs.append((fund, by_ticker[ticker]))
-    first_fx = min(pd.Timestamp(day).date() for day in table["observation_date"])
+    first_fx = min(_observation_date(day) for day in table["observation_date"])
     text = (metadata / "instruments.toml").read_text(encoding="utf-8")
     text += "\n# --- SA17 executable study: NAVs under the declared release, US-close FX ---\n"
     for fund, record in pairs:
@@ -318,7 +335,7 @@ def build(store: Path, study: Mapping[str, Any]) -> dict[str, Any]:
     fx_source = ArchivedTable(table, fx_retrieved, request)
     replayed = dict(NORMALIZERS) | {"DUKASCOPY": DukascopyUsCloseNormalizer()}
     fx_report = updater(store, {"DUKASCOPY": fx_source}, replayed).download(
-        fx_settings["id"], first_fx, max(pd.Timestamp(d).date() for d in table["observation_date"])
+        fx_settings["id"], first_fx, max(_observation_date(d) for d in table["observation_date"])
     )
     if not fx_report.valid:
         raise ValueError(f"FX: {sorted({issue.code for issue in fx_report.issues})}")
