@@ -7,6 +7,7 @@ import json
 import random
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 from zipfile import ZipFile
 
 import pytest
@@ -154,8 +155,8 @@ def test_an_altered_file_is_refused_at_replay(archive) -> None:
 @pytest.mark.slow
 def test_the_study_runs_and_reports_on_drawn_series(archive, tmp_path: Path) -> None:
     """The whole chain after acquisition: replay, books, inference, reading, report."""
-    folder, study = archive
-    study = dict(study) | {"inference": dict(study["inference"]) | {"draws": 200}}
+    folder, frozen = archive
+    study: dict[str, Any] = dict(frozen) | {"inference": dict(frozen["inference"]) | {"draws": 200}}
     coverage = json.loads((folder / "coverage.json").read_text())
     panel = runner.load_panel(folder, coverage, study)
     # The longest volatility window (24 months) before the first held month.
