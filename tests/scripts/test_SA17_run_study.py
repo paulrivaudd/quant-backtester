@@ -9,6 +9,7 @@ import subprocess
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -57,6 +58,77 @@ def test_a_schedule_the_calendars_do_not_give_is_refused(study, study_calendars)
     altered["schedule"]["decisions"] = decisions
     with pytest.raises(ValueError, match="frozen schedule"):
         study_run.checked_schedule(altered, study_calendars)
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [
+        (date(2018, 7, 2), date(2026, 10, 30)),  # room for the June 2018 month end's decision
+        (date(2018, 8, 1), date(2026, 11, 2)),  # room for October 2026's
+        (date(2018, 8, 2), date(2026, 10, 30)),  # the first frozen decision is left out
+        (date(2018, 8, 1), date(2026, 9, 30)),  # the last one is
+    ],
+)
+def test_a_window_the_frozen_decisions_do_not_cover_is_refused(
+    study, study_calendars, start: date, end: date
+) -> None:
+    """A listed schedule drops dates outside the run, so the window is checked here."""
+    altered = dict(study) | {"window": dict(study["window"]) | {"start": start, "end": end}}
+    with pytest.raises(ValueError, match="window"):
+        study_run.checked_schedule(altered, study_calendars)
+
+
+def test_only_a_hold_with_an_unreadable_input_counts_as_one() -> None:
+    """Buy-and-hold answers "hold" every session without having failed to read anything."""
+
+    def decision(hold: bool, skipped: dict[str, str]) -> SimpleNamespace:
+        return SimpleNamespace(requested=SimpleNamespace(hold_positions=hold, skipped=skipped))
+
+    decisions = [
+        decision(True, {}),
+        decision(True, {}),
+        decision(True, {"NAV": "MISSING"}),
+        decision(False, {"NAV": "MISSING"}),
+        decision(False, {}),
+    ]
+    assert study_run.kept_unreadable(decisions) == 1
+    assert study_run.kept_unreadable([]) == 0
+
+
+def test_gate_2d_is_reported_from_the_store_record_not_from_the_frozen_text(
+    study, tmp_path
+) -> None:
+    record = {"fx": {"verification_sample": 24, "table_sha256": "0c5d6ec762d0c289" + "0" * 48}}
+    (tmp_path / "study_store.json").write_text(json.dumps(record))
+    gates = study_run.gates_at_run(study, tmp_path)
+    assert gates["2d_synchronous_fx"].startswith("PASSED: 24 of 24 sampled sessions agree")
+    assert "0c5d6ec762d0" in gates["2d_synchronous_fx"]
+    assert study["gates"]["2d_synchronous_fx"].startswith("MUST_PASS_BEFORE_RUN")
+    assert {key: value for key, value in gates.items() if key != "2d_synchronous_fx"} == {
+        key: value for key, value in study["gates"].items() if key != "2d_synchronous_fx"
+    }
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        {},
+        {"fx": {}},
+        {"fx": {"verification_sample": 0, "table_sha256": "abc"}},
+        {"fx": {"verification_sample": 24}},
+    ],
+)
+def test_a_store_without_gate_2d_evidence_is_refused(study, tmp_path, record) -> None:
+    (tmp_path / "study_store.json").write_text(json.dumps(record))
+    with pytest.raises(ValueError, match="gate 2d"):
+        study_run.gates_at_run(study, tmp_path)
+
+
+def test_other_cost_levels_than_x1_and_x2_are_refused(study) -> None:
+    study_run.checked_multipliers(study)
+    altered = dict(study) | {"costs": dict(study["costs"]) | {"multipliers": [1.0, 3.0]}}
+    with pytest.raises(ValueError, match="x1 with x2"):
+        study_run.checked_multipliers(altered)
 
 
 def test_every_traded_fund_has_its_own_cost_model_and_x2_doubles_every_term(study) -> None:
@@ -167,8 +239,9 @@ def test_run_book_refuses_incomplete_or_changed_cache(study, tmp_path, monkeypat
         ) == {"signature": key}
         return
     # No run method: a rejected cache must not trigger an implicit replacement run.
-    expected_error = OSError if fault in ("no_marker", "missing") else FileExistsError
-    with pytest.raises(expected_error):
+    # An interrupted run is said to be one, not an unreadable folder.
+    expected = "is incomplete" if fault in ("no_marker", "missing") else "choose a new folder"
+    with pytest.raises(FileExistsError, match=expected):
         study_run.run_book(book, study, runner, 1.0, "digest", tmp_path, source, environment)
 
 
@@ -279,6 +352,7 @@ def test_main_captures_environment_once_and_accepts_external_report(
     run = Mock()
     monkeypatch.setattr(study_run, "build_runner", build)
     monkeypatch.setattr(study_run, "run_book", run)
+    monkeypatch.setattr(study_run, "gates_at_run", lambda *args: {})
     monkeypatch.setattr(study_run, "analyse", lambda *args: {})
     monkeypatch.setattr(study_run, "markdown", lambda *args: "report")
     report = tmp_path / "external/nested/study.md"
@@ -303,7 +377,8 @@ def test_run_reserves_directory_before_computation(study, tmp_path) -> None:
     runner.run.side_effect = competing_writer
     with pytest.raises(RuntimeError, match="stop synthetic run"):
         study_run.run_book(book, study, runner, 1.0, "data", tmp_path, "content", {})
-    assert not (folder / "complete.json").exists()
+    # The reservation held nothing, so it is given back: the folder can be used again.
+    assert not folder.exists()
 
 
 def test_run_refuses_a_configuration_environment_mismatch(study, tmp_path) -> None:
@@ -312,7 +387,35 @@ def test_run_refuses_a_configuration_environment_mismatch(study, tmp_path) -> No
     runner.run.return_value.configuration = {"environment": {"numpy": "different"}}
     with pytest.raises(ValueError, match="environment differs"):
         study_run.run_book(book, study, runner, 1.0, "data", tmp_path, "content", {"numpy": "one"})
-    assert not (tmp_path / f"{book.name}_x1/complete.json").exists()
+    assert not (tmp_path / f"{book.name}_x1").exists()
+
+
+@pytest.mark.parametrize("drift", ["environment", "code"])
+def test_a_run_during_which_code_or_environment_changed_is_refused(
+    study, tmp_path, monkeypatch, drift
+) -> None:
+    """The runner stamps the snapshot it was given, so both are sampled again after the run."""
+    book = study_run.books_of(study, ListedSessions((date(2018, 8, 1),), rule="test"))[0]
+    runner = Mock(spec=StrategyRunner)
+    runner.run.return_value.configuration = {"environment": {"numpy": "one"}}
+    sampled = {"numpy": "two" if drift == "environment" else "one"}
+    monkeypatch.setattr(study_run, "environment_state", lambda _: sampled)
+    monkeypatch.setattr(study_run, "producing_files", lambda _: ())
+    monkeypatch.setattr(
+        study_run, "producing_digest", lambda _: "edited" if drift == "code" else "content"
+    )
+    with pytest.raises(ValueError, match="changed during the run"):
+        study_run.run_book(book, study, runner, 1.0, "data", tmp_path, "content", {"numpy": "one"})
+    assert not (tmp_path / f"{book.name}_x1").exists()
+
+
+def test_a_criterion_without_its_measures_is_refused_in_words() -> None:
+    references = {"A": metrics(0.10, 0.8, -0.20)}
+    undefined = metrics(0.12, 1.0, -0.20) | {"sharpe": None}
+    with pytest.raises(ValueError, match="no \\['sharpe'\\]"):
+        study_run.reading_against_references(
+            undefined, references, undefined, references, {"A": 0.01}, 0.02, 0.05
+        )
 
 
 @pytest.mark.parametrize(
@@ -432,8 +535,8 @@ def test_runs_are_saved_compared_and_reported(
         "inference": {
             "primary_statistic": "SHARPE",
             "secondary_statistic": "MEAN_RETURN",
-            "mean_block_sessions": 20,
-            "sensitivity_blocks": [5, 60],
+            "mean_block_sessions": 15,
+            "sensitivity_blocks": [10],
             "draws": 200,
             "seed": 20261107,
             "level": 0.95,
@@ -494,7 +597,14 @@ def test_runs_are_saved_compared_and_reported(
     assert set(summary["holm"]["controls"]) == set(strategy.controls())
     assert 0.0 <= summary["deflated_sharpe"]["probability"] <= 1.0
     assert summary["metrics"][f"{study_run.CANDIDATE}_x1"]["mean_sector_exposure_at_decisions"] > 0
+    held = summary["metrics"]["Hold_S_A_x1"]
+    assert held["decisions"] > 1
+    assert held["decisions_kept_with_unreadable_inputs"] == 0
+    assert held["orders_per_session_within_limit"] is True
+    assert "candidate_drawdown_x2_check" not in summary
     report = study_run.markdown(summary, books)
+    assert "Block 10 interval" in report
+    assert "Block 60" not in report
     assert "## Admission gates" in report
     assert "INSUFFICIENT_EVIDENCE" in report
     study_run.write_json(tmp_path / "summary.json", summary)

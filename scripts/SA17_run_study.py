@@ -38,6 +38,7 @@ and the report ``results/SA17/study.md``.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import importlib
 import json
@@ -48,7 +49,7 @@ import sys
 import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -91,6 +92,14 @@ OUTPUT = ROOT / "results" / "SA17" / "executable"
 REPORT = ROOT / "results" / "SA17" / "study.md"
 SA16_SELECTED = ROOT / "results" / "SA16" / "selected.json"
 CANDIDATE = "SA17_sector_residual_momentum"
+MAX_ORDERS_PER_SESSION = 20
+"""Orders a session may carry: research/SA17/protocol.md, "Max 20 orders per session".
+
+A reporting bound of the protocol, not a parameter of any book: each run says
+whether its busiest session stayed within it.
+"""
+COST_MULTIPLIERS = (1.0, 2.0)
+"""The two cost levels the readings and the report are written for: declared and doubled."""
 SCHEDULE_RULE = (
     "23:00 Paris on the first XPAR session on or after the release of the NAV of the "
     "completed month's last XNYS_XLON session (23:00 Paris, next XLON session), and not "
@@ -200,7 +209,9 @@ def checked_schedule(study: Mapping[str, Any], calendars: CalendarRegistry) -> L
     ------
     ValueError
         If the dates derived from the store's calendars under the declared
-        release differ from those listed in ``study.toml``.
+        release differ from those listed in ``study.toml``, or the study
+        window is not the one those dates cover: a decision outside it, or
+        room in it for a decision the list does not hold.
     """
     settings = study["schedule"]
     release = study["nav_publication"]
@@ -224,6 +235,29 @@ def checked_schedule(study: Mapping[str, Any], calendars: CalendarRegistry) -> L
     if listed != frozen:
         differ = [pair for pair in zip(listed, frozen, strict=False) if pair[0] != pair[1]]
         raise ValueError(f"the calendars no longer give the frozen schedule: {differ[:3]}")
+    # A listed schedule replays its dates and drops those outside the run, so
+    # a window wider than the list would run on with decisions missing.
+    start, end = study["window"]["start"], study["window"]["end"]
+    first_month = date.fromisoformat(frozen[0][0] + "-01")
+    last_month = date.fromisoformat(frozen[-1][0] + "-01")
+    before = month_end_release_decisions(
+        calendars.get(settings["observation_calendar_id"]),
+        calendars.get(settings["release_calendar_id"]),
+        calendars.get(settings["decision_calendar_id"]),
+        rule,
+        settings["decision_time"],
+        (first_month - timedelta(days=1)).replace(day=1),
+        (first_month - timedelta(days=1)).replace(day=1),
+    )[0].decision
+    # The month after the last listed one is decided in the month after it, at the earliest.
+    after = (last_month + timedelta(days=62)).replace(day=1)
+    if derived[0].decision < start or derived[-1].decision > end:
+        raise ValueError("a frozen decision lies outside the study window")
+    if before >= start or end >= after:
+        raise ValueError(
+            f"the window {start}..{end} holds a decision the frozen schedule does not list "
+            f"(the one before it falls on {before}, the one after it not before {after})"
+        )
     return ListedSessions(tuple(item.decision for item in derived), rule=SCHEDULE_RULE)
 
 
@@ -410,6 +444,20 @@ def curve_metrics(curve: pd.Series, config: AnalyticsConfig) -> dict[str, Any]: 
     }
 
 
+def kept_unreadable(decisions: Sequence[Any]) -> int:
+    """Count the decisions that kept the positions because an input was unreadable.
+
+    Holding is also the ordinary answer of a book with nothing to change (a
+    bought-and-held fund, a weight inside its band); only a hold that names
+    an input it could not read counts.
+    """
+    return sum(
+        1
+        for decision in decisions
+        if decision.requested.hold_positions and decision.requested.skipped
+    )
+
+
 def run_metrics(
     result: StrategyResult, config: AnalyticsConfig, models: Mapping[str, CostModel]
 ) -> dict[str, Any]:
@@ -456,11 +504,10 @@ def run_metrics(
         "intervention_days": len(per_session),
         "orders_per_intervention_mean": statistics.fmean(per_session) if per_session else 0.0,
         "orders_per_intervention_max": max(per_session, default=0),
-        "max_orders_per_session_allowed": 20,
+        "max_orders_per_session_allowed": MAX_ORDERS_PER_SESSION,
+        "orders_per_session_within_limit": max(per_session, default=0) <= MAX_ORDERS_PER_SESSION,
         "decisions": len(decisions),
-        "decisions_kept_with_unreadable_inputs": sum(
-            1 for decision in decisions if decision.requested.hold_positions
-        ),
+        "decisions_kept_with_unreadable_inputs": kept_unreadable(decisions),
         "unreadable_input_statuses": cancelled,
         "run_id": result.run_id,
         "data_state": result.data_state.digest,
@@ -605,6 +652,11 @@ def checked_saved_run(folder: Path, key: str) -> dict[str, Any]:
         values = json.loads((folder / "metrics.json").read_text(encoding="utf-8"))
         if values["signature"] != key:
             raise ValueError("different metrics identity")
+    except FileNotFoundError as error:
+        raise FileExistsError(
+            f"{folder} is incomplete ({Path(error.filename or '').name or error} is missing): "
+            "a run was interrupted there; choose a new folder"
+        ) from error
     except OSError as error:
         raise OSError(f"cannot read saved run {folder}: {error}") from error
     except (ValueError, KeyError, TypeError) as error:
@@ -612,6 +664,33 @@ def checked_saved_run(folder: Path, key: str) -> dict[str, Any]:
             f"{folder} is incomplete, changed or holds a different run; choose a new folder"
         ) from error
     return values
+
+
+def release_run(folder: Path) -> None:
+    """Give back a reservation nothing was written into; a folder with content is kept."""
+    with contextlib.suppress(OSError):
+        folder.rmdir()
+
+
+def checked_unchanged(
+    study: Mapping[str, Any], content_digest: str, environment: Mapping[str, str]
+) -> None:
+    """Refuse a run during which the code or the installed environment changed.
+
+    The runner stamps every run with the snapshot taken once by ``main``, so
+    comparing a run's record with that snapshot can never fail. This samples
+    both again, after the run.
+
+    Raises
+    ------
+    ValueError
+        If the installed environment or a producing file is no longer what
+        the run's identity says.
+    """
+    if environment_state(ROOT / "uv.lock") != dict(environment):
+        raise ValueError("the installed environment changed during the run")
+    if producing_digest(producing_files(study)) != content_digest:
+        raise ValueError("a producing file changed during the run")
 
 
 def run_book(
@@ -634,15 +713,20 @@ def run_book(
     reserve_run(folder)
     window = study["window"]
     print(f"  running {book.name} x{multiplier:g}", flush=True)
-    result = runner.run(
-        book.strategy,
-        universe_of(study),
-        window["start"].isoformat(),
-        window["end"].isoformat(),
-        schedule=book.schedule,
-    )
-    if result.configuration["environment"] != dict(environment):
-        raise ValueError("the run environment differs from its cache identity")
+    try:
+        result = runner.run(
+            book.strategy,
+            universe_of(study),
+            window["start"].isoformat(),
+            window["end"].isoformat(),
+            schedule=book.schedule,
+        )
+        if result.configuration["environment"] != dict(environment):
+            raise ValueError("the run environment differs from its cache identity")
+        checked_unchanged(study, content_digest, environment)
+    except BaseException:
+        release_run(folder)
+        raise
     result = replace(
         result,
         configuration=dict(result.configuration)
@@ -719,9 +803,18 @@ def reading_against_references(
     most ``tolerance`` deeper: ``NOT_SUPPORTED`` when that fails at x1;
     ``UNCERTAIN`` when it holds but a Holm p-value is at or above ``alpha`` or
     it fails at x2; ``SUPPORTED_PROVISIONAL`` otherwise.
+
+    Raises
+    ------
+    ValueError
+        If a book has no CAGR, Sharpe ratio or maximum drawdown to compare.
     """
 
     def holds(mine: Mapping[str, Any], theirs: Mapping[str, Any]) -> bool:
+        for values in (mine, theirs):
+            missing = [key for key in ("cagr", "sharpe", "max_drawdown") if values[key] is None]
+            if missing:
+                raise ValueError(f"the criterion cannot be read: a book has no {missing}")
         return (
             mine["cagr"] > theirs["cagr"]
             and mine["sharpe"] > theirs["sharpe"]
@@ -754,8 +847,52 @@ def reading_against_control(difference: float, holm_p: float, stressed: float, a
     return "SUPPORTED_PROVISIONAL"
 
 
-def analyse(study: Mapping[str, Any], books: Sequence[BookSpec], output: Path) -> dict[str, Any]:
-    """Compare the saved runs under the frozen inference and readings."""
+def checked_multipliers(study: Mapping[str, Any]) -> None:
+    """Refuse cost levels other than the two the readings and the report are written for."""
+    if tuple(study["costs"]["multipliers"]) != COST_MULTIPLIERS:
+        raise ValueError(
+            f"the readings compare costs x1 with x2; study.toml declares "
+            f"{study['costs']['multipliers']}"
+        )
+
+
+def gates_at_run(study: Mapping[str, Any], store: Path) -> dict[str, str]:
+    """Return the admission gates as they stood at the run.
+
+    ``study.toml`` was frozen while 2d was still to pass, and says so. The
+    store cannot be built unless 2d's verification passed, and its record
+    names the verified table; 2d is read from that record, and the other
+    gates from ``study.toml``.
+
+    Raises
+    ------
+    ValueError
+        If the store's record does not carry 2d's evidence.
+    """
+    gates = dict(study["gates"])
+    record = json.loads((store / "study_store.json").read_text(encoding="utf-8")).get("fx", {})
+    sample, table = record.get("verification_sample"), record.get("table_sha256")
+    if type(sample) is not int or sample < 1 or not isinstance(table, str) or not table:
+        raise ValueError("the store does not record gate 2d's verification")
+    gates["2d_synchronous_fx"] = (
+        f"PASSED: {sample} of {sample} sampled sessions agree; table {table[:12]}, "
+        "checked when the store was built"
+    )
+    return gates
+
+
+def analyse(
+    study: Mapping[str, Any],
+    books: Sequence[BookSpec],
+    output: Path,
+    gates: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Compare the saved runs under the frozen inference and readings.
+
+    ``gates`` is the admission status at the run, from :func:`gates_at_run`;
+    ``None`` reports the statuses ``study.toml`` froze before it.
+    """
+    checked_multipliers(study)
     config = analytics_of(study)
     inference = study["inference"]
     curves = {
@@ -778,7 +915,7 @@ def analyse(study: Mapping[str, Any], books: Sequence[BookSpec], output: Path) -
         f"{name}_x{multiplier:g}": curve_metrics(curve, config)
         for (name, multiplier), curve in curves.items()
     }
-    candidate_x1, candidate_x2 = curves[(CANDIDATE, 1.0)], curves[(CANDIDATE, 2.0)]
+    candidate_x1 = curves[(CANDIDATE, 1.0)]
     families = inference["holm_families"]
     tests: dict[str, Any] = {}
     for family in families.values():
@@ -836,7 +973,7 @@ def analyse(study: Mapping[str, Any], books: Sequence[BookSpec], output: Path) -
         candidate_x1,
         config,
         trials=len(trials),
-        trial_sharpe_std=statistics.stdev(float(value) for value in per_session if value),
+        trial_sharpe_std=statistics.stdev(float(value) for value in per_session),
     )
     regimes = {
         f"{start}..{end}": {
@@ -848,7 +985,15 @@ def analyse(study: Mapping[str, Any], books: Sequence[BookSpec], output: Path) -
     return {
         "status": study["status"],
         "formal_verdict": study["formal_verdict"],
-        "gates": study["gates"],
+        "gates": dict(study["gates"]) if gates is None else dict(gates),
+        "gates_frozen": dict(study["gates"]),
+        "blocks": {
+            "primary_statistic": inference["primary_statistic"].lower(),
+            "secondary_statistic": inference["secondary_statistic"].lower(),
+            "main": inference["mean_block_sessions"],
+            "sensitivities": list(inference["sensitivity_blocks"]),
+            "level": inference["level"],
+        },
         "sessions": len(common),
         "start": common[0],
         "end": common[-1],
@@ -861,7 +1006,6 @@ def analyse(study: Mapping[str, Any], books: Sequence[BookSpec], output: Path) -
         "against_controls": against_controls,
         "deflated_sharpe": {"trials": len(trials), "probability": deflated},
         "regimes": regimes,
-        "candidate_drawdown_x2_check": candidate_x2.index[-1],
     }
 
 
@@ -897,6 +1041,9 @@ def markdown(summary: Mapping[str, Any], books: Sequence[BookSpec]) -> str:
         lines.append(f"| {gate} | {status} |")
     lines += [
         "",
+        "Statuses at the run. `study.toml`, frozen before it, lists 2d as a gate that had "
+        "to pass first.",
+        "",
         f"Common sessions: {summary['sessions']}, {summary['start']} to {summary['end']} "
         "(XPAR, 252 a year, zero risk-free rate).",
         "",
@@ -920,7 +1067,7 @@ def markdown(summary: Mapping[str, Any], books: Sequence[BookSpec]) -> str:
         "## Costs, orders and refusals (x1)",
         "",
         "| Book | Costs EUR | Spread | Commission | Slippage | Turnover/yr | Orders "
-        "| Mean/max per day | Rejects | Decisions kept (unreadable) |",
+        "| Mean/max per day | Rejects | Decisions kept, input unreadable |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
     ]
     for book in books:
@@ -934,6 +1081,7 @@ def markdown(summary: Mapping[str, Any], books: Sequence[BookSpec]) -> str:
             f"{one['decisions_kept_with_unreadable_inputs']} |"
         )
     candidate = summary["metrics"][f"{CANDIDATE}_x1"]
+    blocks = summary["blocks"]
     lines += [
         "",
         f"Candidate: mean sector exposure at decisions "
@@ -945,26 +1093,30 @@ def markdown(summary: Mapping[str, Any], books: Sequence[BookSpec]) -> str:
         "",
         "## Candidate against references and controls (x1, paired stationary bootstrap)",
         "",
-        "| Against | Sharpe diff | 95 % interval | p | Holm p | Diff x2 "
-        "| Block 5 interval | Block 60 interval | Mean-return diff (ann.) |",
-        "| --- | ---: | --- | ---: | ---: | ---: | --- | --- | ---: |",
+        f"| Against | Sharpe diff | {blocks['level'] * 100:g} % interval | p | Holm p | Diff x2 | "
+        + "".join(f"Block {block} interval | " for block in blocks["sensitivities"])
+        + "Mean-return diff (ann.) |",
+        "| --- | ---: | --- | ---: | ---: | ---: | "
+        + "--- | " * len(blocks["sensitivities"])
+        + "---: |",
     ]
     for family, members in summary["holm"].items():
         for name, holm_p in members.items():
             test = summary["tests"][name]
-            main, five, sixty = (
-                test["sharpe_block20"],
-                test["sharpe_block5"],
-                test["sharpe_block60"],
+            main = test[f"{blocks['primary_statistic']}_block{blocks['main']}"]
+            mean = test[f"{blocks['secondary_statistic']}_block{blocks['main']}"]
+            sensitivities = "".join(
+                f"[{num(interval['low'], 3)}, {num(interval['high'], 3)}] | "
+                for interval in (
+                    test[f"{blocks['primary_statistic']}_block{block}"]
+                    for block in blocks["sensitivities"]
+                )
             )
-            mean = test["mean_return_block20"]
             lines.append(
                 f"| {name} ({family}) | {num(main['estimate'], 3)} | "
                 f"[{num(main['low'], 3)}, {num(main['high'], 3)}] | {num(main['p_value'], 3)} | "
                 f"{num(holm_p, 3)} | {num(summary['sharpe_difference_x2'][name], 3)} | "
-                f"[{num(five['low'], 3)}, {num(five['high'], 3)}] | "
-                f"[{num(sixty['low'], 3)}, {num(sixty['high'], 3)}] | "
-                f"{pct(mean['estimate'])} |"
+                f"{sensitivities}{pct(mean['estimate'])} |"
             )
     refs = summary["against_references"]
     lines += [
@@ -1011,6 +1163,7 @@ def main(arguments: list[str] | None = None) -> int:
     study = load_study()
     output = parsed.output if parsed.output.is_absolute() else ROOT / parsed.output
     report = parsed.report if parsed.report.is_absolute() else ROOT / parsed.report
+    checked_multipliers(study)
     inputs = producing_files(study)
     source = checked_source(output, report, inputs)
     content_digest = producing_digest(inputs)
@@ -1024,7 +1177,7 @@ def main(arguments: list[str] | None = None) -> int:
         runner = build_runner(store, study, calendars, multiplier, source, environment)
         for book in books:
             run_book(book, study, runner, multiplier, digest, output, content_digest, environment)
-    summary = analyse(study, books, output)
+    summary = analyse(study, books, output, gates_at_run(study, store))
     write_json(output / "summary.json", summary)
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(markdown(summary, books), encoding="utf-8")
