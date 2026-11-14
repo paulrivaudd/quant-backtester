@@ -15,6 +15,7 @@ from quant_backtester.backtest.engine import BacktestEngine
 from quant_backtester.backtest.schedule import (
     EveryNSessions,
     EverySession,
+    ListedSessions,
     Monthly,
     Weekly,
 )
@@ -235,3 +236,74 @@ def test_a_period_whose_end_nobody_can_know_is_not_called_ended(
     chosen = schedule.decision_sessions(SEPTEMBER, following=None)
 
     assert date(2026, 9, 14) not in chosen
+
+
+def test_listed_sessions_replays_the_dates_inside_the_run() -> None:
+    """Dates outside the run are someone else's decisions, not errors."""
+    schedule = ListedSessions(
+        (date(2026, 8, 3), date(2026, 9, 2), date(2026, 9, 10), date(2026, 10, 1)), rule="test"
+    )
+
+    chosen = schedule.decision_sessions(SEPTEMBER, following=TUESDAY_15)
+
+    assert sorted(chosen) == [date(2026, 9, 2), date(2026, 9, 10)]
+    assert schedule.decision_sessions([], following=None) == frozenset()
+
+
+def test_a_run_no_listed_date_falls_in_is_refused() -> None:
+    """A book that would sit on its cash for the whole run says so instead."""
+    schedule = ListedSessions((date(2026, 8, 3), date(2026, 10, 1)), rule="test")
+
+    with pytest.raises(ValueError, match="does not cover this run"):
+        schedule.decision_sessions(SEPTEMBER, following=TUESDAY_15)
+
+
+def test_a_listed_date_that_is_not_a_session_is_refused() -> None:
+    """A Saturday inside the run would be a decision skipped without a word."""
+    schedule = ListedSessions((date(2026, 9, 5),), rule="test")
+
+    with pytest.raises(ValueError, match="not sessions"):
+        schedule.decision_sessions(SEPTEMBER, following=TUESDAY_15)
+
+
+@pytest.mark.parametrize(
+    ("dates", "rule"),
+    [
+        ((date(2026, 9, 2), date(2026, 9, 2)), "rule"),
+        ((date(2026, 9, 3), date(2026, 9, 2)), "rule"),
+        (("2026-09-02",), "rule"),
+        ((date(2026, 9, 2),), " "),
+    ],
+)
+def test_an_ambiguous_list_is_refused(dates: tuple[object, ...], rule: str) -> None:
+    with pytest.raises(ValueError):
+        ListedSessions(dates, rule=rule)  # type: ignore[arg-type]
+
+
+def test_the_dates_and_their_rule_are_the_identity_of_a_listed_schedule() -> None:
+    schedule = ListedSessions((date(2026, 9, 2),), rule="after the release")
+
+    assert schedule.definition() == {
+        "type": "ListedSessions",
+        "parameters": {"dates": ["2026-09-02"], "rule": "after the release"},
+    }
+    assert ListedSessions((date(2026, 9, 2),), rule="other").definition() != schedule.definition()
+
+
+def test_a_run_decides_only_on_its_listed_sessions(
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    calendars: CalendarRegistry,
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+    sessions: tuple[date, ...],
+) -> None:
+    """The config accepts the schedule, and the engine asks on exactly those dates."""
+    market = make_market({"ETF_EU": make_bars("ETF_EU", xpar, prices(100.0, 1.0))})
+    asked: list[date] = []
+    strategy = Counting(weights_wanted={"ETF_EU": 1.0}, asked=asked)
+    listed = ListedSessions((sessions[-5], sessions[-2]), rule="test")
+
+    result = engine_over(market, calendars, strategy, listed, sessions[-6], sessions[-1]).run()
+
+    assert [record.decided for record in result.records] == [False, True, False, False, True, False]

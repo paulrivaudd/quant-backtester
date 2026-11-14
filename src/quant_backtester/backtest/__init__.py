@@ -37,6 +37,7 @@ from quant_backtester.backtest.schedule import (
     DecisionSchedule,
     EveryNSessions,
     EverySession,
+    ListedSessions,
     Monthly,
     Weekly,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "EveryNSessions",
     "EverySession",
     "ExecutionTiming",
+    "ListedSessions",
     "MarketObservation",
     "MarketWindow",
     "Monthly",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
@@ -252,7 +253,8 @@ def http_get_text(url: str) -> str:
     ProviderRateLimited
         If the server answers 429.
     ProviderUnavailable
-        If the server answers 5xx, or could not be reached at all.
+        If the server answers 5xx, could not be reached at all, or dropped the
+        connection or broke the protocol before a complete answer.
     ProviderResponseError
         If the server answers any other error status.
 
@@ -304,4 +306,8 @@ def http_get_bytes(url: str, *, headers: Mapping[str, str] | None = None) -> byt
         raise ProviderUnavailable(f"{url} could not be reached: {error.reason}") from error
     except TimeoutError as error:
         raise ProviderUnavailable(f"{url} timed out after {HTTP_TIMEOUT_SECONDS}s") from error
+    except (http.client.HTTPException, ConnectionError) as error:
+        # A connection the server closed without an answer (RemoteDisconnected),
+        # or reset mid-read: transient, like an unreachable host, not a format.
+        raise ProviderUnavailable(f"{url} dropped the connection: {error!r}") from error
     return body
