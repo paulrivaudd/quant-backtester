@@ -7,14 +7,14 @@ the run. A run resting on a declared assumption is `PROVISIONAL_NOT_ADMITTED`,
 and its formal verdict is `INSUFFICIENT_EVIDENCE`, as `research/hypotheses.toml`
 states.
 
-Status on 2026-11-07:
+Status on 2026-11-14:
 
 | Gate | Status | Evidence | What remains |
 | --- | --- | --- | --- |
 | 2a. Fund valuation calendar | **PASSED** | [fund_calendar_evidence.json](fund_calendar_evidence.json), [`SA17_check_fund_calendar.py`](../../scripts/SA17_check_fund_calendar.py) | The grid is registered (`XNYS_XLON`, a checked subset of `XNYS`) and the strategy takes it as `observation_calendar_id`; the amendment adopts it |
 | 2b. Fund actions and index changes | **PASSED** (data screen); notices not exhaustively read | [nav_jump_screen.json](nav_jump_screen.json), [`SA17_screen_nav_jumps.py`](../../scripts/SA17_screen_nav_jumps.py) | Disclose the 2018 GICS reshuffle of the sector indices |
 | 2c. Historical NAV publication | **PARTIAL**: owner chose the declared prospectus rule (2026-11-07) | Prospectus rule (below); one dated notice ([lse_nav_validation.json](lse_nav_validation.json)) | Per-row historical timestamps not obtained |
-| 2d. Synchronous EUR/USD | IN PROGRESS: owner chose Dukascopy (2026-11-07) | Adapter [`dukascopy.py`](../../src/quant_backtester/data/sources/dukascopy.py), [`SA17_acquire_fx.py`](../../scripts/SA17_acquire_fx.py); three probe days read 1.08991, 1.09471, 1.09363 at the US close | Acquisition throttled (HTTP 429) on 2026-11-07; resume with `fetch`, then `verify` and `build` |
+| 2d. Synchronous EUR/USD | **PASSED** (2026-11-14): owner chose Dukascopy (2026-11-07) | Adapter [`dukascopy.py`](../../src/quant_backtester/data/sources/dukascopy.py), [`SA17_acquire_fx.py`](../../scripts/SA17_acquire_fx.py), [fx_verification.json](fx_verification.json); `runs/sa17_fx_20261107/derived/coverage.json`: 2,851 rates for 2,851 sessions, 24 of 24 sampled sessions agree | The series is a retrieval, not a historical vintage (`SNAPSHOT_UNVERIFIED`); the run discloses it |
 | 2e. Execution prices | **PARTIAL**: no second source; the engine's refusals stand | `runs/sa17_store` re-downloaded 2026-11-07: two missing Xetra sessions per sector fund (2025-10-24, 2026-03-06) | Count refusals in the run; opening price plus declared costs stays an approximation |
 
 ## 2a. Fund valuation calendar: passed
@@ -101,7 +101,7 @@ search engines index none of SSGA's NAV notices. So a historical decision can
 rest on the prospectus rule, declared as an assumption, but not on observed
 publication times.
 
-## 2d. Synchronous EUR/USD: decision needed
+## 2d. Synchronous EUR/USD: passed
 
 The NAVs are struck from US closing prices (16:00 New York, valued at
 22:15 Dublin). The risk inputs need EUR/USD at that instant; ECB and WM 16:00
@@ -138,3 +138,86 @@ without leaving a file nobody recorded.
 - **2d**: EUR/USD at the US close is taken from Dukascopy bars (hourly files,
   checked against minute files on a sample). The owner takes responsibility
   for checking Dukascopy's terms for personal research use.
+
+## Owner's decision, 2026-11-08
+
+On 2026-11-08 the feed began dropping connections instead of refusing them.
+The acquisition now runs under a watchdog: when no file arrives for 20 minutes,
+it stops the fetch, waits an hour and starts again. It allows at most six
+pauses per step (`fetch`, then `verify`). A pass that ends with a file skipped
+also ends in a pause.
+
+The running watchdog was copied verbatim in `2de9ed5` as
+[`scripts/SA17_fx_watchdog.sh`](../../scripts/SA17_fx_watchdog.sh). Subsequent
+corrections to this repository copy count only expected complete files and do
+not rely on a manifest to detect progress. They do not replace the running
+process. Do not launch a second copy while acquisition is active.
+
+- **The six-pause limit stays.**
+- **If the six pauses run out, or no new file has arrived after about 24
+  hours**, Dukascopy is not used as it stands. Another source is evaluated
+  against the same two requirements before gate 2d is reopened:
+  - the rate at each XNYS session's close (16:00 New York, 13:00 on a half
+    day), at most five minutes before it;
+  - a verification on the same 24 seeded sessions (seed `20261107`), every one
+    of which must pass.
+- Until a source meets both, 2d stays open and nothing runs, as the protocol
+  requires. ECB and WM fixings stay refused.
+- An expected finishing date is a checkpoint, not a deadline. The acquisition
+  may run out of retries with files still missing. On 2026-11-09 its state is
+  reviewed and this rule is applied.
+
+## Owner's decision, 2026-11-14
+
+The acquisition did not run out of retries; the machine running it stopped.
+From 2026-11-08 21:20 UTC the laptop hosting WSL went in and out of sleep,
+slept from the evening of 2026-11-09 to 2026-11-13, and powered off at
+2026-11-13 15:26 UTC (the journal of that boot). The watchdog and its `verify`
+were frozen, then killed with the virtual machine, without logging a stop. So
+the 2026-11-09 checkpoint was never reviewed. When the machine stopped:
+
+- `fetch` was complete: 272 of 272 hourly files, after one pause;
+- `verify` had 20 of its 48 minute files and had used none of its six pauses.
+  The last file arrived at 2026-11-08 21:35:46 UTC;
+- all 292 archived files matched their manifest hash and size, with no
+  partial file left behind.
+
+The 24-hour clause above is met only by wall-clock time. For most of those
+days nothing asked the feed for a file. The owner read the clause as "the feed
+stopped answering", which did not happen, and chose to resume Dukascopy rather
+than evaluate another source.
+
+The repository copy of the watchdog,
+[`scripts/SA17_fx_watchdog.sh`](../../scripts/SA17_fx_watchdog.sh) at
+`17d963e`, was started on 2026-11-14 at 11:14 UTC. It replaces the 2026-11-08
+process, which no longer exists. `verify` keeps its six pauses, none of which
+had been used. The gap is noted in `runs/sa17_fx_20261107.chain.log`. The rest
+of the 2026-11-08 rule is unchanged.
+
+That process did not survive either: the WSL virtual machine powered off at
+2026-11-14 11:19:55 UTC (the journal of that boot), five minutes into the
+watchdog's initial pause, before it had asked the feed for anything. The same
+script was started again at 11:23 UTC on the same terms: 20 of 48 minute files,
+six pauses unused. The log records both starts.
+
+## 2d outcome, 2026-11-14
+
+The watchdog ended at 2026-11-14 14:22:59 UTC with `build exit 0`. `verify`
+used one of its six pauses: its first pass skipped two files, both of which
+the next pass obtained. The archive holds 272 of 272 hourly files and 48 of 48
+minute files.
+
+`runs/sa17_fx_20261107/derived/coverage.json` records:
+
+- 2,851 rates for 2,851 XNYS sessions from 2015-07-01 to 2026-10-30, 23 of
+  them at a half day's 13:00 close; no missing month and no session without a
+  rate;
+- the 24 sessions of [fx_verification.json](fx_verification.json) (seed
+  `20261107`): on each, the hourly rate equals the minute rate exactly
+  (tolerance 1e-09), and the minute bar ends at the close (staleness 0 s,
+  limit 300 s);
+- the table's hash, `0c5d6ec762d0c28981e41996899e0728a08ab6c8c351f8871ffa73afb8831b56`.
+
+Gate 2d passes. `scripts/SA17_build_study_store.py` checks the same record
+again before it builds the store. Gates 2c and 2e stay partial, so the run is
+`PROVISIONAL_NOT_ADMITTED` and its formal verdict is `INSUFFICIENT_EVIDENCE`.

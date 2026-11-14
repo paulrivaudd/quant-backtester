@@ -5,6 +5,7 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 
+from quant_backtester.data.calendars import TradingCalendar
 from quant_backtester.data.instruments import AssetType, DataType, Instrument, PublicationRule
 from quant_backtester.data.normalizer import SsgaNavNormalizer, get_normalizer
 from quant_backtester.data.schemas import LEVELS_SCHEMA
@@ -190,3 +191,85 @@ def test_later_schedule_is_unavailable_at_fetch(instrument, download):
     assert result.levels is not None
     assert result.levels.empty
     assert result.rejected.unpublished == (date(2026, 11, 7),)
+
+
+def _uk_calendar() -> TradingCalendar:
+    """Return a London calendar on which 2026-11-06 (a Friday) is followed by 2026-11-09."""
+    return TradingCalendar(
+        calendar_id="XLON",
+        timezone="Europe/London",
+        regular_open=time(8),
+        regular_close=time(16, 30),
+        holidays=frozenset(),
+        early_closes={},
+        covered_from=date(2026, 11, 1),
+        covered_until=date(2026, 11, 30),
+    )
+
+
+def _declared(instrument: Instrument) -> Instrument:
+    """Return the instrument under SA17's declared rule: 23:00 Paris, one XLON session later."""
+    rule = PublicationRule(
+        publication_time=time(23),
+        timezone="Europe/Paris",
+        lag_sessions=1,
+        calendar_id="XLON",
+    )
+    return replace(instrument, publication_rule=rule)
+
+
+def test_declared_release_stamps_next_uk_business_day_at_23_paris(instrument, download):
+    later = replace(download, retrieved_at_utc=datetime(2026, 11, 12, tzinfo=UTC))
+    calendar = _uk_calendar()
+    declared = _declared(instrument)
+    result = SsgaNavNormalizer(declared_release=True).normalize(declared, later, calendar)
+    levels = result.levels
+    assert levels is not None
+    assert levels.observation_date.tolist() == [date(2026, 11, 5), date(2026, 11, 6)]
+    # Thursday's NAV on Friday 23:00 Paris (22:00 UTC); Friday's on Monday.
+    assert levels.available_at_utc.tolist() == [
+        pd.Timestamp("2026-11-06T22:00:00Z"),
+        pd.Timestamp("2026-11-09T22:00:00Z"),
+    ]
+    assert validate_levels(declared, levels, calendar).valid
+
+
+def test_declared_release_is_still_refused_before_it_happens(instrument, download):
+    # Fetched on Friday at noon: Friday's NAV is due on Monday, Thursday's tonight.
+    friday_noon = replace(download, retrieved_at_utc=datetime(2026, 11, 6, 12, tzinfo=UTC))
+    result = SsgaNavNormalizer(declared_release=True).normalize(
+        _declared(instrument), friday_noon, _uk_calendar()
+    )
+    assert result.levels is not None
+    assert result.levels.empty
+    assert result.rejected.unpublished == (date(2026, 11, 5), date(2026, 11, 6))
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"not_before_utc": datetime(2026, 11, 7, 12, tzinfo=UTC)},
+        {"lag_sessions": 0, "calendar_id": None},
+    ],
+)
+def test_declared_release_needs_a_lag_and_no_floor(instrument, download, changes):
+    declared = _declared(instrument)
+    assert declared.publication_rule is not None
+    rule = replace(declared.publication_rule, **changes)
+    with pytest.raises(ValueError, match="declared SSGA NAV release"):
+        SsgaNavNormalizer(declared_release=True).normalize(
+            replace(declared, publication_rule=rule), download, _uk_calendar()
+        )
+
+
+def test_the_registered_normalizer_never_accepts_a_declared_rule(instrument, download):
+    with pytest.raises(ValueError, match="not_before_utc"):
+        get_normalizer("SSGA_NAV").normalize(_declared(instrument), download, _uk_calendar())
+    registered = get_normalizer("SSGA_NAV")
+    assert isinstance(registered, SsgaNavNormalizer)
+    assert registered.declared_release is False
+
+
+def test_declared_release_flag_must_be_a_bool():
+    with pytest.raises(ValueError, match="bool"):
+        SsgaNavNormalizer(declared_release=1)  # type: ignore[arg-type]

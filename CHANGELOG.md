@@ -2,6 +2,103 @@
 
 ## Unreleased
 
+### SA17: the executable study, run and reviewed (2026-11-14)
+- **Gate 2d passed.** The Dukascopy archive is complete (272 hourly and 48
+  minute files); the hourly and minute rates agree on the 24 seeded sessions.
+  `research/SA17/admission.md` records it, with the owner's decision to resume
+  the acquisition after the host's outage.
+- **The study ran**: 16 runs on `runs/sa17_study_20261108`, reported in
+  `results/SA17/study.md`. `PROVISIONAL_NOT_ADMITTED`; formal verdict
+  `INSUFFICIENT_EVIDENCE`. Provisional readings: `NOT_SUPPORTED` against the
+  references and against `no_volatility_target`, `UNCERTAIN` against the other
+  three controls.
+- **The report changed after its review; no result did.** The runs were done
+  again with the corrected runner. Every curve, fill, order, reject, weight
+  and decision file is byte-identical to the first run, and so is every test,
+  Holm p-value, reading and regime figure. Three things differ in the report:
+  - "Decisions kept, input unreadable" read 409, 2112 and 422 for `SA16_it2`,
+    `Nasdaq_buy_hold` and it2's C1. It counted every decision that held its
+    positions; it now counts those that name an unreadable input: 0 for each.
+  - Gate 2d read `MUST_PASS_BEFORE_RUN`, the text `study.toml` froze. It is
+    now read from the store's record of the verification. `study.toml` is
+    unchanged.
+  - `summary.json` no longer has `candidate_drawdown_x2_check`, which held the
+    last session's date.
+- **Registry and typing.** `research/hypotheses.toml` records the formal
+  verdict, `INSUFFICIENT_EVIDENCE`. Twelve pyright diagnostics are fixed
+  without a change of behaviour; the runs were done a third time on the
+  changed files and are again identical.
+- **Runner and store builder.**
+  - The environment and the producing files are sampled again after each run;
+    the earlier check compared the batch's snapshot with itself.
+  - A failed run gives back its empty reservation, and an interrupted one is
+    reported as incomplete. A failed store build leaves no folder behind.
+  - A study window the frozen decisions do not cover is refused, as is a
+    `ListedSessions` run no listed date falls in.
+  - A trial with a zero per-session Sharpe stays in the deflated Sharpe's
+    dispersion. The report's block columns follow `[inference]`; cost levels
+    other than x1 and x2 are refused before any run.
+  - The NAV ingestion ends at `[window].end` instead of a constant of its
+    own. The rebuilt store has the digest of the one the study used.
+
+### SA17: review follow-up before the executable run (2026-11-08)
+- Cache identity hashes producing source and configuration contents, independently
+  of HEAD; generated output may dirty the checkout during read-back. Other
+  uncommitted changes remain refused. The batch captures one environment snapshot
+  for cache keys and recorded configurations.
+- Gate 2d reads the committed 24-date design, enforces the frozen tolerance and
+  staleness limits, and checks finite recorded quotes and their difference.
+  Design mismatches and failed quote comparisons have distinct diagnostics.
+- The repository watchdog counts only expected complete files and does not need
+  a manifest to detect progress. The existing running watchdog is unchanged.
+- Output directories are reserved before computation; completion markers and
+  artifact hashes protect read-back. Existing directories are never replaced.
+  External report paths work, and file I/O errors retain their own diagnostics.
+
+### SA17: pre-run review corrections (2026-11-08)
+- Saved-run identity now includes the code revision and dependency environment,
+  so a code correction cannot silently reuse an earlier result.
+- Runs are staged and published only after all artifacts and their completion
+  manifest are written. Reuse verifies every artifact hash; incomplete or
+  mismatched output is preserved and requires a new output folder.
+- The store builder requires gate 2d's exact 24 seeded verification dates,
+  seed and successful comparisons, rather than trusting a self-reported count.
+- These are implementation corrections; frozen study parameters are unchanged.
+
+### SA17: the executable run, frozen and tooled (2026-11-08)
+- **Frozen before any code or run.** The amendment "Executable run: frozen
+  schedule and assumptions" (`research/SA17/protocol.md`) and
+  `research/SA17/study.toml` were approved by the owner, then committed and
+  pushed as `15e67dc` before the study code.
+  - The run is `PROVISIONAL_NOT_ADMITTED`: gates 2c and 2e stay partial, so
+    the formal verdict is `INSUFFICIENT_EVIDENCE`.
+  - The amendment fixes the 99 decision dates, the window (2018-08-01 to
+    2026-10-30), the 8 books at ×1 and ×2, every fund's costs, the inference
+    and the provisional reading.
+- **New `XLON` calendar**, generated in `research/SA17/calendars/` beside the
+  grid. The declared NAV release counts its one-business-day lag on it.
+- **`SsgaNavNormalizer(declared_release=True)`.** It accepts a release rule a
+  study declares (a lag of at least one session, no retrieval floor). The
+  registered instance still requires the retrieval floor.
+- **New `DukascopyUsCloseNormalizer`.** It turns the verified US-close
+  EUR/USD table into levels. It checks mid, bid ≤ ask, a bar ending no later
+  than the instant read, the New York date, and that no release comes before
+  the instant. It is not registered: no live adapter serves that table.
+- **New `backtest.schedule.ListedSessions`.** It replays decision dates
+  derived beforehand from published calendars. The dates and their rule are
+  part of the run's identity, and a listed date that is not a session is
+  refused.
+- **New `research.sa17_contract.month_end_release_decisions`.** It derives
+  SA17's decision dates from the grid, London and Paris calendars and the
+  declared release. A test checks it against the 99 dates in `study.toml`.
+- **New `scripts/SA17_build_study_store.py` and `scripts/SA17_run_study.py`.**
+  - The store builder copies `runs/sa17_store`, replays the NAVs under the
+    declared release and checks every value against the retrieval-floored
+    store. It loads the FX only if 2d's verification passed.
+  - The runner refuses a schedule, store digest or decision time that differ
+    from the frozen ones. It reads back any run whose signature it already
+    saved.
+
 ### SA17: the mechanism study on Ken French industries, run (2026-11-07)
 - **Frozen before any score.** `research/SA17/protocol.md` ("Mechanism study:
   frozen design"), `research/SA17/mechanism.toml` and the hypothesis

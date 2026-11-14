@@ -646,6 +646,9 @@ class StrategyRunner:
         from its checkout. Its digest, the Python version and the versions of
         the numerical libraries are recorded with every run and enter its
         ``run_id``; ``None`` records the lockfile as unrecorded.
+    environment : Mapping[str, str] | None
+        Environment snapshot supplied by a batch driver. When given, reused
+        verbatim for every book instead of sampling the environment again.
 
     Raises
     ------
@@ -671,9 +674,12 @@ class StrategyRunner:
     source: SourceState = field(default_factory=SourceState.unrecorded)
     benchmark: BenchmarkSpec | str | None = None
     lockfile: Path | None = None
+    environment: Mapping[str, str] | None = None
 
     def __post_init__(self) -> None:
         """Reject a runner that could not describe the runs it produces."""
+        if self.environment is not None:
+            object.__setattr__(self, "environment", freeze(dict(self.environment)))
         require_identifier(self.reference_calendar_id, "reference_calendar_id")
         require_identifier(self.base_currency, "base_currency")
         require_finite_positive(self.initial_cash, "initial_cash")
@@ -793,7 +799,11 @@ class StrategyRunner:
                 "source": result.source.definition(),
                 "data_state": state.digest,
                 "inputs": _inputs_digest(self.reader, self.calendars),
-                "environment": environment_state(self.lockfile),
+                "environment": (
+                    dict(self.environment)
+                    if self.environment is not None
+                    else environment_state(self.lockfile)
+                ),
             },
             reader=self.reader,
             data_state=state,
