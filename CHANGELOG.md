@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### SA16: the long-history test of it2, frozen (2026-11-14)
+- **Run once at `3556e4d`: `NOT_SUPPORTED` against both references**, as
+  predicted. Over 523 months net of costs the rule returned 10.8% a year
+  against 12.0% for the growth portfolio and 11.8% for the Nasdaq Composite
+  without dividends; its Sharpe ratio is 0.45 against 0.42 and 0.43 (not
+  distinguishable), its maximum drawdown -44.5% against -79.6% and -75.0%.
+  `results/SA16/long_history/study.md`.
 - **Frozen before any return was computed.** `research/SA16/long_history.md`
   and `long_history.toml`: SA16_it2's rule on monthly research series in US
   dollars over 1975-01 to 2018-07, months SA16 never saw. Hypothesis

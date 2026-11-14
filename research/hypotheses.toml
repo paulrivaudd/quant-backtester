@@ -124,7 +124,7 @@ prediction = "Net CAGR 0.5 to 1.5 points above it2 with a net Sharpe at least eq
 refutation = "Net CAGR or net Sharpe at or below it2's, or criterion 1 of research/SA16/protocol.md lost against either reference."
 [[hypothesis]]
 hypothesis_id = "sa16_it2_long_history_usd"
-status = "PREREGISTERED"
+status = "NOT_SUPPORTED"
 written_on = 2026-11-14
 statement = "SA16_it2's rule - a growth portfolio and gold at inverse-volatility weights scaled by a risk budget of 75% for growth, rebalanced through a 5-point band - beats both the growth portfolio bought and held and the Nasdaq Composite, net of costs, on months SA16 never saw."
 universe = "Monthly, US dollars, 1975-01 to 2018-07: Ken French 12-industry BusEq (total return), World Bank Pink Sheet gold (monthly average), FRED NASDAQCOM (no dividends), French one-month bill. Frozen in research/SA16/long_history.toml before any return was computed. A mechanism test on research series, not the funds, the euro or weekly execution."
