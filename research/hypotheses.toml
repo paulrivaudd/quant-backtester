@@ -133,7 +133,7 @@ refutation = "Net CAGR or net Sharpe at or below a reference's at declared costs
 
 [[hypothesis]]
 hypothesis_id = "sa16_it2_levered_long_history_usd"
-status = "PREREGISTERED"
+status = "NOT_SUPPORTED"
 written_on = 2026-11-14
 statement = "SA16_it2's rule, levered each month to the volatility of its growth asset (at most twice the equity, the loan paying the Treasury bill plus 1% a year), beats both the growth portfolio bought and held and the Nasdaq Composite, net of costs."
 universe = "The series, window (1975-01 to 2018-07) and weights of sa16_it2_long_history_usd. Written after that test was read: the same 523 months, not blind. Frozen in research/SA16/levered_long_history.toml before any levered return was computed."

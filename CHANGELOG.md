@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### SA16: it2's rule with leverage on the long history, frozen (2026-11-14)
+- **Run once at `c372612`: `NOT_SUPPORTED` against both references.** Net
+  CAGR 11.6% against 12.0% and 11.8%, at a volatility of 21.9%; Sharpe 0.41
+  against 0.42 and 0.43; maximum drawdown -69.8% against -79.6% and -75.0%.
+  The prediction was too favourable on two counts: it gave a CAGR of 12 to
+  12.5% and a drawdown of -55% to -65%. Leverage gives back most of the
+  drawdown the unlevered rule saved, and the loan costs about half a point a
+  year. `results/SA16/levered_long_history/study.md`.
 - `research/SA16/levered_long_history.md` and `.toml`: the same weights held
   at a leverage matching the book's volatility to its growth asset's, at most
   twice the equity, the loan paying the bill plus 1% a year. Hypothesis
