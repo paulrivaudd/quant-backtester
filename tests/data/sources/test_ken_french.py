@@ -54,7 +54,10 @@ def download(payload, dataset=INDUSTRY, start=JULY, end=AUGUST):
     )
 
 
-@pytest.mark.parametrize("dataset,count", [(INDUSTRY, 10), (KenFrenchDataset.INDUSTRY_49, 49)])
+@pytest.mark.parametrize(
+    "dataset,count",
+    [(INDUSTRY, 10), (KenFrenchDataset.INDUSTRY_12, 12), (KenFrenchDataset.INDUSTRY_49, 49)],
+)
 def test_industry_snapshot_and_explicit_normalization(dataset, count):
     payload = zipped(industry_text(count), dataset)
     calls = []

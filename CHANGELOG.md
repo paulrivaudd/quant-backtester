@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+### SA16: it2's rule with leverage on the long history, frozen (2026-11-14)
+- **Run once at `c372612`: `NOT_SUPPORTED` against both references.** Net
+  CAGR 11.6% against 12.0% and 11.8%, at a volatility of 21.9%; Sharpe 0.41
+  against 0.42 and 0.43; maximum drawdown -69.8% against -79.6% and -75.0%.
+  The prediction was too favourable on two counts: it gave a CAGR of 12 to
+  12.5% and a drawdown of -55% to -65%. Leverage gives back most of the
+  drawdown the unlevered rule saved, and the loan costs about half a point a
+  year. `results/SA16/levered_long_history/study.md`.
+- `research/SA16/levered_long_history.md` and `.toml`: the same weights held
+  at a leverage matching the book's volatility to its growth asset's, at most
+  twice the equity, the loan paying the bill plus 1% a year. Hypothesis
+  `sa16_it2_levered_long_history_usd`. **Not blind**: the same 523 months
+  were read once; the design says what that leaves the test able to show.
+- `run_levered_book` and `matched_leverage` in `research/sa16_long_history.py`;
+  `scripts/SA16_run_levered_long_history.py`.
+
+### SA16: the long-history test of it2, frozen (2026-11-14)
+- **Run once at `3556e4d`: `NOT_SUPPORTED` against both references**, as
+  predicted. Over 523 months net of costs the rule returned 10.8% a year
+  against 12.0% for the growth portfolio and 11.8% for the Nasdaq Composite
+  without dividends; its Sharpe ratio is 0.45 against 0.42 and 0.43 (not
+  distinguishable), its maximum drawdown -44.5% against -79.6% and -75.0%.
+  `results/SA16/long_history/study.md`.
+- **Frozen before any return was computed.** `research/SA16/long_history.md`
+  and `long_history.toml`: SA16_it2's rule on monthly research series in US
+  dollars over 1975-01 to 2018-07, months SA16 never saw. Hypothesis
+  `sa16_it2_long_history_usd`, with its prediction, in
+  `research/hypotheses.toml`.
+- **New World Bank Pink Sheet adapter** (`data/sources/world_bank.py`) for
+  gold's monthly average price, and the 12-industry table in the Ken French
+  adapter. `scripts/SA16_acquire_long_history.py` archives the inputs;
+  `research/SA16/long_history_inputs.json` records their hashes.
+- `research/sa16_long_history.py` and `scripts/SA16_run_long_history.py`
+  hold the study. SA17's acquisition script names its three French tables
+  instead of taking every table the adapter knows.
+
 ### SA17: the executable study, run and reviewed (2026-11-14)
 - **Gate 2d passed.** The Dukascopy archive is complete (272 hourly and 48
   minute files); the hourly and minute rates agree on the 24 seeded sessions.

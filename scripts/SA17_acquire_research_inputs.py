@@ -124,7 +124,12 @@ def acquire_ken_french(archive: Path) -> None:
     archive.mkdir(parents=True, exist_ok=False)
     source = KenFrenchSource()
     records = []
-    for dataset in KenFrenchDataset:
+    # The three tables SA17's archive holds; a dataset added to the adapter later is not one.
+    for dataset in (
+        KenFrenchDataset.INDUSTRY_10,
+        KenFrenchDataset.INDUSTRY_49,
+        KenFrenchDataset.FACTORS,
+    ):
         download = source.download(dataset, date(1926, 7, 1), date(2026, 9, 1))
         (archive / f"{dataset.value}.zip").write_bytes(download.payload)
         records.append(

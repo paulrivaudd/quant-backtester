@@ -1,0 +1,66 @@
+[
+  {
+    "file": "12_Industry_Portfolios.zip",
+    "dataset": "12_Industry_Portfolios",
+    "source": "KEN_FRENCH",
+    "url": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/12_Industry_Portfolios_CSV.zip",
+    "sha256": "78ff32de9b3b308c96beb48a5f6f8ae06209495ef63ee6efa274d6bdbb491b86",
+    "retrieved_at_utc": "2026-11-14T15:30:29.064787+00:00",
+    "first_month": "192607",
+    "last_month": "202609",
+    "columns": [
+      "NoDur",
+      "Durbl",
+      "Manuf",
+      "Enrgy",
+      "Chems",
+      "BusEq",
+      "Telcm",
+      "Utils",
+      "Shops",
+      "Hlth",
+      "Money",
+      "Other"
+    ]
+  },
+  {
+    "file": "F-F_Research_Data_Factors.zip",
+    "dataset": "F-F_Research_Data_Factors",
+    "source": "KEN_FRENCH",
+    "url": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip",
+    "sha256": "b03d39e4bb253dda0f14893db3b78e64b40b8d6549a0fc0fd4111dae84c98618",
+    "retrieved_at_utc": "2026-11-14T15:30:29.782694+00:00",
+    "first_month": "192607",
+    "last_month": "202609",
+    "columns": [
+      "Mkt-RF",
+      "SMB",
+      "HML",
+      "RF"
+    ]
+  },
+  {
+    "file": "CMO-Historical-Data-Monthly.xlsx",
+    "dataset": "PINK_SHEET_MONTHLY",
+    "source": "WORLD_BANK_PINK_SHEET",
+    "url": "https://thedocs.worldbank.org/en/doc/5d903e848db1d1b83e0ec8f744e55570-0350012021/related/CMO-Historical-Data-Monthly.xlsx",
+    "sha256": "bd89b83eeceadaecb803018c104f76b316d2df3fae28ef7afde48021100c7e11",
+    "retrieved_at_utc": "2026-11-14T15:30:30.237536+00:00",
+    "first_month": "196001",
+    "last_month": "202412",
+    "updated": "Updated on January 03, 2025",
+    "column": "Gold",
+    "unit": "($/troy oz)"
+  },
+  {
+    "file": "NASDAQCOM.csv",
+    "dataset": "NASDAQCOM",
+    "source": "FRED",
+    "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=NASDAQCOM&cosd=1971-02-05&coed=2026-11-14",
+    "sha256": "d95b62d774bce231ddc41c2383badb1e88b8dc681834a974fd24b7ffab2f8d9e",
+    "retrieved_at_utc": "2026-11-14T15:30:30.466898+00:00",
+    "first_day": "1971-02-05",
+    "last_day": "2026-11-13",
+    "rows": 14550
+  }
+]
