@@ -241,3 +241,30 @@ def test_an_existing_or_misplaced_store_is_refused(tmp_path: Path) -> None:
         builder.build(tmp_path / "sa17_study_x", study)
     with pytest.raises(ValueError, match="runs/sa17_study_"):
         builder.build(builder.ROOT / "runs" / "elsewhere", study)
+
+
+def test_a_failed_build_leaves_no_store_behind(tmp_path: Path, monkeypatch) -> None:
+    """Half a store would be refused as "exists" by the next build."""
+    monkeypatch.setattr(builder, "ROOT", tmp_path)
+    monkeypatch.setattr(builder, "checked_fx_table", lambda _: (pd.DataFrame(), {}, None))
+    store = tmp_path / "runs" / "sa17_study_x"
+
+    def half_built(folder: Path, *args: object) -> dict:
+        (folder / "bars").mkdir(parents=True)
+        (folder / "bars" / "part.parquet").write_text("copied")
+        raise ValueError("a NAV differs")
+
+    monkeypatch.setattr(builder, "_build_into", half_built)
+    with pytest.raises(ValueError, match="a NAV differs"):
+        builder.build(store, {"store": {"fx_archive": "fx"}})
+    assert not store.exists()
+
+
+def test_a_refused_build_does_not_touch_an_existing_store(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(builder, "ROOT", tmp_path)
+    store = tmp_path / "runs" / "sa17_study_x"
+    store.mkdir(parents=True)
+    (store / "study_store.json").write_text("built earlier")
+    with pytest.raises(FileExistsError, match="never rewritten"):
+        builder.build(store, {"store": {"fx_archive": "fx"}})
+    assert (store / "study_store.json").read_text() == "built earlier"

@@ -250,6 +250,14 @@ def test_listed_sessions_replays_the_dates_inside_the_run() -> None:
     assert schedule.decision_sessions([], following=None) == frozenset()
 
 
+def test_a_run_no_listed_date_falls_in_is_refused() -> None:
+    """A book that would sit on its cash for the whole run says so instead."""
+    schedule = ListedSessions((date(2026, 8, 3), date(2026, 10, 1)), rule="test")
+
+    with pytest.raises(ValueError, match="does not cover this run"):
+        schedule.decision_sessions(SEPTEMBER, following=TUESDAY_15)
+
+
 def test_a_listed_date_that_is_not_a_session_is_refused() -> None:
     """A Saturday inside the run would be a decision skipped without a word."""
     schedule = ListedSessions((date(2026, 9, 5),), rule="test")

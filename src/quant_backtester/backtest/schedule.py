@@ -239,11 +239,20 @@ class ListedSessions:
         ValueError
             If a listed date inside the run is not one of its sessions: the
             decision would be skipped silently, so the list is wrong for
-            this calendar.
+            this calendar. Also if no listed date falls inside the run: it
+            would hold its starting cash throughout without a word. A list
+            cannot tell that a run extends past its last date, since it does
+            not know the rule's cadence; whoever freezes the list checks its
+            coverage of the window.
         """
         if not sessions:
             return frozenset()
         inside = [day for day in self.dates if sessions[0] <= day <= sessions[-1]]
+        if not inside:
+            raise ValueError(
+                f"no listed decision falls between {sessions[0]} and {sessions[-1]}: "
+                "the list does not cover this run"
+            )
         known = set(sessions)
         absent = [day for day in inside if day not in known]
         if absent:

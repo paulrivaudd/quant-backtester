@@ -62,8 +62,6 @@ from quant_backtester.data.updater import MarketDataUpdater
 
 ROOT = Path(__file__).resolve().parents[1]
 STUDY = ROOT / "research" / "SA17" / "study.toml"
-NAV_END = date(2026, 10, 30)
-"""Last NAV date ingested: the window's end, as for the retrieval-floored store."""
 
 
 def fx_verification_days() -> list[str]:
@@ -255,7 +253,11 @@ def checked_fx_table(archive: Path) -> tuple[pd.DataFrame, dict[str, Any], datet
 
 
 def build(store: Path, study: Mapping[str, Any]) -> dict[str, Any]:
-    """Build the store and return its evidence record."""
+    """Build the store and return its evidence record.
+
+    The NAVs are ingested up to the study window's end, as for the
+    retrieval-floored store. A build that fails leaves no folder behind.
+    """
     settings = study["store"]
     if store.resolve().parent != (ROOT / "runs").resolve() or not store.name.startswith(
         "sa17_study_"
@@ -263,9 +265,26 @@ def build(store: Path, study: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("use a new runs/sa17_study_* directory")
     if store.exists():
         raise FileExistsError(f"{store} exists; a store is never rewritten")
-    fx_settings = study["fx"]
-    table, fx_coverage, fx_retrieved = checked_fx_table(ROOT / settings["fx_archive"])
+    fx_checked = checked_fx_table(ROOT / settings["fx_archive"])
+    try:
+        return _build_into(store, study, *fx_checked)
+    except BaseException:
+        # The folder did not exist before this call. Left half-built it would
+        # be refused as "exists" by the next one, with nothing usable in it.
+        shutil.rmtree(store, ignore_errors=True)
+        raise
 
+
+def _build_into(
+    store: Path,
+    study: Mapping[str, Any],
+    table: pd.DataFrame,
+    fx_coverage: Mapping[str, Any],
+    fx_retrieved: datetime,
+) -> dict[str, Any]:
+    """Fill a store that does not exist yet; :func:`build` removes it on failure."""
+    settings = study["store"]
+    fx_settings = study["fx"]
     shutil.copytree(
         ROOT / settings["bars_from"], store, ignore=shutil.ignore_patterns(".lock", ".pending")
     )
@@ -304,7 +323,7 @@ def build(store: Path, study: Mapping[str, Any]) -> dict[str, Any]:
         fetched = datetime.fromisoformat(record["retrieved_at_utc"])
         source = SsgaNavSource(clock=lambda t=fetched: t, fetch_bytes=lambda _url, p=payload: p)
         report = updater(store, {"SSGA_NAV": source}, declared).download(
-            nav_id, date.fromisoformat(record["first_observation"]), NAV_END
+            nav_id, date.fromisoformat(record["first_observation"]), study["window"]["end"]
         )
         if not report.valid:
             raise ValueError(f"{nav_id}: {sorted({issue.code for issue in report.issues})}")
