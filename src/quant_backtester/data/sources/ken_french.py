@@ -35,6 +35,7 @@ class KenFrenchDataset(Enum):
     """Allowlisted official monthly datasets; no annual or equal-weight option."""
 
     INDUSTRY_10 = "10_Industry_Portfolios"
+    INDUSTRY_12 = "12_Industry_Portfolios"
     INDUSTRY_49 = "49_Industry_Portfolios"
     FACTORS = "F-F_Research_Data_Factors"
 
@@ -138,6 +139,7 @@ def _parse(
     header = tuple(cell.strip() for cell in records[index])
     expected = {
         KenFrenchDataset.INDUSTRY_10: 10,
+        KenFrenchDataset.INDUSTRY_12: 12,
         KenFrenchDataset.INDUSTRY_49: 49,
         KenFrenchDataset.FACTORS: 4,
     }[dataset]
