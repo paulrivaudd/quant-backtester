@@ -44,6 +44,10 @@
     unchanged.
   - `summary.json` no longer has `candidate_drawdown_x2_check`, which held the
     last session's date.
+- **Registry and typing.** `research/hypotheses.toml` records the formal
+  verdict, `INSUFFICIENT_EVIDENCE`. Twelve pyright diagnostics are fixed
+  without a change of behaviour; the runs were done a third time on the
+  changed files and are again identical.
 - **Runner and store builder.**
   - The environment and the producing files are sampled again after each run;
     the earlier check compared the batch's snapshot with itself.
