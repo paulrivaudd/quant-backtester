@@ -1,0 +1,143 @@
+{
+  "hypothesis_id": "sa16_it2_long_history_usd",
+  "commit": "3556e4d81ff4d4c005d0324cc3e49d942eae1609",
+  "window": [
+    "1975-01-01",
+    "2018-07-01"
+  ],
+  "months": 523,
+  "readings": {
+    "GROWTH_BUY_HOLD": {
+      "beats_declared": false,
+      "beats_stressed": false,
+      "sharpe_difference": 0.03656002641455047,
+      "holm_p": 1.0,
+      "reading": "NOT_SUPPORTED"
+    },
+    "NASDAQ_COMPOSITE_PRICE": {
+      "beats_declared": false,
+      "beats_stressed": false,
+      "sharpe_difference": 0.024410682468030354,
+      "holm_p": 1.0,
+      "reading": "NOT_SUPPORTED"
+    }
+  },
+  "holm": {
+    "GROWTH_BUY_HOLD": 1.0,
+    "NASDAQ_COMPOSITE_PRICE": 1.0
+  },
+  "tests": {
+    "GROWTH_BUY_HOLD": {
+      "block12": {
+        "method": "STATIONARY_CIRCULAR",
+        "statistic": "SHARPE",
+        "estimate": 0.03656002641455047,
+        "low": -0.1484787736995177,
+        "high": 0.2158130259584743,
+        "p_value": 0.6901309869013099,
+        "level": 0.95,
+        "sessions": 523,
+        "mean_block": 12,
+        "draws": 10000,
+        "seed": 20261114,
+        "analytics": {
+          "sessions_per_year": 12,
+          "risk_free_rate": 0.0,
+          "minimum_sessions": 60
+        }
+      },
+      "block6": {
+        "method": "STATIONARY_CIRCULAR",
+        "statistic": "SHARPE",
+        "estimate": 0.03656002641455047,
+        "low": -0.12723403978618567,
+        "high": 0.190835583242463,
+        "p_value": 0.6515348465153484,
+        "level": 0.95,
+        "sessions": 523,
+        "mean_block": 6,
+        "draws": 10000,
+        "seed": 20261114,
+        "analytics": {
+          "sessions_per_year": 12,
+          "risk_free_rate": 0.0,
+          "minimum_sessions": 60
+        }
+      },
+      "block24": {
+        "method": "STATIONARY_CIRCULAR",
+        "statistic": "SHARPE",
+        "estimate": 0.03656002641455047,
+        "low": -0.1598928486247276,
+        "high": 0.22207313991956143,
+        "p_value": 0.7138286171382862,
+        "level": 0.95,
+        "sessions": 523,
+        "mean_block": 24,
+        "draws": 10000,
+        "seed": 20261114,
+        "analytics": {
+          "sessions_per_year": 12,
+          "risk_free_rate": 0.0,
+          "minimum_sessions": 60
+        }
+      }
+    },
+    "NASDAQ_COMPOSITE_PRICE": {
+      "block12": {
+        "method": "STATIONARY_CIRCULAR",
+        "statistic": "SHARPE",
+        "estimate": 0.024410682468030354,
+        "low": -0.1812931522243554,
+        "high": 0.20784844890757298,
+        "p_value": 0.809019098090191,
+        "level": 0.95,
+        "sessions": 523,
+        "mean_block": 12,
+        "draws": 10000,
+        "seed": 20261114,
+        "analytics": {
+          "sessions_per_year": 12,
+          "risk_free_rate": 0.0,
+          "minimum_sessions": 60
+        }
+      },
+      "block6": {
+        "method": "STATIONARY_CIRCULAR",
+        "statistic": "SHARPE",
+        "estimate": 0.024410682468030354,
+        "low": -0.1655393696840045,
+        "high": 0.1960657187067429,
+        "p_value": 0.7924207579242076,
+        "level": 0.95,
+        "sessions": 523,
+        "mean_block": 6,
+        "draws": 10000,
+        "seed": 20261114,
+        "analytics": {
+          "sessions_per_year": 12,
+          "risk_free_rate": 0.0,
+          "minimum_sessions": 60
+        }
+      },
+      "block24": {
+        "method": "STATIONARY_CIRCULAR",
+        "statistic": "SHARPE",
+        "estimate": 0.024410682468030354,
+        "low": -0.1836426211433422,
+        "high": 0.20920193470616708,
+        "p_value": 0.8117188281171883,
+        "level": 0.95,
+        "sessions": 523,
+        "mean_block": 24,
+        "draws": 10000,
+        "seed": 20261114,
+        "analytics": {
+          "sessions_per_year": 12,
+          "risk_free_rate": 0.0,
+          "minimum_sessions": 60
+        }
+      }
+    }
+  }
+}
