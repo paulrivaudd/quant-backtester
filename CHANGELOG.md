@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### SA16: it2's rule with leverage on the long history, frozen (2026-11-14)
+- `research/SA16/levered_long_history.md` and `.toml`: the same weights held
+  at a leverage matching the book's volatility to its growth asset's, at most
+  twice the equity, the loan paying the bill plus 1% a year. Hypothesis
+  `sa16_it2_levered_long_history_usd`. **Not blind**: the same 523 months
+  were read once; the design says what that leaves the test able to show.
+- `run_levered_book` and `matched_leverage` in `research/sa16_long_history.py`;
+  `scripts/SA16_run_levered_long_history.py`.
+
 ### SA16: the long-history test of it2, frozen (2026-11-14)
 - **Run once at `3556e4d`: `NOT_SUPPORTED` against both references**, as
   predicted. Over 523 months net of costs the rule returned 10.8% a year

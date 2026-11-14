@@ -17,6 +17,7 @@ from quant_backtester.data.sources.base import ProviderResponseError
 from quant_backtester.data.sources.ken_french import KenFrenchDataset, KenFrenchSource
 from quant_backtester.data.sources.world_bank import WorldBankPinkSheetSource
 from scripts import SA16_acquire_long_history as acquisition
+from scripts import SA16_run_levered_long_history as levered
 from scripts import SA16_run_long_history as runner
 
 NOW = datetime(2026, 11, 14, tzinfo=UTC)
@@ -194,3 +195,51 @@ def test_the_study_runs_and_reports_on_drawn_series(archive, tmp_path: Path) -> 
     verdict = json.loads((output / "verdict.json").read_text())
     assert verdict["readings"] == report["readings"]
     assert (output / "metrics.csv").read_text().startswith("scope,book,measure,value\n")
+
+
+def test_the_levered_design_names_its_base_and_its_only_rule() -> None:
+    design, base = levered.load_designs()
+    assert design["base"] == "research/SA16/long_history.toml"
+    assert base["hypothesis_id"] == "sa16_it2_long_history_usd"
+    assert design["leverage"]["rule"] == levered.RULE
+    assert design["leverage"]["cap"] == 2.0
+
+
+@pytest.mark.slow
+def test_the_levered_study_runs_and_reports_on_drawn_series(archive, tmp_path: Path) -> None:
+    """Replay, the levered book beside the others, inference, reading, report."""
+    folder, frozen = archive
+    base: dict[str, Any] = dict(frozen) | {"inference": dict(frozen["inference"]) | {"draws": 200}}
+    design, _ = levered.load_designs()
+    coverage = json.loads((folder / "coverage.json").read_text())
+    panel = runner.load_panel(folder, coverage, base)
+
+    report = levered.study_report(panel, design, base)
+
+    declared, stressed = report["books"]["declared"], report["books"]["stressed"]
+    assert set(declared) == set(levered.BOOKS)
+    book = declared[levered.LEVERED]
+    assert book["min_leverage"] > 0.0 and book["max_leverage"] < 2.5
+    assert book["mean_leverage"] > 1.0
+    assert book["volatility"] > declared[runner.CANDIDATE]["volatility"]
+    # Doubling the trading cost and the spread can only cost.
+    assert stressed[levered.LEVERED]["cagr"] < book["cagr"]
+    # The unlevered book is the base study's, to the last digit.
+    plain = runner.study_report(panel, base)["books"]["declared"][runner.CANDIDATE]
+    assert declared[runner.CANDIDATE]["cagr"] == plain["cagr"]
+    assert set(report["readings"]) == {runner.GROWTH_HELD, runner.NASDAQ_HELD}
+    assert set(report["sensitivities"]) == {
+        "cap=1.5",
+        "cap=3",
+        "borrowing_spread=0",
+        "borrowing_spread=0.02",
+    }
+    free = report["sensitivities"]["borrowing_spread=0"]
+    assert free["cagr"] > book["cagr"]
+
+    output = tmp_path / "out"
+    levered.write_outputs(output, report, design, base, "0" * 40)
+    text = (output / "study.md").read_text()
+    assert "**Not a blind test**" in text
+    assert "## 1975-01 to 2018-07 (523 months), net" in text
+    assert json.loads((output / "verdict.json").read_text())["readings"] == report["readings"]
