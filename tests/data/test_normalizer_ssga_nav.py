@@ -254,6 +254,7 @@ def test_declared_release_is_still_refused_before_it_happens(instrument, downloa
 )
 def test_declared_release_needs_a_lag_and_no_floor(instrument, download, changes):
     declared = _declared(instrument)
+    assert declared.publication_rule is not None
     rule = replace(declared.publication_rule, **changes)
     with pytest.raises(ValueError, match="declared SSGA NAV release"):
         SsgaNavNormalizer(declared_release=True).normalize(
@@ -264,7 +265,9 @@ def test_declared_release_needs_a_lag_and_no_floor(instrument, download, changes
 def test_the_registered_normalizer_never_accepts_a_declared_rule(instrument, download):
     with pytest.raises(ValueError, match="not_before_utc"):
         get_normalizer("SSGA_NAV").normalize(_declared(instrument), download, _uk_calendar())
-    assert get_normalizer("SSGA_NAV").declared_release is False
+    registered = get_normalizer("SSGA_NAV")
+    assert isinstance(registered, SsgaNavNormalizer)
+    assert registered.declared_release is False
 
 
 def test_declared_release_flag_must_be_a_bool():
