@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### History rewritten without the Claude co-author line (2026-11-14)
+- 32 commits of 2026-11-07 to 2026-11-14 carried a `Co-Authored-By: Claude`
+  line: the WSL clone had not enabled `.githooks/commit-msg`. They were
+  rewritten without it, which changed the hash of 43 commits from `b0951d5`
+  onwards. Trees, authors and dates are unchanged.
+  `docs/HISTORY_REWRITE_2026-11-14.md` maps every old hash to its new one;
+  the entries below and the study reports still cite the old ones.
+
 ### SA16: it2's rule with leverage on the long history, frozen (2026-11-14)
 - **Run once at `c372612`: `NOT_SUPPORTED` against both references.** Net
   CAGR 11.6% against 12.0% and 11.8%, at a volatility of 21.9%; Sharpe 0.41

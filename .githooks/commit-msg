@@ -7,6 +7,8 @@
 # forgotten. The 21 commits that already carried one were rewritten on
 # 2026-10-02; docs/HISTORY_REWRITE_2026-10-02.md maps every old hash to its new
 # one, so a result recorded against an old commit can still be traced.
+# A clone made on 2026-11-07 never enabled this hook and 32 more commits went
+# through; they were rewritten on 2026-11-14, docs/HISTORY_REWRITE_2026-11-14.md.
 #
 # Enabled once per clone:  git config core.hooksPath .githooks
 if grep -Eiq '^[[:space:]]*co-authored-by:.*(claude|anthropic)|generated with.*claude' "$1"; then
