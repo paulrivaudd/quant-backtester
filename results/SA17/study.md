@@ -11,8 +11,10 @@ Frozen in [research/SA17/protocol.md](../../research/SA17/protocol.md) ("Executa
 | 2a_fund_calendar | PASSED |
 | 2b_fund_actions | PASSED |
 | 2c_nav_publication | PARTIAL: declared prospectus rule |
-| 2d_synchronous_fx | MUST_PASS_BEFORE_RUN: fetch, verify (24 sampled sessions agree), build |
+| 2d_synchronous_fx | PASSED: 24 of 24 sampled sessions agree; table 0c5d6ec762d0, checked when the store was built |
 | 2e_execution_prices | PARTIAL: opening price plus declared costs; refusals counted |
+
+Statuses at the run. `study.toml`, frozen before it, lists 2d as a gate that had to pass first.
 
 Common sessions: 2113, 2018-08-01 to 2026-10-30 (XPAR, 252 a year, zero risk-free rate).
 
@@ -31,16 +33,16 @@ Common sessions: 2113, 2018-08-01 to 2026-10-30 (XPAR, 252 a year, zero risk-fre
 
 ## Costs, orders and refusals (x1)
 
-| Book | Costs EUR | Spread | Commission | Slippage | Turnover/yr | Orders | Mean/max per day | Rejects | Decisions kept (unreadable) |
+| Book | Costs EUR | Spread | Commission | Slippage | Turnover/yr | Orders | Mean/max per day | Rejects | Decisions kept, input unreadable |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |
 | SA17_sector_residual_momentum | 20,469 | 10,723 | 4,903 | 4,842 | 6.88 | 421 | 4.3 / 6 | 83 | 0 |
 | total_momentum | 14,109 | 7,105 | 3,529 | 3,475 | 5.78 | 413 | 4.2 / 6 | 66 | 0 |
 | no_volatility_target | 24,217 | 13,051 | 5,629 | 5,537 | 6.41 | 358 | 3.6 / 5 | 54 | 0 |
 | equal_sectors | 1,818 | 615 | 929 | 274 | 0.40 | 878 | 8.9 / 10 | 10 | 0 |
 | equal_sectors_volatility_target | 3,502 | 1,377 | 1,342 | 782 | 1.37 | 935 | 9.4 / 11 | 26 | 0 |
-| SA16_it2 | 1,121 | 374 | 374 | 374 | 0.37 | 44 | 2.0 / 2 | 7 | 409 |
-| Nasdaq_buy_hold | 150 | 50 | 50 | 50 | 0.05 | 1 | 1.0 / 1 | 0 | 2112 |
-| SA16_it2_C1_constant_two_thirds | 558 | 186 | 186 | 186 | 0.19 | 18 | 2.0 / 2 | 3 | 422 |
+| SA16_it2 | 1,121 | 374 | 374 | 374 | 0.37 | 44 | 2.0 / 2 | 7 | 0 |
+| Nasdaq_buy_hold | 150 | 50 | 50 | 50 | 0.05 | 1 | 1.0 / 1 | 0 | 0 |
+| SA16_it2_C1_constant_two_thirds | 558 | 186 | 186 | 186 | 0.19 | 18 | 2.0 / 2 | 3 | 0 |
 
 Candidate: mean sector exposure at decisions 88.3 %, minimum 24.6 %; 0 decisions wholly in XEON; rejects by reason {'INSUFFICIENT_CASH': 83}; unreadable inputs {}.
 

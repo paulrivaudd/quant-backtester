@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+### SA17: the executable study, run and reviewed (2026-11-14)
+- **Gate 2d passed.** The Dukascopy archive is complete (272 hourly and 48
+  minute files); the hourly and minute rates agree on the 24 seeded sessions.
+  `research/SA17/admission.md` records it, with the owner's decision to resume
+  the acquisition after the host's outage.
+- **The study ran**: 16 runs on `runs/sa17_study_20261108`, reported in
+  `results/SA17/study.md`. `PROVISIONAL_NOT_ADMITTED`; formal verdict
+  `INSUFFICIENT_EVIDENCE`. Provisional readings: `NOT_SUPPORTED` against the
+  references and against `no_volatility_target`, `UNCERTAIN` against the other
+  three controls.
+- **The report changed after its review; no result did.** The runs were done
+  again with the corrected runner. Every curve, fill, order, reject, weight
+  and decision file is byte-identical to the first run, and so is every test,
+  Holm p-value, reading and regime figure. Three things differ in the report:
+  - "Decisions kept, input unreadable" read 409, 2112 and 422 for `SA16_it2`,
+    `Nasdaq_buy_hold` and it2's C1. It counted every decision that held its
+    positions; it now counts those that name an unreadable input: 0 for each.
+  - Gate 2d read `MUST_PASS_BEFORE_RUN`, the text `study.toml` froze. It is
+    now read from the store's record of the verification. `study.toml` is
+    unchanged.
+  - `summary.json` no longer has `candidate_drawdown_x2_check`, which held the
+    last session's date.
+- **Runner and store builder.**
+  - The environment and the producing files are sampled again after each run;
+    the earlier check compared the batch's snapshot with itself.
+  - A failed run gives back its empty reservation, and an interrupted one is
+    reported as incomplete. A failed store build leaves no folder behind.
+  - A study window the frozen decisions do not cover is refused, as is a
+    `ListedSessions` run no listed date falls in.
+  - A trial with a zero per-session Sharpe stays in the deflated Sharpe's
+    dispersion. The report's block columns follow `[inference]`; cost levels
+    other than x1 and x2 are refused before any run.
+  - The NAV ingestion ends at `[window].end` instead of a constant of its
+    own. The rebuilt store has the digest of the one the study used.
+
 ### SA17: review follow-up before the executable run (2026-11-08)
 - Cache identity hashes producing source and configuration contents, independently
   of HEAD; generated output may dirty the checkout during read-back. Other
