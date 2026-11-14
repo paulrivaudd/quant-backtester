@@ -1,0 +1,31 @@
+# SA16_it2's rule, levered to the volatility of its growth asset: frozen design.
+#
+# Written 2026-11-14, after the unlevered long-history test was read
+# (results/SA16/long_history/study.md) and before any levered return was
+# computed. research/SA16/levered_long_history.md explains each entry.
+# scripts/SA16_run_levered_long_history.py reads this file and the base design
+# and nothing else for its parameters.
+
+written_on = 2026-11-14
+hypothesis_id = "sa16_it2_levered_long_history_usd"
+# Series, window, weights' rule, costs, inference and regimes are the base
+# design's, unchanged.
+base = "research/SA16/long_history.toml"
+
+[leverage]
+# Each month: the ratio of the growth asset's volatility to the book's, both
+# on the 12 months the weights are estimated on. Not a constant fitted on the
+# window.
+rule = "MATCH_GROWTH_VOLATILITY"
+# US margin rules allow twice the equity at purchase.
+cap = 2.0
+# What a loan pays above the one-month Treasury bill, per year. Cash earns
+# the bill.
+borrowing_spread = 0.010
+# Doubled in the stressed run, together with the trading cost.
+stress_multiplier = 2.0
+
+[sensitivities]
+# Reported, never selected from.
+cap = [1.5, 3.0]
+borrowing_spread = [0.0, 0.020]

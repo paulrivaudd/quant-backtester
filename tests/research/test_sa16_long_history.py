@@ -18,9 +18,11 @@ from quant_backtester.research.sa16_long_history import (
     budget_target,
     budget_weights,
     fixed_target,
+    matched_leverage,
     month_end_changes,
     reading,
     run_book,
+    run_levered_book,
 )
 
 
@@ -244,3 +246,103 @@ def test_constant_weights_name_both_assets_and_add_up_to_one() -> None:
         fixed_target({GROWTH: 0.5, GOLD: 0.4})
     with pytest.raises(ValueError):
         fixed_target({GROWTH: 1.0})
+
+
+def with_bill(growth: list[float], gold: list[float], bill: float) -> MonthlyPanel:
+    count = len(growth)
+    return MonthlyPanel(months(count), tuple(growth), tuple(gold), (0.0,) * count, (bill,) * count)
+
+
+def test_a_leverage_of_one_is_the_unlevered_book() -> None:
+    """The naive form: without leverage the levered loop is the plain one, month for month."""
+    growth, gold = swings(12)
+    held = with_bill(growth, gold, 0.004)
+    rule = budget_target(held, 6, 0.75, 0.05, 1.5, 12)
+    plain = run_book(held, held.months[6], held.months[11], rule, 0.05, 0.001)
+    levered = run_levered_book(
+        held, held.months[6], held.months[11], rule, lambda _p, _w: 1.0, 0.05, 0.001, 0.01
+    )
+    for one, other in zip(plain, levered, strict=True):
+        assert other.net == pytest.approx(one.net, abs=1e-15)
+        assert other.exposures == pytest.approx(one.weights)
+        assert other.traded == one.traded
+
+
+def test_a_loan_pays_the_bill_and_the_spread_and_cash_earns_the_bill() -> None:
+    held = with_bill([0.10, 0.0], [0.0, 0.0], 0.01)
+    all_growth = fixed_target({GROWTH: 1.0, GOLD: 0.0})
+    first = held.months[0]
+
+    # Twice the book in growth: +20%, less a loan of one book at 1% + 0.5%.
+    doubled = run_levered_book(held, first, first, all_growth, lambda _p, _w: 2.0, 0.05, 0.0, 0.005)
+    assert doubled[0].exposures == {GROWTH: 2.0, GOLD: 0.0}
+    assert doubled[0].gross == pytest.approx(0.20 - 0.015)
+    # Half the book in growth: +5%, plus half the book in cash at 1%, no spread.
+    halved = run_levered_book(held, first, first, all_growth, lambda _p, _w: 0.5, 0.05, 0.0, 0.005)
+    assert halved[0].gross == pytest.approx(0.05 + 0.005)
+
+
+def test_a_levered_book_drifts_and_pays_to_come_back() -> None:
+    held = with_bill([0.25, 0.0, 0.0], [0.0, 0.0, 0.0], 0.0)
+    all_growth = fixed_target({GROWTH: 1.0, GOLD: 0.0})
+    book = run_levered_book(
+        held, held.months[0], held.months[2], all_growth, lambda _p, _w: 2.0, 0.05, 0.01, 0.0
+    )
+    # +25% on twice the book: equity 1.5, growth 2.5, so the exposure is 5/3.
+    assert book[0].gross == pytest.approx(0.50)
+    assert book[1].traded
+    assert book[1].turnover == pytest.approx(2.0 - 5.0 / 3.0)
+    assert book[1].net == pytest.approx(-0.01 * (2.0 - 5.0 / 3.0))
+    assert not book[2].traded
+
+
+def test_a_month_that_leaves_no_equity_is_refused() -> None:
+    held = with_bill([-0.60], [0.0], 0.0)
+    with pytest.raises(ValueError, match="no equity"):
+        run_levered_book(
+            held,
+            held.months[0],
+            held.months[0],
+            fixed_target({GROWTH: 1.0, GOLD: 0.0}),
+            lambda _p, _w: 2.0,
+            0.05,
+            0.0,
+            0.0,
+        )
+
+
+def test_the_leverage_matches_the_books_volatility_to_the_growth_assets() -> None:
+    growth, gold = swings(12)
+    held = panel(growth, gold)
+    rule = matched_leverage(held, 6, 1.0, cap=10.0)
+    # All in growth, the book is the growth asset: no leverage.
+    assert rule(8, {GROWTH: 1.0, GOLD: 0.0}) == pytest.approx(1.0)
+    # Half in an asset that does not move halves the volatility: twice the book.
+    still = panel(growth, [0.0] * 12)
+    assert matched_leverage(still, 6, 1.0, cap=10.0)(8, {GROWTH: 0.5, GOLD: 0.5}) == (
+        pytest.approx(2.0)
+    )
+    assert matched_leverage(still, 6, 1.0, cap=1.5)(8, {GROWTH: 0.5, GOLD: 0.5}) == 1.5
+    # A book that does not move at all is held at the cap, not divided by.
+    assert matched_leverage(still, 6, 1.0, cap=1.5)(8, {GROWTH: 0.0, GOLD: 1.0}) == 1.5
+    mixed = rule(8, {GROWTH: 0.6, GOLD: 0.4})
+    assert 1.0 < mixed < 10.0
+    # Scaling gold's variance up makes the book more volatile: less leverage.
+    assert matched_leverage(held, 6, 1.5, cap=10.0)(8, {GROWTH: 0.6, GOLD: 0.4}) < mixed
+    with pytest.raises(ValueError, match="fewer than 6"):
+        rule(5, {GROWTH: 0.6, GOLD: 0.4})
+    with pytest.raises(ValueError):
+        matched_leverage(held, 6, 1.0, cap=0.0)
+
+
+def test_a_future_month_changes_no_leverage_before_it() -> None:
+    """The look-ahead guard for the leverage."""
+    growth, gold = swings(12)
+    planted = list(growth)
+    planted[10] = -0.50
+    weights = {GROWTH: 0.6, GOLD: 0.4}
+    clean_rule = matched_leverage(panel(growth, gold), 6, 1.5, cap=2.0)
+    planted_rule = matched_leverage(panel(planted, gold), 6, 1.5, cap=2.0)
+    assert [planted_rule(p, weights) for p in range(6, 11)] == [
+        clean_rule(p, weights) for p in range(6, 11)
+    ]

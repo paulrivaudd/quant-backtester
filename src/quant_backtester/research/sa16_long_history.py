@@ -420,6 +420,166 @@ def run_book(
     return book
 
 
+@dataclass(frozen=True, slots=True)
+class LeveredMonth:
+    """One held month of a book that may borrow or hold cash.
+
+    Attributes
+    ----------
+    month : date
+        The month held.
+    exposures : Mapping[str, float]
+        Each asset's value over the book's equity at the start of the month,
+        after any trade. Their sum is the leverage; what it leaves of one is
+        cash, a loan when negative.
+    leverage : float
+        The leverage the rule asked for before the month.
+    traded : bool
+        Whether the book was brought back to its target before the month.
+    turnover : float
+        Sum of the absolute exposure changes of that trade.
+    gross : float
+        The month's return on equity after financing, before trading costs.
+    net : float
+        The month's return after the trade's cost.
+    """
+
+    month: date
+    exposures: Mapping[str, float]
+    leverage: float
+    traded: bool
+    turnover: float
+    gross: float
+    net: float
+
+
+def matched_leverage(
+    panel: MonthlyPanel, volatility_months: int, gold_variance_scale: float, cap: float
+) -> Callable[[int, Mapping[str, float]], float]:
+    """Return the rule scaling a two-asset book to the volatility of its growth asset.
+
+    The returned function takes the position of a holding month and the
+    weights held over it. On the ``volatility_months`` log changes ending the
+    month before, it estimates the variance of the growth asset and that of
+    the weighted book (gold's variance scaled as in the weights, the
+    covariance as measured), and returns the ratio of the two volatilities,
+    at most ``cap``. Below one, the rest of the book is cash.
+    """
+    if cap <= 0.0 or not math.isfinite(cap):
+        raise ValueError("the leverage cap is a finite positive number")
+
+    def leverage(position: int, weights: Mapping[str, float]) -> float:
+        if position < volatility_months:
+            raise ValueError(
+                f"{panel.months[position]:%Y-%m} has fewer than {volatility_months} months "
+                "before it"
+            )
+        window = slice(position - volatility_months, position)
+        growth = [math.log1p(value) for value in panel.growth[window]]
+        gold = [math.log1p(value) for value in panel.gold[window]]
+        count = len(growth)
+        mean_growth, mean_gold = math.fsum(growth) / count, math.fsum(gold) / count
+        variance_growth = math.fsum((v - mean_growth) ** 2 for v in growth) / (count - 1)
+        variance_gold = (
+            math.fsum((v - mean_gold) ** 2 for v in gold) / (count - 1) * gold_variance_scale
+        )
+        covariance = math.fsum(
+            (a - mean_growth) * (b - mean_gold) for a, b in zip(growth, gold, strict=True)
+        ) / (count - 1)
+        book = (
+            weights[GROWTH] ** 2 * variance_growth
+            + weights[GOLD] ** 2 * variance_gold
+            + 2.0 * weights[GROWTH] * weights[GOLD] * covariance
+        )
+        if book <= 0.0:
+            return cap
+        return min(cap, math.sqrt(variance_growth / book))
+
+    return leverage
+
+
+def run_levered_book(
+    panel: MonthlyPanel,
+    first_holding: date,
+    last_holding: date,
+    target: Callable[[int], Mapping[str, float]],
+    leverage: Callable[[int, Mapping[str, float]], float],
+    band: float,
+    cost_rate: float,
+    borrowing_spread: float,
+) -> list[LeveredMonth]:
+    """Hold the two assets at a leverage, borrowing or lending the rest.
+
+    Before each month the rule gives weights adding up to one and a leverage;
+    the target exposures are their product. Cash, one less the exposures,
+    earns the month's risk-free rate; a loan pays it plus ``borrowing_spread``.
+    The first purchase is free, as in :func:`run_book`. Afterwards the
+    exposures drift with the months' changes and the book is brought back to
+    its target, whole, when an exposure is further than ``band`` from it, at
+    ``cost_rate`` times the sum of the absolute exposure changes.
+
+    With a leverage of one this is :func:`run_book`.
+
+    Parameters
+    ----------
+    panel : MonthlyPanel
+        The monthly series.
+    first_holding, last_holding : date
+        First and last months held, inclusive.
+    target : Callable[[int], Mapping[str, float]]
+        The weights held over the month at a position, from data before it.
+    leverage : Callable[[int, Mapping[str, float]], float]
+        The leverage held over that month, from data before it.
+    band : float
+        Largest gap between a held exposure and its target that sends no trade.
+    cost_rate : float
+        One-way cost, as a fraction of traded value.
+    borrowing_spread : float
+        What a loan pays above the risk-free rate, per month, as a fraction.
+
+    Returns
+    -------
+    list[LeveredMonth]
+        One record per held month.
+
+    Raises
+    ------
+    ValueError
+        If the months are out of order, or a month would leave no equity.
+    """
+    start, stop = panel.position(first_holding), panel.position(last_holding)
+    if start > stop:
+        raise ValueError("the first holding month is after the last")
+    held: dict[str, float] | None = None
+    book = []
+    for position in range(start, stop + 1):
+        weights = target(position)
+        scale = leverage(position, weights)
+        wanted = {name: scale * weight for name, weight in weights.items()}
+        turnover = 0.0
+        traded = False
+        if held is None:
+            held = wanted
+        elif max(abs(held[name] - wanted[name]) for name in wanted) > band:
+            turnover = math.fsum(abs(held[name] - wanted[name]) for name in wanted)
+            held = wanted
+            traded = True
+        changes = {GROWTH: panel.growth[position], GOLD: panel.gold[position]}
+        cash = 1.0 - math.fsum(held.values())
+        rate = panel.risk_free[position] + (borrowing_spread if cash < 0.0 else 0.0)
+        gross = math.fsum(held[name] * changes[name] for name in held)
+        if cash != 0.0:
+            gross += cash * rate
+        if gross <= -1.0:
+            raise ValueError(f"{panel.months[position]:%Y-%m} leaves no equity")
+        net = (1.0 - cost_rate * turnover) * (1.0 + gross) - 1.0 if traded else gross
+        book.append(
+            LeveredMonth(panel.months[position], dict(held), scale, traded, turnover, gross, net)
+        )
+        held = {name: held[name] * (1.0 + changes[name]) / (1.0 + gross) for name in held}
+    return book
+
+
 def beats(
     candidate: Mapping[str, float | None],
     reference: Mapping[str, float | None],

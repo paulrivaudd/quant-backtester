@@ -132,6 +132,15 @@ prediction = "Net Sharpe above both references and a shallower maximum drawdown,
 refutation = "Net CAGR or net Sharpe at or below a reference's at declared costs: NOT_SUPPORTED against it. Criterion met but Holm p at or above 0.05, or lost at doubled costs: UNCERTAIN. The Nasdaq reference excludes dividends, so a result against it alone does not support the rule."
 
 [[hypothesis]]
+hypothesis_id = "sa16_it2_levered_long_history_usd"
+status = "PREREGISTERED"
+written_on = 2026-11-14
+statement = "SA16_it2's rule, levered each month to the volatility of its growth asset (at most twice the equity, the loan paying the Treasury bill plus 1% a year), beats both the growth portfolio bought and held and the Nasdaq Composite, net of costs."
+universe = "The series, window (1975-01 to 2018-07) and weights of sa16_it2_long_history_usd. Written after that test was read: the same 523 months, not blind. Frozen in research/SA16/levered_long_history.toml before any levered return was computed."
+prediction = "Volatility near the growth portfolio's; net CAGR within one point of both references, about 12 to 12.5%; net Sharpe 0.42 to 0.45; maximum drawdown -55% to -65%. UNCERTAIN where its CAGR is higher, NOT_SUPPORTED where it is not; never SUPPORTED_RETROSPECTIVE, since leverage leaves the Sharpe difference where the first test found it."
+refutation = "Net CAGR or net Sharpe at or below a reference's at declared costs: NOT_SUPPORTED against it. A month that leaves no equity stops the run. Margin calls within a month are not modelled."
+
+[[hypothesis]]
 hypothesis_id = "sa17_usd_nav_residual_momentum"
 status = "INSUFFICIENT_EVIDENCE"
 written_on = 2026-11-07
