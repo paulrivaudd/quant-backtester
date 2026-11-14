@@ -966,14 +966,15 @@ def analyse(
     trials = [CANDIDATE, *families["controls"]]
     if len(trials) != inference["deflated_sharpe_trials"]:
         raise ValueError("the deflated Sharpe trial count is not the frozen one")
-    per_session = [session_sharpe(curves[(name, 1.0)], config) for name in trials]
-    if any(value is None for value in per_session):
+    sampled = [session_sharpe(curves[(name, 1.0)], config) for name in trials]
+    per_session = [float(value) for value in sampled if value is not None]
+    if len(per_session) != len(trials):
         raise ValueError("a trial has no per-session Sharpe ratio")
     deflated = deflated_sharpe_probability(
         candidate_x1,
         config,
         trials=len(trials),
-        trial_sharpe_std=statistics.stdev(float(value) for value in per_session),
+        trial_sharpe_std=statistics.stdev(per_session),
     )
     regimes = {
         f"{start}..{end}": {

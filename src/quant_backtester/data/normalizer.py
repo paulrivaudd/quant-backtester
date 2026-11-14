@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Protocol
+from typing import Any, Protocol
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -1560,8 +1560,11 @@ class DukascopyUsCloseNormalizer:
             raise ValueError(f"Dukascopy US-close table of {instrument.id} changed schema")
         new_york = ZoneInfo("America/New_York")
         observations: dict[date, float] = {}
-        for row in raw.itertuples(index=False):
+        rows: Iterable[Any] = raw.itertuples(index=False)
+        for row in rows:
             day = pd.Timestamp(row.observation_date).date()
+            if pd.isna(day) or not isinstance(day, date):
+                raise ValueError(f"Dukascopy US-close table of {instrument.id} lacks a date")
             if day in observations:
                 raise ValueError(f"Dukascopy US-close table of {instrument.id} repeats {day}")
             bid = _finite_number(str(row.bid), f"bid of {instrument.id} on {day}")
