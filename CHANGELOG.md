@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### SA16: the long-history test of it2, frozen (2026-11-14)
+- **Frozen before any return was computed.** `research/SA16/long_history.md`
+  and `long_history.toml`: SA16_it2's rule on monthly research series in US
+  dollars over 1975-01 to 2018-07, months SA16 never saw. Hypothesis
+  `sa16_it2_long_history_usd`, with its prediction, in
+  `research/hypotheses.toml`.
+- **New World Bank Pink Sheet adapter** (`data/sources/world_bank.py`) for
+  gold's monthly average price, and the 12-industry table in the Ken French
+  adapter. `scripts/SA16_acquire_long_history.py` archives the inputs;
+  `research/SA16/long_history_inputs.json` records their hashes.
+- `research/sa16_long_history.py` and `scripts/SA16_run_long_history.py`
+  hold the study. SA17's acquisition script names its three French tables
+  instead of taking every table the adapter knows.
+
 ### SA17: the executable study, run and reviewed (2026-11-14)
 - **Gate 2d passed.** The Dukascopy archive is complete (272 hourly and 48
   minute files); the hourly and minute rates agree on the 24 seeded sessions.

@@ -1,0 +1,106 @@
+# SA16_it2 on a long history, in US dollars, monthly: frozen design.
+#
+# Written 2026-11-14, before any return, volatility, weight or book was
+# computed on these series. Only identity and coverage had been read: the
+# months each file holds and its "updated on" line. research/SA16/long_history.md
+# explains each entry. scripts/SA16_run_long_history.py reads this file and
+# nothing else for its parameters; a change after the first run is a new
+# hypothesis, not a correction.
+
+written_on = 2026-11-14
+hypothesis_id = "sa16_it2_long_history_usd"
+archive = "runs/sa16_long_inputs_20261114"
+# The archive's coverage record, committed: the run refuses files that do not
+# hash to it.
+inputs = "research/SA16/long_history_inputs.json"
+
+[window]
+# Out of sample: SA16 was designed and read on 2018-08-01 to 2026-10-30. No
+# month below was looked at for it. US residents could hold gold again from
+# 1975-01-01.
+first_holding_month = 1975-01-01
+last_holding_month = 2018-07-01
+
+[replication]
+# The months SA16 was developed on, as far as the gold workbook goes: shown
+# beside the test, never part of it.
+first_holding_month = 2018-08-01
+last_holding_month = 2024-12-01
+
+[series]
+growth_dataset = "INDUSTRY_12"
+growth_column = "BusEq"
+gold_column = "Gold"
+gold_unit = "($/troy oz)"
+nasdaq_series = "NASDAQCOM"
+nasdaq_first_day = 1971-02-05
+periods_per_year = 12
+
+[strategy]
+# SA16_it2's parameters (results/SA16/selected.json), unchanged where a month
+# can carry them: budget, floor, band.
+growth_risk_budget = 0.75
+volatility_floor = 0.05
+rebalance_band = 0.05
+# it2 estimates volatility on 126 daily returns, about six months. Six monthly
+# changes cannot carry that estimate (its standard error is about 30%); twelve
+# are used, and 6 and 24 are reported as sensitivities.
+volatility_months = 12
+# A change between monthly averages has about two thirds of the variance of a
+# month-end change (Working 1960). Gold's variance is scaled back by 1.5 in
+# the volatility estimate; its returns are left as the averages give them.
+gold_variance_scale = 1.5
+
+[control]
+# it2's own control, SA16_it2_C1_constant_two_thirds. Descriptive.
+growth_weight = 0.6667
+gold_weight = 0.3333
+
+[costs]
+# One way, fraction of traded value, as in SA17's mechanism study. The first
+# purchase is free for every book: the references are bought at no cost.
+declared_rate = 0.0010
+stress_multiplier = 2.0
+
+[inference]
+method = "paired_stationary_bootstrap"
+statistic = "SHARPE"
+seed = 20261114
+draws = 10000
+level = 0.95
+mean_block_months = 12
+sensitivity_mean_block_months = [6, 24]
+alpha = 0.05
+# Holm over the two references.
+family = ["GROWTH_BUY_HOLD", "NASDAQ_COMPOSITE_PRICE"]
+max_drawdown_tolerance = 0.02
+
+[sensitivities]
+# Reported, never selected from: the reading is the primary design's.
+volatility_months = [6, 24]
+gold_variance_scale = [1.0]
+
+[[regimes]]
+name = "1975-1979"
+first = 1975-01-01
+last = 1979-12-01
+
+[[regimes]]
+name = "1980-1989"
+first = 1980-01-01
+last = 1989-12-01
+
+[[regimes]]
+name = "1990-1999"
+first = 1990-01-01
+last = 1999-12-01
+
+[[regimes]]
+name = "2000-2009"
+first = 2000-01-01
+last = 2009-12-01
+
+[[regimes]]
+name = "2010-2018"
+first = 2010-01-01
+last = 2018-07-01
