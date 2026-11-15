@@ -1,0 +1,105 @@
+# SA18: a trend filter on the growth portfolio, monthly, in US dollars: frozen
+# design.
+#
+# Written 2026-11-15, before any level, average, signal or return of this rule
+# was computed on these series. The window's buy-and-hold figures are known
+# from the two SA16 long-history tests. research/SA18/trend_long_history.md
+# explains each entry. scripts/SA18_run_trend_long_history.py reads this file
+# and nothing else for its parameters; a change after the first run is a new
+# hypothesis, not a correction.
+
+written_on = 2026-11-15
+hypothesis_id = "sa18_trend_filter_long_history_usd"
+# The archive and coverage record of SA16's long-history tests, unchanged: the
+# run refuses files that do not hash to the record. Gold is not read.
+archive = "runs/sa16_long_inputs_20261114"
+inputs = "research/SA16/long_history_inputs.json"
+
+[window]
+# The window of the two SA16 long-history tests, so the references are the
+# same books over the same months. Read twice already: not blind.
+first_holding_month = 1975-01-01
+last_holding_month = 2018-07-01
+
+[earlier]
+# The growth portfolio before the Nasdaq Composite and before the test window.
+# No month of it has been read for any hypothesis of this project's SA15 to
+# SA18 on this portfolio. Reported against the growth portfolio alone; decides
+# nothing.
+first_holding_month = 1927-07-01
+last_holding_month = 1974-12-01
+
+[later]
+# The months SA15, SA16 and SA17 were developed on. Shown, never part of the
+# test.
+first_holding_month = 2018-08-01
+last_holding_month = 2026-09-01
+
+[series]
+growth_dataset = "INDUSTRY_12"
+growth_column = "BusEq"
+nasdaq_series = "NASDAQCOM"
+periods_per_year = 12
+
+[strategy]
+# At the end of a month, the growth portfolio's total-return level is compared
+# with the simple average of its last `average_months` month-end levels, that
+# month's included. Strictly above: the growth portfolio is held over the next
+# month. Otherwise: the one-month Treasury bill.
+rule = "LEVEL_ABOVE_SIMPLE_AVERAGE"
+signal = "GROWTH_TOTAL_RETURN"
+# Faber (2007), "A Quantitative Approach to Tactical Asset Allocation": the
+# published value, not one chosen on this window.
+average_months = 10
+
+[costs]
+# One way, fraction of traded value. Leaving or entering the growth portfolio
+# trades the whole book once. The position of the first month is taken at no
+# cost, as the references are bought at no cost.
+declared_rate = 0.0010
+stress_multiplier = 2.0
+
+[inference]
+method = "paired_stationary_bootstrap"
+statistic = "SHARPE"
+seed = 20261115
+draws = 10000
+level = 0.95
+mean_block_months = 12
+sensitivity_mean_block_months = [6, 24]
+alpha = 0.05
+# Holm over the two references.
+family = ["GROWTH_BUY_HOLD", "NASDAQ_COMPOSITE_PRICE"]
+max_drawdown_tolerance = 0.02
+
+[sensitivities]
+# Reported, never selected from: the reading is the primary design's.
+average_months = [6, 8, 12]
+# The same rule read on the Nasdaq Composite's month-end closes (no
+# dividends), the growth portfolio still being what is held.
+signal = ["NASDAQ_PRICE"]
+
+[[regimes]]
+name = "1975-1979"
+first = 1975-01-01
+last = 1979-12-01
+
+[[regimes]]
+name = "1980-1989"
+first = 1980-01-01
+last = 1989-12-01
+
+[[regimes]]
+name = "1990-1999"
+first = 1990-01-01
+last = 1999-12-01
+
+[[regimes]]
+name = "2000-2009"
+first = 2000-01-01
+last = 2009-12-01
+
+[[regimes]]
+name = "2010-2018"
+first = 2010-01-01
+last = 2018-07-01
