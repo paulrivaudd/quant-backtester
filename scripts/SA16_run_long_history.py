@@ -25,13 +25,12 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import math
 import sys
 import tomllib
 from collections.abc import Callable, Mapping, Sequence
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -41,9 +40,10 @@ from quant_backtester.analytics.uncertainty import (
     holm_adjusted,
     paired_stationary_bootstrap,
 )
-from quant_backtester.data.sources.ken_french import KenFrenchDataset, MonthlyReturns
+from quant_backtester.data.sources.ken_french import KenFrenchDataset
 from quant_backtester.data.sources.world_bank import parse_pink_sheet_monthly
 from quant_backtester.provenance import changed_paths, git_source_state
+from quant_backtester.research.archive_replay import checked_bytes, replay_french
 from quant_backtester.research.sa16_long_history import (
     GOLD,
     GROWTH,
@@ -62,7 +62,6 @@ from quant_backtester.research.sa17_mechanism import (
     compound_annual_growth,
     excess_curve,
     max_drawdown,
-    replay_monthly_returns,
     sharpe_ratio,
 )
 
@@ -99,87 +98,6 @@ def checked_source(output: Path) -> str:
     return str(source.git_commit)
 
 
-def record_month(value: str) -> date:
-    """Return the first day of a month a coverage record writes as ``YYYYMM``.
-
-    Parameters
-    ----------
-    value : str
-        Six digits: the year, then the month.
-
-    Returns
-    -------
-    date
-        The first day of that month.
-    """
-    return date(int(value[:4]), int(value[4:]), 1)
-
-
-def checked_bytes(archive: Path, recorded: Mapping[str, Mapping[str, Any]], name: str) -> bytes:
-    """Return an archived file's bytes, refused unless they hash to its coverage record.
-
-    Parameters
-    ----------
-    archive : Path
-        The folder the retrieval archived its files in.
-    recorded : Mapping[str, Mapping[str, Any]]
-        The coverage records of the retrieval, by file name.
-    name : str
-        The file to read.
-
-    Raises
-    ------
-    ValueError
-        If the coverage records do not name the file, or its bytes do not
-        hash to the ``sha256`` recorded for it.
-    FileNotFoundError
-        If the archive does not hold the file.
-    """
-    if name not in recorded:
-        raise ValueError(f"{name}: the coverage records do not name this file")
-    payload = (archive / name).read_bytes()
-    digest = hashlib.sha256(payload).hexdigest()
-    if digest != recorded[name]["sha256"]:
-        raise ValueError(f"{name}: archived bytes hash to {digest}, not to the record")
-    return payload
-
-
-def replay_french(
-    archive: Path, recorded: Mapping[str, Mapping[str, Any]], dataset: KenFrenchDataset
-) -> MonthlyReturns:
-    """Replay an archived Ken French file over the months its coverage record states.
-
-    Parameters
-    ----------
-    archive, recorded
-        As :func:`checked_bytes`.
-    dataset : KenFrenchDataset
-        The dataset; its file is ``<dataset value>.zip``.
-
-    Returns
-    -------
-    MonthlyReturns
-        The table from the record's ``first_month`` to its ``last_month``,
-        stamped with the record's retrieval instant (UTC).
-
-    Raises
-    ------
-    ValueError
-        As :func:`checked_bytes`.
-    """
-    name = f"{dataset.value}.zip"
-    payload = checked_bytes(archive, recorded, name)
-    entry = recorded[name]
-    return replay_monthly_returns(
-        payload,
-        dataset,
-        sha256=entry["sha256"],
-        retrieved_at_utc=datetime.fromisoformat(entry["retrieved_at_utc"]),
-        start=record_month(entry["first_month"]),
-        end=record_month(entry["last_month"]),
-    )
-
-
 def load_panel(
     archive: Path, coverage: Sequence[Mapping[str, Any]], study: Mapping[str, Any]
 ) -> MonthlyPanel:
@@ -187,24 +105,20 @@ def load_panel(
     recorded = {entry["file"]: entry for entry in coverage}
     series = study["series"]
 
-    def checked(name: str) -> bytes:
-        return checked_bytes(archive, recorded, name)
-
-    def french(dataset: KenFrenchDataset) -> MonthlyReturns:
-        return replay_french(archive, recorded, dataset)
-
     months, values, _updated = parse_pink_sheet_monthly(
-        checked(GOLD_FILE), series["gold_column"], series["gold_unit"]
+        checked_bytes(archive, recorded, GOLD_FILE), series["gold_column"], series["gold_unit"]
     )
-    nasdaq = month_end_changes(checked(NASDAQ_FILE).decode("utf-8"), series["nasdaq_series"])
+    nasdaq = month_end_changes(
+        checked_bytes(archive, recorded, NASDAQ_FILE).decode("utf-8"), series["nasdaq_series"]
+    )
     needed = study["strategy"]["volatility_months"]
     needed = max(needed, *study["sensitivities"]["volatility_months"])
     first = study["window"]["first_holding_month"]
     start = date(first.year - (needed + 11) // 12, first.month, 1)
     return build_panel(
-        french(KenFrenchDataset[series["growth_dataset"]]),
+        replay_french(archive, recorded, KenFrenchDataset[series["growth_dataset"]]),
         series["growth_column"],
-        french(KenFrenchDataset.FACTORS),
+        replay_french(archive, recorded, KenFrenchDataset.FACTORS),
         average_changes(months, values),
         nasdaq,
         start,

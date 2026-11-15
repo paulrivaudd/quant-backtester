@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### The archive replay is a library module (2026-11-15)
+- `research/archive_replay.py` holds `record_month`, `checked_bytes` and
+  `replay_french`, which lived in `scripts/SA16_run_long_history.py` and
+  were imported from there by SA18's script. They have their own tests
+  (`tests/research/test_archive_replay.py`).
+- A Ken French file is hashed once on replay instead of twice, by
+  `checked_bytes`, with the message every other archived file gets, and
+  before anything else of its record is read. The module depends on no
+  study's code. A record month not written `YYYYMM`, or a retrieval instant
+  without a timezone, is refused by name; the committed records have neither.
+- The tests of `paper_update_store.py` no longer read this checkout through
+  git: what git tracks is tested on a repository created for the test.
+- The reports of SA18 and of the SA16 long-history study are identical before
+  and after, compared whole on the archived inputs.
+
 ### Cleanup after the review of the paper run: no behaviour changes (2026-11-15)
 - **One reading of what differs from the commit.** `provenance.changed_paths`
   replaces three copies of the same git calls, in `paper_trade.py`,

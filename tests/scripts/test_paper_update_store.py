@@ -20,8 +20,19 @@ COMMIT = "0" * 40
 
 @pytest.fixture(scope="module")
 def reviewed() -> dict[str, bytes]:
-    """Return the repository's committed metadata, as the script reads it."""
-    return paper_update_store.reviewed_metadata(paper_update_store.REVIEWED, combined_registry())
+    """Return the committed metadata folder with the store's registry, read from disk.
+
+    Read file by file, not through git: these tests ask nothing of this
+    checkout's state. What git tracks is tested on a repository of its own.
+    """
+    source = paper_update_store.REVIEWED
+    files = {
+        path.relative_to(source).as_posix(): path.read_bytes()
+        for path in sorted(source.rglob("*"))
+        if path.is_file()
+    }
+    files["instruments.toml"] = combined_registry().encode("utf-8")
+    return files
 
 
 def store_holding(root: Path, files: dict[str, bytes]) -> Path:
@@ -38,15 +49,6 @@ def store_holding(root: Path, files: dict[str, bytes]) -> Path:
 def records(store: Path) -> list[dict[str, object]]:
     path = store / paper_update_store.CHANGES
     return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
-
-
-def test_the_reviewed_metadata_is_the_committed_folder_with_the_stores_registry(
-    reviewed: dict[str, bytes],
-) -> None:
-    assert reviewed["instruments.toml"].decode() == combined_registry()
-    assert {"known_gaps.toml", "calendars/XPAR.toml", "crosscheck.toml"} <= set(reviewed)
-    folder = paper_update_store.REVIEWED / "known_gaps.toml"
-    assert reviewed["known_gaps.toml"] == folder.read_bytes()
 
 
 def test_a_store_holding_the_committed_metadata_differs_in_nothing(
@@ -173,10 +175,15 @@ def test_an_adoption_interrupted_between_the_two_folders_starts_again_from_the_o
     paper_update_store.require_recorded_metadata(store)
 
 
-def test_a_file_the_repository_ignores_is_not_metadata(tmp_path: Path) -> None:
+def test_the_reviewed_metadata_is_what_git_tracks_with_the_stores_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On a repository of its own: a file git ignores or does not track is not metadata."""
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
     source = tmp_path / "repository" / "metadata"
     (source / "calendars").mkdir(parents=True)
     (source / "known_gaps.toml").write_text("x = 1\n")
+    (source / "instruments.toml").write_text("the project's registry alone\n")
     (source / "calendars" / "XPAR.toml").write_text("y = 2\n")
     (source.parent / ".gitignore").write_text("*.bak\n")
     for arguments in (["init", "-q"], ["add", "-A"]):
@@ -191,6 +198,11 @@ def test_a_file_the_repository_ignores_is_not_metadata(tmp_path: Path) -> None:
         "known_gaps.toml": b"x = 1\n",
         "instruments.toml": b"registry",
     }
+    # Git does not look above the ceiling from a folder below it.
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    with pytest.raises(subprocess.CalledProcessError):
+        paper_update_store.reviewed_metadata(outside, "registry")
 
 
 def store_like(root: Path) -> Path:

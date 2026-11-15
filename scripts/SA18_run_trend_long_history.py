@@ -44,18 +44,20 @@ from SA16_run_long_history import (  # noqa: E402
     GROWTH_HELD,
     NASDAQ_FILE,
     NASDAQ_HELD,
-    checked_bytes,
     checked_source,
     compare,
     measures,
     num,
     pct,
-    record_month,
-    replay_french,
 )
 
 from quant_backtester.analytics.uncertainty import holm_adjusted  # noqa: E402
 from quant_backtester.data.sources.ken_french import KenFrenchDataset, MonthlyReturns  # noqa: E402
+from quant_backtester.research.archive_replay import (  # noqa: E402
+    checked_bytes,
+    record_month,
+    replay_french,
+)
 from quant_backtester.research.sa16_long_history import (  # noqa: E402
     beats,
     month_end_changes,
