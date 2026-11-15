@@ -141,6 +141,15 @@ prediction = "Volatility near the growth portfolio's; net CAGR within one point 
 refutation = "Net CAGR or net Sharpe at or below a reference's at declared costs: NOT_SUPPORTED against it. A month that leaves no equity stops the run. Margin calls within a month are not modelled."
 
 [[hypothesis]]
+hypothesis_id = "sa18_trend_filter_long_history_usd"
+status = "PREREGISTERED"
+written_on = 2026-11-15
+statement = "Holding the growth portfolio over a month only when its total-return level ended the month before above the simple average of its last ten month-end levels, and the one-month Treasury bill otherwise, beats both the growth portfolio bought and held and the Nasdaq Composite, net of costs."
+universe = "The growth, Nasdaq and bill series and the window (1975-01 to 2018-07) of sa16_it2_long_history_usd; gold is not read. The third hypothesis read on these 523 months, and a published rule (Faber 2007): not blind. Frozen in research/SA18/trend_long_history.toml before any level, average or return of the rule was computed. The growth portfolio's 1927-07 to 1974-12 months, unread until now, are reported and decide nothing."
+prediction = "In the growth portfolio 65 to 75% of months, 40 to 70 switches; volatility 15 to 18%; maximum drawdown -30% to -50%; net Sharpe 0.50 to 0.60, not significantly above the references'; net CAGR 11 to 13.5%, slightly more likely above 12.0% than below. UNCERTAIN where its CAGR is higher, NOT_SUPPORTED where it is not; not SUPPORTED_RETROSPECTIVE."
+refutation = "Net CAGR or net Sharpe at or below a reference's at declared costs, or a maximum drawdown more than 2 points deeper: NOT_SUPPORTED against it. Criterion met but Holm p at or above 0.05, or lost at doubled costs: UNCERTAIN. The Nasdaq reference excludes dividends, so a result against it alone does not support the rule."
+
+[[hypothesis]]
 hypothesis_id = "sa17_usd_nav_residual_momentum"
 status = "INSUFFICIENT_EVIDENCE"
 written_on = 2026-11-07

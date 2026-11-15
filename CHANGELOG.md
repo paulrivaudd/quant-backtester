@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### SA18: a trend filter on the long history, frozen (2026-11-15)
+- **Frozen before any level, average or return of the rule was computed.**
+  `research/SA18/trend_long_history.md` and `.toml`: the growth portfolio of
+  SA16's long-history tests held over a month when its total-return level
+  ended the month before above its ten-month average (Faber 2007), the
+  Treasury bill otherwise; 1975-01 to 2018-07 against the same two
+  references, 10 basis points a switch. Hypothesis
+  `sa18_trend_filter_long_history_usd`, with its prediction. **Not blind**:
+  the third hypothesis read on these months, and a published rule. The
+  growth portfolio's 1927-07 to 1974-12 months are reported beside it.
+- `research/sa18_trend.py` and `scripts/SA18_run_trend_long_history.py`. The
+  archive and coverage record are SA16's; nothing is downloaded.
+
 ### History rewritten without the Claude co-author line (2026-11-14)
 - 32 commits of 2026-11-07 to 2026-11-14 carried a `Co-Authored-By: Claude`
   line: the WSL clone had not enabled `.githooks/commit-msg`. They were
