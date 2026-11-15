@@ -1,0 +1,23 @@
+# Committed before its start. See research/PROTOCOL.md, sections 2 and 6, and
+# research/paper/README.md.
+name = "SA16_IT2"
+start = 2026-11-17
+universe = [
+  "ETF_SP500_PEA",
+  "ETF_NASDAQ",
+  "ETF_EMERGING",
+  "ETF_GOLD",
+  "ETF_EURO_GOV",
+  "ETF_COMMODITY",
+  "ETF_MONETARY_EUR",
+  "ETF_WORLD",
+  "ETF_US_TECH",
+  "ETF_WORLD_HEALTH",
+  "ETF_WORLD_UTILITIES",
+]
+# SA16RiskBudget with the parameters of results/SA16/selected.json, decided weekly.
+# The id hashes the strategy's fingerprint and every condition of the run
+# (quant_backtester.research.paper.CONTRACT_KEYS), under the runner of
+# scripts/SA16_run_study.py: its costs, cash, timetable and lot sizes.
+contract_id = "ce5ff0c5d70be8b12d6f808a1fa09babba10f128945b543429585e6ce9149185"
+note = """The configuration the SA16 study retained (status UNCERTAIN), run forward on sessions nobody has seen. Judged against NASDAQ_BUY_HOLD and SA15_R4_TRIAL71 after 252 sessions, net of costs, on criteria 1 and 2 of research/SA16/protocol.md, section 3: net CAGR and net Sharpe both above each reference's, maximum drawdown at most 2 points deeper than the shallower of the two. Exposure, turnover and drawdown are reported beside the return, whatever they say."""

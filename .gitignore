@@ -71,3 +71,6 @@ results/**
 graphify-out/
 CLAUDE.local.md
 
+
+# The lock a research journal is appended under: a runtime file, never committed.
+*.jsonl.lock

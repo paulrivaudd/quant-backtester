@@ -1,0 +1,23 @@
+# Committed before its start. See research/PROTOCOL.md, sections 2 and 6, and
+# research/paper/README.md.
+name = "NASDAQ_BUY_HOLD"
+start = 2026-11-17
+universe = [
+  "ETF_SP500_PEA",
+  "ETF_NASDAQ",
+  "ETF_EMERGING",
+  "ETF_GOLD",
+  "ETF_EURO_GOV",
+  "ETF_COMMODITY",
+  "ETF_MONETARY_EUR",
+  "ETF_WORLD",
+  "ETF_US_TECH",
+  "ETF_WORLD_HEALTH",
+  "ETF_WORLD_UTILITIES",
+]
+# BuyAndHold(ETF_NASDAQ), decided every session: the first reference of the SA16 study.
+# The id hashes the strategy's fingerprint and every condition of the run
+# (quant_backtester.research.paper.CONTRACT_KEYS), under the runner of
+# scripts/SA16_run_study.py: its costs, cash, timetable and lot sizes.
+contract_id = "cf9c36b6b61a610cf5bc38fd5a4d672eb069541c82b82cfe7a7e376087d55dc3"
+note = """The Nasdaq fund bought at the start and held: the reference SA16_IT2 has to beat after costs, on the same sessions."""

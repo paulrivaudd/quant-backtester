@@ -5,6 +5,8 @@ strategy is measured against (:mod:`~quant_backtester.research.references`).
 The hypotheses, the protocol and the written analyses are documents, under
 ``research/`` at the root of the repository.
 
-The register of runs, the paper-trading plans and the archive of a run lived
-here until 2026-10-11.
+It also runs a strategy kept for observation forward on paper
+(:mod:`~quant_backtester.research.paper`): removed on 2026-10-11 with the
+register of runs and the archive of a run, restored on 2026-11-15 for
+SA16_it2.
 """

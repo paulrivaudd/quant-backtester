@@ -21,6 +21,7 @@ import argparse
 import hashlib
 import json
 import shutil
+from collections.abc import Callable
 from dataclasses import asdict
 from datetime import UTC, date, datetime, time
 from pathlib import Path
@@ -128,7 +129,9 @@ def prepare_store(store: Path) -> None:
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
 
 
-def build_updater(store: Path, end: date) -> MarketDataUpdater:
+def build_updater(
+    store: Path, end: date, clock: Callable[[], datetime] | None = None
+) -> MarketDataUpdater:
     """Wire the project's providers, normalisers, validators and reviews.
 
     Parameters
@@ -137,6 +140,9 @@ def build_updater(store: Path, end: date) -> MarketDataUpdater:
         Root of the isolated store.
     end : date
         Last research date; the clock is 23:59 UTC that day, after every close.
+    clock : Callable[[], datetime] | None
+        The clock of a store that follows the calendar instead of stopping at
+        ``end``: the paper store's. ``None`` for the study's frozen end.
     """
     metadata = store / "metadata"
     return MarketDataUpdater(
@@ -156,7 +162,7 @@ def build_updater(store: Path, end: date) -> MarketDataUpdater:
         cross_check_policy=CrossCheckPolicy.from_toml(metadata / "crosscheck.toml"),
         known_gaps=KnownGaps.from_toml(metadata / "known_gaps.toml"),
         conflict_reviews=ConflictReviews.from_toml(metadata / "conflict_reviews.toml"),
-        clock=lambda: datetime.combine(end, time(23, 59), tzinfo=UTC),
+        clock=clock or (lambda: datetime.combine(end, time(23, 59), tzinfo=UTC)),
     )
 
 

@@ -2590,3 +2590,17 @@ def test_a_dropped_bar_gap_needs_the_correction_that_drops_it(
             clock,
             known_gaps=reviewed_gap(WEDNESDAY, GapKind.BAR_DROPPED),
         )
+
+
+def test_published_until_reads_each_instrument_on_its_own_calendar(
+    updater: MarketDataUpdater,
+) -> None:
+    """Paris has closed on Thursday 12 March at 16:30 UTC; New York has not."""
+    at = utc(2026, 3, 12, 16, 30)
+    assert updater.published_until("ETF_EU", at) == THURSDAY
+    assert updater.published_until("IDX_US", at) == WEDNESDAY
+    assert updater.published_until("RATE_US", at) == safe_end_date(level_with(RATE_RULE), None, at)
+    with pytest.raises(KeyError):
+        updater.published_until("UNKNOWN", at)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        updater.published_until("ETF_EU", datetime(2026, 3, 12, 16, 30))

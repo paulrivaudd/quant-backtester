@@ -930,7 +930,8 @@ the rules down before any experiment they govern:
 - a strategy kept for observation run forward on paper, its configuration
   frozen, and not read before a year of sessions. The two plans committed for
   2026-10-01 were closed before any session was logged, and removed with the
-  code that ran them;
+  code that ran them. That code was restored on 2026-11-15: SA16_it2 and its
+  two references start on 2026-11-17 (`research/paper/README.md`);
 - neighbourhoods rather than points, rolling start dates, twice the costs, and
   an executable baseline over the same sessions before any variant is kept.
 

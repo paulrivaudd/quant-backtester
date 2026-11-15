@@ -555,9 +555,12 @@ The `research/` layer carries the research discipline described in
 | `research/commentary.toml` | the written analysis of each strategy, read by `write_strategy_reports.py` |
 | `quant_backtester.research.references` | `BuyAndHold`, `EqualWeightRebalance`, `FixedWeights`: the books a study measures a strategy against |
 
-The register of runs, the paper trading plans, the archive of a run and the
-loader of hypotheses were removed on 2026-10-11: no script used them any more.
-Each study counts its own trials and prints them.
+| `quant_backtester.research.paper`, `research/paper/` | the plans run forward on paper and their append-only logs (`scripts/paper_trade.py`, on the store `scripts/paper_update_store.py` extends) |
+
+The register of runs, the archive of a run and the loader of hypotheses were
+removed on 2026-10-11: no script used them any more. Each study counts its
+own trials and prints them. The paper plans were removed the same day and
+restored on 2026-11-15 for SA16_it2.
 
 ## 11. Integrity mechanisms, in summary
 
