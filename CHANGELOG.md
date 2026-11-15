@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### A second case study (2026-11-15)
+- `docs/CASE_STUDY_NASDAQ.md`: the three frozen tests on 1975-01 to 2018-07
+  (SA16's rule, its levered variant, SA18's trend filter), their written
+  predictions against their outcomes, and the paper run that follows. Linked
+  from the top of the README. No new result.
+
 ### README brought up to date (2026-11-15)
 - "My contribution" is written: the data layer and SA1 to SA10, the later
   studies as experimental records, and what was done with AI tools.

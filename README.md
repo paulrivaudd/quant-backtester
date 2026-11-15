@@ -21,7 +21,7 @@ A daily-frequency, point-in-time backtester: each decision reads only what was p
 
 No strategy of the common ranking ([ranking.csv](results/summary/ranking.csv)) beats the rebalanced 50/50 net of costs over 2021-2026. Every session of that period had already been examined, so these results are retrospective, not out of sample. SA15 to SA18 are separate studies, on other windows and references: see [Research](#research-what-is-left-to-test-and-how).
 
-[Case study: why none of the ten rules beats the 50/50](docs/CASE_STUDY.md) · [Getting started](#getting-started) · [Architecture](docs/ARCHITECTURE.md) · [Research protocol](research/PROTOCOL.md)
+[Case study: why none of the ten rules beats the 50/50](docs/CASE_STUDY.md) · [Case study: three frozen attempts to beat the Nasdaq](docs/CASE_STUDY_NASDAQ.md) · [Getting started](#getting-started) · [Architecture](docs/ARCHITECTURE.md) · [Research protocol](research/PROTOCOL.md)
 
 ## Contents
 
