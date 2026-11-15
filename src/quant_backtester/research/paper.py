@@ -31,13 +31,19 @@ backtest:
   of that session (D24);
 - **two writers.** Reading the log, checking it and appending to it hold an
   exclusive lock on it, and a session already logged identically is simply
-  already done: running twice changes nothing (D22).
+  already done: running twice changes nothing (D22);
+- **a line half written.** A run's new lines are written in one call and
+  flushed to disk before the lock is released. What an interrupted append
+  left after the last line break was never a logged session: it is ignored on
+  reading and removed by the next append, which logs that session whole. A
+  complete line that cannot be read is another matter, and stops the run.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import tomllib
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -428,14 +434,33 @@ class PaperLog:
         """Return the logged sessions with what each was logged with."""
         if not self.path.exists():
             return []
-        lines = [line for line in self.path.read_text(encoding="utf-8").splitlines() if line]
-        header = json.loads(lines[0])
+        whole = self.path.read_bytes()[: self._whole_length()].decode("utf-8")
+        lines = [line for line in whole.splitlines() if line]
+        if not lines:
+            return []
+        try:
+            header = json.loads(lines[0])
+            rows = [json.loads(line) for line in lines[1:]]
+            logged = [(PaperEntry(**row["entry"]), row["logged_with"]) for row in rows]
+        except (ValueError, KeyError, TypeError) as error:
+            raise PaperPlanBroken(
+                f"{self.path} holds a complete line that is not a log line ({error}): the log "
+                "was edited or damaged. Restore it from its last commit; nothing is appended "
+                "to it meanwhile."
+            ) from error
         if header != self._header():
             raise PaperPlanBroken(
                 f"{self.path} was started under {header} and the plan is {self._header()}"
             )
-        rows = [json.loads(line) for line in lines[1:]]
-        return [(PaperEntry(**row["entry"]), row["logged_with"]) for row in rows]
+        return logged
+
+    def _whole_length(self) -> int:
+        """Return how many bytes of the log are complete lines.
+
+        Every line is written with its line break, so bytes after the last
+        one are what an interrupted append left: not a logged session.
+        """
+        return self.path.read_bytes().rfind(b"\n") + 1
 
     def _header(self) -> dict[str, object]:
         """Return the line a log of this plan starts with."""
@@ -489,17 +514,29 @@ class PaperLog:
                     )
             new = list(entries[len(logged) :])
             if new:
-                with self.path.open("a", encoding="utf-8") as handle:
-                    if not logged and self.path.stat().st_size == 0:
-                        handle.write(json.dumps(self._header(), sort_keys=True) + "\n")
-                    for entry in new:
-                        line = {
+                whole = self._whole_length() if self.path.exists() else 0
+                lines = [] if whole else [json.dumps(self._header(), sort_keys=True)]
+                lines += [
+                    json.dumps(
+                        {
                             "entry": asdict(entry),
                             "logged_with": {
                                 "git_commit": git_commit,
                                 "logged_at": logged_at.isoformat(),
                             },
-                        }
-                        handle.write(json.dumps(line, sort_keys=True, separators=(",", ":")))
-                        handle.write("\n")
+                        },
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                    for entry in new
+                ]
+                payload = "".join(line + "\n" for line in lines).encode("utf-8")
+                with self.path.open("ab") as handle:
+                    # Drop what an interrupted append left, then write this
+                    # run's lines in one call and have them on disk before
+                    # the lock is released.
+                    handle.truncate(whole)
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
             return new

@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Paper recorder: four guards tightened after review (2026-11-15)
+- **A committed log may only grow.** `paper_trade.code_state` let any changed
+  `research/paper/*.jsonl` through, so a log deleted or shortened would have
+  been written again from today's store. Only a log not committed yet, or
+  one whose committed bytes are still the beginning of the file, is let
+  through now.
+- **An interrupted append no longer blocks the run.** A run's lines are
+  written in one call and synced to disk. What follows the last line break is
+  ignored on reading and removed by the next append, which logs that session
+  whole. A complete line that cannot be read stops the run with
+  `PaperPlanBroken`.
+- **An empty log file** is a log with no session, not an `IndexError`.
+- **`advance` checks the contract on every call**, including a day when no
+  session is ready, and no longer reports a started plan as "starts on" when
+  it has no commit to log with (a state a clean checkout cannot be in).
+- No plan, contract or start date changes.
+
 ### A second case study (2026-11-15)
 - `docs/CASE_STUDY_NASDAQ.md`: the three frozen tests on 1975-01 to 2018-07
   (SA16's rule, its levered variant, SA18's trend filter), their written

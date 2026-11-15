@@ -14,7 +14,7 @@ from tests.research.conftest import research_runner  # noqa: F401
 
 from quant_backtester.backtest.runner import StrategyRunner
 from quant_backtester.backtest.schedule import EverySession, Weekly
-from quant_backtester.provenance import SourceStatus
+from quant_backtester.provenance import SourceState, SourceStatus
 from quant_backtester.research.paper import PaperLog, PaperPlan, PaperPlanBroken, contract_id
 from quant_backtester.research.references import BuyAndHold
 from scripts import SA16_run_study as study
@@ -106,6 +106,29 @@ def test_only_a_plans_log_may_differ_from_the_commit(checkout: Path) -> None:
     assert paper_trade.code_state(checkout, logs).status is SourceStatus.CLEAN
 
 
+def test_a_committed_log_may_only_grow(checkout: Path) -> None:
+    """Deleted, shortened or edited, a log is a change: its sessions are not written again."""
+    logs = checkout / "research" / "paper"
+    log = logs / "PLAN.jsonl"
+    committed = log.read_text()
+
+    log.unlink()
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+    log.write_text("")
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+    log.write_text("{ }\n")
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+    log.write_text('{"other": 1}\n' + committed)
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+
+    log.write_text(committed + '{"appended": 1}\n')
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.CLEAN
+    # A folder named like a log is not one.
+    (logs / "FOLDER.jsonl").mkdir()
+    (logs / "FOLDER.jsonl" / "x.jsonl").write_text("{}\n")
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+
+
 @pytest.fixture
 def plan(research_runner: StrategyRunner) -> PaperPlan:  # noqa: F811
     probe = research_runner.run(STRATEGY, ["ETF_EU"], "2026-09-14", "2026-09-14")
@@ -193,3 +216,28 @@ def test_every_instrument_is_extended_and_a_failure_is_recorded_not_swallowed() 
     assert paper_update_store.failed(outcomes) is True
     assert paper_update_store.failed(outcomes[:1]) is False
     assert paper_update_store.failed(outcomes[2:]) is True
+
+
+def test_a_clean_checkout_always_names_the_commit_a_session_is_logged_with() -> None:
+    """A plan is advanced by a CLEAN source only, and a CLEAN source cannot lack its commit."""
+    with pytest.raises(ValueError, match="names its full commit"):
+        SourceState(SourceStatus.CLEAN, None)
+
+
+def test_the_contract_is_checked_on_a_day_no_session_is_ready(
+    plan: PaperPlan,
+    research_runner: StrategyRunner,  # noqa: F811
+    tmp_path: Path,
+) -> None:
+    """The store is complete to Monday but it is not yet 23:00 on the plan's first session."""
+    first_evening = datetime(2026, 9, 9, 18, 0, tzinfo=UTC)
+    log = PaperLog(tmp_path / "hold_eu.jsonl", plan)
+    said = paper_trade.advance(
+        plan, log, research_runner, STRATEGY, EverySession(), date(2026, 9, 14), first_evening
+    )
+    assert "no session is ready yet; contract checked" in said
+    assert not log.path.exists()
+    with pytest.raises(PaperPlanBroken, match="new plan"):
+        paper_trade.advance(
+            plan, log, research_runner, STRATEGY, Weekly(), date(2026, 9, 14), first_evening
+        )

@@ -341,3 +341,74 @@ def test_an_empty_series_or_a_store_too_far_behind_completes_nothing(
     assert complete_at(xpar, stale, late, not_before=date(2026, 9, 1)) == date(2026, 9, 4)
     with pytest.raises(ValueError, match="timezone-aware"):
         complete_at(xpar, stale, datetime(2026, 9, 15, 8, 0))
+
+
+def test_an_empty_log_file_is_a_log_with_no_session(
+    plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    """A file touched, or left by a first run that wrote nothing, is started like a new one."""
+    log = log_of(plan, tmp_path)
+    log.path.write_bytes(b"")
+    assert log.entries() == []
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 14))
+    assert result is not None
+
+    appended = log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
+
+    assert len(appended) == 4 and log.entries() == appended
+    assert log.path.read_text().splitlines()[0].startswith('{"contract_id"')
+
+
+@pytest.mark.parametrize("cut", [1, 40], ids=["line-break-lost", "line-half-written"])
+def test_a_line_an_interrupted_append_left_is_logged_again_whole(
+    plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path, cut: int
+) -> None:
+    """The host froze mid-append: what follows the last line break was never a logged session."""
+    log = log_of(plan, tmp_path)
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 14))
+    assert result is not None
+    entries = entries_of(result)
+    log.extend(entries, git_commit=COMMIT, logged_at=AT)
+    whole = log.path.read_bytes()
+    log.path.write_bytes(whole[:-cut])
+
+    assert [entry.session_date for entry in log.entries()] == [
+        "2026-09-09",
+        "2026-09-10",
+        "2026-09-11",
+    ]
+    appended = log.extend(entries, git_commit=COMMIT, logged_at=AT)
+
+    assert [entry.session_date for entry in appended] == ["2026-09-14"]
+    assert log.path.read_bytes() == whole
+
+
+def test_a_header_half_written_is_written_again(
+    plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    log = log_of(plan, tmp_path)
+    log.path.write_text('{"contract_id": "abc')
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 10))
+    assert result is not None
+
+    log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
+
+    assert len(log.entries()) == 2
+    assert len(log.path.read_text().splitlines()) == 3
+
+
+def test_a_complete_line_that_is_not_a_log_line_stops_the_run(
+    plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    """Damage inside the log is not an interrupted append: nothing is repaired or appended."""
+    log = log_of(plan, tmp_path)
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 14))
+    assert result is not None
+    log.extend(entries_of(result)[:2], git_commit=COMMIT, logged_at=AT)
+    for damage in ("not json\n", '{"entry": {"session_date": "2026-09-11"}}\n', "[1]\n"):
+        before = log.path.read_text()
+        log.path.write_text(before + damage)
+        with pytest.raises(PaperPlanBroken, match="edited or damaged"):
+            log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
+        assert log.path.read_text() == before + damage
+        log.path.write_text(before)
