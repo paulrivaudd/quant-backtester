@@ -28,13 +28,12 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import sys
 import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -45,11 +44,14 @@ from SA16_run_long_history import (  # noqa: E402
     GROWTH_HELD,
     NASDAQ_FILE,
     NASDAQ_HELD,
+    checked_bytes,
     checked_source,
     compare,
     measures,
     num,
     pct,
+    record_month,
+    replay_french,
 )
 
 from quant_backtester.analytics.uncertainty import holm_adjusted  # noqa: E402
@@ -59,7 +61,6 @@ from quant_backtester.research.sa16_long_history import (  # noqa: E402
     month_end_changes,
     reading,
 )
-from quant_backtester.research.sa17_mechanism import replay_monthly_returns  # noqa: E402
 from quant_backtester.research.sa18_trend import (  # noqa: E402
     SwitchMonth,
     above_average,
@@ -136,26 +137,9 @@ def load_series(
     recorded = {entry["file"]: entry for entry in coverage}
     series = study["series"]
 
-    def checked(name: str) -> bytes:
-        payload = (archive / name).read_bytes()
-        digest = hashlib.sha256(payload).hexdigest()
-        if digest != recorded[name]["sha256"]:
-            raise ValueError(f"{name}: archived bytes hash to {digest}, not to the record")
-        return payload
-
     def french(dataset: KenFrenchDataset) -> tuple[MonthlyReturns, date]:
-        entry = recorded[f"{dataset.value}.zip"]
-        first, last = entry["first_month"], entry["last_month"]
-        start = date(int(first[:4]), int(first[4:]), 1)
-        table = replay_monthly_returns(
-            checked(f"{dataset.value}.zip"),
-            dataset,
-            sha256=entry["sha256"],
-            retrieved_at_utc=datetime.fromisoformat(entry["retrieved_at_utc"]),
-            start=start,
-            end=date(int(last[:4]), int(last[4:]), 1),
-        )
-        return table, start
+        table = replay_french(archive, recorded, dataset)
+        return table, record_month(recorded[f"{dataset.value}.zip"]["first_month"])
 
     def column(table: MonthlyReturns, name: str) -> dict[date, float | None]:
         if name not in table.columns:
@@ -179,7 +163,9 @@ def load_series(
                 raise ValueError(f"{name} has no value for {month:%Y-%m}")
             values[name].append(value)
         month = _next_month(month)
-    nasdaq = month_end_changes(checked(NASDAQ_FILE).decode("utf-8"), series["nasdaq_series"])
+    nasdaq = month_end_changes(
+        checked_bytes(archive, recorded, NASDAQ_FILE).decode("utf-8"), series["nasdaq_series"]
+    )
     return TrendSeries(tuple(months), tuple(values["growth"]), tuple(values["risk_free"]), nasdaq)
 
 

@@ -44,7 +44,6 @@ import importlib
 import json
 import math
 import statistics
-import subprocess
 import sys
 import tomllib
 from collections.abc import Mapping, Sequence
@@ -77,7 +76,12 @@ from quant_backtester.data.reader import MarketDataReader
 from quant_backtester.data.repository import MarketDataRepository
 from quant_backtester.execution.costs import CostModel
 from quant_backtester.execution.model import ExecutionModel, Sizing
-from quant_backtester.provenance import SourceState, environment_state, git_source_state
+from quant_backtester.provenance import (
+    SourceState,
+    changed_paths,
+    environment_state,
+    git_source_state,
+)
 from quant_backtester.research.references import BuyAndHold, FixedWeights
 from quant_backtester.research.sa17_contract import load_sector_costs, month_end_release_decisions
 from quant_backtester.strategies.base import Strategy
@@ -162,17 +166,7 @@ def checked_source(output: Path, report: Path, inputs: Sequence[Path]) -> Source
         return source
     if source.dirty is None:
         raise SystemExit("refused: the checkout has no recorded commit")
-    changed = set()
-    for arguments in (
-        ["diff", "HEAD", "--no-renames", "--name-only", "-z"],
-        ["ls-files", "--others", "--exclude-standard", "-z"],
-    ):
-        result = subprocess.run(
-            ["git", "-C", str(ROOT), *arguments], check=True, capture_output=True
-        )
-        changed.update(
-            (ROOT / name.decode()).resolve() for name in result.stdout.split(b"\0") if name
-        )
+    changed = changed_paths(ROOT)
     protected = {path.resolve() for path in inputs}
     output, report = output.resolve(), report.resolve()
     if any(

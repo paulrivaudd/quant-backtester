@@ -28,7 +28,6 @@ import csv
 import hashlib
 import json
 import math
-import subprocess
 import sys
 import tomllib
 from collections.abc import Callable, Mapping, Sequence
@@ -44,7 +43,7 @@ from quant_backtester.analytics.uncertainty import (
 )
 from quant_backtester.data.sources.ken_french import KenFrenchDataset, MonthlyReturns
 from quant_backtester.data.sources.world_bank import parse_pink_sheet_monthly
-from quant_backtester.provenance import git_source_state
+from quant_backtester.provenance import changed_paths, git_source_state
 from quant_backtester.research.sa16_long_history import (
     GOLD,
     GROWTH,
@@ -91,21 +90,75 @@ def checked_source(output: Path) -> str:
     source = git_source_state(ROOT)
     if source.dirty is None:
         raise SystemExit("refused: the checkout has no recorded commit")
-    if source.dirty:
-        changed: set[Path] = set()
-        for arguments in (
-            ["diff", "HEAD", "--no-renames", "--name-only", "-z"],
-            ["ls-files", "--others", "--exclude-standard", "-z"],
-        ):
-            result = subprocess.run(
-                ["git", "-C", str(ROOT), *arguments], check=True, capture_output=True
-            )
-            changed.update(
-                (ROOT / name.decode()).resolve() for name in result.stdout.split(b"\0") if name
-            )
-        if any(not path.is_relative_to(output.resolve()) for path in changed):
-            raise SystemExit("refused: commit the design and the code before the run")
+    if source.dirty and any(
+        not path.is_relative_to(output.resolve()) for path in changed_paths(ROOT)
+    ):
+        raise SystemExit("refused: commit the design and the code before the run")
     return str(source.git_commit)
+
+
+def record_month(value: str) -> date:
+    """Return the first day of a month a coverage record writes as ``YYYYMM``."""
+    return date(int(value[:4]), int(value[4:]), 1)
+
+
+def checked_bytes(archive: Path, recorded: Mapping[str, Mapping[str, Any]], name: str) -> bytes:
+    """Return an archived file's bytes, refused unless they hash to its coverage record.
+
+    Parameters
+    ----------
+    archive : Path
+        The folder the retrieval archived its files in.
+    recorded : Mapping[str, Mapping[str, Any]]
+        The coverage records of the retrieval, by file name.
+    name : str
+        The file to read.
+
+    Raises
+    ------
+    ValueError
+        If the bytes do not hash to the ``sha256`` recorded for the file.
+    """
+    payload = (archive / name).read_bytes()
+    digest = hashlib.sha256(payload).hexdigest()
+    if digest != recorded[name]["sha256"]:
+        raise ValueError(f"{name}: archived bytes hash to {digest}, not to the record")
+    return payload
+
+
+def replay_french(
+    archive: Path, recorded: Mapping[str, Mapping[str, Any]], dataset: KenFrenchDataset
+) -> MonthlyReturns:
+    """Replay an archived Ken French file over the months its coverage record states.
+
+    Parameters
+    ----------
+    archive, recorded
+        As :func:`checked_bytes`.
+    dataset : KenFrenchDataset
+        The dataset; its file is ``<dataset value>.zip``.
+
+    Returns
+    -------
+    MonthlyReturns
+        The table from the record's ``first_month`` to its ``last_month``,
+        stamped with the record's retrieval instant (UTC).
+
+    Raises
+    ------
+    ValueError
+        As :func:`checked_bytes`.
+    """
+    name = f"{dataset.value}.zip"
+    entry = recorded[name]
+    return replay_monthly_returns(
+        checked_bytes(archive, recorded, name),
+        dataset,
+        sha256=entry["sha256"],
+        retrieved_at_utc=datetime.fromisoformat(entry["retrieved_at_utc"]),
+        start=record_month(entry["first_month"]),
+        end=record_month(entry["last_month"]),
+    )
 
 
 def load_panel(
@@ -116,23 +169,10 @@ def load_panel(
     series = study["series"]
 
     def checked(name: str) -> bytes:
-        payload = (archive / name).read_bytes()
-        digest = hashlib.sha256(payload).hexdigest()
-        if digest != recorded[name]["sha256"]:
-            raise ValueError(f"{name}: archived bytes hash to {digest}, not to the record")
-        return payload
+        return checked_bytes(archive, recorded, name)
 
     def french(dataset: KenFrenchDataset) -> MonthlyReturns:
-        entry = recorded[f"{dataset.value}.zip"]
-        first, last = entry["first_month"], entry["last_month"]
-        return replay_monthly_returns(
-            checked(f"{dataset.value}.zip"),
-            dataset,
-            sha256=entry["sha256"],
-            retrieved_at_utc=datetime.fromisoformat(entry["retrieved_at_utc"]),
-            start=date(int(first[:4]), int(first[4:]), 1),
-            end=date(int(last[:4]), int(last[4:]), 1),
-        )
+        return replay_french(archive, recorded, dataset)
 
     months, values, _updated = parse_pink_sheet_monthly(
         checked(GOLD_FILE), series["gold_column"], series["gold_unit"]

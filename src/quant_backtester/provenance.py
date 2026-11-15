@@ -147,6 +147,51 @@ def git_source_state(path: Path) -> SourceState:
     return SourceState(status, commit)
 
 
+def changed_paths(root: Path) -> frozenset[Path]:
+    """Return every file of a checkout that is not as its commit has it.
+
+    Parameters
+    ----------
+    root : Path
+        The root of the checkout: git names files relative to it.
+
+    Returns
+    -------
+    frozenset[Path]
+        The resolved path of each file modified, deleted or added since
+        ``HEAD``, staged or not, and of each untracked file the repository
+        does not ignore. Empty for a clean checkout. A rename is its two
+        files: the one that went and the one that came.
+
+    Raises
+    ------
+    subprocess.CalledProcessError
+        If ``root`` is not inside a git checkout with a commit.
+    OSError
+        If git cannot be run.
+
+    Notes
+    -----
+    :func:`git_source_state` says whether a checkout is dirty; this says by
+    what. A script that lets some files differ from the commit - the output
+    it generates, the log it appends to - calls it once and applies its own
+    rule to each path, so that the rule is the only thing two scripts can
+    disagree on.
+    """
+    changed: set[Path] = set()
+    for arguments in (
+        ["diff", "HEAD", "--no-renames", "--name-only", "-z"],
+        ["ls-files", "--others", "--exclude-standard", "-z"],
+    ):
+        result = subprocess.run(
+            ["git", "-C", str(root), *arguments], check=True, capture_output=True
+        )
+        changed.update(
+            (root / name.decode()).resolve() for name in result.stdout.split(b"\0") if name
+        )
+    return frozenset(changed)
+
+
 ENVIRONMENT_PACKAGES: tuple[str, ...] = ("numpy", "pandas", "pyarrow", "scipy")
 """The libraries whose version can change a number a run prints."""
 

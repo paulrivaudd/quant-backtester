@@ -11,7 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from quant_backtester.provenance import SourceState, SourceStatus, git_source_state
+from quant_backtester.provenance import (
+    SourceState,
+    SourceStatus,
+    changed_paths,
+    git_source_state,
+)
 
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
 
@@ -154,3 +159,38 @@ def test_a_status_must_be_one_of_the_statuses() -> None:
     """A free-text status cannot be compared across runs."""
     with pytest.raises(ValueError, match="SourceStatus"):
         SourceState("clean")  # type: ignore[arg-type]
+
+
+def test_the_changed_paths_are_what_differs_from_the_commit_and_nothing_else(
+    repository: Path,
+) -> None:
+    """Edited, deleted, staged, renamed and untracked; not ignored, not unchanged."""
+    (repository / ".gitignore").write_text("cache/\n")
+    (repository / "kept.py").write_text("x = 1\n")
+    (repository / "removed.py").write_text("x = 2\n")
+    (repository / "moved.py").write_text("a long enough file to be seen as renamed\n" * 5)
+    git(repository, "add", "-A")
+    git(repository, "commit", "-m", "more files")
+    assert changed_paths(repository) == frozenset()
+
+    (repository / "strategy.py").write_text("LOOKBACK = 20\n")
+    (repository / "removed.py").unlink()
+    (repository / "staged.py").write_text("y = 1\n")
+    git(repository, "add", "staged.py")
+    git(repository, "mv", "moved.py", "arrived.py")
+    (repository / "deeper").mkdir()
+    (repository / "deeper" / "untracked.py").write_text("z = 1\n")
+    (repository / "cache").mkdir()
+    (repository / "cache" / "ignored.bin").write_text("ignored\n")
+
+    names = ("strategy.py", "removed.py", "staged.py", "moved.py", "arrived.py")
+    expected = {(repository / name).resolve() for name in names}
+    expected.add((repository / "deeper" / "untracked.py").resolve())
+    assert changed_paths(repository) == expected
+
+
+def test_the_changed_paths_of_a_folder_that_is_not_a_checkout_are_refused(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    with pytest.raises(subprocess.CalledProcessError):
+        changed_paths(tmp_path_factory.mktemp("no-repository"))

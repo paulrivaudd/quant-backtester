@@ -60,7 +60,12 @@ from SA16_run_study import (  # noqa: E402
 from quant_backtester.backtest.runner import StrategyRunner  # noqa: E402
 from quant_backtester.backtest.schedule import DecisionSchedule, EverySession  # noqa: E402
 from quant_backtester.data.repository import MarketDataRepository  # noqa: E402
-from quant_backtester.provenance import SourceState, SourceStatus, git_source_state  # noqa: E402
+from quant_backtester.provenance import (  # noqa: E402
+    SourceState,
+    SourceStatus,
+    changed_paths,
+    git_source_state,
+)
 from quant_backtester.research.paper import (  # noqa: E402
     PaperLog,
     PaperPlan,
@@ -84,6 +89,12 @@ SELECTED = OUTPUT / "selected.json"
 
 def books() -> dict[str, tuple[Strategy, DecisionSchedule]]:
     """Return the strategy each plan names, as code. The plan's contract checks it.
+
+    Returns
+    -------
+    dict[str, tuple[Strategy, DecisionSchedule]]
+        By plan name, the strategy and the schedule it decides on: SA16_it2
+        as the study retained it, and its two references.
 
     Raises
     ------
@@ -113,21 +124,25 @@ def code_state(root: Path, logs: Path) -> SourceState:
     any other, so the run stops instead of writing the missing sessions again
     from today's store. Anything else changed or untracked leaves the state
     as git reports it.
+
+    Parameters
+    ----------
+    root : Path
+        The root of the checkout.
+    logs : Path
+        The folder of the plans' logs; only ``*.jsonl`` files directly in it
+        are logs.
+
+    Returns
+    -------
+    SourceState
+        ``CLEAN`` with the commit when nothing differs from it but lines
+        appended to logs; otherwise the state :func:`git_source_state` gives.
     """
     state = git_source_state(root)
     if state.status is not SourceStatus.DIRTY:
         return state
-    changed: set[Path] = set()
-    for arguments in (
-        ["diff", "HEAD", "--no-renames", "--name-only", "-z"],
-        ["ls-files", "--others", "--exclude-standard", "-z"],
-    ):
-        result = subprocess.run(
-            ["git", "-C", str(root), *arguments], check=True, capture_output=True
-        )
-        changed.update(
-            (root / name.decode()).resolve() for name in result.stdout.split(b"\0") if name
-        )
+    changed = changed_paths(root)
     folder = logs.resolve()
     if all(
         path.parent == folder and path.suffix == ".jsonl" and _only_appended(root, path)
@@ -227,6 +242,19 @@ def waiting_line(session: date, short: Mapping[str, tuple[date | None, date]]) -
     A series is waited for until the store holds an observation of it at or
     after the date given, which may be a day or so after the store is in fact
     whole: see :func:`quant_backtester.research.paper.series_short_of`.
+
+    Parameters
+    ----------
+    session : date
+        The session held back, a date of the reference calendar.
+    short : Mapping[str, tuple[date | None, date]]
+        By series, where it stops in the store (``None`` if empty) and the
+        observation date it has to reach.
+
+    Returns
+    -------
+    str
+        One line for the run's output.
     """
     series = "; ".join(
         f"{name} stored to {last if last is not None else 'nothing'}, waits for {needed} or later"
@@ -294,7 +322,18 @@ def advance(
 
 
 def main(arguments: Sequence[str] | None = None) -> int:
-    """Run every plan up to its last ready session, and extend its log."""
+    """Run every plan up to its last ready session, and extend its log.
+
+    Parameters
+    ----------
+    arguments : Sequence[str] | None
+        Command-line arguments; ``None`` reads the process's.
+
+    Returns
+    -------
+    int
+        Zero. Anything that stops the run raises.
+    """
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--contracts", action="store_true")
