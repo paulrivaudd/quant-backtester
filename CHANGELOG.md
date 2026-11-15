@@ -18,6 +18,12 @@
   that moved on, adoption from a clean checkout only.
 - **Docstrings completed** on `contract_of`, `contract_id`, `entries_of` and
   the public functions of the two paper scripts.
+- **After its review**: `changed_paths` reads the whole checkout from any
+  folder of it and names a changed link itself, not its target; a checkout
+  git calls dirty while no file differs from the commit (a change staged,
+  then undone) is no longer let through by the three scripts, which read an
+  empty set as "only allowed files changed"; the shared replay helpers have
+  their own tests and refuse a file the coverage records do not name.
 
 ### Paper run: the store can take a reviewed decision, and a waiting session says why (2026-11-15)
 - **The paper store keeps the metadata it was seeded with.**

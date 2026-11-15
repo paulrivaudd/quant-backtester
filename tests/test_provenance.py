@@ -184,13 +184,36 @@ def test_the_changed_paths_are_what_differs_from_the_commit_and_nothing_else(
     (repository / "cache" / "ignored.bin").write_text("ignored\n")
 
     names = ("strategy.py", "removed.py", "staged.py", "moved.py", "arrived.py")
-    expected = {(repository / name).resolve() for name in names}
-    expected.add((repository / "deeper" / "untracked.py").resolve())
+    expected = {repository.resolve() / name for name in names}
+    expected.add(repository.resolve() / "deeper" / "untracked.py")
     assert changed_paths(repository) == expected
+    # The whole checkout is read, whichever folder of it is given.
+    assert changed_paths(repository / "deeper") == expected
+
+
+def test_a_changed_link_is_named_itself_not_what_it_points_to(repository: Path) -> None:
+    (repository / "output").mkdir()
+    (repository / "output" / "generated.txt").write_text("generated\n")
+    (repository / "helper.py").symlink_to("output/generated.txt")
+    changed = changed_paths(repository)
+    assert repository.resolve() / "helper.py" in changed
+    assert all(path.name != "generated.txt" or path.parent.name == "output" for path in changed)
+
+
+def test_a_change_staged_then_undone_is_dirty_with_no_changed_path(repository: Path) -> None:
+    """Git's status and its diff against the commit disagree: nothing differs, and it is dirty."""
+    (repository / "strategy.py").write_text("LOOKBACK = 20\n")
+    git(repository, "add", "strategy.py")
+    (repository / "strategy.py").write_text("LOOKBACK = 60\n")
+    assert git_source_state(repository).status is SourceStatus.DIRTY
+    assert changed_paths(repository) == frozenset()
 
 
 def test_the_changed_paths_of_a_folder_that_is_not_a_checkout_are_refused(
-    tmp_path_factory: pytest.TempPathFactory,
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    folder = tmp_path_factory.mktemp("no-repository")
+    # Wherever the temporary folder lives, git does not look above it.
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(folder.parent))
     with pytest.raises(subprocess.CalledProcessError):
-        changed_paths(tmp_path_factory.mktemp("no-repository"))
+        changed_paths(folder)

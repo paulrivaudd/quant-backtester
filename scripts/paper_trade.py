@@ -144,7 +144,9 @@ def code_state(root: Path, logs: Path) -> SourceState:
         return state
     changed = changed_paths(root)
     folder = logs.resolve()
-    if all(
+    # Dirty with no file differing from the commit (a change staged, then
+    # undone) is still dirty: an empty set is not a set of logs.
+    if changed and all(
         path.parent == folder and path.suffix == ".jsonl" and _only_appended(root, path)
         for path in changed
     ):

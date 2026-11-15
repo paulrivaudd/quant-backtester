@@ -273,6 +273,8 @@ def paper_run(
     store = store_holding(tmp_path / "store", reviewed)
     updater = RecordingUpdater()
     monkeypatch.setattr(paper_update_store, "build_updater", lambda *_args, **_kwargs: updater)
+    # The script compares the store with what the fixture read, not with a second reading.
+    monkeypatch.setattr(paper_update_store, "reviewed_metadata", lambda *_args: reviewed)
     return store, updater
 
 

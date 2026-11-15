@@ -264,3 +264,12 @@ def test_the_run_refuses_a_store_whose_metadata_is_not_the_one_it_recorded(
     (store / "metadata" / "known_gaps.toml").write_text("x = 1\n")
     with pytest.raises(ValueError, match="not the one it recorded"):
         paper_trade.main(["--store", str(store)])
+
+
+def test_a_change_staged_then_undone_does_not_pass_for_appended_logs(checkout: Path) -> None:
+    """Dirty with no file differing from the commit is not a clean checkout."""
+    (checkout / "code.py").write_text("x = 2\n")
+    git(checkout, "add", "code.py")
+    (checkout / "code.py").write_text("x = 1\n")
+    state = paper_trade.code_state(checkout, checkout / "research" / "paper")
+    assert state.status is SourceStatus.DIRTY

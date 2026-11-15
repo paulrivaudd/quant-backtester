@@ -90,15 +90,28 @@ def checked_source(output: Path) -> str:
     source = git_source_state(ROOT)
     if source.dirty is None:
         raise SystemExit("refused: the checkout has no recorded commit")
-    if source.dirty and any(
-        not path.is_relative_to(output.resolve()) for path in changed_paths(ROOT)
-    ):
-        raise SystemExit("refused: commit the design and the code before the run")
+    if source.dirty:
+        changed, folder = changed_paths(ROOT), output.resolve()
+        # No file differing while git says dirty (a change staged, then
+        # undone) is not generated output either.
+        if not changed or any(not path.is_relative_to(folder) for path in changed):
+            raise SystemExit("refused: commit the design and the code before the run")
     return str(source.git_commit)
 
 
 def record_month(value: str) -> date:
-    """Return the first day of a month a coverage record writes as ``YYYYMM``."""
+    """Return the first day of a month a coverage record writes as ``YYYYMM``.
+
+    Parameters
+    ----------
+    value : str
+        Six digits: the year, then the month.
+
+    Returns
+    -------
+    date
+        The first day of that month.
+    """
     return date(int(value[:4]), int(value[4:]), 1)
 
 
@@ -117,8 +130,13 @@ def checked_bytes(archive: Path, recorded: Mapping[str, Mapping[str, Any]], name
     Raises
     ------
     ValueError
-        If the bytes do not hash to the ``sha256`` recorded for the file.
+        If the coverage records do not name the file, or its bytes do not
+        hash to the ``sha256`` recorded for it.
+    FileNotFoundError
+        If the archive does not hold the file.
     """
+    if name not in recorded:
+        raise ValueError(f"{name}: the coverage records do not name this file")
     payload = (archive / name).read_bytes()
     digest = hashlib.sha256(payload).hexdigest()
     if digest != recorded[name]["sha256"]:
@@ -150,9 +168,10 @@ def replay_french(
         As :func:`checked_bytes`.
     """
     name = f"{dataset.value}.zip"
+    payload = checked_bytes(archive, recorded, name)
     entry = recorded[name]
     return replay_monthly_returns(
-        checked_bytes(archive, recorded, name),
+        payload,
         dataset,
         sha256=entry["sha256"],
         retrieved_at_utc=datetime.fromisoformat(entry["retrieved_at_utc"]),

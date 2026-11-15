@@ -169,7 +169,7 @@ def checked_source(output: Path, report: Path, inputs: Sequence[Path]) -> Source
     changed = changed_paths(ROOT)
     protected = {path.resolve() for path in inputs}
     output, report = output.resolve(), report.resolve()
-    if any(
+    if not changed or any(
         path in protected or not (path == report or path.is_relative_to(output)) for path in changed
     ):
         raise SystemExit("refused: commit changes outside generated study output first")
