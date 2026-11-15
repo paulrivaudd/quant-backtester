@@ -19,9 +19,9 @@ A daily-frequency, point-in-time backtester: each decision reads only what was p
 | SA7 - factor blend | 8.90% | 10.80% | 0.83 | -16.36% |
 | SA3 - smooth MA | 8.62% | 11.01% | 0.79 | -21.64% |
 
-No strategy of the common ranking ([ranking.csv](results/summary/ranking.csv)) beats the rebalanced 50/50 net of costs over 2021-2026. Every session of that period had already been examined, so these results are retrospective, not out of sample. SA15 and SA16 are separate studies, on other windows and references ([SA16](results/SA16/study.md)).
+No strategy of the common ranking ([ranking.csv](results/summary/ranking.csv)) beats the rebalanced 50/50 net of costs over 2021-2026. Every session of that period had already been examined, so these results are retrospective, not out of sample. SA15 to SA18 are separate studies, on other windows and references: see [Research](#research-what-is-left-to-test-and-how).
 
-[Getting started](#getting-started) · [Architecture](docs/ARCHITECTURE.md) · [Research protocol](research/PROTOCOL.md)
+[Case study: why none of the ten rules beats the 50/50](docs/CASE_STUDY.md) · [Getting started](#getting-started) · [Architecture](docs/ARCHITECTURE.md) · [Research protocol](research/PROTOCOL.md)
 
 ## Contents
 
@@ -184,30 +184,53 @@ has its report under `results/`, measured on the common period 2021-04-01 to
 | SA9 | Take a small position once a volatility panic eases and the fund starts to rise. | [SA9](results/SA9/analysis.md) |
 | SA10 | Several rules, fixed capital budgets, one risk control and one rebalancing band. | [SA10](results/SA10/analysis.md) |
 
-The rest of this section is still to be written.
+I also wrote the data layer: the providers, the calendars, the local Parquet
+store, validation, cross-checking between sources, the revision policy and
+the point-in-time reader ([docs/DATA.md](docs/DATA.md)).
 
-### What I designed
-
-*Architecture, research protocol, choice of tests.*
-
-### What I implemented myself
+The later studies, SA11 to SA18, are more experimental: forecasting models,
+fitted models, and studies on other funds and longer histories. They are
+research records more than finished strategies, and most of them conclude
+that the rule tested is not supported.
 
 ### What was done with AI tools, and how I checked it
 
+The studies added from 2026-11-07 (SA17, the long-history tests of SA16,
+SA18, and the paper run) were written with AI coding assistants under my
+direction. Each one is checked the same way: the design and a written
+prediction are committed before any return is computed, the run refuses
+uncommitted code and inputs whose hash is not the recorded one, and a second
+run has to give the same files.
+
 ## Status
 
-The **market data layer is complete and in use**: providers, calendars, a local
-Parquet store, validation, multi-source cross-checking, a revision policy and a
-point-in-time reader. It ingests six instruments end to end, with dated
-universe memberships, and deleting the derived layer and rebuilding it from the
-raw archive gives the same files byte for byte.
+Every layer is in use by the studies under `results/`. As of 2026-11-15:
 
-The **signals layer has its first version**: a window loader that refuses a
-window which is not what it claims to be, six signals computed from a fund's
-own window — return, momentum, moving-average trend, realised volatility,
-current drawdown and mean reversion — two more for published series, a
-cross-sectional ranking over any of them, and a universe per signal so a gauge
-can reach the same decision as the funds it gates.
+| Layer | What it holds | Test functions |
+| --- | --- | ---: |
+| `data/` | six provider adapters, three venue calendars, the Parquet store, validation, cross-checking, the revision policy, the point-in-time reader | 954 in `tests/data/` |
+| `signals/` | the window loader and seventeen signals: price, risk, published levels, cross-asset, cross-sectional rank | 366 in `tests/signals/` |
+| `portfolio/` | admissibility and limits: what a book may hold of what a strategy asked for | 131 in `tests/portfolio/` |
+| `execution/` | orders, fills, refusals; commission, spread and slippage as separate terms | 139 in `tests/execution/` |
+| `backtest/` | the event loop, the schedules, the timetable, the runner | 248 in `tests/backtest/` |
+| `analytics/` | performance, risk, comparison, bootstrap intervals, deflated Sharpe, figures | 239 in `tests/analytics/` |
+| `strategies/` | the contract and the catalogue, SA1 to SA17 | 368 in `tests/strategies/` |
+| `research/`, `ml/` | reference books, study contracts, the paper recorder; fitted models | 190 in `tests/research/` and `tests/ml/` |
+
+The whole offline suite runs in CI on every push, with lint, format and type
+checks.
+
+The **market data layer is complete and in use**. The committed registry
+declares ten instruments, with dated universe memberships; each study adds
+its own in an isolated store. Deleting the derived layer and rebuilding it
+from the raw archive gives the same files byte for byte.
+
+The **signals layer** has a window loader that refuses a window which is not
+what it claims to be, signals computed from a fund's own window (return,
+momentum, moving-average trend, realised volatility, drawdown, mean
+reversion), others for published series and for one series against another,
+a cross-sectional ranking over any of them, and a universe per signal so a
+gauge can reach the same decision as the funds it gates.
 
 **Writing a strategy is the point, and it takes about fifteen lines.** A
 strategy declares the signals it needs and answers one question - what to hold,
@@ -266,12 +289,12 @@ src/quant_backtester/
     backtest/    the event loop                                (V1 done)
     analytics/   performance, risk, comparison, plots           (V1 done)
     strategies/  the contract, and strategies written on it     (V1 done)
-    research/    hypotheses, experiment register, archives, paper plans
+    research/    reference books, study contracts, the paper recorder
     demo.py      an invented market for a first, offline backtest
 tests/           mirrors the package layout
 scripts/         command-line entry points (see docs/ARCHITECTURE.md §13)
 docs/            architecture, data layer, formulas, corporate actions, glossary
-results/         one folder per strategy (SA1 ... SA16) and summary/, which compares them;
+results/         one folder per strategy or study (SA1 ... SA18) and summary/, which compares SA1 to SA14;
                  the raw exports of SA15 and SA16 are in a Release (results/ARCHIVE.md)
 runs/            what the study scripts export, run after run; not committed
 market_data/     metadata/ is committed; raw/, clean/ and validation/ are not
@@ -1062,7 +1085,25 @@ retrospective.
 US technology and gold held together under a 75/25 risk budget; it beats
 Nasdaq-100 held and SA15's archived selection on 2018-08 to 2026-10 net of
 costs, with a Sharpe edge established and a return edge that is not
-([study](results/SA16/study.md)).
+([study](results/SA16/study.md)). Its registered status is `UNCERTAIN`.
+
+That window is the one the rule was designed on. Two tests on months it
+never saw, 1975-01 to 2018-07, on monthly research series in US dollars,
+each frozen with a written prediction before its run:
+
+| Test | Net CAGR | Sharpe | Max drawdown | Reading |
+| --- | ---: | ---: | ---: | --- |
+| The rule, unlevered ([study](results/SA16/long_history/study.md)) | 10.8% | 0.45 | -44.5% | `NOT_SUPPORTED` |
+| The rule, levered to the technology portfolio's volatility ([study](results/SA16/levered_long_history/study.md)) | 11.6% | 0.41 | -69.8% | `NOT_SUPPORTED` |
+| Technology portfolio, held (reference) | 12.0% | 0.42 | -79.6% | |
+| Nasdaq Composite, held, no dividends (reference) | 11.8% | 0.43 | -75.0% | |
+
+The rule halves the worst loss and earns about a point less a year. Leverage
+gives most of that protection back. The second prediction was too favourable.
+
+The configuration retained is now run forward on paper beside its two
+references, from 2026-11-17, and is not read before 2027-11-09
+([plans](research/paper/README.md)).
 
 <details>
 <summary>Read the summary of the study</summary>
@@ -1096,19 +1137,35 @@ looked at before: the result is retrospective.
 
 </details>
 
-### SA17: market-adjusted sector momentum (implemented, not run)
+### SA17: market-adjusted sector momentum
 
 The US sectors whose recent monthly returns most exceed what their beta to the
 market explains: the three best are held in equal parts, the sleeve is scaled
 to a 15% volatility target, and the rest goes to the EUR monetary fund. It is
-`SA17SectorResidualMomentum`, catalogued `SA17 - sector residual momentum`,
-on `MonthlyMomentumSignal`. Four controls each remove one mechanism. All of it
-is tested offline and through the engine on a synthetic market. Its data, ten
-Xetra sector funds, the S&P 500 total return in USD, XEON, EUR/USD and the
-funds of the external references, was acquired on 2026-11-07. No strategy has
-been run on it. The proposal stays `PROPOSED / NOT_TESTED`. Its data audit,
-the coverage of the acquisition and the decisions still open before a
-protocol can be frozen are in [`research/SA17/`](research/SA17/README.md).
+`SA17SectorResidualMomentum`, catalogued `SA17 - sector residual momentum`.
+Four controls each remove one mechanism.
+
+Two studies, each frozen before its run
+([protocol](research/SA17/protocol.md)):
+
+- **The mechanism, on Ken French industry portfolios since 1929**
+  ([study](results/SA17/mechanism/study.md)): `UNCERTAIN` against plain 12-1
+  momentum, `SUPPORTED_RETROSPECTIVE` against holding every industry in equal
+  weight. A replication on published series, not an executable result.
+- **The executable book, 2018-08 to 2026-10**
+  ([study](results/SA17/study.md)): formal verdict `INSUFFICIENT_EVIDENCE`,
+  because two of the five admission gates are only partly met (when a fund's
+  value is published, and the prices orders are filled at). The provisional
+  figures do not favour it: 14.8% a year net against 19.1% for the Nasdaq
+  fund held and 22.3% for SA16's retained configuration.
+
+### SA18: a trend filter on the long history
+
+The technology portfolio held while its level is above its ten-month average,
+Treasury bills otherwise (Faber 2007), on the same 1975-01 to 2018-07 months
+as the two SA16 tests above: 9.4% a year net, Sharpe 0.35, maximum drawdown
+-46.1%. `NOT_SUPPORTED` against both references; the written prediction was
+too favourable ([study](results/SA18/trend_long_history/study.md)).
 
 ## What a strategy may not do
 
