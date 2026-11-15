@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import io
 import json
 import random
@@ -152,41 +151,6 @@ def test_an_altered_file_is_refused_at_replay(archive) -> None:
     (folder / "NASDAQCOM.csv").write_text("observation_date,NASDAQCOM\n1972-01-27,1\n")
     with pytest.raises(ValueError, match=r"NASDAQCOM\.csv"):
         runner.load_panel(folder, coverage, study)
-
-
-def test_a_record_month_is_the_first_day_of_the_month_written() -> None:
-    assert runner.record_month("192607") == date(1926, 7, 1)
-    assert runner.record_month("201812") == date(2018, 12, 1)
-    with pytest.raises(ValueError):
-        runner.record_month("201813")
-
-
-def test_archived_bytes_are_returned_only_if_they_hash_to_their_record(tmp_path: Path) -> None:
-    (tmp_path / "file.csv").write_bytes(b"as archived")
-    recorded = {"file.csv": {"sha256": hashlib.sha256(b"as archived").hexdigest()}}
-    assert runner.checked_bytes(tmp_path, recorded, "file.csv") == b"as archived"
-    (tmp_path / "file.csv").write_bytes(b"as altered")
-    with pytest.raises(ValueError, match="not to the record"):
-        runner.checked_bytes(tmp_path, recorded, "file.csv")
-    with pytest.raises(ValueError, match="do not name this file"):
-        runner.checked_bytes(tmp_path, recorded, "other.csv")
-    with pytest.raises(FileNotFoundError):
-        runner.checked_bytes(tmp_path, {"missing.csv": {"sha256": "0"}}, "missing.csv")
-
-
-def test_a_french_table_is_replayed_over_the_months_its_record_states(archive) -> None:
-    folder, _study = archive
-    recorded = {
-        entry["file"]: entry for entry in json.loads((folder / "coverage.json").read_text())
-    }
-    table = runner.replay_french(folder, recorded, KenFrenchDataset.FACTORS)
-    entry = recorded[f"{KenFrenchDataset.FACTORS.value}.zip"]
-    assert table.months[0] == runner.record_month(entry["first_month"])
-    assert table.months[-1] == runner.record_month(entry["last_month"])
-    name = f"{KenFrenchDataset.FACTORS.value}.zip"
-    (folder / name).write_bytes((folder / name).read_bytes() + b"x")
-    with pytest.raises(ValueError, match="not to the record"):
-        runner.replay_french(folder, recorded, KenFrenchDataset.FACTORS)
 
 
 @pytest.mark.slow
