@@ -22,8 +22,9 @@ or after that point: after a day without one (a weekend for a rate released
 the next day, a publisher's holiday) a session waits for the next observation
 and is logged a day or so late. The script names the series it waits for.
 
-Uncommitted code, a run under another contract, or a logged past that comes
-out differently stops the script: see ``research/PROTOCOL.md``. The logs
+Uncommitted code, a run under another contract, a logged past that comes out
+differently, or a store whose metadata is not the one it recorded stops the
+script: see ``research/PROTOCOL.md``. The logs
 themselves may be uncommitted: they are what this script writes. Running it
 twice changes nothing. It performs no network I/O.
 
@@ -45,7 +46,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from paper_update_store import STORE  # noqa: E402
+from paper_update_store import STORE, require_recorded_metadata  # noqa: E402
 from SA16_download_data import INSTRUMENT_IDS, STUDY_END, build_updater  # noqa: E402
 from SA16_run_study import (  # noqa: E402
     OUTPUT,
@@ -137,21 +138,55 @@ def code_state(root: Path, logs: Path) -> SourceState:
 
 
 def _only_appended(root: Path, log: Path) -> bool:
-    """Return whether a log still starts with the bytes committed for it, if any were."""
+    """Return whether a log still starts with the lines committed for it, if any were.
+
+    The committed lines are the committed bytes up to their last line break:
+    a fragment an interrupted append left, committed with the rest, is not a
+    line, and the next append removes it.
+
+    Raises
+    ------
+    subprocess.CalledProcessError
+        If git cannot say whether the log is in the commit, or cannot show
+        it: the run stops rather than take an unreadable log for a new one.
+    """
     if not log.is_file():
         return False
     name = log.relative_to(root.resolve()).as_posix()
-    committed = subprocess.run(
-        ["git", "-C", str(root), "show", f"HEAD:{name}"], check=False, capture_output=True
-    )
-    if committed.returncode != 0:
+
+    def git(*arguments: str) -> bytes:
+        return subprocess.run(
+            ["git", "-C", str(root), *arguments], check=True, capture_output=True
+        ).stdout
+
+    if not git("ls-tree", "-z", "--name-only", "HEAD", "--", name):
         # Not in the commit: the first sessions of a plan, not committed yet.
         return True
-    return log.read_bytes().startswith(committed.stdout)
+    committed = git("show", f"HEAD:{name}")
+    return log.read_bytes().startswith(committed[: committed.rfind(b"\n") + 1])
 
 
 def complete_until(runner: StrategyRunner, store: Path, now: datetime, not_before: date) -> date:
     """Return the last session the store is complete for, saying what a later one waits for.
+
+    Parameters
+    ----------
+    runner : StrategyRunner
+        The runner of the study: its reference calendar (Paris) and timetable
+        give each session's decision instant.
+    store : Path
+        The paper store, read once: where each series stops.
+    now : datetime
+        Timezone-aware wall-clock instant.
+    not_before : date
+        The earliest session of interest, a date of the reference calendar.
+
+    Returns
+    -------
+    date
+        The latest session since ``not_before`` whose decision instant has
+        passed and for which the store holds every series up to what was
+        published at that instant.
 
     Raises
     ------
@@ -160,12 +195,13 @@ def complete_until(runner: StrategyRunner, store: Path, now: datetime, not_befor
     """
     updater = build_updater(store, STUDY_END, clock=lambda: now)
     repository = MarketDataRepository(store)
+    stored = {name: repository.last_date(name) for name in INSTRUMENT_IDS}
     arguments = (
         runner.calendars.get(runner.reference_calendar_id),
         runner.timetable,
         INSTRUMENT_IDS,
         updater.published_until,
-        repository.last_date,
+        stored.__getitem__,
         now,
         not_before,
     )
@@ -175,8 +211,12 @@ def complete_until(runner: StrategyRunner, store: Path, now: datetime, not_befor
     complete = last_complete_session(*arguments)
     if complete is None:
         raise SystemExit(
-            f"no session since {not_before} is complete in {store}: update the store, or "
-            "wait for the series named above"
+            f"no session since {not_before} is complete in {store}: "
+            + (
+                "update the store, or wait for the series named above"
+                if held_back is not None
+                else "none has been decided yet"
+            )
         )
     return complete
 
@@ -261,6 +301,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     parsed = parser.parse_args(arguments)
     store = parsed.store.resolve()
     now = datetime.now(UTC)
+    require_recorded_metadata(store)
     runner = replace(build_runner(store), source=code_state(ROOT, PLANS))
     strategies = books()
     if parsed.contracts:

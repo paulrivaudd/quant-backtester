@@ -28,7 +28,8 @@ done in the repository, committed, and then adopted on purpose::
 
 which replaces the store's metadata by the committed one and appends what
 changed, the reason and the commit to the store's ``metadata_changes.jsonl``.
-Metadata edited in place in the store is refused. An adoption that changes
+Metadata edited in place in the store is refused, by this script and by
+``scripts/paper_trade.py``. An adoption that changes
 what a plan decided on a logged session is caught by the log, as any other
 change of the past is.
 
@@ -40,7 +41,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
+import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict
@@ -151,15 +154,30 @@ def reviewed_metadata(source: Path, registry: str) -> dict[str, bytes]:
     Parameters
     ----------
     source : Path
-        The repository's metadata folder.
+        The repository's metadata folder, inside a git checkout.
     registry : str
         The store's registry, which replaces the folder's ``instruments.toml``:
         the project's followed by the studies' additions.
+
+    Returns
+    -------
+    dict[str, bytes]
+        The content of every file of ``source`` that git tracks. A file the
+        repository ignores - an editor's backup, a lock - is not metadata, and
+        a clean checkout says nothing about it.
+
+    Raises
+    ------
+    subprocess.CalledProcessError
+        If ``source`` is not inside a git checkout.
     """
+    listed = subprocess.run(
+        ["git", "-C", str(source), "ls-files", "-z"], check=True, capture_output=True
+    ).stdout
     files = {
-        path.relative_to(source).as_posix(): path.read_bytes()
-        for path in sorted(source.rglob("*"))
-        if path.is_file()
+        name.decode(): (source / name.decode()).read_bytes()
+        for name in sorted(listed.split(b"\0"))
+        if name and (source / name.decode()).is_file()
     }
     files["instruments.toml"] = registry.encode("utf-8")
     return files
@@ -189,6 +207,26 @@ def _differences(metadata: Path, reviewed: Mapping[str, bytes]) -> dict[str, dic
     }
 
 
+def require_recorded_metadata(store: Path) -> None:
+    """Refuse a store whose metadata is not the one its manifest records.
+
+    Raises
+    ------
+    ValueError
+        If the metadata was edited in place, or an adoption was interrupted.
+        Both scripts of the paper run call this before reading the store.
+    """
+    manifest = store / MANIFEST
+    held = metadata_manifest(store / "metadata")
+    if not manifest.exists() or json.loads(manifest.read_text(encoding="utf-8")) != held:
+        raise ValueError(
+            f"the metadata of {store} is not the one it recorded: it is never edited in "
+            "place. Commit the change to the repository's metadata, then run "
+            "scripts/paper_update_store.py --adopt-metadata REASON, which also repairs an "
+            "interrupted adoption"
+        )
+
+
 def metadata_differences(store: Path, reviewed: Mapping[str, bytes]) -> dict[str, dict[str, Any]]:
     """Return what adopting ``reviewed`` would change in a store's metadata.
 
@@ -202,17 +240,9 @@ def metadata_differences(store: Path, reviewed: Mapping[str, bytes]) -> dict[str
     Raises
     ------
     ValueError
-        If the store's metadata is not the one its manifest records: it was
-        edited in place, or an adoption was interrupted.
+        As :func:`require_recorded_metadata`.
     """
-    held = metadata_manifest(store / "metadata")
-    manifest = store / MANIFEST
-    if not manifest.exists() or json.loads(manifest.read_text(encoding="utf-8")) != held:
-        raise ValueError(
-            f"the metadata of {store} is not the one it recorded: it is never edited in "
-            "place. Commit the change to the repository's metadata, then run with "
-            "--adopt-metadata REASON, which also repairs an interrupted adoption"
-        )
+    require_recorded_metadata(store)
     return _differences(store / "metadata", reviewed)
 
 
@@ -239,7 +269,7 @@ def adopt_metadata(
     dict[str, dict[str, Any]]
         What changed, as :func:`metadata_differences`; empty if the store
         already held ``reviewed``, in which case nothing is written but a
-        manifest an interrupted adoption left behind.
+        missing or stale manifest.
 
     Raises
     ------
@@ -249,24 +279,32 @@ def adopt_metadata(
 
     Notes
     -----
-    The record is appended first, the folder swapped second and the manifest
-    written last. An interruption leaves a store whose metadata is not the one
-    its manifest records, which every later run refuses until the adoption
-    is run again.
+    The new folder is built beside the old one; the old one is set aside, the
+    new one takes its place, the record is appended, the manifest is written,
+    and only then is the old one deleted. An interruption leaves the old
+    folder set aside, and a manifest that does not match: every run of the
+    paper scripts refuses the store until the adoption is run again, which
+    first puts the old folder back. The record of an adoption interrupted
+    after it was appended is then appended a second time, with the same
+    content; no record ever describes a change that was not made.
     """
     if not reason.strip():
         raise ValueError("an adoption needs a reason")
     if now.tzinfo is None:
         raise ValueError(f"now must be timezone-aware, got {now!r}")
-    metadata = store / "metadata"
-    held = metadata_manifest(metadata)
+    metadata, previous = store / "metadata", store / "metadata.previous"
+    partial, manifest = store / "metadata.partial", store / MANIFEST
+    if previous.exists():
+        # An adoption was interrupted: start again from what the store held.
+        if metadata.exists():
+            shutil.rmtree(metadata)
+        previous.rename(metadata)
     changed = _differences(metadata, reviewed)
-    manifest = store / MANIFEST
     if not changed:
+        held = metadata_manifest(metadata)
         if not manifest.exists() or json.loads(manifest.read_text(encoding="utf-8")) != held:
             manifest.write_text(json.dumps(held, indent=2) + "\n", encoding="utf-8")
         return {}
-    partial = store / "metadata.partial"
     if partial.exists():
         shutil.rmtree(partial)
     for name, content in reviewed.items():
@@ -285,12 +323,14 @@ def adopt_metadata(
         "git_commit": git_commit,
         "files": changed,
     }
+    metadata.rename(previous)
+    partial.rename(metadata)
     with (store / CHANGES).open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(record, sort_keys=True) + "\n")
-    if metadata.exists():
-        shutil.rmtree(metadata)
-    partial.rename(metadata)
+        stream.flush()
+        os.fsync(stream.fileno())
     manifest.write_text(json.dumps(metadata_manifest(metadata), indent=2) + "\n", encoding="utf-8")
+    shutil.rmtree(previous)
     return changed
 
 

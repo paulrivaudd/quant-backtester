@@ -23,6 +23,14 @@
   late. The check was not loosened: a day without a value cannot be told
   from a value a provider serves late, and a session logged before a value
   its decision could read would break the plan.
+- **After a second review**, before the merge: `paper_trade.py` refuses a
+  store whose metadata is not the one it recorded, as the update does; an
+  adoption sets the old folder aside and puts it back if it was interrupted,
+  so its record never describes a change that was not made; only files git
+  tracks are adopted; a log holding blank lines gets its header; a fragment
+  committed with a log does not make its repair an edit; a log git cannot be
+  asked about stops the run instead of passing for a new one; the log is read
+  once per check, and bytes that are not text are reported as damage.
 - No plan, contract or start date changes.
 
 ### Paper recorder: four guards tightened after review (2026-11-15)

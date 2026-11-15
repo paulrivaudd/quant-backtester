@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -148,3 +149,43 @@ def test_an_interrupted_adoption_is_refused_until_it_is_run_again(
         paper_update_store.metadata_differences(store, later)
     assert paper_update_store.adopt_metadata(store, later, "again", COMMIT, NOW) == {}
     assert paper_update_store.metadata_differences(store, later) == {}
+
+
+def test_an_adoption_interrupted_between_the_two_folders_starts_again_from_the_old_one(
+    reviewed: dict[str, bytes], tmp_path: Path
+) -> None:
+    """The old folder was set aside and the new one never took its place."""
+    store = store_holding(tmp_path / "store", reviewed)
+    later = dict(reviewed)
+    later["known_gaps.toml"] += b"\n# a gap reviewed since\n"
+    (store / "metadata").rename(store / "metadata.previous")
+    with pytest.raises(ValueError, match="not the one it recorded"):
+        paper_update_store.require_recorded_metadata(store)
+
+    changed = paper_update_store.adopt_metadata(store, later, "again", COMMIT, NOW)
+
+    # The record says what changed from what the store held, not that every file is new.
+    assert list(changed) == ["known_gaps.toml"] and changed["known_gaps.toml"]["from"] is not None
+    assert [record["files"] for record in records(store)] == [changed]
+    assert not (store / "metadata.previous").exists()
+    paper_update_store.require_recorded_metadata(store)
+
+
+def test_a_file_the_repository_ignores_is_not_metadata(tmp_path: Path) -> None:
+    source = tmp_path / "repository" / "metadata"
+    (source / "calendars").mkdir(parents=True)
+    (source / "known_gaps.toml").write_text("x = 1\n")
+    (source / "calendars" / "XPAR.toml").write_text("y = 2\n")
+    (source.parent / ".gitignore").write_text("*.bak\n")
+    for arguments in (["init", "-q"], ["add", "-A"]):
+        subprocess.run(["git", "-C", str(source.parent), *arguments], check=True)
+    (source / "known_gaps.toml.bak").write_text("an editor's backup\n")
+    (source / "untracked.toml").write_text("not committed\n")
+
+    files = paper_update_store.reviewed_metadata(source, "registry")
+
+    assert files == {
+        "calendars/XPAR.toml": b"y = 2\n",
+        "known_gaps.toml": b"x = 1\n",
+        "instruments.toml": b"registry",
+    }

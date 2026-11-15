@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 from collections.abc import Callable, Mapping
 from dataclasses import replace
@@ -488,3 +489,34 @@ def test_a_complete_line_that_is_not_a_log_line_stops_the_run(
             log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
         assert log.path.read_text() == before + damage
         log.path.write_text(before)
+
+
+@pytest.mark.parametrize("blank", ["\n", "\n\n\n"])
+def test_a_log_of_blank_lines_gets_its_header_before_its_first_session(
+    blank: str, plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    """Saved empty by an editor: a line break and no line. The header is not skipped."""
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 14))
+    assert result is not None
+    log = log_of(plan, tmp_path)
+    log.path.write_text(blank)
+
+    assert log.entries() == []
+    appended = log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
+
+    assert len(appended) == 4
+    assert json.loads(log.path.read_text().splitlines()[0])["contract_id"] == plan.contract_id
+    assert log.entries() == appended
+
+
+def test_a_complete_line_of_bytes_that_are_not_text_stops_the_run(
+    plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 14))
+    assert result is not None
+    log = log_of(plan, tmp_path)
+    log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
+    with log.path.open("ab") as stream:
+        stream.write(b"\xff\xfe not utf-8\n")
+    with pytest.raises(PaperPlanBroken, match="edited or damaged"):
+        log.entries()
