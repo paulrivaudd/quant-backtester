@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### README brought up to date (2026-11-15)
+- "My contribution" is written: the data layer and SA1 to SA10, the later
+  studies as experimental records, and what was done with AI tools.
+- "Status" is a table of the layers with their tests. The research section
+  gives SA17's two studies and their statuses, the two long-history tests of
+  SA16, SA18, and the paper run. The case study is linked from the top.
+
 ### Paper run of SA16_it2: the recorder restored, three plans committed (2026-11-15)
 - **Three plans start on 2026-11-17** (`research/paper/`): `SA16_IT2`, the
   configuration the SA16 study retained, and its two references,

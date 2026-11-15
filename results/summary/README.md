@@ -1,7 +1,8 @@
 # Results and analyses of 10 October 2026
 
 `results/` has one folder per strategy, `SA1` to `SA14`, and this folder, which
-compares them. Everything is written by `scripts/write_strategy_reports.py` from
+compares them. The studies added since, SA15 to SA18, are not in this
+comparison: each has its own `study.md`. Everything is written by `scripts/write_strategy_reports.py` from
 the exports of `scripts/SA11_run_garch_study.py`, after the store was updated to
 2026-10-09; only this file is written by hand.
 
