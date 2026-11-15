@@ -49,6 +49,26 @@ observation is run forward with its configuration frozen and is not read
 before a year of sessions (section 6); how that is recorded has to be written
 again before the first such run.
 
+**Written again on 2026-11-15, for SA16_it2.** The recorder was restored from
+`a9e301f` (`quant_backtester.research.paper`, `scripts/paper_trade.py`) and
+three plans are committed before their start, `2026-11-17`, in
+`research/paper/`: `SA16_IT2`, the configuration the SA16 study retained, and
+its two references, `NASDAQ_BUY_HOLD` and `SA15_R4_TRIAL71`, under the
+conventions of that study. What the second paragraph of this section says of
+a plan, its contract and its log holds as written. Three things differ:
+
+- a plan names the instruments it may hold, not a committed universe;
+- the plans read a store of their own, `runs/paper_sa16_store`: the study's
+  store, copied once and extended by `scripts/paper_update_store.py`. The
+  study's store stays frozen at 2026-10-30;
+- a session is logged only once the store holds every series up to what was
+  published at its decision instant, so that a value arriving later cannot
+  change a session already logged. The plans' own logs may be uncommitted
+  when the script runs; nothing else may.
+
+`research/paper/README.md` gives the commands and the reading: 252 sessions
+(section 6), the 252nd being 2027-11-09.
+
 **Reading the result.** No verdict before 12 months of sessions (about 255):
 below that, the difference between two funds' returns is mostly one fund's
 luck. At 12 months the comparison is net of costs, on the same sessions,

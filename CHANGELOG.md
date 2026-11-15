@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Paper run of SA16_it2: the recorder restored, three plans committed (2026-11-15)
+- **Three plans start on 2026-11-17** (`research/paper/`): `SA16_IT2`, the
+  configuration the SA16 study retained, and its two references,
+  `NASDAQ_BUY_HOLD` and `SA15_R4_TRIAL71`, each under a `contract_id` and the
+  conventions of the study. Nothing is read before 252 sessions (2027-11-09).
+- **The recorder of 2026-10-11 is back** (`research/paper.py`,
+  `research/journal.py`, from `a9e301f`), by decision of the owner. A plan
+  now names its instruments instead of a committed universe.
+- **New rule: a session is logged only when the store is complete for it.**
+  `last_complete_session` compares what the store holds of every series with
+  what was published at the session's decision instant
+  (`MarketDataUpdater.published_until`, new), so a US close or a rate that
+  arrives later cannot change a session already logged.
+- `scripts/paper_update_store.py` copies the study's store once to
+  `runs/paper_sa16_store` and extends it at the wall clock;
+  `scripts/paper_trade.py` runs the plans and appends to their logs, the logs
+  themselves being the only files allowed to differ from the commit.
+  `SA16_download_data.build_updater` takes an optional clock; the study's
+  store and its frozen end are unchanged.
+- `research/PROTOCOL.md`, section 2, says what was written again.
 ### SA18: a trend filter on the long history, frozen (2026-11-15)
 - **Run once at `5fef32d`: `NOT_SUPPORTED` against both references.** Net
   CAGR 9.4% against 12.0% and 11.8%; Sharpe 0.35 against 0.42 and 0.43;

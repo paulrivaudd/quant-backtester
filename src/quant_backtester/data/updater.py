@@ -920,6 +920,36 @@ class MarketDataUpdater:
         end = safe_end_date(instrument, self._calendar_of(instrument), self._clock())
         return self.download(instrument_id, instrument.first_session, end)
 
+    def published_until(self, instrument_id: str, at_utc: datetime) -> date:
+        """Return the latest observation date of an instrument entirely published at an instant.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument concerned.
+        at_utc : datetime
+            Timezone-aware instant: a decision's, or the wall clock's, passed
+            in by the caller. The updater's own clock is not read.
+
+        Returns
+        -------
+        date
+            :func:`safe_end_date` on the instrument's own calendar: the last
+            session closed at ``at_utc`` for a ``BAR``, the last observation
+            released at ``at_utc`` for a ``LEVEL``. A store that holds the
+            instrument up to this date is missing nothing a reader at
+            ``at_utc`` could see of it, short of a hole before it.
+
+        Raises
+        ------
+        KeyError
+            If the instrument or its calendar is not registered.
+        ValueError
+            As :func:`safe_end_date`.
+        """
+        instrument = self._instruments.get(instrument_id)
+        return safe_end_date(instrument, self._calendar_of(instrument), at_utc)
+
     def history_coverage(self, instrument_id: str) -> HistoryCoverage:
         """Return how much of an instrument's declared history the store holds.
 
