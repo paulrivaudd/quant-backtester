@@ -147,6 +147,64 @@ def git_source_state(path: Path) -> SourceState:
     return SourceState(status, commit)
 
 
+def changed_paths(root: Path) -> frozenset[Path]:
+    """Return every file of a checkout that is not as its commit has it.
+
+    Parameters
+    ----------
+    root : Path
+        A directory inside the checkout - its root, normally. The whole
+        checkout is read, whichever directory of it is given.
+
+    Returns
+    -------
+    frozenset[Path]
+        The path of each file modified, deleted or added since ``HEAD``,
+        staged or not, and of each untracked file the repository does not
+        ignore: the resolved root of the checkout, then the name git gives. A
+        symbolic link that changed is named itself, not what it points to. A
+        rename is its two files: the one that went and the one that came.
+
+        Empty for a clean checkout, and not only for one: a change staged and
+        then undone in the working tree makes :func:`git_source_state` say
+        ``DIRTY`` while no file differs from the commit. A caller that lets
+        some paths differ must not read an empty set as permission.
+
+    Raises
+    ------
+    subprocess.CalledProcessError
+        If ``root`` is not inside a git checkout with a commit.
+    OSError
+        If git cannot be run.
+
+    Notes
+    -----
+    :func:`git_source_state` says whether a checkout is dirty; this says by
+    what. A script that lets some files differ from the commit - the output
+    it generates, the log it appends to - calls it once and applies its own
+    rule to each path, so that the rule is the only thing two scripts can
+    disagree on.
+    """
+    top = Path(
+        subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.rstrip("\n")
+    ).resolve()
+    changed: set[Path] = set()
+    for arguments in (
+        ["diff", "HEAD", "--no-renames", "--name-only", "-z"],
+        ["ls-files", "--others", "--exclude-standard", "-z"],
+    ):
+        result = subprocess.run(
+            ["git", "-C", str(top), *arguments], check=True, capture_output=True
+        )
+        changed.update(top / name.decode() for name in result.stdout.split(b"\0") if name)
+    return frozenset(changed)
+
+
 ENVIRONMENT_PACKAGES: tuple[str, ...] = ("numpy", "pandas", "pyarrow", "scipy")
 """The libraries whose version can change a number a run prints."""
 

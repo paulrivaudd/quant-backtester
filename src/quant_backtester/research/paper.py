@@ -93,7 +93,22 @@ class PaperPlanBroken(RuntimeError):
 
 
 def contract_of(result: StrategyResult) -> dict[str, object]:
-    """Return the conditions of a run a plan commits to, and the strategy's fingerprint."""
+    """Return the conditions of a run a plan commits to, and the strategy's fingerprint.
+
+    Parameters
+    ----------
+    result : StrategyResult
+        Any run of the strategy under the plan's conditions, over any period:
+        the contract is read from the run's configuration, never from what
+        the run did, so one session is enough and no price enters it.
+
+    Returns
+    -------
+    dict[str, object]
+        The strategy's ``fingerprint`` and the run's value for each key of
+        :data:`CONTRACT_KEYS`, as plain JSON types; ``None`` for a key the
+        configuration does not carry.
+    """
     configuration = plain_configuration(result.configuration)
     assert isinstance(configuration, dict)
     return {
@@ -103,7 +118,20 @@ def contract_of(result: StrategyResult) -> dict[str, object]:
 
 
 def contract_id(result: StrategyResult) -> str:
-    """Return the SHA-256 of a run's contract, rendered as canonical JSON."""
+    """Return the SHA-256 of a run's contract, rendered as canonical JSON.
+
+    Parameters
+    ----------
+    result : StrategyResult
+        As :func:`contract_of`.
+
+    Returns
+    -------
+    str
+        The hexadecimal digest of :func:`contract_of`, keys sorted and no
+        whitespace: two runs share it exactly when they share the strategy
+        and every condition it is run under.
+    """
     canonical = json.dumps(contract_of(result), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -202,7 +230,23 @@ class PaperEntry:
 
 
 def entries_of(result: StrategyResult) -> list[PaperEntry]:
-    """Return one log entry per session of a run, with the whole economic state."""
+    """Return one log entry per session of a run, with the whole economic state.
+
+    Parameters
+    ----------
+    result : StrategyResult
+        A run of the plan from its start.
+
+    Returns
+    -------
+    list[PaperEntry]
+        One entry per session of the run, in order. A session is named by its
+        date on the run's reference calendar (ISO, no time: the decision and
+        valuation instants are the timetable's, part of the contract).
+        Amounts are in the run's base currency, quantities in units, and
+        instruments within an entry are sorted by name so that one state has
+        one rendering.
+    """
     entries: list[PaperEntry] = []
     for record in result.records():
         decision = record.decision

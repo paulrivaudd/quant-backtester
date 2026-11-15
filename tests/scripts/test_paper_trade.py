@@ -1,4 +1,4 @@
-"""Tests of the paper run's scripts: the plans, the books, the code state, the store's seed."""
+"""Tests of the paper run's recorder script: the plans, the books, the code state, a run."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
-from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -22,7 +21,7 @@ from quant_backtester.provenance import SourceState, SourceStatus
 from quant_backtester.research.paper import PaperLog, PaperPlan, PaperPlanBroken, contract_id
 from quant_backtester.research.references import BuyAndHold
 from scripts import SA16_run_study as study
-from scripts import paper_trade, paper_update_store
+from scripts import paper_trade
 
 NOW = datetime(2026, 9, 15, 8, 0, tzinfo=UTC)
 STRATEGY = BuyAndHold(instruments=("ETF_EU",))
@@ -183,51 +182,6 @@ def test_before_its_start_a_plan_only_has_its_contract_checked(
         paper_trade.advance(later, log, research_runner, STRATEGY, Weekly(), date(2026, 9, 14), NOW)
 
 
-def store_like(root: Path) -> Path:
-    for name in ("metadata", "raw", "clean", "validation", "reports"):
-        (root / name).mkdir(parents=True)
-        (root / name / "file.txt").write_text(name)
-    (root / "metadata_sha256.json").write_text("{}\n")
-    (root / ".lock").write_text("")
-    return root
-
-
-def test_the_paper_store_is_seeded_once_from_the_studys(tmp_path: Path) -> None:
-    seed, store = store_like(tmp_path / "seed"), tmp_path / "paper"
-    assert paper_update_store.seed_store(store, seed) is True
-    assert sorted(path.name for path in store.iterdir()) == sorted(paper_update_store.SEEDED)
-    assert (store / "clean" / "file.txt").read_text() == "clean"
-    # The seed is read, never written, and a store that exists is left alone.
-    (store / "clean" / "file.txt").write_text("extended")
-    assert paper_update_store.seed_store(store, seed) is False
-    assert (store / "clean" / "file.txt").read_text() == "extended"
-    assert (seed / "clean" / "file.txt").read_text() == "clean"
-
-
-def test_a_seed_that_is_not_a_built_store_is_refused(tmp_path: Path) -> None:
-    with pytest.raises(FileNotFoundError, match="SA16_download_data"):
-        paper_update_store.seed_store(tmp_path / "paper", tmp_path / "missing")
-    assert not (tmp_path / "paper").exists()
-
-
-def test_every_instrument_is_extended_and_a_failure_is_recorded_not_swallowed() -> None:
-    class Updater:
-        def update(self, instrument_id: str) -> SimpleNamespace:
-            if instrument_id == "DOWN":
-                raise RuntimeError("provider is down")
-            return SimpleNamespace(
-                valid=instrument_id != "REFUSED", errors=[], warnings=[], issues=[]
-            )
-
-    outcomes = paper_update_store.update_store(Updater(), ("FINE", "DOWN", "REFUSED"))  # type: ignore[arg-type]
-
-    assert [outcome["instrument_id"] for outcome in outcomes] == ["FINE", "DOWN", "REFUSED"]
-    assert outcomes[0]["valid"] is True and "provider is down" in outcomes[1]["exception"]
-    assert paper_update_store.failed(outcomes) is True
-    assert paper_update_store.failed(outcomes[:1]) is False
-    assert paper_update_store.failed(outcomes[2:]) is True
-
-
 def test_a_clean_checkout_always_names_the_commit_a_session_is_logged_with() -> None:
     """A plan is advanced by a CLEAN source only, and a CLEAN source cannot lack its commit."""
     with pytest.raises(ValueError, match="names its full commit"):
@@ -310,3 +264,12 @@ def test_the_run_refuses_a_store_whose_metadata_is_not_the_one_it_recorded(
     (store / "metadata" / "known_gaps.toml").write_text("x = 1\n")
     with pytest.raises(ValueError, match="not the one it recorded"):
         paper_trade.main(["--store", str(store)])
+
+
+def test_a_change_staged_then_undone_does_not_pass_for_appended_logs(checkout: Path) -> None:
+    """Dirty with no file differing from the commit is not a clean checkout."""
+    (checkout / "code.py").write_text("x = 2\n")
+    git(checkout, "add", "code.py")
+    (checkout / "code.py").write_text("x = 1\n")
+    state = paper_trade.code_state(checkout, checkout / "research" / "paper")
+    assert state.status is SourceStatus.DIRTY

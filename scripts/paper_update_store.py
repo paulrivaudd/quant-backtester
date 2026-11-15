@@ -83,6 +83,19 @@ CHANGES = "metadata_changes.jsonl"
 def seed_store(store: Path, seed: Path) -> bool:
     """Copy the study's store once; return whether it was copied now.
 
+    Parameters
+    ----------
+    store : Path
+        The paper store. Left alone if it exists.
+    seed : Path
+        The study's store, read and never written.
+
+    Returns
+    -------
+    bool
+        Whether the store was created by this call. It is copied beside its
+        place and renamed, so an interrupted copy leaves no store behind.
+
     Raises
     ------
     FileNotFoundError
@@ -113,6 +126,20 @@ def update_store(updater: MarketDataUpdater, instruments: Sequence[str]) -> list
 
     An instrument that raises or is refused does not stop the others: each
     outcome is recorded, never swallowed.
+
+    Parameters
+    ----------
+    updater : MarketDataUpdater
+        The store's updater; its clock decides how far each series is fetched.
+    instruments : Sequence[str]
+        The series to extend, in this order.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        One outcome per instrument, in order: its id and either the
+        ``exception`` it raised, or whether the extension is ``valid`` with
+        its counts of errors and warnings and its ``issues``.
     """
     outcomes: list[dict[str, Any]] = []
     for instrument_id in instruments:
@@ -144,7 +171,19 @@ def update_store(updater: MarketDataUpdater, instruments: Sequence[str]) -> list
 
 
 def failed(outcomes: Sequence[dict[str, Any]]) -> bool:
-    """Return whether an instrument raised or was refused."""
+    """Return whether an instrument raised or was refused.
+
+    Parameters
+    ----------
+    outcomes : Sequence[dict[str, Any]]
+        What :func:`update_store` returned.
+
+    Returns
+    -------
+    bool
+        ``True`` if any outcome carries an ``exception`` or is not ``valid``:
+        the script then exits non-zero and the paper run waits.
+    """
     return any("exception" in outcome or not outcome["valid"] for outcome in outcomes)
 
 
@@ -335,7 +374,18 @@ def adopt_metadata(
 
 
 def main(arguments: Sequence[str] | None = None) -> int:
-    """Seed the paper store if needed, extend it, and write what was done."""
+    """Seed the paper store if needed, extend it, and write what was done.
+
+    Parameters
+    ----------
+    arguments : Sequence[str] | None
+        Command-line arguments; ``None`` reads the process's.
+
+    Returns
+    -------
+    int
+        Zero if every series was extended, one if any raised or was refused.
+    """
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--seed", type=Path, default=STUDY_STORE)

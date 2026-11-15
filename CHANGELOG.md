@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Cleanup after the review of the paper run: no behaviour changes (2026-11-15)
+- **One reading of what differs from the commit.** `provenance.changed_paths`
+  replaces three copies of the same git calls, in `paper_trade.py`,
+  `SA16_run_long_history.py` and `SA17_run_study.py`; each script keeps only
+  its own rule on the paths.
+- **One hash-checked replay of the archives.** `checked_bytes`,
+  `replay_french` and `record_month` of `SA16_run_long_history.py` are used
+  by SA18's script instead of a copy. The reports of SA18 and of the SA16
+  long-history study are identical before and after, compared whole on the
+  archived inputs.
+- **Tests for what had none**: `tests/research/test_journal.py` (the lock),
+  and `tests/scripts/test_paper_update_store.py` now holds the store script's
+  tests, with its `main`: exit code, evidence file, the note on a repository
+  that moved on, adoption from a clean checkout only.
+- **Docstrings completed** on `contract_of`, `contract_id`, `entries_of` and
+  the public functions of the two paper scripts.
+- **After its review**: `changed_paths` reads the whole checkout from any
+  folder of it and names a changed link itself, not its target; a checkout
+  git calls dirty while no file differs from the commit (a change staged,
+  then undone) is no longer let through by the three scripts, which read an
+  empty set as "only allowed files changed"; the shared replay helpers have
+  their own tests and refuse a file the coverage records do not name.
+
 ### Paper run: the store can take a reviewed decision, and a waiting session says why (2026-11-15)
 - **The paper store keeps the metadata it was seeded with.**
   `paper_update_store.py` applied the study store's rule, which refuses any
