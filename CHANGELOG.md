@@ -3,6 +3,18 @@
 ## Unreleased
 
 ### SA18: a trend filter on the long history, frozen (2026-11-15)
+- **Run once at `5fef32d`: `NOT_SUPPORTED` against both references.** Net
+  CAGR 9.4% against 12.0% and 11.8%; Sharpe 0.35 against 0.42 and 0.43;
+  volatility 16.9%; maximum drawdown -46.1% against -79.6% and -75.0%. The
+  book held the growth portfolio in 70% of months and switched 85 times.
+  **The prediction was too favourable**: it gave a CAGR of 11 to 13.5%, a
+  Sharpe of 0.50 to 0.60 and 40 to 70 switches; only the volatility, the
+  drawdown and the share of months invested fell in their ranges. The filter
+  earned its keep in 2000-2009 alone (4.9% a year against -6.2%) and lagged
+  the growth portfolio in the four other regimes. On the earlier months
+  (1927-07 to 1974-12, deciding nothing) it is ahead, 9.9% against 9.2% with
+  a Sharpe of 0.50 against 0.37, the difference not significant (p 0.38).
+  `results/SA18/trend_long_history/study.md`.
 - **Frozen before any level, average or return of the rule was computed.**
   `research/SA18/trend_long_history.md` and `.toml`: the growth portfolio of
   SA16's long-history tests held over a month when its total-return level

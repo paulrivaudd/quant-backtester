@@ -142,7 +142,7 @@ refutation = "Net CAGR or net Sharpe at or below a reference's at declared costs
 
 [[hypothesis]]
 hypothesis_id = "sa18_trend_filter_long_history_usd"
-status = "PREREGISTERED"
+status = "NOT_SUPPORTED"
 written_on = 2026-11-15
 statement = "Holding the growth portfolio over a month only when its total-return level ended the month before above the simple average of its last ten month-end levels, and the one-month Treasury bill otherwise, beats both the growth portfolio bought and held and the Nasdaq Composite, net of costs."
 universe = "The growth, Nasdaq and bill series and the window (1975-01 to 2018-07) of sa16_it2_long_history_usd; gold is not read. The third hypothesis read on these 523 months, and a published rule (Faber 2007): not blind. Frozen in research/SA18/trend_long_history.toml before any level, average or return of the rule was computed. The growth portfolio's 1927-07 to 1974-12 months, unread until now, are reported and decide nothing."
