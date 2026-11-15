@@ -935,10 +935,11 @@ class MarketDataUpdater:
         -------
         date
             :func:`safe_end_date` on the instrument's own calendar: the last
-            session closed at ``at_utc`` for a ``BAR``, the last observation
-            released at ``at_utc`` for a ``LEVEL``. A store that holds the
-            instrument up to this date is missing nothing a reader at
-            ``at_utc`` could see of it, short of a hole before it.
+            session closed at ``at_utc`` for a ``BAR``; for a ``LEVEL``, the
+            last calendar day whose release instant has passed at ``at_utc``.
+            A store that holds the instrument up to this date is missing
+            nothing a reader at ``at_utc`` could see of it, short of a hole
+            before it.
 
         Raises
         ------
@@ -946,6 +947,16 @@ class MarketDataUpdater:
             If the instrument or its calendar is not registered.
         ValueError
             As :func:`safe_end_date`.
+
+        Notes
+        -----
+        The converse does not hold for a ``LEVEL``. Its date is a bound, not
+        an observation: a publication rule knows when a day's value is
+        released, not whether that day has one. With a lag of one session, the
+        bound on a Monday evening is the Sunday; on a publisher's holiday it
+        is the holiday. A store that stops on the last real observation is
+        then short of the bound and whole all the same, and from the dates
+        alone it cannot be told from a store a provider has not served yet.
         """
         instrument = self._instruments.get(instrument_id)
         return safe_end_date(instrument, self._calendar_of(instrument), at_utc)

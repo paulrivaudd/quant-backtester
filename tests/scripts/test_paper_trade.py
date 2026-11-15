@@ -4,17 +4,21 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 from tests.research.conftest import research_runner  # noqa: F401
 
 from quant_backtester.backtest.runner import StrategyRunner
 from quant_backtester.backtest.schedule import EverySession, Weekly
-from quant_backtester.provenance import SourceStatus
+from quant_backtester.data.calendars import TradingCalendar
+from quant_backtester.data.reader import MarketDataReader
+from quant_backtester.provenance import SourceState, SourceStatus
 from quant_backtester.research.paper import PaperLog, PaperPlan, PaperPlanBroken, contract_id
 from quant_backtester.research.references import BuyAndHold
 from scripts import SA16_run_study as study
@@ -106,6 +110,35 @@ def test_only_a_plans_log_may_differ_from_the_commit(checkout: Path) -> None:
     assert paper_trade.code_state(checkout, logs).status is SourceStatus.CLEAN
 
 
+def test_a_committed_log_may_only_grow(checkout: Path) -> None:
+    """Deleted, shortened or edited, a log is a change: its sessions are not written again."""
+    logs = checkout / "research" / "paper"
+    log = logs / "PLAN.jsonl"
+    committed = log.read_text()
+
+    log.unlink()
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+    log.write_text("")
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+    log.write_text("{ }\n")
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+    log.write_text('{"other": 1}\n' + committed)
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+
+    log.write_text(committed + '{"appended": 1}\n')
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.CLEAN
+    # A file git cannot be asked about is not taken for a log not committed yet.
+    outside = checkout.parent / "outside"
+    outside.mkdir()
+    (outside / "PLAN.jsonl").write_text("{}\n")
+    with pytest.raises(subprocess.CalledProcessError):
+        paper_trade._only_appended(outside, outside / "PLAN.jsonl")
+    # A folder named like a log is not one.
+    (logs / "FOLDER.jsonl").mkdir()
+    (logs / "FOLDER.jsonl" / "x.jsonl").write_text("{}\n")
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+
+
 @pytest.fixture
 def plan(research_runner: StrategyRunner) -> PaperPlan:  # noqa: F811
     probe = research_runner.run(STRATEGY, ["ETF_EU"], "2026-09-14", "2026-09-14")
@@ -193,3 +226,87 @@ def test_every_instrument_is_extended_and_a_failure_is_recorded_not_swallowed() 
     assert paper_update_store.failed(outcomes) is True
     assert paper_update_store.failed(outcomes[:1]) is False
     assert paper_update_store.failed(outcomes[2:]) is True
+
+
+def test_a_clean_checkout_always_names_the_commit_a_session_is_logged_with() -> None:
+    """A plan is advanced by a CLEAN source only, and a CLEAN source cannot lack its commit."""
+    with pytest.raises(ValueError, match="names its full commit"):
+        SourceState(SourceStatus.CLEAN, None)
+
+
+def test_the_contract_is_checked_on_a_day_no_session_is_ready(
+    plan: PaperPlan,
+    research_runner: StrategyRunner,  # noqa: F811
+    tmp_path: Path,
+) -> None:
+    """The store is complete to Monday but it is not yet 23:00 on the plan's first session."""
+    first_evening = datetime(2026, 9, 9, 18, 0, tzinfo=UTC)
+    log = PaperLog(tmp_path / "hold_eu.jsonl", plan)
+    said = paper_trade.advance(
+        plan, log, research_runner, STRATEGY, EverySession(), date(2026, 9, 14), first_evening
+    )
+    assert "no session is ready yet; contract checked" in said
+    assert not log.path.exists()
+    with pytest.raises(PaperPlanBroken, match="new plan"):
+        paper_trade.advance(
+            plan, log, research_runner, STRATEGY, Weekly(), date(2026, 9, 14), first_evening
+        )
+
+
+def test_the_series_a_session_waits_for_are_said_with_what_they_have_to_reach() -> None:
+    line = paper_trade.waiting_line(
+        date(2026, 11, 16),
+        {"US10Y": (date(2026, 11, 13), date(2026, 11, 15)), "VIX": (None, date(2026, 11, 16))},
+    )
+    assert line == (
+        "session 2026-11-16 is held back: US10Y stored to 2026-11-13, waits for 2026-11-15 "
+        "or later; VIX stored to nothing, waits for 2026-11-16 or later"
+    )
+
+
+def test_a_fragment_committed_with_the_log_does_not_make_its_repair_an_edit(
+    checkout: Path,
+) -> None:
+    """The host slept mid-append, the fragment was committed, and the next append removed it."""
+    logs = checkout / "research" / "paper"
+    log = logs / "PLAN.jsonl"
+    whole = log.read_text()
+    log.write_text(whole + '{"entry": {"session_da')
+    git(checkout, "add", "-A")
+    git(checkout, "commit", "-q", "-m", "a fragment")
+
+    log.write_text(whole + '{"appended": 1}\n')
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.CLEAN
+    # The committed lines themselves still may not change.
+    log.write_text('{"appended": 1}\n')
+    assert paper_trade.code_state(checkout, logs).status is SourceStatus.DIRTY
+
+
+def test_a_fund_without_a_close_holds_the_plan_back_and_its_contract_is_still_checked(
+    plan: PaperPlan,
+    research_runner: StrategyRunner,  # noqa: F811
+    make_market: Callable[..., MarketDataReader],
+    make_bars: Callable[..., pd.DataFrame],
+    xpar: TradingCalendar,
+    prices: Callable[..., dict[date, float]],
+    tmp_path: Path,
+) -> None:
+    """The plan's first session has no close of its fund: nothing is run on a guess."""
+    closes = {day: price for day, price in prices(100.0, 1.0).items() if day < plan.start}
+    runner = replace(
+        research_runner, reader=make_market({"ETF_EU": make_bars("ETF_EU", xpar, closes)})
+    )
+    log = PaperLog(tmp_path / "hold_eu.jsonl", plan)
+    said = paper_trade.advance(plan, log, runner, STRATEGY, EverySession(), plan.start, NOW)
+    assert "no session is ready yet; contract checked" in said
+    assert not log.path.exists()
+
+
+def test_the_run_refuses_a_store_whose_metadata_is_not_the_one_it_recorded(
+    tmp_path: Path,
+) -> None:
+    store = tmp_path / "store"
+    (store / "metadata").mkdir(parents=True)
+    (store / "metadata" / "known_gaps.toml").write_text("x = 1\n")
+    with pytest.raises(ValueError, match="not the one it recorded"):
+        paper_trade.main(["--store", str(store)])

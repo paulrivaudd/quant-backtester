@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 from collections.abc import Callable, Mapping
 from dataclasses import replace
@@ -29,6 +30,8 @@ from quant_backtester.research.paper import (
     last_complete_session,
     last_ready_session,
     run_plan,
+    series_short_of,
+    session_held_back,
 )
 from quant_backtester.research.references import BuyAndHold
 
@@ -323,6 +326,80 @@ def test_a_series_that_lags_holds_every_plan_back(xpar: TradingCalendar) -> None
     assert complete_at(xpar, {"FUND": friday, "RATE": friday}, late) == friday
 
 
+def bound_on_a_day_without_an_observation(
+    xpar: TradingCalendar, stored: Mapping[str, date | None], now: datetime
+) -> tuple[date | None, tuple[date, dict[str, tuple[date | None, date]]] | None]:
+    """Return what is complete and held back with a rate whose Monday bound is the Sunday."""
+    timetable = BacktestTimetable(
+        decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)
+    )
+
+    def published_until(name: str, at: datetime) -> date:
+        day = at.astimezone(PARIS).date()
+        return day if name == "FUND" else day - timedelta(days=1)
+
+    arguments = (
+        xpar, timetable, list(stored), published_until, stored.__getitem__, now, date(2026, 9, 1)
+    )  # fmt: skip
+    return last_complete_session(*arguments), session_held_back(*arguments)
+
+
+def test_a_bound_without_an_observation_waits_for_the_next_one(xpar: TradingCalendar) -> None:
+    """Friday's rate is all there is on Monday evening, and the store cannot show it."""
+    friday, sunday, monday = date(2026, 9, 11), date(2026, 9, 13), date(2026, 9, 14)
+    tuesday_morning = datetime(2026, 9, 15, 8, 0, tzinfo=PARIS)
+    complete, held_back = bound_on_a_day_without_an_observation(
+        xpar, {"FUND": monday, "RATE": friday}, tuesday_morning
+    )
+    # Not logged on a guess: a rate served late looks the same from here.
+    assert complete == friday
+    assert held_back == (monday, {"RATE": (friday, sunday)})
+    # Monday's rate arrives: it is past the bound, and the session is complete.
+    complete, held_back = bound_on_a_day_without_an_observation(
+        xpar, {"FUND": monday, "RATE": monday}, tuesday_morning
+    )
+    assert (complete, held_back) == (monday, None)
+
+
+def test_the_series_short_of_a_decision_are_named_with_what_they_have_to_reach() -> None:
+    at = datetime(2026, 9, 14, 23, 0, tzinfo=PARIS)
+    stored: dict[str, date | None] = {
+        "WHOLE": date(2026, 9, 14),
+        "AHEAD": date(2026, 9, 15),
+        "SHORT": date(2026, 9, 11),
+        "EMPTY": None,
+    }
+    short = series_short_of(
+        list(stored), lambda _name, instant: instant.date(), stored.__getitem__, at
+    )
+    assert short == {
+        "SHORT": (date(2026, 9, 11), date(2026, 9, 14)),
+        "EMPTY": (None, date(2026, 9, 14)),
+    }
+    assert series_short_of([], lambda _name, instant: instant.date(), stored.__getitem__, at) == {}
+
+
+def test_nothing_is_held_back_before_any_decision_or_with_a_naive_clock(
+    xpar: TradingCalendar,
+) -> None:
+    stored: dict[str, date | None] = {"FUND": None, "RATE": None}
+    timetable = BacktestTimetable(
+        decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)
+    )
+
+    def held_back(now: datetime) -> object:
+        return session_held_back(
+            xpar, timetable, list(stored), lambda _n, at: at.date(), stored.__getitem__, now,
+            date(2026, 9, 14),
+        )  # fmt: skip
+
+    # Monday 14 September is the first session of interest and has not been decided.
+    assert held_back(datetime(2026, 9, 14, 22, 0, tzinfo=PARIS)) is None
+    assert held_back(datetime(2026, 9, 14, 23, 0, tzinfo=PARIS)) is not None
+    with pytest.raises(ValueError, match="timezone-aware"):
+        held_back(datetime(2026, 9, 14, 23, 0))
+
+
 def test_a_session_is_not_complete_before_its_decision_instant(xpar: TradingCalendar) -> None:
     friday, monday = date(2026, 9, 11), date(2026, 9, 14)
     stored = {"FUND": monday, "RATE": friday}
@@ -341,3 +418,105 @@ def test_an_empty_series_or_a_store_too_far_behind_completes_nothing(
     assert complete_at(xpar, stale, late, not_before=date(2026, 9, 1)) == date(2026, 9, 4)
     with pytest.raises(ValueError, match="timezone-aware"):
         complete_at(xpar, stale, datetime(2026, 9, 15, 8, 0))
+
+
+def test_an_empty_log_file_is_a_log_with_no_session(
+    plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    """A file touched, or left by a first run that wrote nothing, is started like a new one."""
+    log = log_of(plan, tmp_path)
+    log.path.write_bytes(b"")
+    assert log.entries() == []
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 14))
+    assert result is not None
+
+    appended = log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
+
+    assert len(appended) == 4 and log.entries() == appended
+    assert log.path.read_text().splitlines()[0].startswith('{"contract_id"')
+
+
+@pytest.mark.parametrize("cut", [1, 40], ids=["line-break-lost", "line-half-written"])
+def test_a_line_an_interrupted_append_left_is_logged_again_whole(
+    plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path, cut: int
+) -> None:
+    """The host froze mid-append: what follows the last line break was never a logged session."""
+    log = log_of(plan, tmp_path)
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 14))
+    assert result is not None
+    entries = entries_of(result)
+    log.extend(entries, git_commit=COMMIT, logged_at=AT)
+    whole = log.path.read_bytes()
+    log.path.write_bytes(whole[:-cut])
+
+    assert [entry.session_date for entry in log.entries()] == [
+        "2026-09-09",
+        "2026-09-10",
+        "2026-09-11",
+    ]
+    appended = log.extend(entries, git_commit=COMMIT, logged_at=AT)
+
+    assert [entry.session_date for entry in appended] == ["2026-09-14"]
+    assert log.path.read_bytes() == whole
+
+
+def test_a_header_half_written_is_written_again(
+    plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    log = log_of(plan, tmp_path)
+    log.path.write_text('{"contract_id": "abc')
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 10))
+    assert result is not None
+
+    log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
+
+    assert len(log.entries()) == 2
+    assert len(log.path.read_text().splitlines()) == 3
+
+
+def test_a_complete_line_that_is_not_a_log_line_stops_the_run(
+    plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    """Damage inside the log is not an interrupted append: nothing is repaired or appended."""
+    log = log_of(plan, tmp_path)
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 14))
+    assert result is not None
+    log.extend(entries_of(result)[:2], git_commit=COMMIT, logged_at=AT)
+    for damage in ("not json\n", '{"entry": {"session_date": "2026-09-11"}}\n', "[1]\n"):
+        before = log.path.read_text()
+        log.path.write_text(before + damage)
+        with pytest.raises(PaperPlanBroken, match="edited or damaged"):
+            log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
+        assert log.path.read_text() == before + damage
+        log.path.write_text(before)
+
+
+@pytest.mark.parametrize("blank", ["\n", "\n\n\n"])
+def test_a_log_of_blank_lines_gets_its_header_before_its_first_session(
+    blank: str, plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    """Saved empty by an editor: a line break and no line. The header is not skipped."""
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 14))
+    assert result is not None
+    log = log_of(plan, tmp_path)
+    log.path.write_text(blank)
+
+    assert log.entries() == []
+    appended = log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
+
+    assert len(appended) == 4
+    assert json.loads(log.path.read_text().splitlines()[0])["contract_id"] == plan.contract_id
+    assert log.entries() == appended
+
+
+def test_a_complete_line_of_bytes_that_are_not_text_stops_the_run(
+    plan: PaperPlan, plan_runner: StrategyRunner, tmp_path: Path
+) -> None:
+    result = run_plan(plan, plan_runner, STRATEGY, EverySession(), date(2026, 9, 14))
+    assert result is not None
+    log = log_of(plan, tmp_path)
+    log.extend(entries_of(result), git_commit=COMMIT, logged_at=AT)
+    with log.path.open("ab") as stream:
+        stream.write(b"\xff\xfe not utf-8\n")
+    with pytest.raises(PaperPlanBroken, match="edited or damaged"):
+        log.entries()

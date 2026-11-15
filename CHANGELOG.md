@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+### Paper run: the store can take a reviewed decision, and a waiting session says why (2026-11-15)
+- **The paper store keeps the metadata it was seeded with.**
+  `paper_update_store.py` applied the study store's rule, which refuses any
+  difference from the repository's registry: an instrument added for another
+  study would have stopped the daily update, and a reviewed decision could
+  not be recorded short of deleting the manifest by hand. A difference is now
+  reported and does not reach the store. `--adopt-metadata REASON` replaces
+  the store's metadata by the committed one, from a clean checkout, and
+  appends what changed, why and the commit to the store's
+  `metadata_changes.jsonl`. Metadata edited in place is still refused. Line
+  endings are not a difference (the study's store was built under Windows).
+- **A session held back names the series it waits for**
+  (`paper.series_short_of`, `paper.session_held_back`, printed by
+  `paper_trade.py`). The completeness check is unchanged, and is now
+  described as what it is: a series is shown whole by an observation stored
+  at or after its publication bound, and where that bound is a day without
+  one (the Sunday, for a rate released the next session; a publisher's
+  holiday) the session is logged with the next observation, a day or so
+  late. The check was not loosened: a day without a value cannot be told
+  from a value a provider serves late, and a session logged before a value
+  its decision could read would break the plan.
+- **After a second review**, before the merge: `paper_trade.py` refuses a
+  store whose metadata is not the one it recorded, as the update does; an
+  adoption sets the old folder aside and puts it back if it was interrupted,
+  so its record never describes a change that was not made; only files git
+  tracks are adopted; a log holding blank lines gets its header; a fragment
+  committed with a log does not make its repair an edit; a log git cannot be
+  asked about stops the run instead of passing for a new one; the log is read
+  once per check, and bytes that are not text are reported as damage.
+- No plan, contract or start date changes.
+
+### Paper recorder: four guards tightened after review (2026-11-15)
+- **A committed log may only grow.** `paper_trade.code_state` let any changed
+  `research/paper/*.jsonl` through, so a log deleted or shortened would have
+  been written again from today's store. Only a log not committed yet, or
+  one whose committed bytes are still the beginning of the file, is let
+  through now.
+- **An interrupted append no longer blocks the run.** A run's lines are
+  written in one call and synced to disk. What follows the last line break is
+  ignored on reading and removed by the next append, which logs that session
+  whole. A complete line that cannot be read stops the run with
+  `PaperPlanBroken`.
+- **An empty log file** is a log with no session, not an `IndexError`.
+- **`advance` checks the contract on every call**, including a day when no
+  session is ready, and no longer reports a started plan as "starts on" when
+  it has no commit to log with (a state a clean checkout cannot be in).
+- No plan, contract or start date changes.
+
 ### A second case study (2026-11-15)
 - `docs/CASE_STUDY_NASDAQ.md`: the three frozen tests on 1975-01 to 2018-07
   (SA16's rule, its levered variant, SA18's trend filter), their written

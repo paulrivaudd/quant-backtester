@@ -36,6 +36,14 @@ the plan has a close of that session, and the paper store
 that instant. A series the pipeline refuses, or a provider that is down,
 holds the log back; it does not put a hole in it.
 
+The store shows that a series is whole by holding an observation at or after
+that point. Where the point falls on a day without one - the Sunday, for the
+US 10-year rate on a Monday evening; a US holiday, for the VIX - the proof
+comes with the next observation, and the session is logged a day or so
+later: a day without a value cannot be told from a value a provider serves
+late. `paper_trade.py` prints which series a session waits for
+(`session ... is held back: ...`). Nothing has to be done about it.
+
 ## What stops the run, on purpose
 
 - **Uncommitted code** (the logs themselves apart).
