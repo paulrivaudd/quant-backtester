@@ -28,7 +28,8 @@ def reviewed() -> dict[str, bytes]:
     source = paper_update_store.REVIEWED
     files = {
         path.relative_to(source).as_posix(): path.read_bytes()
-        for path in sorted(source.rglob("*.toml"))
+        for path in sorted(source.rglob("*"))
+        if path.is_file()
     }
     files["instruments.toml"] = combined_registry().encode("utf-8")
     return files
@@ -197,8 +198,11 @@ def test_the_reviewed_metadata_is_what_git_tracks_with_the_stores_registry(
         "known_gaps.toml": b"x = 1\n",
         "instruments.toml": b"registry",
     }
+    # Git does not look above the ceiling from a folder below it.
+    outside = tmp_path / "outside"
+    outside.mkdir()
     with pytest.raises(subprocess.CalledProcessError):
-        paper_update_store.reviewed_metadata(tmp_path, "registry")
+        paper_update_store.reviewed_metadata(outside, "registry")
 
 
 def store_like(root: Path) -> Path:

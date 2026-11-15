@@ -21,8 +21,12 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from quant_backtester.data.sources.ken_french import KenFrenchDataset, MonthlyReturns
-from quant_backtester.research.sa17_mechanism import replay_monthly_returns
+from quant_backtester.data.sources.ken_french import (
+    KenFrenchDataset,
+    KenFrenchSource,
+    MonthlyReturns,
+    normalize_monthly_returns,
+)
 
 
 def record_month(value: str) -> date:
@@ -43,18 +47,9 @@ def record_month(value: str) -> date:
     ValueError
         If ``value`` is not six digits naming a month.
     """
-    if len(value) != 6 or not value.isdigit():
+    if len(value) != 6 or not (value.isascii() and value.isdigit()):
         raise ValueError(f"a record month is written YYYYMM, got {value!r}")
     return date(int(value[:4]), int(value[4:]), 1)
-
-
-def _recorded_file(
-    archive: Path, recorded: Mapping[str, Mapping[str, Any]], name: str
-) -> tuple[bytes, Mapping[str, Any]]:
-    """Return an archived file's bytes and its coverage record, unchecked."""
-    if name not in recorded:
-        raise ValueError(f"{name}: the coverage records do not name this file")
-    return (archive / name).read_bytes(), recorded[name]
 
 
 def checked_bytes(archive: Path, recorded: Mapping[str, Mapping[str, Any]], name: str) -> bytes:
@@ -83,9 +78,11 @@ def checked_bytes(archive: Path, recorded: Mapping[str, Mapping[str, Any]], name
     FileNotFoundError
         If the archive does not hold the file.
     """
-    payload, entry = _recorded_file(archive, recorded, name)
+    if name not in recorded:
+        raise ValueError(f"{name}: the coverage records do not name this file")
+    payload = (archive / name).read_bytes()
     digest = hashlib.sha256(payload).hexdigest()
-    if digest != entry["sha256"]:
+    if digest != recorded[name]["sha256"]:
         raise ValueError(f"{name}: archived bytes hash to {digest}, not to the record")
     return payload
 
@@ -113,18 +110,25 @@ def replay_french(
     Raises
     ------
     ValueError
-        If the coverage records do not name the file, or its bytes are not
-        the recorded ones. The bytes are hashed once, by
-        :func:`~quant_backtester.research.sa17_mechanism.replay_monthly_returns`.
+        As :func:`checked_bytes`, before anything else of the record is read;
+        then if the record's months are not written ``YYYYMM`` or its
+        retrieval instant carries no timezone.
     FileNotFoundError
         If the archive does not hold the file.
+    ProviderResponseError
+        If the adapter refuses the file or the range.
+
+    Notes
+    -----
+    The bytes are hashed once, by :func:`checked_bytes`, and then parsed by
+    the same adapter that downloaded them, as if just served.
     """
-    payload, entry = _recorded_file(archive, recorded, f"{dataset.value}.zip")
-    return replay_monthly_returns(
-        payload,
-        dataset,
-        sha256=entry["sha256"],
-        retrieved_at_utc=datetime.fromisoformat(entry["retrieved_at_utc"]),
-        start=record_month(entry["first_month"]),
-        end=record_month(entry["last_month"]),
-    )
+    name = f"{dataset.value}.zip"
+    payload = checked_bytes(archive, recorded, name)
+    entry = recorded[name]
+    retrieved_at_utc = datetime.fromisoformat(entry["retrieved_at_utc"])
+    if retrieved_at_utc.tzinfo is None:
+        raise ValueError(f"{name}: the recorded retrieval instant carries no timezone")
+    start, end = record_month(entry["first_month"]), record_month(entry["last_month"])
+    source = KenFrenchSource(clock=lambda: retrieved_at_utc, fetch_bytes=lambda _url: payload)
+    return normalize_monthly_returns(source.download(dataset, start, end))
