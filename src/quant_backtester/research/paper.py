@@ -27,8 +27,12 @@ backtest:
   The log keeps what was done at the time, and the run stops until someone
   looks;
 - **a session logged before it happened.** A session is logged once its
-  decision instant has passed and every instrument the plan trades has a close
-  of that session (D24);
+  decision instant has passed, every instrument the plan trades has a close
+  of that session (D24), and the store can be shown to hold every series up
+  to what was published at that instant. The proof is an observation stored
+  at or after that point, so a session followed by a day without one - a
+  weekend for a rate released the next day, a publisher's holiday - is logged
+  a day or so late rather than on a guess (:func:`series_short_of`);
 - **two writers.** Reading the log, checking it and appending to it hold an
   exclusive lock on it, and a session already logged identically is simply
   already done: running twice changes nothing (D22);
@@ -45,7 +49,7 @@ import hashlib
 import json
 import os
 import tomllib
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -305,6 +309,69 @@ def last_ready_session(
     return None
 
 
+def series_short_of(
+    instruments: Sequence[str],
+    published_until: Callable[[str, datetime], date],
+    stored_until: Callable[[str], date | None],
+    decided_at: datetime,
+) -> dict[str, tuple[date | None, date]]:
+    """Return the series a store cannot show to be whole at a decision instant.
+
+    Parameters
+    ----------
+    instruments : Sequence[str]
+        Every series the plans read, traded or not.
+    published_until : Callable[[str, datetime], date]
+        For an instrument and an instant, the latest date an observation
+        published at it can carry
+        (:meth:`~quant_backtester.data.updater.MarketDataUpdater.published_until`).
+    stored_until : Callable[[str], date | None]
+        The latest observation date the store holds for an instrument.
+    decided_at : datetime
+        Timezone-aware decision instant of the session.
+
+    Returns
+    -------
+    dict[str, tuple[date | None, date]]
+        For each series stored short of that date: where it stops in the
+        store (``None`` if it is empty) and the date it has to reach. Empty
+        when nothing is waited for.
+
+    Notes
+    -----
+    The date a series has to reach need not carry an observation. A rate
+    released the next business day has, on a Monday evening, a bound of
+    Sunday; an index has no value on its publisher's holiday. The store then
+    stops on the last real observation, short of the bound, and nothing here
+    can tell a day that has no observation from one a provider serves late -
+    and a provider does serve late. So the series is counted as waited for,
+    and stops being so when a later observation is stored. The session is
+    logged a day or so after it could have been; it is never logged before a
+    value its decision could read.
+    """
+    short: dict[str, tuple[date | None, date]] = {}
+    for name in instruments:
+        last, needed = stored_until(name), published_until(name, decided_at)
+        if last is None or last < needed:
+            short[name] = (last, needed)
+    return short
+
+
+def _decided_sessions(
+    calendar: TradingCalendar, timetable: BacktestTimetable, now: datetime, not_before: date
+) -> Iterator[tuple[date, datetime]]:
+    """Yield, latest first, each session since ``not_before`` whose decision instant has passed."""
+    if now.tzinfo is None:
+        raise ValueError(f"now must be timezone-aware, got {now!r}")
+    today = now.astimezone(UTC).date()
+    session = calendar.session(today) or calendar.previous_session(today)
+    while session is not None and session.session_date >= not_before:
+        decided_at = timetable.decision_instant(session.session_date)
+        if decided_at <= now:
+            yield session.session_date, decided_at
+        session = calendar.previous_session(session.session_date)
+
+
 def last_complete_session(
     calendar: TradingCalendar,
     timetable: BacktestTimetable,
@@ -321,7 +388,7 @@ def last_complete_session(
     held everything its decision could read - a US close, a rate released the
     next morning - would come out differently the day that value arrives. So
     a session is logged only once nothing published at its decision instant
-    is still missing.
+    can still be missing.
 
     Parameters
     ----------
@@ -332,8 +399,8 @@ def last_complete_session(
     instruments : Sequence[str]
         Every series the plans read, traded or not.
     published_until : Callable[[str, datetime], date]
-        For an instrument and an instant, the latest observation date
-        entirely published at it, on the instrument's own calendar and
+        For an instrument and an instant, the latest date an observation
+        published at it can carry, on the instrument's own calendar and
         publication rule
         (:meth:`~quant_backtester.data.updater.MarketDataUpdater.published_until`).
     stored_until : Callable[[str], date | None]
@@ -347,28 +414,51 @@ def last_complete_session(
     -------
     date | None
         The latest session, no earlier than ``not_before``, whose decision
-        instant has passed and for which every instrument is stored up to
-        what was published at that instant; ``None`` if there is none.
+        instant has passed and for which :func:`series_short_of` is empty;
+        ``None`` if there is none.
 
     Notes
     -----
+    The proof that a series is whole is an observation stored at or after its
+    bound. Where the bound falls on a day without an observation, that proof
+    arrives with the next observation: see :func:`series_short_of`. The
+    session waits; it is not skipped, and :func:`session_held_back` names
+    what it waits for.
+
     The end of each series is compared, not its inside: a bar a provider
     skipped and serves later is not seen here. It is caught where it matters,
     by the log, which refuses a logged session that comes out differently.
     """
-    if now.tzinfo is None:
-        raise ValueError(f"now must be timezone-aware, got {now!r}")
     stored = {name: stored_until(name) for name in instruments}
-    today = now.astimezone(UTC).date()
-    session = calendar.session(today) or calendar.previous_session(today)
-    while session is not None and session.session_date >= not_before:
-        decided_at = timetable.decision_instant(session.session_date)
-        if decided_at <= now and all(
-            last is not None and last >= published_until(name, decided_at)
-            for name, last in stored.items()
-        ):
-            return session.session_date
-        session = calendar.previous_session(session.session_date)
+    for session_date, decided_at in _decided_sessions(calendar, timetable, now, not_before):
+        if not series_short_of(instruments, published_until, stored.__getitem__, decided_at):
+            return session_date
+    return None
+
+
+def session_held_back(
+    calendar: TradingCalendar,
+    timetable: BacktestTimetable,
+    instruments: Sequence[str],
+    published_until: Callable[[str, datetime], date],
+    stored_until: Callable[[str], date | None],
+    now: datetime,
+    not_before: date,
+) -> tuple[date, dict[str, tuple[date | None, date]]] | None:
+    """Return the latest decided session and the series it waits for, if it waits.
+
+    Parameters are those of :func:`last_complete_session`.
+
+    Returns
+    -------
+    tuple[date, dict[str, tuple[date | None, date]]] | None
+        The latest session, no earlier than ``not_before``, whose decision
+        instant has passed, with :func:`series_short_of` at that instant;
+        ``None`` if that session is complete or there is no such session.
+    """
+    for session_date, decided_at in _decided_sessions(calendar, timetable, now, not_before):
+        short = series_short_of(instruments, published_until, stored_until, decided_at)
+        return (session_date, short) if short else None
     return None
 
 

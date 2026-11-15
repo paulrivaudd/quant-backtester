@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Paper run: the store can take a reviewed decision, and a waiting session says why (2026-11-15)
+- **The paper store keeps the metadata it was seeded with.**
+  `paper_update_store.py` applied the study store's rule, which refuses any
+  difference from the repository's registry: an instrument added for another
+  study would have stopped the daily update, and a reviewed decision could
+  not be recorded short of deleting the manifest by hand. A difference is now
+  reported and does not reach the store. `--adopt-metadata REASON` replaces
+  the store's metadata by the committed one, from a clean checkout, and
+  appends what changed, why and the commit to the store's
+  `metadata_changes.jsonl`. Metadata edited in place is still refused. Line
+  endings are not a difference (the study's store was built under Windows).
+- **A session held back names the series it waits for**
+  (`paper.series_short_of`, `paper.session_held_back`, printed by
+  `paper_trade.py`). The completeness check is unchanged, and is now
+  described as what it is: a series is shown whole by an observation stored
+  at or after its publication bound, and where that bound is a day without
+  one (the Sunday, for a rate released the next session; a publisher's
+  holiday) the session is logged with the next observation, a day or so
+  late. The check was not loosened: a day without a value cannot be told
+  from a value a provider serves late, and a session logged before a value
+  its decision could read would break the plan.
+- No plan, contract or start date changes.
+
 ### Paper recorder: four guards tightened after review (2026-11-15)
 - **A committed log may only grow.** `paper_trade.code_state` let any changed
   `research/paper/*.jsonl` through, so a log deleted or shortened would have

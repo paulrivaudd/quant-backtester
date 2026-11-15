@@ -241,3 +241,14 @@ def test_the_contract_is_checked_on_a_day_no_session_is_ready(
         paper_trade.advance(
             plan, log, research_runner, STRATEGY, Weekly(), date(2026, 9, 14), first_evening
         )
+
+
+def test_the_series_a_session_waits_for_are_said_with_what_they_have_to_reach() -> None:
+    line = paper_trade.waiting_line(
+        date(2026, 11, 16),
+        {"US10Y": (date(2026, 11, 13), date(2026, 11, 15)), "VIX": (None, date(2026, 11, 16))},
+    )
+    assert line == (
+        "session 2026-11-16 is held back: US10Y stored to 2026-11-13, waits for 2026-11-15 "
+        "or later; VIX stored to nothing, waits for 2026-11-16 or later"
+    )

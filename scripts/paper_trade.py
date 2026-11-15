@@ -17,7 +17,10 @@ contract is checked.
 A session is ready when its decision instant has passed, every fund of the
 plan has a close of that session, and the store holds every series up to what
 was published at that instant - so that nothing arriving later can change
-what the plan decided on it.
+what the plan decided on it. The store shows it by holding an observation at
+or after that point: after a day without one (a weekend for a rate released
+the next day, a publisher's holiday) a session waits for the next observation
+and is logged a day or so late. The script names the series it waits for.
 
 Uncommitted code, a run under another contract, or a logged past that comes
 out differently stops the script: see ``research/PROTOCOL.md``. The logs
@@ -34,7 +37,7 @@ import argparse
 import json
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -66,6 +69,7 @@ from quant_backtester.research.paper import (  # noqa: E402
     last_complete_session,
     last_ready_session,
     run_plan,
+    session_held_back,
 )
 from quant_backtester.research.references import BuyAndHold  # noqa: E402
 from quant_backtester.strategies.base import Strategy  # noqa: E402
@@ -147,10 +151,16 @@ def _only_appended(root: Path, log: Path) -> bool:
 
 
 def complete_until(runner: StrategyRunner, store: Path, now: datetime, not_before: date) -> date:
-    """Return the last session the store is complete for, refusing a store that has none."""
+    """Return the last session the store is complete for, saying what a later one waits for.
+
+    Raises
+    ------
+    SystemExit
+        If no session since ``not_before`` is complete in the store.
+    """
     updater = build_updater(store, STUDY_END, clock=lambda: now)
     repository = MarketDataRepository(store)
-    complete = last_complete_session(
+    arguments = (
         runner.calendars.get(runner.reference_calendar_id),
         runner.timetable,
         INSTRUMENT_IDS,
@@ -159,11 +169,30 @@ def complete_until(runner: StrategyRunner, store: Path, now: datetime, not_befor
         now,
         not_before,
     )
+    held_back = session_held_back(*arguments)
+    if held_back is not None:
+        print(waiting_line(*held_back), flush=True)
+    complete = last_complete_session(*arguments)
     if complete is None:
         raise SystemExit(
-            f"no session since {not_before} is complete in {store}: update the store first"
+            f"no session since {not_before} is complete in {store}: update the store, or "
+            "wait for the series named above"
         )
     return complete
+
+
+def waiting_line(session: date, short: Mapping[str, tuple[date | None, date]]) -> str:
+    """Say which series hold a decided session back, and what each has to reach.
+
+    A series is waited for until the store holds an observation of it at or
+    after the date given, which may be a day or so after the store is in fact
+    whole: see :func:`quant_backtester.research.paper.series_short_of`.
+    """
+    series = "; ".join(
+        f"{name} stored to {last if last is not None else 'nothing'}, waits for {needed} or later"
+        for name, (last, needed) in short.items()
+    )
+    return f"session {session} is held back: {series}"
 
 
 def advance(

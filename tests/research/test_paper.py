@@ -29,6 +29,8 @@ from quant_backtester.research.paper import (
     last_complete_session,
     last_ready_session,
     run_plan,
+    series_short_of,
+    session_held_back,
 )
 from quant_backtester.research.references import BuyAndHold
 
@@ -321,6 +323,80 @@ def test_a_series_that_lags_holds_every_plan_back(xpar: TradingCalendar) -> None
     assert complete_at(xpar, {"FUND": monday, "RATE": thursday}, late) == friday
     # The fund stopped on Friday.
     assert complete_at(xpar, {"FUND": friday, "RATE": friday}, late) == friday
+
+
+def bound_on_a_day_without_an_observation(
+    xpar: TradingCalendar, stored: Mapping[str, date | None], now: datetime
+) -> tuple[date | None, tuple[date, dict[str, tuple[date | None, date]]] | None]:
+    """Return what is complete and held back with a rate whose Monday bound is the Sunday."""
+    timetable = BacktestTimetable(
+        decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)
+    )
+
+    def published_until(name: str, at: datetime) -> date:
+        day = at.astimezone(PARIS).date()
+        return day if name == "FUND" else day - timedelta(days=1)
+
+    arguments = (
+        xpar, timetable, list(stored), published_until, stored.__getitem__, now, date(2026, 9, 1)
+    )  # fmt: skip
+    return last_complete_session(*arguments), session_held_back(*arguments)
+
+
+def test_a_bound_without_an_observation_waits_for_the_next_one(xpar: TradingCalendar) -> None:
+    """Friday's rate is all there is on Monday evening, and the store cannot show it."""
+    friday, sunday, monday = date(2026, 9, 11), date(2026, 9, 13), date(2026, 9, 14)
+    tuesday_morning = datetime(2026, 9, 15, 8, 0, tzinfo=PARIS)
+    complete, held_back = bound_on_a_day_without_an_observation(
+        xpar, {"FUND": monday, "RATE": friday}, tuesday_morning
+    )
+    # Not logged on a guess: a rate served late looks the same from here.
+    assert complete == friday
+    assert held_back == (monday, {"RATE": (friday, sunday)})
+    # Monday's rate arrives: it is past the bound, and the session is complete.
+    complete, held_back = bound_on_a_day_without_an_observation(
+        xpar, {"FUND": monday, "RATE": monday}, tuesday_morning
+    )
+    assert (complete, held_back) == (monday, None)
+
+
+def test_the_series_short_of_a_decision_are_named_with_what_they_have_to_reach() -> None:
+    at = datetime(2026, 9, 14, 23, 0, tzinfo=PARIS)
+    stored: dict[str, date | None] = {
+        "WHOLE": date(2026, 9, 14),
+        "AHEAD": date(2026, 9, 15),
+        "SHORT": date(2026, 9, 11),
+        "EMPTY": None,
+    }
+    short = series_short_of(
+        list(stored), lambda _name, instant: instant.date(), stored.__getitem__, at
+    )
+    assert short == {
+        "SHORT": (date(2026, 9, 11), date(2026, 9, 14)),
+        "EMPTY": (None, date(2026, 9, 14)),
+    }
+    assert series_short_of([], lambda _name, instant: instant.date(), stored.__getitem__, at) == {}
+
+
+def test_nothing_is_held_back_before_any_decision_or_with_a_naive_clock(
+    xpar: TradingCalendar,
+) -> None:
+    stored: dict[str, date | None] = {"FUND": None, "RATE": None}
+    timetable = BacktestTimetable(
+        decision_time=time(23, 0), execution_time=time(9, 1), valuation_time=time(23, 0)
+    )
+
+    def held_back(now: datetime) -> object:
+        return session_held_back(
+            xpar, timetable, list(stored), lambda _n, at: at.date(), stored.__getitem__, now,
+            date(2026, 9, 14),
+        )  # fmt: skip
+
+    # Monday 14 September is the first session of interest and has not been decided.
+    assert held_back(datetime(2026, 9, 14, 22, 0, tzinfo=PARIS)) is None
+    assert held_back(datetime(2026, 9, 14, 23, 0, tzinfo=PARIS)) is not None
+    with pytest.raises(ValueError, match="timezone-aware"):
+        held_back(datetime(2026, 9, 14, 23, 0))
 
 
 def test_a_session_is_not_complete_before_its_decision_instant(xpar: TradingCalendar) -> None:
